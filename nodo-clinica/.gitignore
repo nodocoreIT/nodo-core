@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+dist-ssr/
+*.tsbuildinfo
+
+# Environment variables — NEVER commit these
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Logs
+*.log
+
+# Vercel
+.vercel/
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/

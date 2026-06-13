@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs rg -l \"kanban|drag|dnd|draggable\")",
+      "Bash(mkdir -p /Users/ramirotule/Documents/1.Proyectos/nodocore/nodo-core/app/panel/unidades/\\\\[slug\\\\])",
+      "Bash(npx --prefix /Users/ramirotule/Documents/1.Proyectos/nodocore/nodo-inmo tsc --noEmit --project /Users/ramirotule/Documents/1.Proyectos/nodocore/nodo-inmo/tsconfig.json)"
+    ],
+    "additionalDirectories": [
+      "/Users/ramirotule/Documents/1.Proyectos/nodocore/nodo-core/app/panel/unidades",
+      "/Users/ramirotule/Documents/1.Proyectos/nodocore/nodo-inmo/src/portals/admin/components",
+      "/Users/ramirotule/Documents/1.Proyectos/nodocore/nodo-inmo/src/features/auth/login"
+    ]
+  }
+}

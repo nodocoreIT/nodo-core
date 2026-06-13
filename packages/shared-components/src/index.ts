@@ -1,0 +1,101 @@
+// ─── Lib ─────────────────────────────────────────────────────────────────────
+export { cn } from "./lib/utils";
+
+// ─── Providers ───────────────────────────────────────────────────────────────
+export { SupabaseProvider, useSupabase } from "./providers/supabase-provider";
+export {
+  AuthProvider,
+  useAuth,
+  type AuthConfig,
+  type AuthContextValue,
+} from "./providers/auth-provider";
+
+// ─── Components ──────────────────────────────────────────────────────────────
+export { BrandMark, type BrandMarkProps } from "./components/brand-mark";
+export { SearchInput, type SearchInputProps } from "./components/search-input";
+export { PlanGate, type PlanTier } from "./components/plan-gate";
+export { RequireAuth } from "./components/require-auth";
+
+// ─── UI primitives ───────────────────────────────────────────────────────────
+export { Button, buttonVariants, type ButtonProps } from "./components/ui/button";
+export { Input, type InputProps } from "./components/ui/input";
+export { Label } from "./components/ui/label";
+export {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "./components/ui/card";
+export {
+  Table,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableCaption,
+} from "./components/ui/table";
+export {
+  Select,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectLabel,
+  SelectItem,
+  SelectSeparator,
+  SelectScrollUpButton,
+  SelectScrollDownButton,
+} from "./components/ui/select";
+export { Textarea } from "./components/ui/textarea";
+export {
+  Dialog,
+  DialogPortal,
+  DialogOverlay,
+  DialogTrigger,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "./components/ui/dialog";
+export {
+  AlertDialog,
+  AlertDialogPortal,
+  AlertDialogOverlay,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "./components/ui/alert-dialog";
+export {
+  useFormField,
+  Form,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormDescription,
+  FormMessage,
+  FormField,
+} from "./components/ui/form";
+export { PaginationControls } from "./components/ui/pagination";
+export { Combobox } from "./components/ui/combobox";
+
+// ─── Hooks ───────────────────────────────────────────────────────────────────
+export {
+  useThemeSettings,
+  useThemeStore,
+  configureThemeDefaults,
+  DEFAULT_SETTINGS,
+  type ThemeSettings,
+} from "./hooks/use-theme-settings";
+export { useUIStore } from "./hooks/use-ui-store";
+export { useSearchStore } from "./hooks/use-search-store";

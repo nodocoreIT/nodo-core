@@ -1,0 +1,135 @@
+/**
+ * AuthProvider + useAuth hook
+ *
+ * Wraps the app, subscribes to supabase.auth.onAuthStateChange,
+ * and loads the initial session via supabase.auth.getSession().
+ *
+ * Role and orgId are read from session.user.app_metadata — NEVER
+ * from user_metadata, which is user-editable and unsafe for authorization.
+ *
+ * Security note: Role-based routing in this app is a UX convenience only.
+ * The actual security boundary is Postgres Row-Level Security (RLS) enforced
+ * server-side. The frontend cannot be trusted as a security layer.
+ */
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import type { Session, User } from "@supabase/supabase-js";
+import { supabase } from "@/shared/lib/supabase";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type AppRole = "admin" | "agent" | "owner" | "tenant";
+export type PlanTier = "starter" | "pro";
+
+export interface AuthContextValue {
+  session: Session | null;
+  user: User | null;
+  /** Read from app_metadata — null when claim-sync hasn't run yet */
+  role: AppRole | null;
+  /** Read from app_metadata — null when claim-sync hasn't run yet */
+  orgId: string | null;
+  /** Read from app_metadata — null when not yet set by NodoCore provisioning */
+  plan: PlanTier | null;
+  loading: boolean;
+  signInWithPassword: (credentials: {
+    email: string;
+    password: string;
+  }) => ReturnType<typeof supabase.auth.signInWithPassword>;
+  signOut: () => ReturnType<typeof supabase.auth.signOut>;
+}
+
+// ── Context ───────────────────────────────────────────────────────────────────
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+/**
+ * Read org_id + role from the ACCESS TOKEN claims, not from session.user.app_metadata.
+ *
+ * The Custom Access Token Hook injects org_id/role into the JWT claims at mint
+ * time. supabase-js populates `session.user.app_metadata` from the stored user
+ * record (which only has provider/providers) — NOT from the hook-injected claims.
+ * So the authorization signal lives in the decoded access_token, not on user.
+ */
+function readClaims(session: Session | null): {
+  role: AppRole | null;
+  orgId: string | null;
+  plan: PlanTier | null;
+} {
+  const token = session?.access_token;
+  if (!token) return { role: null, orgId: null, plan: null };
+  try {
+    const payloadB64 = token.split(".")[1];
+    const json = atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"));
+    const payload = JSON.parse(json) as {
+      app_metadata?: { role?: AppRole; org_id?: string; plan?: PlanTier };
+    };
+    return {
+      role: payload.app_metadata?.role ?? null,
+      orgId: payload.app_metadata?.org_id ?? null,
+      plan: payload.app_metadata?.plan ?? null,
+    };
+  } catch {
+    return { role: null, orgId: null, plan: null };
+  }
+}
+
+// ── Provider ──────────────────────────────────────────────────────────────────
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Load initial session; sets loading=false regardless of outcome.
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setLoading(false);
+    });
+
+    // Subscribe to auth state changes (sign-in, sign-out, token refresh).
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const signInWithPassword = useCallback(
+    (credentials: { email: string; password: string }) =>
+      supabase.auth.signInWithPassword(credentials),
+    [],
+  );
+
+  const signOut = useCallback(() => supabase.auth.signOut(), []);
+
+  const user = session?.user ?? null;
+  const { role, orgId, plan } = readClaims(session);
+
+  return (
+    <AuthContext.Provider
+      value={{ session, user, role, orgId, plan, loading, signInWithPassword, signOut }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useAuth must be used inside <AuthProvider>");
+  }
+  return ctx;
+}

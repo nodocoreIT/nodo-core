@@ -1,0 +1,171 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* Colors */
+  --color-navy: #1B2A41;
+  --color-navy-700: #233650;
+  --color-navy-900: #121E2F;
+  --color-brand: #DA5A0E;
+  --color-brand-600: #C04E0B;
+  --color-brand-300: #F0A877;
+  --color-paper: #F5F8FC;
+  --color-slate2: #647890;
+  --color-slate2-300: #9DACBE;
+  --color-mist: #DEE7F1;
+  --color-mist-200: #EBF1F7;
+  --color-ink: #16202E;
+  --color-footer: #0D1722;
+
+  /* Fonts */
+  --font-display: var(--font-sora), system-ui, sans-serif;
+  --font-sans: var(--font-hanken), system-ui, sans-serif;
+
+  /* Border radius */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-xl: 32px;
+  --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(18,30,47,.06), 0 2px 6px rgba(18,30,47,.05);
+  --shadow-md: 0 8px 24px rgba(18,30,47,.08), 0 2px 6px rgba(18,30,47,.04);
+  --shadow-lg: 0 24px 60px rgba(18,30,47,.16), 0 8px 20px rgba(18,30,47,.08);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Ghost-light link: transparent bg, rgba border that turns white on hover */
+.btn-ghost-light {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  transition: border-color 150ms, background-color 150ms;
+}
+.btn-ghost-light:hover {
+  border-color: white;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Unidades responsive grid */
+@media (max-width: 820px) {
+  .unidad-row {
+    grid-template-columns: 40px 1fr !important;
+  }
+  .unidad-row .unidad-arrow {
+    display: none;
+  }
+  .unidad-row .unidad-desc {
+    grid-column: 2;
+  }
+  .filosofia-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .benefits-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .contacto-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .footer-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 860px) {
+  .nav-links {
+    display: none !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .nav-access-btn {
+    display: none !important;
+  }
+}
+
+/* Login split layout */
+@media (min-width: 881px) {
+  .login-split {
+    grid-template-columns: 1.05fr 0.95fr;
+  }
+  .login-brand-panel {
+    display: flex !important;
+  }
+}
+@media (max-width: 880px) {
+  .login-brand-panel {
+    display: none !important;
+  }
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  line-height: 1.55;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+/* Panel responsive */
+@media (max-width: 920px) {
+  .panel-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .panel-sidebar {
+    display: none !important;
+  }
+}
+@media (max-width: 1180px) {
+  .kanban-board {
+    grid-template-columns: repeat(2, minmax(240px, 1fr)) !important;
+  }
+}
+@media (max-width: 1080px) {
+  .panel-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Ecosystem core "heartbeat" — animates the orange halo behind the Core node */
+.ecosystem-core-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ecosystemCorePulse 2.6s ease-in-out infinite;
+}
+@keyframes ecosystemCorePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.1;
+  }
+  12% {
+    transform: scale(1.22);
+    opacity: 0.28;
+  }
+  24% {
+    transform: scale(1.04);
+    opacity: 0.15;
+  }
+  36% {
+    transform: scale(1.14);
+    opacity: 0.22;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ecosystem-core-pulse {
+    animation: none;
+  }
+}

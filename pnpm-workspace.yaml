@@ -1,0 +1,4 @@
+packages:
+  - 'packages/*'
+  - 'nodo-inmo'
+  - 'nodo-clinica'

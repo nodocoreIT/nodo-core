@@ -1,0 +1,99 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/shared/lib/supabase";
+import { PAYMENTS_QUERY_KEY } from "./use-payments";
+import { OWNER_SETTLEMENTS_QUERY_KEY } from "@/features/caja/hooks/use-owner-settlements";
+import { CASH_MOVEMENTS_QUERY_KEY } from "@/features/caja/hooks/use-cash-movements";
+
+/** Hard-delete multiple unpaid installments. */
+export function useDeletePayments() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (paymentIds: string[]) => {
+      if (paymentIds.length === 0) return;
+      const { error } = await supabase
+        .schema("nodo_inmo")
+        .from("payments")
+        .delete()
+        .in("id", paymentIds);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PAYMENTS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: OWNER_SETTLEMENTS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: CASH_MOVEMENTS_QUERY_KEY });
+    },
+  });
+}
+
+/** Hard-delete an unpaid installment (no cobro posted yet). */
+export function useDeletePayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (paymentId: string) => {
+      const { error } = await supabase
+        .schema("nodo_inmo")
+        .from("payments")
+        .delete()
+        .eq("id", paymentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PAYMENTS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: OWNER_SETTLEMENTS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: CASH_MOVEMENTS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * Revert a collected installment via annul_payment RPC (cleans caja + rendición + cuota).
+ */
+export function useAnnulPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (paymentId: string) => {
+      const { error } = await supabase
+        .schema("nodo_inmo")
+        .rpc("annul_payment", { p_payment_id: paymentId });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PAYMENTS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: OWNER_SETTLEMENTS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: CASH_MOVEMENTS_QUERY_KEY });
+    },
+  });
+}
+
+/** Tag the auto-posted commission movement with the selected cash account. */
+export async function assignCommissionAccount(
+  paymentId: string,
+  accountLabel: string,
+  accountId?: string,
+) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data, error } = await supabase
+      .schema("nodo_inmo")
+      .from("cash_movements")
+      .update({
+        category: accountLabel,
+        ...(accountId ? { cash_account_id: accountId } : {}),
+      })
+      .eq("payment_id", paymentId)
+      .eq("source", "commission")
+      .select("id");
+
+    if (error) throw error;
+    if (data && data.length > 0) return;
+
+    await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
+  }
+
+  throw new Error("No se pudo asignar la cuenta al movimiento de comisión.");
+}
