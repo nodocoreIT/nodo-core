@@ -1,4 +1,6 @@
 packages:
   - 'packages/*'
+  - 'nodo-core'
   - 'nodo-inmo'
   - 'nodo-clinica'
+  - 'future_nodes/*'
