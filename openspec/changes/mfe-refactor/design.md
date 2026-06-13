@@ -279,21 +279,21 @@ Todo nuevo nodo DEBE cumplir:
 
 | Archivo | Accion | Descripcion |
 |---------|--------|-------------|
-| `pnpm-workspace.yaml` | Modify | Agregar `nodo-core` al workspace |
+| `pnpm-workspace.yaml` | Modify | Agregar `nodo-landing` al workspace |
 | `packages/shared-components/src/providers/auth-provider.tsx` | Modify | Reemplazar `extractMeta` por `readClaims` (JWT decode) |
 | `packages/shared-components/tsup.config.ts` | Create | Configuracion de build con tsup |
 | `packages/shared-components/package.json` | Modify | Agregar script build, actualizar exports a dist/ |
 | `nodo-inmo/src/main.tsx` | Modify | Agregar `basename="/inmo"` al BrowserRouter |
 | `nodo-inmo/src/app/auth/use-auth.tsx` | Delete | Reemplazado por shared-components AuthProvider |
 | `nodo-inmo/src/app/providers.tsx` | Modify | Usar AuthProvider de shared-components |
-| `nodo-core/next.config.ts` | Modify | Agregar rewrites Multi-Zone para `/inmo/**` y assets Vite |
-| `nodo-core/.env.local` | Modify | Agregar `NODO_INMO_URL=http://localhost:5174` |
+| `nodo-landing/next.config.ts` | Modify | Agregar rewrites Multi-Zone para `/inmo/**` y assets Vite |
+| `nodo-landing/.env.local` | Modify | Agregar `NODO_INMO_URL=http://localhost:5174` |
 | `turbo.json` | Modify | dev task con dependsOn ^build, outputs incluyen .next |
 
 **Archivos eliminados del plan original (Module Federation)**:
 - `nodo-inmo/src/bootstrap.tsx` — ya no se necesita entry point MFE separado
 - `nodo-inmo/src/app/router.tsx` — ya no se necesita extraer Routes sin BrowserRouter
-- `nodo-core/app/inmo/[...slug]/page.tsx` — ya no se necesita catch-all page
+- `nodo-landing/app/inmo/[...slug]/page.tsx` — ya no se necesita catch-all page
 
 ## Testing Strategy
 

@@ -7,7 +7,7 @@ Tiempo estimado: **menos de 30 minutos**.
 
 ## Requisitos previos
 
-- Acceso al monorepo `nodocoreIT/nodo-core`
+- Acceso al monorepo `nodocoreIT/nodo-core` (el repo se llama nodo-core en GitHub)
 - pnpm >= 10 instalado
 - Puerto disponible para desarrollo local (ver convención al final)
 
@@ -25,7 +25,7 @@ pnpm create vite nodo-finanzas --template react-ts
 Mover al directorio raíz del monorepo:
 ```
 nodocore/
-├── nodo-core/
+├── nodo-landing/
 ├── nodo-inmo/
 ├── nodo-finanzas/   ← acá
 └── packages/
@@ -39,7 +39,7 @@ Agregar la nueva app al workspace:
 # pnpm-workspace.yaml
 packages:
   - 'packages/*'
-  - 'nodo-core'
+  - 'nodo-landing'
   - 'nodo-inmo'
   - 'nodo-finanzas'   # ← agregar
 ```
@@ -98,9 +98,9 @@ createRoot(document.getElementById("root")!).render(
 );
 ```
 
-### 5. Registrar el rewrite en nodo-core
+### 5. Registrar el rewrite en nodo-landing
 
-En `nodo-core/next.config.ts`, agregar en el array de `rewrites()`:
+En `nodo-landing/next.config.ts`, agregar en el array de `rewrites()`:
 
 ```ts
 const NODO_FINANZAS_URL = process.env.NODO_FINANZAS_URL ?? "http://localhost:5175";
@@ -126,7 +126,7 @@ const NODO_FINANZAS_URL = process.env.NODO_FINANZAS_URL ?? "http://localhost:517
 
 ### 6. Agregar la variable de entorno
 
-En `nodo-core/.env.local`:
+En `nodo-landing/.env.local`:
 ```
 NODO_FINANZAS_URL=http://localhost:5175
 ```
@@ -136,9 +136,9 @@ En Vercel (producción):
 NODO_FINANZAS_URL=https://nodofinanzas.vercel.app
 ```
 
-### 7. Actualizar el login en nodo-core (si el nodo tiene auth)
+### 7. Actualizar el login en nodo-landing (si el nodo tiene auth)
 
-En `nodo-core/app/[nodeSlug]/login/page.tsx`, agregar el caso del nuevo nodo:
+En `nodo-landing/app/[nodeSlug]/login/page.tsx`, agregar el caso del nuevo nodo:
 
 ```tsx
 if (nodeParam === "nodo-finanzas" || nodeParam === "finanzas") {
@@ -165,7 +165,7 @@ export default defineConfig({
 
 | App | Puerto |
 |-----|--------|
-| nodo-core (Next.js) | 3000 |
+| nodo-landing (Next.js) | 3000 |
 | nodo-inmo (Vite) | 5174 |
 | nodo-clinica (Vite) — demo | 5173 |
 | nodo-finanzas (Vite) | 5175 |
@@ -176,7 +176,7 @@ export default defineConfig({
 
 ## Convención de rutas públicas
 
-| Nodo | Ruta en nodo-core | basename del router |
+| Nodo | Ruta en nodo-landing | basename del router |
 |------|-------------------|---------------------|
 | nodo-inmo | `/inmo/*` | `/inmo` |
 | nodo-finanzas | `/finanzas/*` | `/finanzas` |

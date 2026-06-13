@@ -55,7 +55,7 @@ Configurar `@module-federation/nextjs-mf` en nodo-core (host) y `@originjs/vite-
 | `pnpm-workspace.yaml` | Modified | Agregar nodo-core y nodo-inmo |
 | `packages/shared-components/` | Modified | Auth contract → JWT decode |
 | `apps/nodo-inmo/` | Modified | Consumir shared-components, config federation remote |
-| `apps/nodo-core/` | Modified | Config federation host, reemplazar redirect por dynamic import |
+| `apps/nodo-landing/` | Modified | Config federation host, reemplazar redirect por dynamic import |
 | `docs/` o `openspec/` | New | Blueprint para nuevos nodos |
 
 ## Risks

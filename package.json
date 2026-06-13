@@ -2,12 +2,20 @@
   "name": "nodocore",
   "private": true,
   "version": "0.0.0",
+  "packageManager": "pnpm@10.30.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  },
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "dev:landing": "turbo dev --filter=nodo-landing",
+    "dev:inmo": "turbo dev --filter=nodo-inmo",
+    "dev:all": "turbo dev --filter=nodo-landing --filter=nodo-inmo"
   },
   "devDependencies": {
     "turbo": "latest"

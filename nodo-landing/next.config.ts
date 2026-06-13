@@ -7,7 +7,7 @@ const NODO_INMO_URL = process.env.NODO_INMO_URL ?? "http://localhost:5174";
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "192.168.1.37"],
   turbopack: {
-    root: "/Users/ramirotule/Documents/1.Proyectos/nodocore/nodo-core",
+    root: "/Users/ramirotule/Documents/1.Proyectos/nodocore/nodo-landing",
   },
   async rewrites() {
     return [
