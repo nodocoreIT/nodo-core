@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Clock, Plus } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@nodocore/shared-components";
 import {
   Table,
   TableBody,
@@ -8,7 +8,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/shared/components/ui/table";
+} from "@nodocore/shared-components";
 import { formatMoney } from "@/features/contracts/lib/contract-labels";
 import type { MonthCollectionItem } from "../hooks/use-dashboard-metrics";
 import { currentMonthLabel } from "../lib/dashboard-payment-utils";

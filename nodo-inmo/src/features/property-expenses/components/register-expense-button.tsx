@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Receipt } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
-import { useAuth } from "@/app/auth/use-auth";
+import { Button } from "@nodocore/shared-components";
+import { useAuth } from "@nodocore/shared-components";
 import { ExpenseFormDialog } from "./expense-form-dialog";
 
 interface RegisterExpenseButtonProps {

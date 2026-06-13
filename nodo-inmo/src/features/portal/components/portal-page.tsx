@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@nodocore/shared-components";
 import { usePortalProperties, type PortalProperty } from "../hooks/use-portal-properties";
 import { PropertyCard } from "./property-card";
 import { PropertyDetailDialog } from "./property-detail-dialog";

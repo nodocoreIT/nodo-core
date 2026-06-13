@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Share2, Loader2 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@nodocore/shared-components";
 import { supabase } from "@/shared/lib/supabase";
 import type { PropertyRow } from "@/features/properties/hooks/use-properties";
 import {

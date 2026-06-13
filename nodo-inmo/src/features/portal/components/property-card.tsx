@@ -1,5 +1,5 @@
 import { Home } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@nodocore/shared-components";
 import type { PortalProperty } from "../hooks/use-portal-properties";
 import { PropertyAmenityIcons } from "./amenity-icons";
 import {

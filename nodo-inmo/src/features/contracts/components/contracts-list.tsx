@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Plus, Pencil, Trash2, FileText, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
-import { PaginationControls } from "@/shared/components/ui/pagination";
-import { Button } from "@/shared/components/ui/button";
+import { PaginationControls } from "@nodocore/shared-components";
+import { Button } from "@nodocore/shared-components";
 import { useContracts } from "@/features/contracts/hooks/use-contracts";
 import type { ContractWithRelations } from "@/features/contracts/hooks/use-contracts";
 import { useDeleteContract } from "@/features/contracts/hooks/use-delete-contract";
@@ -37,7 +37,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/shared/components/ui/table";
+} from "@nodocore/shared-components";
 import {
   ADJUSTMENT_INDEX_LABELS,
   formatMoney,

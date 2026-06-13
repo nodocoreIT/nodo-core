@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
-import { PaginationControls } from "@/shared/components/ui/pagination";
+import { Button } from "@nodocore/shared-components";
+import { Input } from "@nodocore/shared-components";
+import { PaginationControls } from "@nodocore/shared-components";
 import { PAGE_SIZE } from "@/shared/lib/constants";
 import { useProperties } from "@/features/properties/hooks/use-properties";
 import type { PropertyRow } from "@/features/properties/hooks/use-properties";
@@ -34,14 +34,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/shared/components/ui/table";
+} from "@nodocore/shared-components";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/shared/components/ui/select";
+} from "@nodocore/shared-components";
 import {
   OPERATION_LABELS,
   PROPERTY_TYPE_LABELS,

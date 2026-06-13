@@ -4,9 +4,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
-import { Textarea } from "@/shared/components/ui/textarea";
+import { Button } from "@nodocore/shared-components";
+import { Input } from "@nodocore/shared-components";
+import { Textarea } from "@nodocore/shared-components";
 import {
   Dialog,
   DialogContent,
@@ -22,14 +22,14 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/shared/components/ui/form";
+} from "@nodocore/shared-components";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/shared/components/ui/select";
+} from "@nodocore/shared-components";
 import { useCreateExpense } from "@/features/property-expenses/hooks/use-create-expense";
 import { useUploadReceipt } from "@/features/property-expenses/hooks/use-upload-receipt";
 import { formatCurrencyInput, parseCurrencyInput } from "@/shared/lib/format-money";

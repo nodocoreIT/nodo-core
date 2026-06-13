@@ -3,8 +3,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2, Trash2, FileDown } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
+import { Button } from "@nodocore/shared-components";
+import { Input } from "@nodocore/shared-components";
 import {
   Dialog,
   DialogContent,
@@ -30,15 +30,15 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/shared/components/ui/form";
+} from "@nodocore/shared-components";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/shared/components/ui/select";
-import { useAuth } from "@/app/auth/use-auth";
+} from "@nodocore/shared-components";
+import { useAuth } from "@nodocore/shared-components";
 import { supabase } from "@/shared/lib/supabase";
 import { usePayments, type PaymentWithRelations } from "../hooks/use-payments";
 import { useUpdatePayment } from "../hooks/use-update-payment";

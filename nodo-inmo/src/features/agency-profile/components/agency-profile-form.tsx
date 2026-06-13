@@ -4,8 +4,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
+import { Button } from "@nodocore/shared-components";
+import { Input } from "@nodocore/shared-components";
 import {
   Form,
   FormControl,
@@ -13,8 +13,8 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/shared/components/ui/form";
-import { useAuth } from "@/app/auth/use-auth";
+} from "@nodocore/shared-components";
+import { useAuth } from "@nodocore/shared-components";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import { useUpsertOrgProfile } from "@/features/agency-profile/hooks/use-upsert-org-profile";
 import { useUploadLogo } from "@/features/agency-profile/hooks/use-upload-logo";

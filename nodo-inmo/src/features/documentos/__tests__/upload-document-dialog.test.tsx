@@ -22,7 +22,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 // ── Radix Select → native <select> (jsdom has no Pointer Events) ──────────────
-vi.mock("@/shared/components/ui/select", () => ({
+vi.mock("@nodocore/shared-components", () => ({
   Select: ({ children, onValueChange, value }: {
     children: ReactNode;
     onValueChange?: (v: string) => void;

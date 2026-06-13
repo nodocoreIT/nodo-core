@@ -48,7 +48,7 @@ vi.mock("@/shared/lib/supabase", () => ({
 
 // ── Mock useAuth ──────────────────────────────────────────────────────────────
 const mockUseAuth = vi.fn();
-vi.mock("@/app/auth/use-auth", () => ({
+vi.mock("@nodocore/shared-components", () => ({
   useAuth: () => mockUseAuth(),
 }));
 

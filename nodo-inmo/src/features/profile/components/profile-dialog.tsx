@@ -3,8 +3,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
+import { Button } from "@nodocore/shared-components";
+import { Input } from "@nodocore/shared-components";
 import {
   Dialog,
   DialogContent,
@@ -20,8 +20,8 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/shared/components/ui/form";
-import { Label } from "@/shared/components/ui/label";
+} from "@nodocore/shared-components";
+import { Label } from "@nodocore/shared-components";
 import { useUpdateProfile } from "@/features/profile/hooks/use-update-profile";
 
 const schema = z

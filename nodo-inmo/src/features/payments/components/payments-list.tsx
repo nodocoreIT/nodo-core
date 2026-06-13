@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { PAGE_SIZE } from "@/shared/lib/constants";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Check, ChevronLeft, ChevronRight, Pencil, Trash2, Undo2 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@nodocore/shared-components";
 import {
   Table,
   TableBody,
@@ -10,7 +10,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/shared/components/ui/table";
+} from "@nodocore/shared-components";
 import { usePayments } from "@/features/payments/hooks/use-payments";
 import {
   PAYMENT_STATUS_LABELS,

@@ -27,7 +27,7 @@ vi.mock("@/features/agenda/hooks/use-tasks", () => ({
   useTasks: () => ({ data: [], isLoading: false, error: null }),
 }));
 
-vi.mock("@/app/auth/use-auth", () => ({
+vi.mock("@nodocore/shared-components", () => ({
   useAuth: () => ({
     user: { email: "juan@test.com", user_metadata: { full_name: "Juan Mendía" } },
     orgId: "org-1",

@@ -5,8 +5,8 @@ import { formatCurrencyInput, parseCurrencyInput } from "@/shared/lib/format-mon
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
+import { Button } from "@nodocore/shared-components";
+import { Input } from "@nodocore/shared-components";
 import {
   Dialog,
   DialogContent,
@@ -22,14 +22,14 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/shared/components/ui/form";
+} from "@nodocore/shared-components";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/shared/components/ui/select";
+} from "@nodocore/shared-components";
 import { CreatableCombobox } from "@/shared/components/ui/creatable-combobox";
 import { useCreateCashMovement } from "@/features/caja/hooks/use-create-cash-movement";
 import { useUpdateCashMovement } from "@/features/caja/hooks/use-update-cash-movement";

@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/shared/lib/supabase";
-import { useAuth } from "@/app/auth/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 
 const BUCKET = "org-branding";
 

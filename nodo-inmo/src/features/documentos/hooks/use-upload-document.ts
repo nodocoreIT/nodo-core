@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/shared/lib/supabase";
-import { useAuth } from "@/app/auth/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 import { DOCUMENTS_QUERY_KEY } from "./use-documents";
 
 const BUCKET = "org-documents";

@@ -5,8 +5,8 @@
  */
 import { useState, useMemo, useEffect } from "react";
 import { Plus, Pencil, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
-import { PaginationControls } from "@/shared/components/ui/pagination";
-import { Button } from "@/shared/components/ui/button";
+import { PaginationControls } from "@nodocore/shared-components";
+import { Button } from "@nodocore/shared-components";
 import {
   Table,
   TableBody,
@@ -14,7 +14,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/shared/components/ui/table";
+} from "@nodocore/shared-components";
 import {
   AlertDialog,
   AlertDialogAction,

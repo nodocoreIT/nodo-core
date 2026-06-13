@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Lock } from "lucide-react";
-import { useAuth, type PlanTier } from "@/app/auth/use-auth";
+import { useAuth, type PlanTier } from "@nodocore/shared-components";
 
 interface PlanGateProps {
   /** Minimum plan required to access this content. */
@@ -22,7 +22,7 @@ function hasPlan(userPlan: PlanTier | null, required: PlanTier): boolean {
 
 export function PlanGate({ requiredPlan, children, fullPage = false }: PlanGateProps) {
   const { plan } = useAuth();
-  const allowed = hasPlan(plan, requiredPlan);
+  const allowed = hasPlan(plan as PlanTier | null, requiredPlan);
 
   if (allowed) return <>{children}</>;
 

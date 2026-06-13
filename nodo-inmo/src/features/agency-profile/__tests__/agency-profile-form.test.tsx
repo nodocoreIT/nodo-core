@@ -35,7 +35,7 @@ vi.mock("@/shared/lib/supabase", () => ({
 
 // ── Mock useAuth ──────────────────────────────────────────────────────────────
 const mockAuthState = { role: "admin" as "admin" | "agent" };
-vi.mock("@/app/auth/use-auth", () => ({
+vi.mock("@nodocore/shared-components", () => ({
   useAuth: () => ({
     user: { email: "admin@nodo.com" },
     role: mockAuthState.role,

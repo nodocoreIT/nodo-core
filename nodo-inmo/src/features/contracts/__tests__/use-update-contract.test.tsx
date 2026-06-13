@@ -17,7 +17,7 @@ vi.mock("@/shared/lib/supabase", () => ({
   supabase: { schema: (...a: unknown[]) => mockSchema(...a) },
 }));
 
-vi.mock("@/app/auth/use-auth", () => ({
+vi.mock("@nodocore/shared-components", () => ({
   useAuth: () => ({ orgId: "org-1" }),
 }));
 

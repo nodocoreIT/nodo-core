@@ -7,7 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/shared/components/ui/dialog";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@nodocore/shared-components";
 import type { PortalProperty } from "../hooks/use-portal-properties";
 import { PropertyAmenityIconsLarge } from "./amenity-icons";
 import {

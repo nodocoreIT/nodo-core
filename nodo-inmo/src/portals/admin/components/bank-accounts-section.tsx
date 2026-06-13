@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
-import { Label } from "@/shared/components/ui/label";
+import { Button } from "@nodocore/shared-components";
+import { Input } from "@nodocore/shared-components";
+import { Label } from "@nodocore/shared-components";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/shared/components/ui/select";
+} from "@nodocore/shared-components";
 import {
   formatCurrencyInput,
   parseCurrencyInput,

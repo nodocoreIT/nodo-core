@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/shared/lib/supabase";
-import { useAuth } from "@/app/auth/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 
 export const CONCEPTOS_QUERY_KEY = ["conceptos"] as const;
 

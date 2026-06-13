@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Plus, ArrowUpRight, ArrowDownRight, Pencil, Trash2 } from "lucide-react";
-import { PaginationControls } from "@/shared/components/ui/pagination";
-import { Button } from "@/shared/components/ui/button";
+import { PaginationControls } from "@nodocore/shared-components";
+import { Button } from "@nodocore/shared-components";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +19,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/shared/components/ui/table";
+} from "@nodocore/shared-components";
 import { useCashMovements, type CashMovementRow } from "@/features/caja/hooks/use-cash-movements";
 import { useDeleteCashMovement } from "@/features/caja/hooks/use-delete-cash-movement";
 import { MovementFormDialog } from "./movement-form-dialog";

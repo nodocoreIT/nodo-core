@@ -20,7 +20,7 @@ vi.mock("@/shared/lib/supabase", () => ({
 }));
 
 import { supabase } from "@/shared/lib/supabase";
-import { AuthProvider, useAuth } from "@/app/auth/use-auth";
+import { AuthProvider, useAuth } from "@nodocore/shared-components";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

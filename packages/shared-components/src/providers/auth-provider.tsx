@@ -6,7 +6,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import type { Session, User } from "@supabase/supabase-js";
+import type { AuthResponse, Session, User } from "@supabase/supabase-js";
 import { useSupabase } from "./supabase-provider";
 
 // ─── Public interfaces ──────────────────────────────────────────────────────
@@ -19,14 +19,17 @@ export interface AuthConfig {
 export interface AuthContextValue {
   session: Session | null;
   user: User | null;
-  /** Role string from JWT app_metadata (e.g. "medico", "admin"). */
+  /** Role string from JWT app_metadata claims (e.g. "admin", "agent"). */
   role: string | null;
-  /** Organisation / clinic ID from JWT app_metadata, if present. */
+  /** Organisation ID from JWT app_metadata claims, if present. */
   orgId: string | null;
-  /** Subscription plan tier from JWT app_metadata, if present. */
+  /** Subscription plan tier from JWT app_metadata claims, if present. */
   plan: string | null;
+  isLoading: boolean;
+  /** @deprecated Use isLoading instead. Kept for backward compatibility. */
   loading: boolean;
-  signInWithPassword: (creds: { email: string; password: string }) => Promise<void>;
+  signIn: (creds: { email: string; password: string }) => Promise<AuthResponse>;
+  signInWithPassword: (creds: { email: string; password: string }) => Promise<AuthResponse>;
   signOut: () => Promise<void>;
   /** The roleDestinations map passed to AuthProvider — available for consumers (e.g. LoginPage). */
   roleDestinations: Record<string, string>;
@@ -35,6 +38,40 @@ export interface AuthContextValue {
 // ─── Context ────────────────────────────────────────────────────────────────
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Read role/orgId/plan from the ACCESS TOKEN JWT claims, not from
+ * session.user.app_metadata.
+ *
+ * The Custom Access Token Hook injects these into the JWT at mint time.
+ * supabase-js populates `session.user.app_metadata` from the stored user
+ * record (provider/providers only) — NOT from the hook-injected claims.
+ * So the authorization signal lives in the decoded access_token only.
+ */
+function readClaims(session: Session | null): {
+  role: string | null;
+  orgId: string | null;
+  plan: string | null;
+} {
+  const token = session?.access_token;
+  if (!token) return { role: null, orgId: null, plan: null };
+  try {
+    const payloadB64 = token.split(".")[1];
+    const json = atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"));
+    const payload = JSON.parse(json) as {
+      app_metadata?: { role?: string; org_id?: string; plan?: string };
+    };
+    return {
+      role: payload.app_metadata?.role ?? null,
+      orgId: payload.app_metadata?.org_id ?? null,
+      plan: payload.app_metadata?.plan ?? null,
+    };
+  } catch {
+    return { role: null, orgId: null, plan: null };
+  }
+}
 
 // ─── Provider ───────────────────────────────────────────────────────────────
 
@@ -50,16 +87,6 @@ export function AuthProvider({
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Extract role/orgId/plan from app_metadata (set by DB trigger + Edge Function).
-  function extractMeta(s: Session | null) {
-    const meta = s?.user?.app_metadata ?? {};
-    return {
-      role: (meta.role as string) ?? null,
-      orgId: (meta.org_id as string) ?? null,
-      plan: (meta.plan as string) ?? null,
-    };
-  }
-
   useEffect(() => {
     // Seed session from cache
     supabase.auth.getSession().then(({ data }) => {
@@ -67,7 +94,7 @@ export function AuthProvider({
       setLoading(false);
     });
 
-    // Subscribe to auth state changes
+    // Subscribe to auth state changes (sign-in, sign-out, token refresh)
     const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setLoading(false);
@@ -77,10 +104,8 @@ export function AuthProvider({
   }, [supabase]);
 
   const signInWithPassword = useCallback(
-    async (creds: { email: string; password: string }) => {
-      const { error } = await supabase.auth.signInWithPassword(creds);
-      if (error) throw error;
-    },
+    (creds: { email: string; password: string }): Promise<AuthResponse> =>
+      supabase.auth.signInWithPassword(creds),
     [supabase],
   );
 
@@ -88,7 +113,7 @@ export function AuthProvider({
     await supabase.auth.signOut();
   }, [supabase]);
 
-  const { role, orgId, plan } = extractMeta(session);
+  const { role, orgId, plan } = readClaims(session);
 
   const value: AuthContextValue = {
     session,
@@ -96,7 +121,9 @@ export function AuthProvider({
     role,
     orgId,
     plan,
+    isLoading: loading,
     loading,
+    signIn: signInWithPassword,
     signInWithPassword,
     signOut,
     roleDestinations: config.roleDestinations,

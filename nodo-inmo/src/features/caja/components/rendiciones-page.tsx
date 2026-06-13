@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Eye, CheckCheck, HandCoins, Loader2 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@nodocore/shared-components";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/shared/components/ui/table";
+} from "@nodocore/shared-components";
 import { useOwnerSettlements } from "@/features/caja/hooks/use-owner-settlements";
 import { useSettleOwner } from "@/features/caja/hooks/use-settle-owner";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";

@@ -19,7 +19,7 @@ import {
   LineChart,
   Lock,
 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@nodocore/shared-components";
 import { BrandMark } from "@/shared/components/brand-mark";
 import { SearchInput } from "@/shared/components/search-input";
 import { ProfileDialog } from "@/features/profile/components/profile-dialog";
@@ -32,7 +32,7 @@ import {
 } from "@/shared/components/ui/dialog";
 import { AgencyProfileForm } from "@/features/agency-profile/components/agency-profile-form";
 import { useSearchStore } from "@/shared/search/use-search-store";
-import { useAuth } from "@/app/auth/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 import { cn } from "@/shared/lib/utils";
 import { SettingsDialog } from "./settings-dialog";
 import { FeedbackFAB } from "@/features/feedback/components/feedback-node";

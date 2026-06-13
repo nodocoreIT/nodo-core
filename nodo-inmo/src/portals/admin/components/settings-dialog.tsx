@@ -8,9 +8,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/shared/components/ui/dialog";
-import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
-import { Label } from "@/shared/components/ui/label";
+import { Button } from "@nodocore/shared-components";
+import { Input } from "@nodocore/shared-components";
+import { Label } from "@nodocore/shared-components";
 import { useThemeSettings } from "@/shared/hooks/use-theme-settings";
 import { AgencyProfileForm } from "@/features/agency-profile/components/agency-profile-form";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
@@ -23,7 +23,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useUpdateProfile } from "@/features/profile/hooks/use-update-profile";
-import { useAuth } from "@/app/auth/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 import {
   Form,
   FormControl,
@@ -31,7 +31,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/shared/components/ui/form";
+} from "@nodocore/shared-components";
 
 const profileSchema = z
   .object({

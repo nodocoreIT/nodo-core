@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Download, Share2, Loader2 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@nodocore/shared-components";
 import type { StatementData } from "@/features/caja/lib/settlement-statement-data";
 import {
   buildBlob,

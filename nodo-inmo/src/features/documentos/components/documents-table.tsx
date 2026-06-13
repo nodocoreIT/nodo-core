@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Download, Trash2, Loader2 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@nodocore/shared-components";
 import {
   Table,
   TableBody,
@@ -8,7 +8,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/shared/components/ui/table";
+} from "@nodocore/shared-components";
 import {
   AlertDialog,
   AlertDialogAction,

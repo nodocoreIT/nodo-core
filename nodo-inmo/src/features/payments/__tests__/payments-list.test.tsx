@@ -27,7 +27,7 @@ vi.mock("@/features/payments/hooks/use-delete-payment", () => ({
   assignCommissionAccount: vi.fn(),
 }));
 
-vi.mock("@/app/auth/use-auth", () => ({
+vi.mock("@nodocore/shared-components", () => ({
   useAuth: () => ({ orgId: "org-1" }),
 }));
 

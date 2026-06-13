@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Download, Share2, Loader2 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@nodocore/shared-components";
 import type { PaymentWithRelations } from "../hooks/use-payments";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import { buildReceiptData } from "../lib/payment-receipt-pdf";
