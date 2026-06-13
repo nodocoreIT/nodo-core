@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 
+// Multi-Zone URLs — each remote app has its own deployment
+// Set NODO_INMO_URL in .env.local for dev, and in Vercel env vars for prod
+const NODO_INMO_URL = process.env.NODO_INMO_URL ?? "http://localhost:5174";
+
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "192.168.1.37"],
   turbopack: {
@@ -7,6 +11,33 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
+      // ── nodo-inmo (Multi-Zone) ────────────────────────────────────────────
+      // All /inmo/* routes are proxied to nodo-inmo's deployment.
+      // nodo-inmo uses basename="/inmo" in its BrowserRouter.
+      {
+        source: "/inmo",
+        destination: `${NODO_INMO_URL}/inmo`,
+      },
+      {
+        source: "/inmo/:path*",
+        destination: `${NODO_INMO_URL}/inmo/:path*`,
+      },
+      // nodo-inmo Vite dev assets (only needed in development)
+      {
+        source: "/@vite/:path*",
+        destination: `${NODO_INMO_URL}/@vite/:path*`,
+      },
+      {
+        source: "/@id/:path*",
+        destination: `${NODO_INMO_URL}/@id/:path*`,
+      },
+      {
+        source: "/@react-refresh",
+        destination: `${NODO_INMO_URL}/@react-refresh`,
+      },
+      // ── (legacy) nodo-clinica ─────────────────────────────────────────────
+      // Kept for reference — nodo-clinica is out of active scope (demo only).
+      // Remove these once nodo-clinica is fully decommissioned.
       {
         source: "/paciente/:path*",
         destination: "http://localhost:5173/paciente/:path*",
@@ -18,32 +49,6 @@ const nextConfig: NextConfig = {
       {
         source: "/admin/:path*",
         destination: "http://localhost:5173/admin/:path*",
-      },
-      // Vite dev assets and hot reloading
-      {
-        source: "/src/:path*",
-        destination: "http://localhost:5173/src/:path*",
-      },
-      {
-        source: "/@vite/:path*",
-        destination: "http://localhost:5173/@vite/:path*",
-      },
-      {
-        source: "/@id/:path*",
-        destination: "http://localhost:5173/@id/:path*",
-      },
-      {
-        source: "/@react-refresh",
-        destination: "http://localhost:5173/@react-refresh",
-      },
-      {
-        source: "/node_modules/.vite/:path*",
-        destination: "http://localhost:5173/node_modules/.vite/:path*",
-      },
-      // Vite production assets
-      {
-        source: "/assets/:path*",
-        destination: "http://localhost:5173/assets/:path*",
       },
     ];
   },
