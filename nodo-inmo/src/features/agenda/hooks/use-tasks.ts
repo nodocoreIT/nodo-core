@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/shared/lib/supabase";
-import { useAuth } from "@/app/auth/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 import type { Database } from "@/shared/types/database";
 
 export type TaskRow = Database["nodo_inmo"]["Tables"]["tasks"]["Row"];

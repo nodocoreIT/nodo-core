@@ -12,7 +12,7 @@ import { MemoryRouter } from "react-router-dom";
 const mockSignIn = vi.fn();
 const mockUseAuth = vi.fn();
 
-vi.mock("@/app/auth/use-auth", () => ({
+vi.mock("@nodocore/shared-components", () => ({
   useAuth: () => mockUseAuth(),
   AuthProvider: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>

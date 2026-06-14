@@ -1,6 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { AuthProvider } from "@/app/auth/use-auth";
+import {
+  SupabaseProvider,
+  AuthProvider,
+} from "@nodocore/shared-components";
+import { supabase } from "@/shared/lib/supabase";
 import { useThemeSettings } from "@/shared/hooks/use-theme-settings";
 
 const queryClient = new QueryClient({
@@ -11,6 +15,15 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+const AUTH_CONFIG = {
+  roleDestinations: {
+    admin: "/admin",
+    agent: "/admin",
+    owner: "/owner",
+    tenant: "/tenant",
+  },
+};
 
 interface AppProvidersProps {
   children: ReactNode;
@@ -25,9 +38,11 @@ function ThemeInitializer({ children }: { children: ReactNode }) {
 export function AppProviders({ children }: AppProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <ThemeInitializer>{children}</ThemeInitializer>
-      </AuthProvider>
+      <SupabaseProvider client={supabase}>
+        <AuthProvider config={AUTH_CONFIG}>
+          <ThemeInitializer>{children}</ThemeInitializer>
+        </AuthProvider>
+      </SupabaseProvider>
     </QueryClientProvider>
   );
 }

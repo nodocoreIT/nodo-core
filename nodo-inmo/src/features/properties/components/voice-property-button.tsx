@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@nodocore/shared-components";
 import { useExtractPropertyFromVoice } from "@/features/properties/hooks/use-extract-property-from-voice";
 import type { PropertyFormValues } from "@/features/properties/components/property-form-dialog";
 

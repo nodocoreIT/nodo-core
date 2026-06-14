@@ -15,10 +15,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/shared/components/ui/dialog";
-import { Button } from "@/shared/components/ui/button";
-import { Textarea } from "@/shared/components/ui/textarea";
+import { Button } from "@nodocore/shared-components";
+import { Textarea } from "@nodocore/shared-components";
 import { supabase } from "@/shared/lib/supabase";
-import { useAuth } from "@/app/auth/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 import { cn } from "@/shared/lib/utils";
 
 // --- Types ---

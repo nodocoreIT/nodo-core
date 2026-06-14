@@ -10,7 +10,7 @@
  * Never use user_metadata for authorization decisions.
  */
 import { Navigate } from "react-router-dom";
-import { useAuth } from "@/app/auth/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 
 const ROLE_DESTINATIONS: Record<string, string> = {
   admin: "/admin",

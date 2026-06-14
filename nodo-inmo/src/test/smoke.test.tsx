@@ -13,10 +13,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { Button } from "@/shared/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
-import { Input } from "@/shared/components/ui/input";
-import { Label } from "@/shared/components/ui/label";
+import { Button } from "@nodocore/shared-components";
+import { Card, CardContent, CardHeader, CardTitle } from "@nodocore/shared-components";
+import { Input } from "@nodocore/shared-components";
+import { Label } from "@nodocore/shared-components";
 
 // ── Button ────────────────────────────────────────────────────────────────────
 

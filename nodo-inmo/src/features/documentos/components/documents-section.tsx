@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@nodocore/shared-components";
 import { DocumentsTable } from "./documents-table";
 import { UploadDocumentDialog } from "./upload-document-dialog";
 import { useDocuments } from "@/features/documentos/hooks/use-documents";
-import { PaginationControls } from "@/shared/components/ui/pagination";
+import { PaginationControls } from "@nodocore/shared-components";
 import { PAGE_SIZE } from "@/shared/lib/constants";
 
 /**

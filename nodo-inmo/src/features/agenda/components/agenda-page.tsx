@@ -24,9 +24,9 @@ import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, TaskRow } from "
 import { useProperties } from "@/features/properties/hooks/use-properties";
 import { useContacts } from "@/features/contacts/hooks/use-contacts";
 import { useStaff } from "@/shared/hooks/use-staff";
-import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
-import { Label } from "@/shared/components/ui/label";
+import { Button } from "@nodocore/shared-components";
+import { Input } from "@nodocore/shared-components";
+import { Label } from "@nodocore/shared-components";
 import {
   Dialog,
   DialogContent,

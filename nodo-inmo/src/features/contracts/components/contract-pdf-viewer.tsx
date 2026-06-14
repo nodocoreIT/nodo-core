@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Download, Share2, Loader2 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
+import { Button } from "@nodocore/shared-components";
 import type { ContractWithRelations } from "@/features/contracts/hooks/use-contracts";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";

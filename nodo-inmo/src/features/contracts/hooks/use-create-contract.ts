@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/shared/lib/supabase";
-import { useAuth } from "@/app/auth/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 import type { Database } from "@/shared/types/database";
 import { syncContractInstallments } from "@/features/payments/lib/sync-contract-installments";
 import { PAYMENTS_QUERY_KEY } from "@/features/payments/hooks/use-payments";

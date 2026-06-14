@@ -6,7 +6,7 @@
  */
 import { useState, useMemo, useEffect } from "react";
 import { useContracts } from "@/features/contracts/hooks/use-contracts";
-import { PaginationControls } from "@/shared/components/ui/pagination";
+import { PaginationControls } from "@nodocore/shared-components";
 import { ContractPdfActions } from "@/features/contracts/components/contract-pdf-actions";
 import { ContractStatusBadge } from "@/features/contracts/components/contract-status-badge";
 import { ContractLocacionButton } from "@/features/contracts/components/contract-locacion-button";
@@ -20,7 +20,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/shared/components/ui/table";
+} from "@nodocore/shared-components";
 import { formatMoney, formatDate } from "@/features/contracts/lib/contract-labels";
 import { PAGE_SIZE } from "@/shared/lib/constants";
 

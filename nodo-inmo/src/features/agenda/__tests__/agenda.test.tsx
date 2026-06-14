@@ -19,7 +19,7 @@ vi.mock("@/shared/lib/supabase", () => ({
   },
 }));
 
-vi.mock("@/app/auth/use-auth", () => ({
+vi.mock("@nodocore/shared-components", () => ({
   useAuth: () => ({
     user: { email: "admin@nodo.com" },
     role: "admin",

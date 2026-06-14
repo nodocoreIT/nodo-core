@@ -1,6 +1,6 @@
 import { History, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useAuth } from "@/app/auth/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 import { useDashboardMetrics } from "../hooks/use-dashboard-metrics";
 import { useTasks } from "@/features/agenda/hooks/use-tasks";
 import { DashboardActionCard } from "./dashboard-action-card";

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useAuth } from "@/app/auth/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 import { useTasks } from "@/features/agenda/hooks/use-tasks";
 import { useDashboardMetrics } from "./use-dashboard-metrics";
 import { buildNotifications, type AppNotification } from "../lib/build-notifications";

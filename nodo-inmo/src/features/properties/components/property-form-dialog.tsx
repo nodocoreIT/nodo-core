@@ -13,9 +13,9 @@ import {
   MoveVertical,
   ParkingCircle,
 } from "lucide-react";
-import { Button } from "@/shared/components/ui/button";
-import { Input } from "@/shared/components/ui/input";
-import { Textarea } from "@/shared/components/ui/textarea";
+import { Button } from "@nodocore/shared-components";
+import { Input } from "@nodocore/shared-components";
+import { Textarea } from "@nodocore/shared-components";
 import {
   Dialog,
   DialogContent,
@@ -31,14 +31,14 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/shared/components/ui/form";
+} from "@nodocore/shared-components";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/shared/components/ui/select";
+} from "@nodocore/shared-components";
 import type { PropertyRow } from "@/features/properties/hooks/use-properties";
 import { useContacts } from "@/features/contacts/hooks/use-contacts";
 import {
@@ -47,7 +47,7 @@ import {
 } from "@/shared/lib/format-money";
 import { PhotoGallery } from "./photo-gallery";
 import { cn } from "@/shared/lib/utils";
-import { Combobox } from "@/shared/components/ui/combobox";
+import { Combobox } from "@nodocore/shared-components";
 import { PROVINCIAS, LOCALIDADES_BY_PROVINCIA, type Provincia } from "@/shared/data/argentina-geo";
 
 // ── Schema ────────────────────────────────────────────────────────────────────

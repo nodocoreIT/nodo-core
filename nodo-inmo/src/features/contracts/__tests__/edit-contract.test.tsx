@@ -35,7 +35,7 @@ vi.mock("@/features/contacts/hooks/use-contacts", () => ({
   }),
 }));
 
-vi.mock("@/shared/components/ui/select", () => ({
+vi.mock("@nodocore/shared-components", () => ({
   Select: ({ children, onValueChange, value }: {
     children: React.ReactNode;
     onValueChange?: (v: string) => void;

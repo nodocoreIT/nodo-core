@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/app/auth/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 import { syncContractInstallments } from "@/features/payments/lib/sync-contract-installments";
 import { PAYMENTS_QUERY_KEY } from "./use-payments";
 

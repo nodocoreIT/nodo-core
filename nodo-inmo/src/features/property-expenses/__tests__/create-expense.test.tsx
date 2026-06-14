@@ -41,7 +41,7 @@ vi.mock("@/shared/lib/supabase", () => ({
 // ── Mock useAuth ──────────────────────────────────────────────────────────────
 // Use an object so tests can mutate the role field between test runs.
 const mockAuthState = { role: "admin" as "admin" | "agent" };
-vi.mock("@/app/auth/use-auth", () => ({
+vi.mock("@nodocore/shared-components", () => ({
   useAuth: () => ({
     user: { email: "admin@nodo.com" },
     role: mockAuthState.role,
@@ -54,7 +54,7 @@ vi.mock("@/app/auth/use-auth", () => ({
 }));
 
 // ── Mock Radix Select with native <select> for jsdom testability ──────────────
-vi.mock("@/shared/components/ui/select", () => ({
+vi.mock("@nodocore/shared-components", () => ({
   Select: ({
     children,
     onValueChange,

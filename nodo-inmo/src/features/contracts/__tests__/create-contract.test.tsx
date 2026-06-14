@@ -26,7 +26,7 @@ vi.mock("@/shared/lib/supabase", () => ({
   },
 }));
 
-vi.mock("@/app/auth/use-auth", () => ({
+vi.mock("@nodocore/shared-components", () => ({
   useAuth: () => ({
     user: { email: "admin@nodo.com" },
     role: "admin",
@@ -57,7 +57,7 @@ vi.mock("@/features/contacts/hooks/use-contacts", () => ({
 }));
 
 // Native <select> mock for Radix Select
-vi.mock("@/shared/components/ui/select", () => ({
+vi.mock("@nodocore/shared-components", () => ({
   Select: ({ children, onValueChange, value }: {
     children: React.ReactNode;
     onValueChange?: (v: string) => void;

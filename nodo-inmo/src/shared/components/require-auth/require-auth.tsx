@@ -14,7 +14,7 @@
  *                      (claim-sync trigger/Edge Function not yet run)
  */
 import { Navigate } from "react-router-dom";
-import { useAuth } from "@/app/auth/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 import type { ReactNode } from "react";
 
 interface RequireAuthProps {
