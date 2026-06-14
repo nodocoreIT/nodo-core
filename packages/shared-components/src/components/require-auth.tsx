@@ -6,7 +6,7 @@
  * boundary is Postgres Row-Level Security (RLS) enforced server-side.
  *
  * Behaviour:
- *   loading           → renders nothing (avoid flash of wrong content)
+ *   isLoading         → renders nothing (avoid flash of wrong content)
  *   no session        → Navigate to /login
  *   session + role    → renders children (filtered by allowedRoles if provided)
  *   session, no role  → renders a graceful "pending" state
@@ -23,9 +23,9 @@ interface RequireAuthProps {
 }
 
 export function RequireAuth({ children, allowedRoles }: RequireAuthProps) {
-  const { loading, session, role } = useAuth();
+  const { isLoading, session, role } = useAuth();
 
-  if (loading) {
+  if (isLoading) {
     return null;
   }
 

@@ -3,12 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/src/index.d.ts",
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./styles/base.css": "./src/styles/base.css"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
   },
   "peerDependencies": {
     "react": ">=19.0.0",
@@ -20,6 +26,7 @@
     "typescript": "^5.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "tsup": "^8.0.0",
     "lucide-react": "^0.400.0",
     "react-router-dom": "^7.0.0",
     "@radix-ui/react-alert-dialog": "^1.0.0",
@@ -32,6 +39,6 @@
     "tailwind-merge": "^2.0.0",
     "react-hook-form": "^7.0.0",
     "@hookform/resolvers": "^3.0.0",
-    "zod": "^3.0.0"
+    "zod": "^4.0.0"
   }
 }
