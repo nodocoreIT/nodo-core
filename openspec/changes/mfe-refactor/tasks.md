@@ -55,7 +55,7 @@ FASE 3 (Multi-Zone Architecture)
 
 **Archivos afectados**:
 - `package.json` (raíz)
-- `apps/nodo-core/package.json`
+- `apps/nodo-landing/package.json`
 - `apps/nodo-inmo/package.json`
 - `packages/shared-components/package.json`
 
@@ -295,11 +295,11 @@ FASE 3 (Multi-Zone Architecture)
 **Descripción**: Auditar `apps/nodo-core` para verificar que NO importa `AuthProvider` de `@nodocore/shared-components`. nodo-core debe seguir usando `@supabase/ssr` directamente. Verificar que cada app tiene sus propias variables de entorno Supabase (`NEXT_PUBLIC_SUPABASE_URL` en core, `VITE_SUPABASE_URL` en inmo).
 
 **Archivos afectados**:
-- `apps/nodo-core/.env.local` (verificar/documentar)
+- `apps/nodo-landing/.env.local` (verificar/documentar)
 - `apps/nodo-inmo/.env.local` (verificar/documentar)
 
 **Criterio de done**:
-- `rg "AuthProvider" apps/nodo-core/` retorna cero resultados de `@nodocore/shared-components`
+- `rg "AuthProvider" apps/nodo-landing/` retorna cero resultados de `@nodocore/shared-components`
 - Cada app tiene su propia `SUPABASE_URL` configurada
 - nodo-core arranca sin depender del build de shared-components en runtime
 
@@ -344,9 +344,9 @@ FASE 3 (Multi-Zone Architecture)
 **Descripción**: Declarar `NODO_INMO_URL` en los archivos de entorno de nodo-core. En dev apunta a la instancia local de nodo-inmo; en producción apunta al dominio desplegado. Documentar el patrón `NODO_{SLUG}_URL` para futuros nodos en el README o en una sección de variables de entorno.
 
 **Archivos afectados**:
-- `apps/nodo-core/.env.local` — agregar `NODO_INMO_URL=http://localhost:5174`
-- `apps/nodo-core/.env.production` — agregar `NODO_INMO_URL=https://nodoinmo.vercel.app`
-- `apps/nodo-core/README.md` (o sección env vars existente) — documentar la variable
+- `apps/nodo-landing/.env.local` — agregar `NODO_INMO_URL=http://localhost:5174`
+- `apps/nodo-landing/.env.production` — agregar `NODO_INMO_URL=https://nodoinmo.vercel.app`
+- `apps/nodo-landing/README.md` (o sección env vars existente) — documentar la variable
 
 **Criterio de done**:
 - La variable `NODO_INMO_URL` está definida en `.env.local` y `.env.production`
@@ -364,10 +364,10 @@ FASE 3 (Multi-Zone Architecture)
 
 **Requisitos cubiertos**: REQ-F3-02
 
-**Descripción**: En `apps/nodo-core/next.config.ts`, reemplazar el hard redirect a nodo-inmo por una función `async rewrites()` que proxea `/inmo/:path*` hacia `${NODO_INMO_URL}/inmo/:path*`. Agregar también rewrites de assets de Vite para que el dev server de nodo-inmo pueda servir correctamente en modo Multi-Zone: `/@vite/:path*` y `/assets/:path*` hacia `${NODO_INMO_URL}/:path*`.
+**Descripción**: En `apps/nodo-landing/next.config.ts`, reemplazar el hard redirect a nodo-inmo por una función `async rewrites()` que proxea `/inmo/:path*` hacia `${NODO_INMO_URL}/inmo/:path*`. Agregar también rewrites de assets de Vite para que el dev server de nodo-inmo pueda servir correctamente en modo Multi-Zone: `/@vite/:path*` y `/assets/:path*` hacia `${NODO_INMO_URL}/:path*`.
 
 **Archivos afectados**:
-- `apps/nodo-core/next.config.ts`
+- `apps/nodo-landing/next.config.ts`
 
 **Criterio de done**:
 - Navegando a `/inmo/*` en nodo-core el request se proxea a nodo-inmo sin redirect visible en la barra del navegador
@@ -409,11 +409,11 @@ FASE 3 (Multi-Zone Architecture)
 **Descripción**: Localizar en nodo-core el lugar donde se hace `window.location.href = "https://nodoinmo.vercel.app"` (o redirect equivalente al dominio externo de nodo-inmo) y reemplazarlo por `router.push('/inmo')` usando el router de Next.js. Esto elimina la navegación cross-origin y mantiene al usuario dentro del dominio de nodo-core.
 
 **Archivos afectados**:
-- `apps/nodo-core/app` — el componente o page donde está el redirect hardcodeado (probablemente relacionado con login exitoso)
+- `apps/nodo-landing/app` — el componente o page donde está el redirect hardcodeado (probablemente relacionado con login exitoso)
 
 **Criterio de done**:
-- `rg "nodoinmo.vercel.app" apps/nodo-core/` retorna cero resultados
-- `rg "window.location.href.*inmo" apps/nodo-core/` retorna cero resultados
+- `rg "nodoinmo.vercel.app" apps/nodo-landing/` retorna cero resultados
+- `rg "window.location.href.*inmo" apps/nodo-landing/` retorna cero resultados
 - Login exitoso en nodo-core navega a `/inmo` sin cambiar de dominio
 
 **Depende de**: T3-03

@@ -17,7 +17,7 @@ function NotFoundPage() {
 
 export function AppRouter() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/inmo">
       <Routes>
         {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
