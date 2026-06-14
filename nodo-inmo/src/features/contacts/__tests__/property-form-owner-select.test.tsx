@@ -23,38 +23,29 @@ vi.mock("@/shared/lib/supabase", () => ({
   },
 }));
 
-vi.mock("@nodocore/shared-components", () => ({
-  useAuth: () => ({
-    user: { email: "admin@nodo.com" },
-    role: "admin",
-    orgId: "org-abc",
-    signOut: vi.fn(),
-    session: {},
-    loading: false,
-  }),
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  // Use require to avoid issues with async import in hoisted vi.mock factory
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const R = require("react") as typeof import("react");
 
-// Mock Radix Select with native <select>
-vi.mock("@nodocore/shared-components", () => {
-  const React = require("react");
-  const TriggerCtx = (React.createContext as any)({} as { id?: string; ariaLabel?: string });
+  const TriggerCtx = (R.createContext as any)({} as { id?: string; ariaLabel?: string });
 
   const Select = ({
     children,
     onValueChange,
     value,
   }: {
-    children: React.ReactNode;
+    children: R.ReactNode;
     onValueChange?: (v: string) => void;
     value?: string;
   }) => {
-    const [triggerMeta, setTriggerMeta] = (React.useState as any)({} as { id?: string; ariaLabel?: string });
+    const [triggerMeta, setTriggerMeta] = (R.useState as any)({} as { id?: string; ariaLabel?: string });
     return (
       <TriggerCtx.Provider value={triggerMeta}>
-        {React.Children.map(children, (child: React.ReactNode) =>
-          React.isValidElement(child)
-            ? React.cloneElement(child as React.ReactElement<Record<string, unknown>>, {
+        {R.Children.map(children, (child: R.ReactNode) =>
+          R.isValidElement(child)
+            ? R.cloneElement(child as R.ReactElement<Record<string, unknown>>, {
                 _onValueChange: onValueChange,
                 _value: value ?? "",
                 _setTriggerMeta: setTriggerMeta,
@@ -74,9 +65,9 @@ vi.mock("@nodocore/shared-components", () => {
     id?: string;
     "aria-label"?: string;
     _setTriggerMeta?: (v: { id?: string; ariaLabel?: string }) => void;
-    children?: React.ReactNode;
+    children?: R.ReactNode;
   }) => {
-    const called = React.useRef(false);
+    const called = R.useRef(false);
     if (!called.current) {
       called.current = true;
       _setTriggerMeta?.({ id, ariaLabel });
@@ -89,11 +80,11 @@ vi.mock("@nodocore/shared-components", () => {
     _onValueChange,
     _value,
   }: {
-    children: React.ReactNode;
+    children: R.ReactNode;
     _onValueChange?: (v: string) => void;
     _value?: string;
   }) => {
-    const { id, ariaLabel } = React.useContext(TriggerCtx);
+    const { id, ariaLabel } = R.useContext(TriggerCtx);
     return (
       <select
         id={id}
@@ -107,11 +98,27 @@ vi.mock("@nodocore/shared-components", () => {
   };
 
   const SelectValue = (_props: { placeholder?: string }) => null;
-  const SelectItem = ({ value, children }: { value: string; children: React.ReactNode }) => (
+  const SelectItem = ({ value, children }: { value: string; children: R.ReactNode }) => (
     <option value={value}>{children}</option>
   );
 
-  return { Select, SelectTrigger, SelectContent, SelectValue, SelectItem };
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: { email: "admin@nodo.com" },
+      role: "admin",
+      orgId: "org-abc",
+      signOut: vi.fn(),
+      session: {},
+      loading: false,
+    }),
+    AuthProvider: ({ children }: { children: R.ReactNode }) => <>{children}</>,
+    Select,
+    SelectTrigger,
+    SelectContent,
+    SelectValue,
+    SelectItem,
+  };
 });
 
 // Mock useContacts — only owner-role contacts

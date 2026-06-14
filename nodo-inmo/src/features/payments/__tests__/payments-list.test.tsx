@@ -27,9 +27,13 @@ vi.mock("@/features/payments/hooks/use-delete-payment", () => ({
   assignCommissionAccount: vi.fn(),
 }));
 
-vi.mock("@nodocore/shared-components", () => ({
-  useAuth: () => ({ orgId: "org-1" }),
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    useAuth: () => ({ orgId: "org-1" }),
+  };
+});
 
 vi.mock("@/features/agency-profile/hooks/use-org-profile", () => ({
   useOrgProfile: () => ({ data: null }),

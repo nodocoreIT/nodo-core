@@ -35,17 +35,21 @@ vi.mock("@/shared/lib/supabase", () => ({
 
 // ── Mock useAuth ──────────────────────────────────────────────────────────────
 const mockAuthState = { role: "admin" as "admin" | "agent" };
-vi.mock("@nodocore/shared-components", () => ({
-  useAuth: () => ({
-    user: { email: "admin@nodo.com" },
-    role: mockAuthState.role,
-    orgId: "org-abc",
-    signOut: vi.fn(),
-    session: {},
-    loading: false,
-  }),
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: { email: "admin@nodo.com" },
+      role: mockAuthState.role,
+      orgId: "org-abc",
+      signOut: vi.fn(),
+      session: {},
+      loading: false,
+    }),
+    AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  };
+});
 
 // ── Mock mutation + query hooks ──────────────────────────────────────────────
 const mockUpsertAsync = vi.fn();

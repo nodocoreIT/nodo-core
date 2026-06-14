@@ -57,16 +57,20 @@ vi.mock("@/shared/lib/supabase", () => ({
 
 // ── Mock useAuth ──────────────────────────────────────────────────────────────
 const mockAuthState = { orgId: "org-abc" as string | null };
-vi.mock("@nodocore/shared-components", () => ({
-  useAuth: () => ({
-    user: { email: "admin@nodo.com" },
-    role: "admin",
-    orgId: mockAuthState.orgId,
-    signOut: vi.fn(),
-    session: {},
-    loading: false,
-  }),
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: { email: "admin@nodo.com" },
+      role: "admin",
+      orgId: mockAuthState.orgId,
+      signOut: vi.fn(),
+      session: {},
+      loading: false,
+    }),
+  };
+});
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const client = new QueryClient({

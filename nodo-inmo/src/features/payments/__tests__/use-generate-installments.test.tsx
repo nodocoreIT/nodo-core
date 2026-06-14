@@ -15,9 +15,13 @@ vi.mock("@/shared/lib/supabase", () => ({
   supabase: { schema: (...a: unknown[]) => mockSchema(...a) },
 }));
 
-vi.mock("@nodocore/shared-components", () => ({
-  useAuth: () => ({ orgId: "org-1" }),
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    useAuth: () => ({ orgId: "org-1" }),
+  };
+});
 
 import { useGenerateInstallments } from "@/features/payments/hooks/use-generate-installments";
 
