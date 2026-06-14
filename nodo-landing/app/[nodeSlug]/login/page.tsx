@@ -148,7 +148,7 @@ function LoginForm() {
         return;
       }
       if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
-        window.location.href = "https://nodoinmo.vercel.app";
+        router.push("/inmo");
       } else if (
         nodeParam === "nodo-clinica" ||
         nodeParam === "clinica-virtual"
