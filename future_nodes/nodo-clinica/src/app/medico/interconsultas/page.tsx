@@ -3,12 +3,17 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { InterconsultPanel } from "@/components/interconsult/interconsult-panel";
+import { NodoChatWidget } from "@/components/nodo-chat/nodo-chat-widget";
 import { clinicApi } from "@/lib/clinic/client-api";
+import { isProPlan } from "@/lib/nodo-chat/is-pro-plan";
 
 export default function MedicoInterconsultasPage() {
   const router = useRouter();
-  const [doctorId, setDoctorId] = useState<string | null>(null);
+  const [doctor, setDoctor] = useState<{
+    id: string;
+    fullName: string;
+    subscriptionPlan?: string;
+  } | null>(null);
 
   useEffect(() => {
     clinicApi.getSession().then(({ session, user }) => {
@@ -16,11 +21,15 @@ export default function MedicoInterconsultasPage() {
         router.push("/login");
         return;
       }
-      setDoctorId(user.id);
+      setDoctor({
+        id: user.id,
+        fullName: user.fullName,
+        subscriptionPlan: user.subscriptionPlan,
+      });
     });
   }, [router]);
 
-  if (!doctorId) {
+  if (!doctor) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-brand" />
@@ -28,5 +37,12 @@ export default function MedicoInterconsultasPage() {
     );
   }
 
-  return <InterconsultPanel currentDoctorId={doctorId} />;
+  return (
+    <NodoChatWidget
+      doctorId={doctor.id}
+      doctorName={doctor.fullName}
+      isPro={isProPlan(doctor.subscriptionPlan)}
+      embedded
+    />
+  );
 }

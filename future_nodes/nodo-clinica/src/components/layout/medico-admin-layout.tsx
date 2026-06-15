@@ -16,7 +16,10 @@ import {
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/nodo/brand-mark";
 import { ThemeSettingsDialog } from "@/components/settings/theme-settings-dialog";
+import { NodoChatWidget } from "@/components/nodo-chat/nodo-chat-widget";
+import { NodoChatBell } from "@/components/nodo-chat/nodo-chat-bell";
 import { clinicApi } from "@/lib/clinic/client-api";
+import { isProPlan } from "@/lib/nodo-chat/is-pro-plan";
 import { Button } from "@/components/ui/button";
 
 interface NavItem {
@@ -52,10 +55,17 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [doctor, setDoctor] = useState<{ fullName: string; email: string } | null>(
-    null,
-  );
+  const [doctor, setDoctor] = useState<{
+    id: string;
+    fullName: string;
+    email: string;
+    subscriptionPlan?: string;
+  } | null>(null);
   const [checking, setChecking] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
+
+  const isPro = isProPlan(doctor?.subscriptionPlan);
+  const chatEmbedded = pathname === "/medico/interconsultas";
 
   useEffect(() => {
     clinicApi.getSession().then(({ session, user }) => {
@@ -63,7 +73,12 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
         router.push("/login");
         return;
       }
-      setDoctor({ fullName: user.fullName, email: user.email ?? session.email });
+      setDoctor({
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email ?? session.email,
+        subscriptionPlan: user.subscriptionPlan,
+      });
       setChecking(false);
     });
   }, [router]);
@@ -203,12 +218,30 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
               </h1>
             </div>
           </div>
+
+          {doctor && (
+            <NodoChatBell
+              isPro={isPro}
+              chatEmbedded={chatEmbedded}
+              onOpenChat={() => setChatOpen(true)}
+            />
+          )}
         </header>
 
         <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
       </div>
 
       <ThemeSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+
+      {doctor && !chatEmbedded && (
+        <NodoChatWidget
+          doctorId={doctor.id}
+          doctorName={doctor.fullName}
+          isPro={isPro}
+          open={chatOpen}
+          onOpenChange={setChatOpen}
+        />
+      )}
     </div>
   );
 }
