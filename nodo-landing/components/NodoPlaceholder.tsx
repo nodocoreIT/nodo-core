@@ -116,6 +116,20 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
                 >
                   Entrar a Inmo
                 </Link>
+              ) : slug === "autos" ? (
+                <Link
+                  href="/nodo-autos/login"
+                  className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150 shadow-md shadow-brand/15"
+                >
+                  Entrar al Concesionario
+                </Link>
+              ) : slug === "clinica" ? (
+                <Link
+                  href="/nodo-clinica/login"
+                  className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150 shadow-md shadow-brand/15"
+                >
+                  Entrar a Clínica
+                </Link>
               ) : (
                 <>
                   {/* Row 1 */}
