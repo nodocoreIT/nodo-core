@@ -418,4 +418,56 @@ export const clinicApi = {
     if (!res.ok) throw new Error(data.error || "Error al actualizar perfil");
     return data;
   },
+
+  async getInterconsultMessages(peerId: string | null = null) {
+    const params = peerId ? `?peerId=${encodeURIComponent(peerId)}` : "";
+    const res = await fetch(`/api/clinic/interconsult/messages${params}`, fetchOpts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar mensajes");
+    return data as {
+      messages: Array<{
+        id: string;
+        fromDoctorId: string;
+        fromDoctorName: string;
+        toDoctorId: string | null;
+        content: string;
+        createdAt: string;
+      }>;
+    };
+  },
+
+  async sendInterconsultMessage(content: string, toDoctorId: string | null = null) {
+    const res = await fetch("/api/clinic/interconsult/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      credentials: "include",
+      body: JSON.stringify({ content, toDoctorId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al enviar mensaje");
+    return data;
+  },
+
+  async getInterconsultPresence() {
+    const res = await fetch("/api/clinic/interconsult/presence", fetchOpts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar presencia");
+    return data as {
+      doctors: Array<{
+        id: string;
+        fullName: string;
+        specialty: string;
+        online: boolean;
+        lastSeen: string | null;
+      }>;
+    };
+  },
+
+  async pingInterconsultPresence() {
+    await fetch("/api/clinic/interconsult/presence", {
+      method: "POST",
+      headers: authHeaders(),
+      credentials: "include",
+    });
+  },
 };
