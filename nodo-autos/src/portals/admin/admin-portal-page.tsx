@@ -7,14 +7,7 @@ import { VehicleDetailPage } from "@/features/vehicles/vehicle-detail-page";
 import { CustomersListPage } from "@/features/customers/customers-list-page";
 import { PublicationsPage } from "@/features/publications/publications-page";
 import { ConfigPage } from "@/features/config/config-page";
-
-function ContratosPlaceholder() {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
-      <p className="text-slate2 text-sm">Módulo de contratos — próximamente.</p>
-    </div>
-  );
-}
+import { ContractsPage } from "@/features/contracts/contracts-page";
 
 export function AdminPortalPage() {
   return (
@@ -28,7 +21,7 @@ export function AdminPortalPage() {
         <Route path="vehiculos/:id/editar" element={<VehicleFormPage />} />
         <Route path="clientes" element={<CustomersListPage />} />
         <Route path="publicaciones" element={<PublicationsPage />} />
-        <Route path="contratos" element={<ContratosPlaceholder />} />
+        <Route path="contratos" element={<ContractsPage />} />
         <Route path="configuracion" element={<ConfigPage />} />
       </Route>
     </Routes>
