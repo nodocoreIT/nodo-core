@@ -4,7 +4,7 @@
  * Security note: This guard is a UX convenience ONLY. The actual security
  * boundary is Postgres Row-Level Security (RLS) enforced server-side.
  */
-import { useEffect } from "react";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "@nodocore/shared-components";
 import type { ReactNode } from "react";
 
@@ -15,14 +15,10 @@ interface RequireAuthProps {
 export function RequireAuth({ children }: RequireAuthProps) {
   const { loading, session, role } = useAuth();
 
-  useEffect(() => {
-    if (!loading && !session) {
-      window.location.replace("/nodo-clinica/login");
-    }
-  }, [loading, session]);
+  if (loading) return null;
 
-  if (loading || !session) {
-    return null;
+  if (!session) {
+    return <Navigate to="/login" replace />;
   }
 
   if (!role) {
