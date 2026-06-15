@@ -116,6 +116,22 @@ export interface LocalClinicalNote {
   updatedAt: string;
 }
 
+/** Mensaje en sala general o DM entre médicos */
+export interface InterconsultMessage {
+  id: string;
+  fromDoctorId: string;
+  fromDoctorName: string;
+  /** null = sala general de interconsultas */
+  toDoctorId: string | null;
+  content: string;
+  createdAt: string;
+}
+
+export interface DoctorPresenceEntry {
+  doctorId: string;
+  lastSeen: string;
+}
+
 export interface ClinicDatabase {
   doctors: LocalDoctor[];
   patients: LocalPatient[];
@@ -123,6 +139,8 @@ export interface ClinicDatabase {
   documents: LocalDocument[];
   clinicalRecords: LocalClinicalRecord[];
   clinicalNotes: Record<string, LocalClinicalNote>;
+  interconsultMessages?: InterconsultMessage[];
+  doctorPresence?: Record<string, DoctorPresenceEntry>;
 }
 
 const DATA_DIR = process.env.CLINIC_DATA_DIR
@@ -193,6 +211,18 @@ const SEED: ClinicDatabase = {
     },
   ],
   clinicalNotes: {},
+  interconsultMessages: [
+    {
+      id: "ic-welcome-001",
+      fromDoctorId: "doc-mauro-001",
+      fromDoctorName: "Mauro Lluch",
+      toDoctorId: null,
+      content:
+        "Bienvenidos a la sala de interconsultas. Acá pueden consultar casos clínicos entre colegas en tiempo real.",
+      createdAt: new Date(Date.now() - 3600000).toISOString(),
+    },
+  ],
+  doctorPresence: {},
 };
 
 let writeQueue: Promise<void> = Promise.resolve();
@@ -237,14 +267,15 @@ async function ensureDb(): Promise<ClinicDatabase> {
   const fromBlob = await readFromBlob();
   if (fromBlob) {
     await fs.mkdir(DATA_DIR, { recursive: true });
-    await fs.writeFile(DB_PATH, JSON.stringify(fromBlob, null, 2), "utf-8");
-    return fromBlob;
+    const normalized = normalizeDb(fromBlob);
+    await fs.writeFile(DB_PATH, JSON.stringify(normalized, null, 2), "utf-8");
+    return normalized;
   }
 
   await fs.mkdir(DATA_DIR, { recursive: true });
   try {
     const raw = await fs.readFile(DB_PATH, "utf-8");
-    const parsed = JSON.parse(raw) as ClinicDatabase;
+    const parsed = normalizeDb(JSON.parse(raw) as ClinicDatabase);
     await writeToBlob(parsed);
     return parsed;
   } catch {
@@ -253,6 +284,14 @@ async function ensureDb(): Promise<ClinicDatabase> {
     return seed;
   }
 }
+
+function normalizeDb(db: ClinicDatabase): ClinicDatabase {
+  if (!db.interconsultMessages) db.interconsultMessages = [];
+  if (!db.doctorPresence) db.doctorPresence = {};
+  return db;
+}
+
+export const ONLINE_THRESHOLD_MS = 90_000;
 
 export async function readDb(): Promise<ClinicDatabase> {
   return ensureDb();
