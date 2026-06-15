@@ -5,7 +5,7 @@ import { AuthCallbackPage } from "@/features/auth/callback/auth-callback-page";
 import { AdminPortalPage } from "@/portals/admin/admin-portal-page";
 
 function LoginRedirect() {
-  window.location.replace("/nodo-landing/login");
+  window.location.replace("/nodo-autos/login");
   return null;
 }
 
