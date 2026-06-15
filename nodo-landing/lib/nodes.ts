@@ -242,6 +242,34 @@ export const NODES: NodeDef[] = [
       "Gestión contable e impositiva: balances, liquidaciones de impuestos y cumplimiento fiscal.",
     Icon: Calculator,
   },
+  {
+    code: "Clínica",
+    slug: "clinica",
+    label: "Nodo Clínica",
+    description:
+      "Plataforma HealthTech para telemedicina profesional: consultorios virtuales, recetas digitales e informes automatizados con IA.",
+    Icon: Stethoscope,
+    intro:
+      "Digitaliza tu consultorio: agenda online, videoconsultas, prescripciones digitales y resúmenes SOAP generados con IA.",
+    highlights: [
+      {
+        title: "Videoconsultas",
+        description:
+          "Consultorios virtuales con Jitsi Meet, sin instalaciones.",
+      },
+      {
+        title: "IA Clínica",
+        description:
+          "Resúmenes SOAP automáticos desde la transcripción de la consulta.",
+      },
+      {
+        title: "Recetas digitales",
+        description:
+          "Emití prescripciones y pedidos de estudios con firma digital en PDF.",
+      },
+    ],
+    provisionable: true,
+  },
 ];
 
 export function getNodeBySlug(slug: string): NodeDef | undefined {

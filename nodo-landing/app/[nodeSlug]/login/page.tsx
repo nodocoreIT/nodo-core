@@ -154,16 +154,11 @@ function LoginForm() {
         window.location.href = `/inmo/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
       } else if (
         nodeParam === "nodo-clinica" ||
-        nodeParam === "clinica-virtual"
+        nodeParam === "clinica-virtual" ||
+        nodeParam === "clinica"
       ) {
-        const role = data.user?.app_metadata?.role;
-        if (role === "medico") {
-          window.location.href = "/medico";
-        } else if (role === "admin") {
-          window.location.href = "/admin";
-        } else {
-          window.location.href = "/paciente";
-        }
+        const { access_token, refresh_token } = data.session!;
+        window.location.href = `/clinica/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
       } else {
         router.push("/panel");
       }
@@ -473,7 +468,8 @@ function LoginForm() {
                 {/* Kicker */}
                 <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
                   {nodeParam === "nodo-clinica" ||
-                  nodeParam === "clinica-virtual"
+                  nodeParam === "clinica-virtual" ||
+                  nodeParam === "clinica"
                     ? "◎ Portal Clínica Virtual"
                     : nodeParam === "nodo-inmo" || nodeParam === "inmo"
                       ? "◎ Portal Inmobiliarias"
@@ -485,8 +481,9 @@ function LoginForm() {
                 </h1>
                 <p className="text-slate2 text-[14.5px] mb-6">
                   {nodeParam === "nodo-clinica" ||
-                  nodeParam === "clinica-virtual"
-                    ? "Ingrese sus credenciales de profesional o paciente para acceder."
+                  nodeParam === "clinica-virtual" ||
+                  nodeParam === "clinica"
+                    ? "Ingrese sus credenciales de médico o paciente para acceder."
                     : nodeParam === "nodo-inmo" || nodeParam === "inmo"
                       ? "Ingrese sus credenciales de dueño de inmobiliaria para acceder."
                       : "Ingrese sus credenciales para acceder al panel de Nodo Core."}

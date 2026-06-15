@@ -1,0 +1,39 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import {
+  SupabaseProvider,
+  AuthProvider,
+} from "@nodocore/shared-components";
+import { supabase } from "@/shared/lib/supabase";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000, // 1 minute
+      retry: 1,
+    },
+  },
+});
+
+const AUTH_CONFIG = {
+  roleDestinations: {
+    medico: "/medico",
+    paciente: "/paciente",
+  },
+};
+
+interface AppProvidersProps {
+  children: ReactNode;
+}
+
+export function AppProviders({ children }: AppProvidersProps) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SupabaseProvider client={supabase}>
+        <AuthProvider config={AUTH_CONFIG}>
+          {children}
+        </AuthProvider>
+      </SupabaseProvider>
+    </QueryClientProvider>
+  );
+}

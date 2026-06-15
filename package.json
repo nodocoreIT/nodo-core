@@ -15,6 +15,7 @@
     "typecheck": "turbo typecheck",
     "dev:core": "turbo dev --filter=nodo-core",
     "dev:inmo": "turbo dev --filter=nodo-inmo",
+    "dev:clinica": "turbo dev --filter=clinica-virtual",
     "dev:all": "turbo dev --filter=nodo-core --filter=nodo-inmo"
   },
   "devDependencies": {
