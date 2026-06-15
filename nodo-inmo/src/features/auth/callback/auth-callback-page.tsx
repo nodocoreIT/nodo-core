@@ -16,29 +16,21 @@ export function AuthCallbackPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // onAuthStateChange fires once the session from the URL fragment is exchanged.
-    // We listen for a single SIGNED_IN event then navigate away.
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN") {
-        subscription.unsubscribe();
-        navigate("/");
-      }
-    });
+    const params = new URLSearchParams(window.location.hash.substring(1));
+    const access_token = params.get("access_token");
+    const refresh_token = params.get("refresh_token");
 
-    // Fallback: if there's already a session (page re-visited), redirect
-    // immediately rather than waiting for an event that may never fire.
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        subscription.unsubscribe();
-        navigate("/");
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    if (access_token && refresh_token) {
+      supabase.auth
+        .setSession({ access_token, refresh_token })
+        .then(({ data }) => {
+          if (data.session) navigate("/");
+        });
+    } else {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) navigate("/");
+      });
+    }
   }, [navigate]);
 
   return (

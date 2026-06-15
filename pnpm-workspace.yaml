@@ -1,4 +1,5 @@
 packages:
   - 'packages/*'
+  - 'nodo-landing'
   - 'nodo-inmo'
   - 'nodo-clinica'

@@ -8,7 +8,7 @@ const NODO_INMO_URL = process.env.NODO_INMO_URL ?? "http://localhost:5173";
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "192.168.1.37"],
   turbopack: {
-    root: "/Users/ramirotule/Documents/1.Proyectos/nodocore/nodo-landing",
+    root: "/Users/ramirotule/Documents/1.Proyectos/nodocore",
   },
   async rewrites() {
     return [
@@ -35,6 +35,27 @@ const nextConfig: NextConfig = {
       {
         source: "/@react-refresh",
         destination: `${NODO_INMO_URL}/@react-refresh`,
+      },
+      {
+        source: "/@fs/:path*",
+        destination: `${NODO_INMO_URL}/@fs/:path*`,
+      },
+      {
+        source: "/src/:path*",
+        destination: `${NODO_INMO_URL}/src/:path*`,
+      },
+      {
+        source: "/node_modules/.vite/:path*",
+        destination: `${NODO_INMO_URL}/node_modules/.vite/:path*`,
+      },
+      // nodo-inmo static assets (public/)
+      {
+        source: "/brand/:path*",
+        destination: `${NODO_INMO_URL}/brand/:path*`,
+      },
+      {
+        source: "/assets/:path*",
+        destination: `${NODO_INMO_URL}/assets/:path*`,
       },
     ];
   },

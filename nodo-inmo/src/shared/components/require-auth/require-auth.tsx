@@ -13,7 +13,7 @@
  *   session, no role → renders a graceful "pending" state
  *                      (claim-sync trigger/Edge Function not yet run)
  */
-import { Navigate } from "react-router-dom";
+import { useEffect } from "react";
 import { useAuth } from "@nodocore/shared-components";
 import type { ReactNode } from "react";
 
@@ -24,12 +24,14 @@ interface RequireAuthProps {
 export function RequireAuth({ children }: RequireAuthProps) {
   const { loading, session, role } = useAuth();
 
-  if (loading) {
-    return null;
-  }
+  useEffect(() => {
+    if (!loading && !session) {
+      window.location.replace("/nodo-inmo/login");
+    }
+  }, [loading, session]);
 
-  if (!session) {
-    return <Navigate to="/login" replace />;
+  if (loading || !session) {
+    return null;
   }
 
   // Session exists but claim-sync hasn't assigned a role yet.

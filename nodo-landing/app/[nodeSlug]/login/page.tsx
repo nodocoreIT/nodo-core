@@ -148,7 +148,10 @@ function LoginForm() {
         return;
       }
       if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
-        router.push("/inmo");
+        // Pass tokens in the hash so nodo-inmo's Supabase JS client
+        // can detect and store the session in localStorage.
+        const { access_token, refresh_token } = data.session!;
+        window.location.href = `/inmo/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
       } else if (
         nodeParam === "nodo-clinica" ||
         nodeParam === "clinica-virtual"
