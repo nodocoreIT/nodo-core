@@ -141,6 +141,8 @@ export interface ClinicDatabase {
   clinicalNotes: Record<string, LocalClinicalNote>;
   interconsultMessages?: InterconsultMessage[];
   doctorPresence?: Record<string, DoctorPresenceEntry>;
+  /** Última vez que el médico leyó el chat (ISO por doctorId) */
+  nodoChatReadAt?: Record<string, string>;
 }
 
 const DATA_DIR = process.env.CLINIC_DATA_DIR
@@ -221,6 +223,14 @@ const SEED: ClinicDatabase = {
         "Bienvenidos a la sala de interconsultas. Acá pueden consultar casos clínicos entre colegas en tiempo real.",
       createdAt: new Date(Date.now() - 3600000).toISOString(),
     },
+    {
+      id: "ic-demo-dm-001",
+      fromDoctorId: "doc-demo-001",
+      fromDoctorName: "Dra. María González",
+      toDoctorId: "doc-mauro-001",
+      content: "Mauro, ¿podés revisar este caso de dispepsia funcional?",
+      createdAt: new Date(Date.now() - 120000).toISOString(),
+    },
   ],
   doctorPresence: {},
 };
@@ -288,6 +298,7 @@ async function ensureDb(): Promise<ClinicDatabase> {
 function normalizeDb(db: ClinicDatabase): ClinicDatabase {
   if (!db.interconsultMessages) db.interconsultMessages = [];
   if (!db.doctorPresence) db.doctorPresence = {};
+  if (!db.nodoChatReadAt) db.nodoChatReadAt = {};
   return db;
 }
 

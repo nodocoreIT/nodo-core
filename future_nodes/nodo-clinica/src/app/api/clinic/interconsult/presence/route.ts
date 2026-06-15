@@ -6,6 +6,7 @@ import {
   publicDoctorSummary,
 } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
+import { isProPlan } from "@/lib/nodo-chat/is-pro-plan";
 
 export async function GET(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -14,6 +15,11 @@ export async function GET(request: NextRequest) {
   }
 
   const db = await readDb();
+  const me = db.doctors.find((d) => d.id === session.userId);
+  if (!me || !isProPlan(me.subscriptionPlan)) {
+    return NextResponse.json({ error: "Plan Pro requerido" }, { status: 403 });
+  }
+
   const now = Date.now();
 
   const doctors = db.doctors

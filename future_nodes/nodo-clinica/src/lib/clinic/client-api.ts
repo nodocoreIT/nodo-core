@@ -470,4 +470,51 @@ export const clinicApi = {
       credentials: "include",
     });
   },
+
+  async searchNodoChatDirectory(q = "") {
+    const params = q ? `?q=${encodeURIComponent(q)}` : "";
+    const res = await fetch(`/api/clinic/interconsult/directory${params}`, fetchOpts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al buscar contactos");
+    return data as {
+      contacts: Array<{
+        id: string;
+        fullName: string;
+        role: string;
+        nodeSlug: string;
+        nodeLabel: string;
+        specialty?: string;
+        online: boolean;
+      }>;
+      currentPlan: string;
+    };
+  },
+
+  async getNodoChatUnread() {
+    const res = await fetch("/api/clinic/interconsult/unread", fetchOpts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar notificaciones");
+    return data as {
+      count: number;
+      items: Array<{
+        id: string;
+        fromDoctorId: string;
+        fromDoctorName: string;
+        toDoctorId: string | null;
+        content: string;
+        createdAt: string;
+      }>;
+    };
+  },
+
+  async markNodoChatRead() {
+    const res = await fetch("/api/clinic/interconsult/read", {
+      method: "POST",
+      headers: authHeaders(),
+      credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al marcar leído");
+    return data as { readAt: string };
+  },
 };
