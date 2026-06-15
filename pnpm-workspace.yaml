@@ -2,4 +2,4 @@ packages:
   - 'packages/*'
   - 'nodo-landing'
   - 'nodo-inmo'
-  - 'clinica-virtual'
+  - 'nodo-clinica'
