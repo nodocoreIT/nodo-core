@@ -1,4 +1,4 @@
 packages:
   - 'packages/*'
   - 'nodo-inmo'
-  - 'nodo-clinica'
+  - 'future_nodes/nodo-clinica'
