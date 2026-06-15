@@ -12,6 +12,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 /**
  * Supabase client singleton.
  *
- * Public schema: supabase.from("table_name")
+ * Targets schema "nodo_autos" — must be listed under
+ * Settings → API → Extra schemas in the Supabase dashboard.
  */
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  db: { schema: "nodo_autos" },
+});
