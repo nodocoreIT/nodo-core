@@ -6,6 +6,8 @@ import {
   type InterconsultMessage,
 } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
+import { ECOSYSTEM_PRO_CONTACTS } from "@/lib/nodo-chat/ecosystem-directory";
+import { isProPlan } from "@/lib/nodo-chat/is-pro-plan";
 
 function filterMessages(
   messages: InterconsultMessage[],
@@ -28,8 +30,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const peerId = new URL(request.url).searchParams.get("peerId");
   const db = await readDb();
+  const me = db.doctors.find((d) => d.id === session.userId);
+  if (!me || !isProPlan(me.subscriptionPlan)) {
+    return NextResponse.json({ error: "Plan Pro requerido" }, { status: 403 });
+  }
+
+  const peerId = new URL(request.url).searchParams.get("peerId");
   const messages = filterMessages(
     db.interconsultMessages ?? [],
     session.userId,
@@ -58,11 +65,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Mensaje vacío" }, { status: 400 });
   }
 
+  const dbCheck = await readDb();
+  const mePost = dbCheck.doctors.find((d) => d.id === session.userId);
+  if (!mePost || !isProPlan(mePost.subscriptionPlan)) {
+    return NextResponse.json({ error: "Plan Pro requerido" }, { status: 403 });
+  }
+
   if (toDoctorId) {
-    const db = await readDb();
-    const peer = db.doctors.find((d) => d.id === toDoctorId);
-    if (!peer) {
-      return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+    const localPeer = dbCheck.doctors.find((d) => d.id === toDoctorId);
+    const externalPeer = ECOSYSTEM_PRO_CONTACTS.find((c) => c.id === toDoctorId);
+    if (!localPeer && !externalPeer) {
+      return NextResponse.json({ error: "Contacto no encontrado" }, { status: 404 });
     }
   }
 
