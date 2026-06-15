@@ -6,7 +6,6 @@
 -- ─── Create schema ───────────────────────────────────────────
 create schema if not exists nodo_autos;
 
--- Grant PostgREST access (required for Supabase REST API)
 grant usage on schema nodo_autos to anon, authenticated, service_role;
 alter default privileges in schema nodo_autos
   grant all on tables to anon, authenticated, service_role;
@@ -15,7 +14,9 @@ alter default privileges in schema nodo_autos
 alter default privileges in schema nodo_autos
   grant all on functions to anon, authenticated, service_role;
 
--- ─── clientes (dealership tenants) ───────────────────────────
+-- ─── Tables ──────────────────────────────────────────────────
+-- (all tables first, policies after — avoids forward-reference errors)
+
 create table if not exists nodo_autos.clientes (
   id                  uuid primary key default gen_random_uuid(),
   nombre              text not null,
@@ -36,17 +37,6 @@ create table if not exists nodo_autos.clientes (
   creado_en           timestamptz not null default now()
 );
 
-alter table nodo_autos.clientes enable row level security;
-
-create policy "Authenticated users can read their own cliente"
-  on nodo_autos.clientes for select
-  using (
-    id in (
-      select cliente_id from nodo_autos.users where id = auth.uid()
-    )
-  );
-
--- ─── users ───────────────────────────────────────────────────
 create table if not exists nodo_autos.users (
   id                uuid primary key references auth.users(id) on delete cascade,
   cliente_id        uuid not null references nodo_autos.clientes(id) on delete cascade,
@@ -59,26 +49,9 @@ create table if not exists nodo_autos.users (
   created_at        timestamptz not null default now()
 );
 
-alter table nodo_autos.users enable row level security;
-
-create policy "Users can read users in their cliente"
-  on nodo_autos.users for select
-  using (
-    cliente_id in (
-      select cliente_id from nodo_autos.users where id = auth.uid()
-    )
-  );
-
-create policy "Users can update their own profile"
-  on nodo_autos.users for update
-  using (id = auth.uid());
-
--- ─── vehicles ────────────────────────────────────────────────
 create table if not exists nodo_autos.vehicles (
   id                   uuid primary key default gen_random_uuid(),
   cliente_id           uuid not null references nodo_autos.clientes(id) on delete cascade,
-
-  -- Identity
   brand                text not null,
   model                text not null,
   version              text,
@@ -92,26 +65,18 @@ create table if not exists nodo_autos.vehicles (
   numero_motor         text,
   color                text,
   single_owner         boolean default false,
-
-  -- Usage
   kilometers           integer not null default 0,
   condition            text not null check (condition in ('nuevo', 'usado')),
   status               text not null check (status in ('disponible', 'reservado', 'vendido', 'en_preparacion')),
-
-  -- Price
   currency             text not null check (currency in ('ARS', 'USD')),
   list_price           numeric not null,
   cash_price           numeric,
   show_price           boolean not null default true,
   price_observations   text,
-
-  -- Commercial
   entry_date           date not null,
   owner_type           text not null check (owner_type in ('own', 'consignment')),
   margin               numeric,
   expenses             numeric,
-
-  -- Content
   description          text not null default '',
   features             text[],
   photos               text[],
@@ -121,62 +86,12 @@ create table if not exists nodo_autos.vehicles (
   internal_notes       text,
   responsible_user_id  uuid references nodo_autos.users(id),
   tags                 text[],
-
-  -- Audit
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now(),
   created_by           uuid references auth.users(id),
   updated_by           uuid references auth.users(id)
 );
 
-alter table nodo_autos.vehicles enable row level security;
-
-create policy "Users can read vehicles of their cliente"
-  on nodo_autos.vehicles for select
-  using (
-    cliente_id in (
-      select cliente_id from nodo_autos.users where id = auth.uid()
-    )
-  );
-
-create policy "Users can insert vehicles into their cliente"
-  on nodo_autos.vehicles for insert
-  with check (
-    cliente_id in (
-      select cliente_id from nodo_autos.users where id = auth.uid()
-    )
-  );
-
-create policy "Users can update vehicles of their cliente"
-  on nodo_autos.vehicles for update
-  using (
-    cliente_id in (
-      select cliente_id from nodo_autos.users where id = auth.uid()
-    )
-  );
-
-create policy "Users can delete vehicles of their cliente"
-  on nodo_autos.vehicles for delete
-  using (
-    cliente_id in (
-      select cliente_id from nodo_autos.users where id = auth.uid()
-    )
-  );
-
--- Auto-update updated_at
-create or replace function nodo_autos.set_updated_at()
-returns trigger language plpgsql as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
-
-create trigger vehicles_updated_at
-  before update on nodo_autos.vehicles
-  for each row execute function nodo_autos.set_updated_at();
-
--- ─── publications ─────────────────────────────────────────────
 create table if not exists nodo_autos.publications (
   id                uuid primary key default gen_random_uuid(),
   vehicle_id        uuid not null references nodo_autos.vehicles(id) on delete cascade,
@@ -188,46 +103,9 @@ create table if not exists nodo_autos.publications (
   last_published_at timestamptz,
   error_message     text,
   created_at        timestamptz not null default now(),
-
   unique (vehicle_id, channel)
 );
 
-alter table nodo_autos.publications enable row level security;
-
-create policy "Users can read publications of their cliente vehicles"
-  on nodo_autos.publications for select
-  using (
-    vehicle_id in (
-      select id from nodo_autos.vehicles
-      where cliente_id in (
-        select cliente_id from nodo_autos.users where id = auth.uid()
-      )
-    )
-  );
-
-create policy "Users can insert publications for their cliente vehicles"
-  on nodo_autos.publications for insert
-  with check (
-    vehicle_id in (
-      select id from nodo_autos.vehicles
-      where cliente_id in (
-        select cliente_id from nodo_autos.users where id = auth.uid()
-      )
-    )
-  );
-
-create policy "Users can update publications for their cliente vehicles"
-  on nodo_autos.publications for update
-  using (
-    vehicle_id in (
-      select id from nodo_autos.vehicles
-      where cliente_id in (
-        select cliente_id from nodo_autos.users where id = auth.uid()
-      )
-    )
-  );
-
--- ─── customers ───────────────────────────────────────────────
 create table if not exists nodo_autos.customers (
   id              uuid primary key default gen_random_uuid(),
   cliente_id      uuid not null references nodo_autos.clientes(id) on delete cascade,
@@ -244,45 +122,6 @@ create table if not exists nodo_autos.customers (
   updated_at      timestamptz not null default now()
 );
 
-alter table nodo_autos.customers enable row level security;
-
-create policy "Users can read customers of their cliente"
-  on nodo_autos.customers for select
-  using (
-    cliente_id in (
-      select cliente_id from nodo_autos.users where id = auth.uid()
-    )
-  );
-
-create policy "Users can insert customers into their cliente"
-  on nodo_autos.customers for insert
-  with check (
-    cliente_id in (
-      select cliente_id from nodo_autos.users where id = auth.uid()
-    )
-  );
-
-create policy "Users can update customers of their cliente"
-  on nodo_autos.customers for update
-  using (
-    cliente_id in (
-      select cliente_id from nodo_autos.users where id = auth.uid()
-    )
-  );
-
-create policy "Users can delete customers of their cliente"
-  on nodo_autos.customers for delete
-  using (
-    cliente_id in (
-      select cliente_id from nodo_autos.users where id = auth.uid()
-    )
-  );
-
-create trigger customers_updated_at
-  before update on nodo_autos.customers
-  for each row execute function nodo_autos.set_updated_at();
-
--- ─── contracts ───────────────────────────────────────────────
 create table if not exists nodo_autos.contracts (
   id                uuid primary key default gen_random_uuid(),
   cliente_id        uuid not null references nodo_autos.clientes(id) on delete cascade,
@@ -299,25 +138,6 @@ create table if not exists nodo_autos.contracts (
   created_at        timestamptz not null default now()
 );
 
-alter table nodo_autos.contracts enable row level security;
-
-create policy "Users can read contracts of their cliente"
-  on nodo_autos.contracts for select
-  using (
-    cliente_id in (
-      select cliente_id from nodo_autos.users where id = auth.uid()
-    )
-  );
-
-create policy "Users can insert contracts into their cliente"
-  on nodo_autos.contracts for insert
-  with check (
-    cliente_id in (
-      select cliente_id from nodo_autos.users where id = auth.uid()
-    )
-  );
-
--- ─── audit_logs ──────────────────────────────────────────────
 create table if not exists nodo_autos.audit_logs (
   id          uuid primary key default gen_random_uuid(),
   cliente_id  uuid not null references nodo_autos.clientes(id) on delete cascade,
@@ -330,9 +150,122 @@ create table if not exists nodo_autos.audit_logs (
   timestamp   timestamptz not null default now()
 );
 
-alter table nodo_autos.audit_logs enable row level security;
+-- ─── Triggers ────────────────────────────────────────────────
 
-create policy "Admins can read audit logs of their cliente"
+create or replace function nodo_autos.set_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger vehicles_updated_at
+  before update on nodo_autos.vehicles
+  for each row execute function nodo_autos.set_updated_at();
+
+create trigger customers_updated_at
+  before update on nodo_autos.customers
+  for each row execute function nodo_autos.set_updated_at();
+
+-- ─── RLS ─────────────────────────────────────────────────────
+-- All tables exist at this point, so cross-table references in policies are safe.
+
+alter table nodo_autos.clientes    enable row level security;
+alter table nodo_autos.users       enable row level security;
+alter table nodo_autos.vehicles    enable row level security;
+alter table nodo_autos.publications enable row level security;
+alter table nodo_autos.customers   enable row level security;
+alter table nodo_autos.contracts   enable row level security;
+alter table nodo_autos.audit_logs  enable row level security;
+
+-- clientes
+create policy "clientes: read own"
+  on nodo_autos.clientes for select
+  using (id in (select cliente_id from nodo_autos.users where id = auth.uid()));
+
+-- users
+create policy "users: read same cliente"
+  on nodo_autos.users for select
+  using (cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid()));
+
+create policy "users: update own profile"
+  on nodo_autos.users for update
+  using (id = auth.uid());
+
+-- vehicles
+create policy "vehicles: read"
+  on nodo_autos.vehicles for select
+  using (cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid()));
+
+create policy "vehicles: insert"
+  on nodo_autos.vehicles for insert
+  with check (cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid()));
+
+create policy "vehicles: update"
+  on nodo_autos.vehicles for update
+  using (cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid()));
+
+create policy "vehicles: delete"
+  on nodo_autos.vehicles for delete
+  using (cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid()));
+
+-- publications
+create policy "publications: read"
+  on nodo_autos.publications for select
+  using (
+    vehicle_id in (
+      select id from nodo_autos.vehicles
+      where cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid())
+    )
+  );
+
+create policy "publications: insert"
+  on nodo_autos.publications for insert
+  with check (
+    vehicle_id in (
+      select id from nodo_autos.vehicles
+      where cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid())
+    )
+  );
+
+create policy "publications: update"
+  on nodo_autos.publications for update
+  using (
+    vehicle_id in (
+      select id from nodo_autos.vehicles
+      where cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid())
+    )
+  );
+
+-- customers
+create policy "customers: read"
+  on nodo_autos.customers for select
+  using (cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid()));
+
+create policy "customers: insert"
+  on nodo_autos.customers for insert
+  with check (cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid()));
+
+create policy "customers: update"
+  on nodo_autos.customers for update
+  using (cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid()));
+
+create policy "customers: delete"
+  on nodo_autos.customers for delete
+  using (cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid()));
+
+-- contracts
+create policy "contracts: read"
+  on nodo_autos.contracts for select
+  using (cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid()));
+
+create policy "contracts: insert"
+  on nodo_autos.contracts for insert
+  with check (cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid()));
+
+-- audit_logs
+create policy "audit_logs: read (admins only)"
   on nodo_autos.audit_logs for select
   using (
     cliente_id in (
@@ -341,10 +274,6 @@ create policy "Admins can read audit logs of their cliente"
     )
   );
 
-create policy "Users can insert audit logs for their cliente"
+create policy "audit_logs: insert"
   on nodo_autos.audit_logs for insert
-  with check (
-    cliente_id in (
-      select cliente_id from nodo_autos.users where id = auth.uid()
-    )
-  );
+  with check (cliente_id in (select cliente_id from nodo_autos.users where id = auth.uid()));
