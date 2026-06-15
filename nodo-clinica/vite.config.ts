@@ -6,6 +6,7 @@ import { resolve } from "path";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  base: "/clinica",
   server: {
     port: 5174,
     strictPort: true,
