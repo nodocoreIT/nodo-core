@@ -7,6 +7,7 @@ import {
   Stethoscope,
   Wheat,
   Calculator,
+  Car,
   type LucideIcon,
 } from "lucide-react";
 
@@ -266,6 +267,34 @@ export const NODES: NodeDef[] = [
         title: "Recetas digitales",
         description:
           "Emití prescripciones y pedidos de estudios con firma digital en PDF.",
+      },
+    ],
+    provisionable: true,
+  },
+  {
+    code: "Autos",
+    slug: "autos",
+    label: "Nodo Autos",
+    description:
+      "Panel de gestión de stock para concesionarias y agencias de autos: inventario, clientes, publicaciones y contratos de venta.",
+    Icon: Car,
+    intro:
+      "Administrá tu agencia desde un solo lugar: cargá vehículos, gestioná clientes, publicá en redes y generá contratos de venta.",
+    highlights: [
+      {
+        title: "Stock inteligente",
+        description:
+          "Inventario de vehículos con fotos, filtros avanzados y estado en tiempo real.",
+      },
+      {
+        title: "Publicación multicanal",
+        description:
+          "Publicá en Instagram, Facebook, MercadoLibre y tu sitio web desde un solo panel.",
+      },
+      {
+        title: "Contratos digitales",
+        description:
+          "Generá contratos de compraventa en PDF con datos del comprador y condiciones de pago.",
       },
     ],
     provisionable: true,

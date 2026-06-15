@@ -97,6 +97,11 @@ function LoginForm() {
     panelTitle = "NODO | Clínica Virtual";
     panelDesc =
       "Plataforma HealthTech para telemedicina profesional: consultorios virtuales, recetas digitales e informes automatizados con Inteligencia Artificial.";
+  } else if (nodeParam === "nodo-autos" || nodeParam === "autos") {
+    activeNodeSlug = "autos";
+    panelTitle = "NODO | Autos";
+    panelDesc =
+      "Panel de gestión de stock para concesionarias y agencias: inventario, clientes, publicaciones y contratos de venta digitales.";
   } else if (matchedNode) {
     activeNodeSlug = matchedNode.slug;
     panelTitle = `NODO | ${matchedNode.code}`;
@@ -159,6 +164,9 @@ function LoginForm() {
       ) {
         const { access_token, refresh_token } = data.session!;
         window.location.href = `/clinica/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+      } else if (nodeParam === "nodo-autos" || nodeParam === "autos") {
+        const { access_token, refresh_token } = data.session!;
+        window.location.href = `/autos/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
       } else {
         router.push("/panel");
       }

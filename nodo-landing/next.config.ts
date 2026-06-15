@@ -5,6 +5,7 @@ import type { NextConfig } from "next";
 // and in Vercel environment variables for production.
 const NODO_INMO_URL = process.env.NODO_INMO_URL ?? "http://localhost:5173";
 const NODO_CLINICA_URL = process.env.NODO_CLINICA_URL ?? "http://localhost:5174";
+const NODO_AUTOS_URL = process.env.NODO_AUTOS_URL ?? "http://localhost:5175";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "192.168.1.37"],
@@ -66,6 +67,15 @@ const nextConfig: NextConfig = {
       {
         source: "/clinica/:path*",
         destination: `${NODO_CLINICA_URL}/clinica/:path*`,
+      },
+      // ── nodo-autos (Multi-Zone) ────────────────────────────────────────────
+      {
+        source: "/autos",
+        destination: `${NODO_AUTOS_URL}/autos`,
+      },
+      {
+        source: "/autos/:path*",
+        destination: `${NODO_AUTOS_URL}/autos/:path*`,
       },
     ];
   },

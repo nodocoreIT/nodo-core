@@ -16,7 +16,8 @@
     "dev:core": "turbo dev --filter=nodo-core",
     "dev:inmo": "turbo dev --filter=nodo-inmo",
     "dev:clinica": "turbo dev --filter=nodo-clinica",
-    "dev:all": "turbo dev --filter=nodo-core --filter=nodo-inmo"
+    "dev:all": "turbo dev --filter=nodo-core --filter=nodo-inmo",
+    "dev:autos": "turbo dev --filter=nodo-autos"
   },
   "devDependencies": {
     "turbo": "latest"
