@@ -4,8 +4,6 @@ import { IPC_QUERY_KEY } from "./use-current-ipc";
 
 
 
-/**
- * Fetches IPC from Argentina's open data API (datos.gob.ar) and persists
 export function useRefreshIPC() {
   const queryClient = useQueryClient();
 
