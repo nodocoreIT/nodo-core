@@ -162,7 +162,13 @@ export async function POST(request: NextRequest) {
 
   const patient = db.patients.find((p) => p.id === session.userId);
   if (!patient) {
-    return NextResponse.json({ error: "Paciente no encontrado" }, { status: 404 });
+    return NextResponse.json(
+      {
+        error:
+          "Tu sesión no coincide con la base de datos. Cerrá sesión e ingresá de nuevo con paciente1@nodo.demo",
+      },
+      { status: 404 },
+    );
   }
 
   const requiresPayment = doctorRequiresPayment(doctor);
