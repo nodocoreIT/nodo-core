@@ -19,6 +19,30 @@ import { supabase } from "@/shared/lib/supabase";
 import { generateVehicleSlug } from "@/shared/lib/utils";
 import type { VehicleStatus, VehicleCondition, FuelType, Currency } from "@/types";
 
+function formatCurrencyInput(value: string | number | null | undefined, currency: "ARS" | "USD" = "ARS"): string {
+  if (value === null || value === undefined) return "";
+  const clean = String(value).replace(/\D/g, "");
+  if (!clean) return "";
+  const formatted = Number(clean).toLocaleString("de-DE"); // formats with dot separator
+  const prefix = currency === "ARS" ? "$ " : "US$ ";
+  return `${prefix}${formatted}`;
+}
+
+function formatNumericInput(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  const clean = String(value).replace(/\D/g, "");
+  if (!clean) return "";
+  return Number(clean).toLocaleString("de-DE");
+}
+
+function parseNumberInput(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const clean = String(value).replace(/\D/g, "");
+  if (!clean) return null;
+  const n = Number(clean);
+  return isNaN(n) ? null : n;
+}
+
 const vehicleSchema = z.object({
   brand: z.string().min(1, "Marca requerida"),
   model: z.string().min(1, "Modelo requerido"),
@@ -28,17 +52,17 @@ const vehicleSchema = z.object({
   fuelType: z.enum(["Diésel", "Eléctrico", "Nafta", "Nafta/GNC", "GNC", "Híbrido"]),
   transmission: z.enum(["manual", "automatica"]).optional(),
   doors: z.coerce.number().optional(),
-  kilometers: z.coerce.number().min(0),
+  kilometers: z.string().min(1, "Kilómetros requeridos"),
   condition: z.enum(["nuevo", "usado"]),
   status: z.enum(["disponible", "reservado", "vendido", "en_preparacion"]),
   currency: z.enum(["ARS", "USD"]),
-  listPrice: z.coerce.number().min(0),
-  cashPrice: z.coerce.number().optional(),
+  listPrice: z.string().min(1, "Precio de lista requerido"),
+  cashPrice: z.string().optional(),
   showPrice: z.boolean(),
   entryDate: z.string().min(1, "Fecha de ingreso requerida"),
   ownerType: z.enum(["own", "consignment"]),
-  margin: z.coerce.number().optional(),
-  expenses: z.coerce.number().optional(),
+  margin: z.string().optional(),
+  expenses: z.string().optional(),
   description: z.string(),
   internalNotes: z.string().optional(),
   licensePlate: z.string().optional(),
@@ -70,6 +94,8 @@ export function VehicleFormPage() {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<VehicleFormValues>({
     resolver: zodResolver(vehicleSchema) as import("react-hook-form").Resolver<VehicleFormValues>,
@@ -81,8 +107,11 @@ export function VehicleFormPage() {
       ownerType: "own",
       showPrice: true,
       year: new Date().getFullYear(),
-      kilometers: 0,
-      listPrice: 0,
+      kilometers: "0",
+      listPrice: "",
+      cashPrice: "",
+      margin: "",
+      expenses: "",
       entryDate: new Date().toISOString().split("T")[0],
       description: "",
     },
@@ -103,17 +132,17 @@ export function VehicleFormPage() {
         fuelType: existing.fuelType,
         transmission: existing.transmission,
         doors: existing.doors,
-        kilometers: existing.kilometers,
+        kilometers: formatNumericInput(existing.kilometers),
         condition: existing.condition,
         status: existing.status,
         currency: existing.currency,
-        listPrice: existing.listPrice,
-        cashPrice: existing.cashPrice,
+        listPrice: formatCurrencyInput(existing.listPrice, existing.currency),
+        cashPrice: existing.cashPrice !== undefined && existing.cashPrice !== null ? formatCurrencyInput(existing.cashPrice, existing.currency) : "",
         showPrice: existing.showPrice,
         entryDate: existing.entryDate,
         ownerType: existing.ownerType,
-        margin: existing.margin,
-        expenses: existing.expenses,
+        margin: existing.margin !== undefined && existing.margin !== null ? formatNumericInput(existing.margin) : "",
+        expenses: existing.expenses !== undefined && existing.expenses !== null ? formatNumericInput(existing.expenses) : "",
         description: existing.description,
         internalNotes: existing.internalNotes ?? "",
         licensePlate: existing.licensePlate ?? "",
@@ -123,6 +152,25 @@ export function VehicleFormPage() {
       setFeatures(existing.features ?? []);
     }
   }, [existing, reset]);
+
+  const currency = watch("currency") || "ARS";
+  const prevCurrencyRef = useRef(currency);
+
+  useEffect(() => {
+    if (prevCurrencyRef.current !== currency) {
+      const currentPrice = watch("listPrice");
+      if (currentPrice) {
+        const raw = currentPrice.replace(/\D/g, "");
+        setValue("listPrice", formatCurrencyInput(raw, currency));
+      }
+      const currentCashPrice = watch("cashPrice");
+      if (currentCashPrice) {
+        const raw = currentCashPrice.replace(/\D/g, "");
+        setValue("cashPrice", formatCurrencyInput(raw, currency));
+      }
+      prevCurrencyRef.current = currency;
+    }
+  }, [currency, setValue, watch]);
 
   // ── Photo upload ───────────────────────────────────────────────────────────
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -223,17 +271,17 @@ export function VehicleFormPage() {
       fuelType: values.fuelType as FuelType,
       transmission: values.transmission,
       doors: values.doors as 3 | 4 | 5 | undefined,
-      kilometers: values.kilometers,
+      kilometers: parseNumberInput(values.kilometers) ?? 0,
       condition: values.condition as VehicleCondition,
       status: values.status as VehicleStatus,
       currency: values.currency as Currency,
-      listPrice: values.listPrice,
-      cashPrice: values.cashPrice,
+      listPrice: parseNumberInput(values.listPrice) ?? 0,
+      cashPrice: parseNumberInput(values.cashPrice) ?? undefined,
       showPrice: values.showPrice,
       entryDate: values.entryDate,
       ownerType: values.ownerType,
-      margin: values.margin,
-      expenses: values.expenses,
+      margin: parseNumberInput(values.margin) ?? undefined,
+      expenses: parseNumberInput(values.expenses) ?? undefined,
       description: values.description,
       internalNotes: values.internalNotes || undefined,
       licensePlate: values.licensePlate || undefined,
@@ -329,7 +377,14 @@ export function VehicleFormPage() {
               </select>
             </FormField>
             <FormField label="Kilómetros *" error={errors.kilometers?.message}>
-              <Input type="number" {...register("kilometers")} />
+              <Input
+                type="text"
+                {...register("kilometers")}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, "");
+                  setValue("kilometers", formatNumericInput(raw));
+                }}
+              />
             </FormField>
             <FormField label="Condición">
               <select {...register("condition")} className="w-full rounded-md border border-mist bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand">
@@ -436,10 +491,26 @@ export function VehicleFormPage() {
               </select>
             </FormField>
             <FormField label="Precio lista *" error={errors.listPrice?.message}>
-              <Input type="number" {...register("listPrice")} />
+              <Input
+                type="text"
+                placeholder={currency === "ARS" ? "$ 0" : "US$ 0"}
+                {...register("listPrice")}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, "");
+                  setValue("listPrice", formatCurrencyInput(raw, currency));
+                }}
+              />
             </FormField>
             <FormField label="Precio contado">
-              <Input type="number" {...register("cashPrice")} />
+              <Input
+                type="text"
+                placeholder={currency === "ARS" ? "$ 0" : "US$ 0"}
+                {...register("cashPrice")}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, "");
+                  setValue("cashPrice", formatCurrencyInput(raw, currency));
+                }}
+              />
             </FormField>
             <div className="flex items-center gap-2 pt-6">
               <input type="checkbox" id="showPrice" {...register("showPrice")} className="h-4 w-4 accent-brand" />
@@ -472,10 +543,26 @@ export function VehicleFormPage() {
               </select>
             </FormField>
             <FormField label="Margen ($)">
-              <Input type="number" {...register("margin")} />
+              <Input
+                type="text"
+                placeholder="0"
+                {...register("margin")}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, "");
+                  setValue("margin", formatNumericInput(raw));
+                }}
+              />
             </FormField>
             <FormField label="Gastos ($)">
-              <Input type="number" {...register("expenses")} />
+              <Input
+                type="text"
+                placeholder="0"
+                {...register("expenses")}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, "");
+                  setValue("expenses", formatNumericInput(raw));
+                }}
+              />
             </FormField>
           </CardContent>
         </Card>
