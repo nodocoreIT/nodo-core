@@ -36,7 +36,7 @@ export function useAutoContractDefaults(propertyId?: string, tenantId?: string) 
       endDate.setMonth(endDate.getMonth() + 24);
 
       const ownerRate = (
-        property.owner as { commission_rate: number | null } | null
+        property.owner as unknown as { commission_rate: number | null } | null
       )?.commission_rate;
 
       return {

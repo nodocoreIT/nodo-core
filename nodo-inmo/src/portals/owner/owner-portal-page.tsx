@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { OwnerLayout } from "./components/owner-layout";
-import { OwnerHomePage } from "./components/owner-home-page";
 import { OwnerPropertiesPage } from "./components/owner-properties-page";
 import { OwnerSettlementsPage } from "./components/owner-settlements-page";
 
