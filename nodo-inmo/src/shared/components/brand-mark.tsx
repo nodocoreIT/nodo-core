@@ -27,6 +27,8 @@ interface BrandMarkProps {
 }
 
 export function BrandMark({ onDark, className, iconClassName, useLegacyIcon = false }: BrandMarkProps) {
+  const baseUrl = import.meta.env.BASE_URL || "/";
+  const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   let settings: ThemeSettings = DEFAULT_SETTINGS;
   let logoUrl: string | null = null;
 
@@ -87,7 +89,9 @@ export function BrandMark({ onDark, className, iconClassName, useLegacyIcon = fa
     return (
       <span className={cn("inline-flex items-center gap-2", className)}>
         <img
-          src={onDark ? "/brand/nodo-mark-white.png" : "/brand/nodo-mark.png"}
+          src={onDark 
+            ? `${normalizedBaseUrl}brand/nodo-mark-white.png` 
+            : `${normalizedBaseUrl}brand/nodo-mark.png`}
           alt=""
           className={cn("h-7 w-7 flex-shrink-0", iconClassName)}
         />

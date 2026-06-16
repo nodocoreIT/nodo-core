@@ -15,10 +15,14 @@ import { MemoryRouter, Routes, Route } from "react-router-dom";
 const mockSignOut = vi.fn();
 const mockUseAuth = vi.fn();
 
-vi.mock("@nodocore/shared-components", () => ({
-  useAuth: () => mockUseAuth(),
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    useAuth: () => mockUseAuth(),
+    AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  };
+});
 
 // Isolate the layout test from the profile dialog (it imports supabase).
 vi.mock("@/features/profile/components/profile-dialog", () => ({

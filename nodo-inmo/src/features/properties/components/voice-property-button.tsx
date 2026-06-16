@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2 } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import { useExtractPropertyFromVoice } from "@/features/properties/hooks/use-extract-property-from-voice";
 import type { PropertyFormValues } from "@/features/properties/components/property-form-dialog";
@@ -136,7 +135,7 @@ export function VoicePropertyButton({ onExtracted }: VoicePropertyButtonProps) {
               : ""
         }`}
       >
-        {isProcessing ? (
+        {/* {isProcessing ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
             Procesando…
@@ -151,7 +150,7 @@ export function VoicePropertyButton({ onExtracted }: VoicePropertyButtonProps) {
             <Mic className="h-4 w-4" />
             Dictar propiedad
           </>
-        )}
+        )} */}
       </Button>
 
       {/* Inline error tooltip */}

@@ -27,12 +27,16 @@ vi.mock("@/features/agenda/hooks/use-tasks", () => ({
   useTasks: () => ({ data: [], isLoading: false, error: null }),
 }));
 
-vi.mock("@nodocore/shared-components", () => ({
-  useAuth: () => ({
-    user: { email: "juan@test.com", user_metadata: { full_name: "Juan Mendía" } },
-    orgId: "org-1",
-  }),
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: { email: "juan@test.com", user_metadata: { full_name: "Juan Mendía" } },
+      orgId: "org-1",
+    }),
+  };
+});
 
 vi.mock("@/features/agency-profile/hooks/use-org-profile", () => ({
   useOrgProfile: () => ({ data: null, isLoading: false }),

@@ -20,9 +20,9 @@ const ROLE_DESTINATIONS: Record<string, string> = {
 };
 
 export function RoleRouter() {
-  const { loading, session, role } = useAuth();
+  const { isLoading, session, role } = useAuth();
 
-  if (loading) {
+  if (isLoading) {
     return null;
   }
 

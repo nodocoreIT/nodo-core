@@ -22,6 +22,7 @@ export const STATUS_LABELS: Record<string, string> = {
   rented: "Alquilada",
   sold: "Vendida",
   inactive: "Inactiva",
+  negotiation: "En tratativa",
 };
 
 export const CURRENCY_LABELS: Record<string, string> = {

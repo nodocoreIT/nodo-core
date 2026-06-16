@@ -62,6 +62,7 @@
 }
 
 @import "tailwindcss";
+@source "../../packages/shared-components/src/**/*.{ts,tsx}";
 
 
 /* ─── Base styles ──────────────────────────────────────────── */

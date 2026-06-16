@@ -41,50 +41,51 @@ vi.mock("@/shared/lib/supabase", () => ({
 // ── Mock useAuth ──────────────────────────────────────────────────────────────
 // Use an object so tests can mutate the role field between test runs.
 const mockAuthState = { role: "admin" as "admin" | "agent" };
-vi.mock("@nodocore/shared-components", () => ({
-  useAuth: () => ({
-    user: { email: "admin@nodo.com" },
-    role: mockAuthState.role,
-    orgId: "org-abc",
-    signOut: vi.fn(),
-    session: {},
-    loading: false,
-  }),
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
-// ── Mock Radix Select with native <select> for jsdom testability ──────────────
-vi.mock("@nodocore/shared-components", () => ({
-  Select: ({
-    children,
-    onValueChange,
-    value,
-  }: {
-    children: React.ReactNode;
-    onValueChange?: (v: string) => void;
-    value?: string;
-  }) => (
-    <select value={value ?? ""} onChange={(e) => onValueChange?.(e.target.value)}>
-      {children}
-    </select>
-  ),
-  SelectTrigger: ({
-    children,
-  }: {
-    children: React.ReactNode;
-    "aria-label"?: string;
-    id?: string;
-  }) => <>{children}</>,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  SelectValue: (_placeholder: { placeholder?: string }) => null,
-  SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => {
-    if (value === "") {
-      throw new Error("A <SelectItem /> must have a value prop that is not an empty string.");
-    }
-    return <option value={value}>{children}</option>;
-  },
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: { email: "admin@nodo.com" },
+      role: mockAuthState.role,
+      orgId: "org-abc",
+      signOut: vi.fn(),
+      session: {},
+      loading: false,
+    }),
+    AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    // Mock Radix Select with native <select> for jsdom testability
+    Select: ({
+      children,
+      onValueChange,
+      value,
+    }: {
+      children: React.ReactNode;
+      onValueChange?: (v: string) => void;
+      value?: string;
+    }) => (
+      <select value={value ?? ""} onChange={(e) => onValueChange?.(e.target.value)}>
+        {children}
+      </select>
+    ),
+    SelectTrigger: ({
+      children,
+    }: {
+      children: React.ReactNode;
+      "aria-label"?: string;
+      id?: string;
+    }) => <>{children}</>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    SelectValue: (_placeholder: { placeholder?: string }) => null,
+    SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => {
+      if (value === "") {
+        throw new Error("A <SelectItem /> must have a value prop that is not an empty string.");
+      }
+      return <option value={value}>{children}</option>;
+    },
+  };
+});
 
 // ── Mock mutation hooks ───────────────────────────────────────────────────────
 const mockMutateAsync = vi.fn();

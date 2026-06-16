@@ -79,7 +79,7 @@ function Eyebrow({
 function HeroSection() {
   return (
     <section
-      className="relative overflow-hidden pt-[140px] pb-[clamp(64px,9vw,120px)]"
+      className="relative overflow-hidden pt-[140px] pb-[clamp(16px,3vw,32px)]"
       style={{ backgroundColor: "var(--color-navy-900)" }}
     >
       {/* Glow pseudo-layer */}

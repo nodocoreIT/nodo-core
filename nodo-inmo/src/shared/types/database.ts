@@ -449,6 +449,7 @@ export type Database = {
       org_profiles: {
         Row: {
           address: string | null
+          alert_settings: Json | null
           created_at: string
           cuit: string | null
           email: string | null
@@ -456,10 +457,12 @@ export type Database = {
           logo_path: string | null
           org_id: string
           phone: string | null
+          theme_settings: Json | null
           updated_at: string
         }
         Insert: {
           address?: string | null
+          alert_settings?: Json | null
           created_at?: string
           cuit?: string | null
           email?: string | null
@@ -467,10 +470,12 @@ export type Database = {
           logo_path?: string | null
           org_id: string
           phone?: string | null
+          theme_settings?: Json | null
           updated_at?: string
         }
         Update: {
           address?: string | null
+          alert_settings?: Json | null
           created_at?: string
           cuit?: string | null
           email?: string | null
@@ -478,6 +483,7 @@ export type Database = {
           logo_path?: string | null
           org_id?: string
           phone?: string | null
+          theme_settings?: Json | null
           updated_at?: string
         }
         Relationships: []
@@ -633,6 +639,7 @@ export type Database = {
           rooms: number | null
           sale_price: number | null
           status: string
+          status_changed_by: string | null
           total_sqm: number | null
           updated_at: string
         }
@@ -664,6 +671,7 @@ export type Database = {
           rooms?: number | null
           sale_price?: number | null
           status?: string
+          status_changed_by?: string | null
           total_sqm?: number | null
           updated_at?: string
         }
@@ -695,6 +703,7 @@ export type Database = {
           rooms?: number | null
           sale_price?: number | null
           status?: string
+          status_changed_by?: string | null
           total_sqm?: number | null
           updated_at?: string
         }
@@ -704,6 +713,13 @@ export type Database = {
             columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "properties_status_changed_by_fkey"
+            columns: ["status_changed_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
         ]

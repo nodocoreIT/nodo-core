@@ -12,12 +12,16 @@ import { MemoryRouter } from "react-router-dom";
 const mockSignIn = vi.fn();
 const mockUseAuth = vi.fn();
 
-vi.mock("@nodocore/shared-components", () => ({
-  useAuth: () => mockUseAuth(),
-  AuthProvider: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    useAuth: () => mockUseAuth(),
+    AuthProvider: ({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
+    ),
+  };
+});
 
 // Mock react-router-dom navigate
 const mockNavigate = vi.fn();

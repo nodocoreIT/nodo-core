@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
   SupabaseProvider,
   AuthProvider,
 } from "@nodocore/shared-components";
 import { supabase } from "@/shared/lib/supabase";
-import { useThemeSettings } from "@/shared/hooks/use-theme-settings";
+import { useThemeSettings, useThemeStore, type ThemeSettings } from "@/shared/hooks/use-theme-settings";
+import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,8 +31,20 @@ interface AppProvidersProps {
 }
 
 function ThemeInitializer({ children }: { children: ReactNode }) {
-  // Boot up theme customization variables on mount
+  const { setSettings } = useThemeStore();
+  const { data: profile } = useOrgProfile();
+
+  // Sync theme from Supabase when the org profile loads.
+  // Supabase wins over localStorage so all admins share the same branding.
+  useEffect(() => {
+    if (profile?.theme_settings && typeof profile.theme_settings === "object") {
+      setSettings(profile.theme_settings as Partial<ThemeSettings>);
+    }
+  }, [profile?.theme_settings, setSettings]);
+
+  // Apply CSS custom properties to :root from the Zustand store.
   useThemeSettings();
+
   return <>{children}</>;
 }
 

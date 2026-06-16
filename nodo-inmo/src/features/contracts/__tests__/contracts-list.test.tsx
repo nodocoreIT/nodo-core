@@ -36,12 +36,6 @@ vi.mock("@/features/contracts/components/create-contract-dialog", () => ({
   CreateContractDialog: () => null,
 }));
 
-// ContractLocacionButton pulls in org-profile hooks; stub for list test.
-vi.mock("@/features/contracts/components/contract-locacion-button", () => ({
-  ContractLocacionButton: () => (
-    <button aria-label="Generar contrato">Generar contrato</button>
-  ),
-}));
 
 import { ContractsList } from "@/features/contracts/components/contracts-list";
 
@@ -105,7 +99,7 @@ describe("ContractsList", () => {
     expect(screen.getByText("Activo")).toBeInTheDocument();
   });
 
-  it("renders the Generar contrato button in the Acciones cell for each row", () => {
+  it("renders action buttons (Ver PDF, Editar, Eliminar) in the Acciones cell for each row", () => {
     mockUseContracts.mockReturnValue({
       isLoading: false,
       isError: false,
@@ -126,6 +120,7 @@ describe("ContractsList", () => {
     });
     renderList();
 
-    expect(screen.getByRole("button", { name: /generar contrato/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /ver pdf/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /editar/i })).toBeInTheDocument();
   });
 });

@@ -65,6 +65,8 @@ interface FeedbackDialogProps {
 }
 
 export function FeedbackFAB() {
+  const baseUrl = import.meta.env.BASE_URL || "/";
+  const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
@@ -204,7 +206,7 @@ export function FeedbackFAB() {
           style={{ backgroundColor: "#111E2F" }}
         >
           <img
-            src="/brand/nodo-mark-white.png"
+            src={`${normalizedBaseUrl}brand/nodo-mark-white.png`}
             alt="Nodo"
             className="h-8 w-8 shrink-0 select-none pointer-events-none"
           />

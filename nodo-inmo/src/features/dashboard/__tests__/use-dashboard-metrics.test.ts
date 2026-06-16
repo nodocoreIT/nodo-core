@@ -24,6 +24,13 @@ vi.mock("@/features/contracts/hooks/use-contracts", () => ({
   useContracts: () => mockUseContracts(),
 }));
 
+vi.mock("@/shared/hooks/use-alert-settings", () => ({
+  useAlertSettings: () => ({
+    settings: { contractExpirationMonths: 2, rentAdjustmentMonths: 1 },
+    isLoading: false,
+  }),
+}));
+
 import { useDashboardMetrics } from "../hooks/use-dashboard-metrics";
 
 // ── Fixed test date (deterministic) ─────────────────────────────────────────
@@ -410,5 +417,62 @@ describe("useDashboardMetrics", () => {
 
     expect(result.current.recentReceipts).toHaveLength(1);
     expect(result.current.recentReceipts[0].tenantName).toBe("Ana");
+  });
+
+  it("includes overdue partial payments in overdue count with the remaining amount", () => {
+    mockUsePayments.mockReturnValue({
+      data: [
+        makePayment({
+          id: "p-1",
+          due_date: "2026-05-10",
+          status: "pending",
+          amount: 1000,
+          paid_amount: 300,
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    const { result } = renderHook(() => useDashboardMetrics(FIXED_TODAY));
+
+    expect(result.current.overduePayments.count).toBe(1);
+    expect(result.current.overduePayments.items[0].amount).toBe(700);
+    expect(result.current.overduePayments.totalByCurrency["ARS"]).toBe(700);
+  });
+
+  it("includes contract expiration and adjustment alerts with correct days remaining representation", () => {
+    // FIXED_TODAY is 2026-06-06.
+    // Expiring on 2026-07-01 (25 days left)
+    // Next adjustment on 2026-06-16 (10 days left)
+    mockUsePayments.mockReturnValue({
+      data: [
+        makePayment({
+          id: "p-1",
+          due_date: "2026-06-15", // current month payment
+          status: "pending",
+          amount: 1000,
+          contract: {
+            rent_amount: 1000,
+            commission_amount: null,
+            end_date: "2026-07-01",
+            next_adjustment_date: "2026-06-16",
+            property: { address: "Mitre 100", commission_rate: null, owner: null },
+            tenant: { name: "Juan Pérez" },
+          },
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    const { result } = renderHook(() => useDashboardMetrics(FIXED_TODAY));
+
+    expect(result.current.currentMonthCollections).toHaveLength(1);
+    const item = result.current.currentMonthCollections[0];
+    expect(item.alerts).toEqual([
+      { type: "expiration", text: "Vence en 26 días" },
+      { type: "adjustment", text: "Ajuste en 11 días" },
+    ]);
   });
 });

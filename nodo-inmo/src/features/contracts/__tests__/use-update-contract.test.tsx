@@ -7,9 +7,12 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+const mockUpdateSingle = vi.fn();
+const mockUpdateSelect = vi.fn();
 const mockUpdateEq = vi.fn();
 const mockDeleteEq = vi.fn();
 const mockInsert = vi.fn();
+const mockUpsert = vi.fn();
 const mockFrom = vi.fn();
 const mockSchema = vi.fn();
 
@@ -17,9 +20,13 @@ vi.mock("@/shared/lib/supabase", () => ({
   supabase: { schema: (...a: unknown[]) => mockSchema(...a) },
 }));
 
-vi.mock("@nodocore/shared-components", () => ({
-  useAuth: () => ({ orgId: "org-1" }),
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    useAuth: () => ({ orgId: "org-1" }),
+  };
+});
 
 import { useUpdateContract } from "@/features/contracts/hooks/use-update-contract";
 
@@ -33,12 +40,19 @@ function wrapper({ children }: { children: React.ReactNode }) {
 describe("useUpdateContract", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUpdateEq.mockResolvedValue({ error: null });
+    // .update().eq().select().single() chain for contracts
+    mockUpdateSingle.mockResolvedValue({ data: { id: "c-1", start_date: "2026-01-01", end_date: "2028-01-01", rent_amount: 300000, currency: "ARS", status: "active" }, error: null });
+    mockUpdateSelect.mockReturnValue({ single: mockUpdateSingle });
+    mockUpdateEq.mockReturnValue({ select: mockUpdateSelect });
     mockDeleteEq.mockResolvedValue({ error: null });
     mockInsert.mockResolvedValue({ error: null });
+    mockUpsert.mockResolvedValue({ error: null });
     mockFrom.mockImplementation((table: string) => {
       if (table === "contracts") {
         return { update: () => ({ eq: mockUpdateEq }) };
+      }
+      if (table === "payments") {
+        return { upsert: mockUpsert };
       }
       // contract_guarantors
       return {

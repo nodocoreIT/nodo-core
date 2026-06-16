@@ -19,17 +19,21 @@ vi.mock("@/shared/lib/supabase", () => ({
   },
 }));
 
-vi.mock("@nodocore/shared-components", () => ({
-  useAuth: () => ({
-    user: { email: "admin@nodo.com" },
-    role: "admin",
-    orgId: "org-1",
-    signOut: vi.fn(),
-    session: {},
-    loading: false,
-  }),
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: { email: "admin@nodo.com" },
+      role: "admin",
+      orgId: "org-1",
+      signOut: vi.fn(),
+      session: {},
+      loading: false,
+    }),
+    AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  };
+});
 
 // Mock feature hooks
 const mockUseTasks = vi.fn();
@@ -48,13 +52,18 @@ vi.mock("@/features/contacts/hooks/use-contacts", () => ({
   useContacts: () => ({ data: [], isLoading: false }),
 }));
 
+import { MemoryRouter } from "react-router-dom";
 import { AgendaPage } from "../components/agenda-page";
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <MemoryRouter>
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    </MemoryRouter>
+  );
 }
 
 describe("AgendaPage", () => {
