@@ -21,7 +21,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/vehiculos", label: "Vehículos", icon: Car },
   { to: "/admin/clientes", label: "Clientes", icon: Users },
   { to: "/admin/publicaciones", label: "Publicaciones", icon: Share2 },
@@ -30,7 +30,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const ROUTE_TITLES: Record<string, string> = {
-  "/admin": "Dashboard",
+  "/admin/dashboard": "Dashboard",
   "/admin/vehiculos": "Vehículos",
   "/admin/clientes": "Clientes",
   "/admin/publicaciones": "Publicaciones",
@@ -120,7 +120,7 @@ export function AdminLayout() {
               <NavLink
                 key={to}
                 to={to}
-                end={to === "/admin"}
+                end
                 onClick={() => setMobileMenuOpen(false)}
                 className={({ isActive }) =>
                   cn(
