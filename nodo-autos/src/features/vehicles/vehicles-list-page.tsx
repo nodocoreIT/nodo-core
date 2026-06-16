@@ -191,9 +191,9 @@ export function VehiclesListPage() {
       {/* Delete confirmation dialog */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
-            <h3 className="text-base font-semibold text-navy mb-2">¿Eliminar vehículo?</h3>
-            <p className="text-sm text-slate2 mb-6">
+          <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-lg">
+            <h3 className="text-base font-semibold text-navy mb-3">¿Eliminar vehículo?</h3>
+            <p className="text-sm text-slate2 mb-8">
               Esta acción no se puede deshacer. El vehículo será eliminado permanentemente.
             </p>
             <div className="flex gap-3 justify-end">
