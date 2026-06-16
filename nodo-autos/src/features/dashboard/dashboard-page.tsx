@@ -67,7 +67,11 @@ export function DashboardPage() {
               <Icon className={`h-4 w-4 ${color}`} />
             </CardHeader>
             <CardContent>
-              <p className={`text-3xl font-bold ${color}`}>{loading ? "–" : value}</p>
+              {loading ? (
+                <div className="h-9 w-12 animate-pulse rounded-md bg-slate-200" />
+              ) : (
+                <p className={`text-3xl font-bold ${color}`}>{value}</p>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -90,7 +94,7 @@ export function DashboardPage() {
                   key={v.id}
                   type="button"
                   onClick={() => navigate(`/admin/vehiculos/${v.id}`)}
-                  className="flex w-full items-center gap-4 px-6 py-3 text-left hover:bg-mist-200 transition-colors"
+                  className="flex w-full cursor-pointer items-center gap-4 px-6 py-3 text-left hover:bg-mist-200 transition-colors"
                 >
                   {/* Thumbnail */}
                   <div className="h-12 w-16 flex-shrink-0 overflow-hidden rounded-md bg-mist">
