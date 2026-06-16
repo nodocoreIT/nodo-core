@@ -7,6 +7,10 @@ import { resolve } from "path";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: "/autos",
+  build: {
+    outDir: "../nodo-landing/public/autos",
+    emptyOutDir: true,
+  },
   server: {
     port: 5175,
     strictPort: true,

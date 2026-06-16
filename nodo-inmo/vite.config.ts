@@ -7,6 +7,10 @@ import { resolve } from "path";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: "/inmo",
+  build: {
+    outDir: "../nodo-landing/public/inmo",
+    emptyOutDir: true,
+  },
   server: {
     port: 5173,
     strictPort: true, // fail fast if port is taken instead of picking a random one
