@@ -10,16 +10,16 @@ import {
   LogOut,
   Menu,
   X,
-  Calendar,
   MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/nodo/brand-mark";
-import { ThemeSettingsDialog } from "@/components/settings/theme-settings-dialog";
 import { NodoChatWidget } from "@/components/nodo-chat/nodo-chat-widget";
 import { NodoChatBell } from "@/components/nodo-chat/nodo-chat-bell";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { isProPlan } from "@/lib/nodo-chat/is-pro-plan";
+import { useThemeStore } from "@/hooks/use-theme-settings";
+import { mergeThemeSettings } from "@/lib/clinic/theme-settings";
 import { Button } from "@/components/ui/button";
 
 interface NavItem {
@@ -32,14 +32,13 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/medico/dashboard", label: "Inicio", icon: LayoutDashboard },
   { href: "/medico/consultorio", label: "Consultorio", icon: Stethoscope },
   { href: "/medico/interconsultas", label: "Interconsultas", icon: MessageSquare },
-  { href: "/medico/configuracion", label: "Agenda y perfil", icon: Calendar },
 ];
 
 const ROUTE_TITLES: Record<string, string> = {
   "/medico/dashboard": "Inicio",
   "/medico/consultorio": "Consultorio",
   "/medico/interconsultas": "Interconsultas",
-  "/medico/configuracion": "Agenda y perfil",
+  "/medico/configuracion": "Configuración",
 };
 
 function initials(value: string): string {
@@ -53,7 +52,6 @@ function initials(value: string): string {
 export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [doctor, setDoctor] = useState<{
     id: string;
@@ -68,7 +66,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const chatEmbedded = pathname === "/medico/interconsultas";
 
   useEffect(() => {
-    clinicApi.getSession().then(({ session, user }) => {
+    clinicApi.getSession().then(async ({ session, user }) => {
       if (!session || session.role !== "doctor") {
         router.push("/login");
         return;
@@ -79,6 +77,16 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
         email: user.email ?? session.email,
         subscriptionPlan: user.subscriptionPlan,
       });
+      try {
+        const office = await clinicApi.getDoctorSchedule(user.id);
+        if (office.themeSettings) {
+          useThemeStore.getState().hydrateSettings(
+            mergeThemeSettings(office.themeSettings),
+          );
+        }
+      } catch {
+        /* tema local por defecto */
+      }
       setChecking(false);
     });
   }, [router]);
@@ -176,12 +184,17 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
             </div>
             <button
               type="button"
-              aria-label="Personalización"
+              aria-label="Configuración"
               onClick={() => {
                 setMobileMenuOpen(false);
-                setSettingsOpen(true);
+                router.push("/medico/configuracion");
               }}
-              className="flex-shrink-0 rounded-md p-1.5 text-[var(--color-sidebar-text)] transition-colors hover:text-brand"
+              className={cn(
+                "flex-shrink-0 rounded-md p-1.5 transition-colors hover:text-brand",
+                pathname === "/medico/configuracion"
+                  ? "text-brand"
+                  : "text-[var(--color-sidebar-text)]",
+              )}
             >
               <Settings className="h-4 w-4" />
             </button>
@@ -230,8 +243,6 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
 
         <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
       </div>
-
-      <ThemeSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 
       {doctor && !chatEmbedded && (
         <NodoChatWidget

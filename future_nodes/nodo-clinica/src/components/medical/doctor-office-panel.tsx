@@ -22,6 +22,7 @@ import {
   CreditCard,
   CalendarOff,
   Bell,
+  Palette,
 } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
@@ -35,6 +36,13 @@ import type { DoctorPaymentSettings, DoctorReminderSettings } from "@/lib/clinic
 import { parseGoogleCalendarSrc } from "@/lib/google-calendar";
 import { format, addDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
+import { ThemeSettingsPanel } from "@/components/settings/theme-settings-panel";
+import {
+  DEFAULT_THEME_SETTINGS,
+  mergeThemeSettings,
+  type DoctorThemeSettings,
+} from "@/lib/clinic/theme-settings";
+import { useThemeSettings } from "@/hooks/use-theme-settings";
 
 const ALL_DAYS = [1, 2, 3, 4, 5, 6, 0];
 
@@ -73,6 +81,10 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
     minutesBefore: 1440,
   });
   const [googleCalendarId, setGoogleCalendarId] = useState("");
+  const [themeSettings, setThemeSettings] = useState<DoctorThemeSettings>(
+    DEFAULT_THEME_SETTINGS,
+  );
+  const { hydrateSettings } = useThemeSettings();
   const [newBlockDate, setNewBlockDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [testingReminder, setTestingReminder] = useState(false);
@@ -96,8 +108,13 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
         });
       }
       if (data.googleCalendarId) setGoogleCalendarId(data.googleCalendarId);
+      if (data.themeSettings) {
+        const merged = mergeThemeSettings(data.themeSettings);
+        setThemeSettings(merged);
+        hydrateSettings(merged);
+      }
     });
-  }, [doctorId]);
+  }, [doctorId, hydrateSettings]);
 
   const toggleDay = (dayOfWeek: number) => {
     setAvailability((prev) => {
@@ -145,8 +162,10 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
         reminderSettings,
         googleCalendarId:
           parseGoogleCalendarSrc(googleCalendarId) ?? googleCalendarId.trim(),
+        themeSettings,
       });
-      toast.success("Consultorio guardado");
+      hydrateSettings(themeSettings);
+      toast.success("Configuración guardada");
     } catch {
       toast.error("Error al guardar");
     } finally {
@@ -177,23 +196,23 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
       <CardHeader className="py-3 px-4 bg-slate-50 border-b">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <CalendarClock className="h-4 w-4 text-blue-600" />
-          {fullPage ? "Configuración del consultorio" : "Mi Consultorio"}
+          {fullPage ? "Configuración" : "Mi consultorio"}
         </CardTitle>
         {fullPage && (
           <p className="text-xs text-slate-500 mt-1">
-            Los cambios se aplican a tu agenda, perfil público y calendario embebido
-            en el panel principal.
+            Agenda, perfil, cobros, recordatorios, días libres y apariencia del panel.
           </p>
         )}
       </CardHeader>
       <CardContent className="p-0">
         <Tabs defaultValue="agenda" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 rounded-none border-b bg-slate-50 h-auto p-1">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 rounded-none border-b bg-slate-50 h-auto p-1">
             <TabsTrigger value="agenda" className="text-xs">Agenda</TabsTrigger>
             <TabsTrigger value="perfil" className="text-xs">Perfil</TabsTrigger>
             <TabsTrigger value="cobros" className="text-xs">Cobros</TabsTrigger>
             <TabsTrigger value="avisos" className="text-xs">Recordatorios</TabsTrigger>
             <TabsTrigger value="libres" className="text-xs">Días libres</TabsTrigger>
+            <TabsTrigger value="apariencia" className="text-xs">Apariencia</TabsTrigger>
           </TabsList>
 
           <TabsContent value="agenda" className="p-4 space-y-4 mt-0">
@@ -703,6 +722,21 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
               ))}
             </div>
           </TabsContent>
+
+          <TabsContent value="apariencia" className="p-4 space-y-4 mt-0">
+            <p className="text-xs text-slate-500 flex items-center gap-1.5">
+              <Palette className="h-3.5 w-3.5" />
+              Personalizá colores, tipografía y marca de tu panel médico.
+            </p>
+            <ThemeSettingsPanel
+              settings={themeSettings}
+              onChange={(patch) =>
+                setThemeSettings((prev) => mergeThemeSettings({ ...prev, ...patch }))
+              }
+              onReset={() => setThemeSettings(DEFAULT_THEME_SETTINGS)}
+              compact
+            />
+          </TabsContent>
         </Tabs>
 
         <div className="p-4 border-t">
@@ -717,7 +751,7 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
             ) : (
               <>
                 <Save className="h-4 w-4 mr-1" />
-                Guardar consultorio
+                Guardar configuración
               </>
             )}
           </Button>
