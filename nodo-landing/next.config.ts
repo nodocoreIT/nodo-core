@@ -18,40 +18,37 @@ const nextConfig: NextConfig = {
   async rewrites() {
     if (isDev) {
       // In development, proxy to local Vite dev servers.
-      return [
-        // ── nodo-inmo ───────────────────────────────────────────────────────
-        { source: "/inmo", destination: `${NODO_INMO_URL}/inmo` },
-        { source: "/inmo/:path*", destination: `${NODO_INMO_URL}/inmo/:path*` },
-        { source: "/brand/:path*", destination: `${NODO_INMO_URL}/brand/:path*` },
-        { source: "/assets/:path*", destination: `${NODO_INMO_URL}/assets/:path*` },
-        // Vite dev server internals
-        { source: "/@vite/:path*", destination: `${NODO_INMO_URL}/@vite/:path*` },
-        { source: "/@id/:path*", destination: `${NODO_INMO_URL}/@id/:path*` },
-        { source: "/@react-refresh", destination: `${NODO_INMO_URL}/@react-refresh` },
-        { source: "/@fs/:path*", destination: `${NODO_INMO_URL}/@fs/:path*` },
-        { source: "/src/:path*", destination: `${NODO_INMO_URL}/src/:path*` },
-        { source: "/node_modules/.vite/:path*", destination: `${NODO_INMO_URL}/node_modules/.vite/:path*` },
-        // ── nodo-clinica ─────────────────────────────────────────────────────
-        { source: "/clinica", destination: `${NODO_CLINICA_URL}/clinica` },
-        { source: "/clinica/:path*", destination: `${NODO_CLINICA_URL}/clinica/:path*` },
-        // ── nodo-autos ───────────────────────────────────────────────────────
-        { source: "/autos", destination: `${NODO_AUTOS_URL}/autos` },
-        { source: "/autos/:path*", destination: `${NODO_AUTOS_URL}/autos/:path*` },
-      ];
+      // Must use beforeFiles so these rewrites run BEFORE the SPA catch-all
+      // Route Handlers (app/inmo/[[...slug]]/route.ts etc.) are evaluated.
+      return {
+        beforeFiles: [
+          // ── nodo-inmo ─────────────────────────────────────────────────────
+          { source: "/inmo", destination: `${NODO_INMO_URL}/inmo` },
+          { source: "/inmo/:path*", destination: `${NODO_INMO_URL}/inmo/:path*` },
+          { source: "/brand/:path*", destination: `${NODO_INMO_URL}/brand/:path*` },
+          { source: "/assets/:path*", destination: `${NODO_INMO_URL}/assets/:path*` },
+          // Vite dev server internals
+          { source: "/@vite/:path*", destination: `${NODO_INMO_URL}/@vite/:path*` },
+          { source: "/@id/:path*", destination: `${NODO_INMO_URL}/@id/:path*` },
+          { source: "/@react-refresh", destination: `${NODO_INMO_URL}/@react-refresh` },
+          { source: "/@fs/:path*", destination: `${NODO_INMO_URL}/@fs/:path*` },
+          { source: "/src/:path*", destination: `${NODO_INMO_URL}/src/:path*` },
+          { source: "/node_modules/.vite/:path*", destination: `${NODO_INMO_URL}/node_modules/.vite/:path*` },
+          // ── nodo-clinica ───────────────────────────────────────────────────
+          { source: "/clinica", destination: `${NODO_CLINICA_URL}/clinica` },
+          { source: "/clinica/:path*", destination: `${NODO_CLINICA_URL}/clinica/:path*` },
+          // ── nodo-autos ─────────────────────────────────────────────────────
+          { source: "/autos", destination: `${NODO_AUTOS_URL}/autos` },
+          { source: "/autos/:path*", destination: `${NODO_AUTOS_URL}/autos/:path*` },
+        ],
+      };
     }
 
-    // In production, Vite SPAs are pre-built into public/inmo/ and public/autos/.
-    // afterFiles runs after static file checks: assets are served directly from
-    // public/, and only real SPA routes (no matching file) fall through to index.html.
-    return {
-      afterFiles: [
-        { source: "/inmo", destination: "/inmo/index.html" },
-        { source: "/inmo/:path*", destination: "/inmo/index.html" },
-        { source: "/autos", destination: "/autos/index.html" },
-        { source: "/autos/:path*", destination: "/autos/index.html" },
-        // nodo-clinica: add here once it's built into public/clinica/
-      ],
-    };
+    // In production, SPA routes are handled by catch-all Route Handlers
+    // (app/inmo/[[...slug]]/route.ts, app/autos/[[...slug]]/route.ts).
+    // Static assets in public/inmo/ and public/autos/ are served directly
+    // by Next.js before the Route Handlers are ever reached.
+    return {};
   },
 };
 
