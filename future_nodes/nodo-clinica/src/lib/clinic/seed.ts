@@ -3,7 +3,7 @@ import type { ClinicDatabase } from "@/lib/clinic/local-db";
 import { DEFAULT_AVAILABILITY } from "@/lib/clinic/schedule";
 
 /** Incrementar para resetear clinic.json / Blob en deploy (cuentas demo limpias). */
-export const CLINIC_SEED_VERSION = 1;
+export const CLINIC_SEED_VERSION = 2;
 
 export const DEMO_PASSWORD = "Probando1";
 

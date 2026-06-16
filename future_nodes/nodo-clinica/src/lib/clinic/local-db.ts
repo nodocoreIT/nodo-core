@@ -201,7 +201,7 @@ async function persistDb(db: ClinicDatabase): Promise<void> {
   await writeToBlob(db);
 }
 
-async function ensureDb(): Promise<ClinicDatabase> {
+async function loadDb(): Promise<ClinicDatabase> {
   let db: ClinicDatabase | null = null;
 
   const fromBlob = await readFromBlob();
@@ -225,10 +225,11 @@ async function ensureDb(): Promise<ClinicDatabase> {
     return normalized;
   }
 
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
-  await writeToBlob(db);
   return db;
+}
+
+async function ensureDb(): Promise<ClinicDatabase> {
+  return loadDb();
 }
 
 function normalizeDb(db: ClinicDatabase): ClinicDatabase {
@@ -246,13 +247,18 @@ export async function readDb(): Promise<ClinicDatabase> {
 }
 
 export async function writeDb(updater: (db: ClinicDatabase) => void): Promise<ClinicDatabase> {
+  let saved: ClinicDatabase | null = null;
   writeQueue = writeQueue.then(async () => {
-    const db = await ensureDb();
+    const db = await loadDb();
     updater(db);
+    if (!db.meta) {
+      db.meta = { seedVersion: CLINIC_SEED_VERSION };
+    }
     await persistDb(db);
+    saved = db;
   });
   await writeQueue;
-  return ensureDb();
+  return saved!;
 }
 
 export function newToken(): string {
