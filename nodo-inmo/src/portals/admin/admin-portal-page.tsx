@@ -12,6 +12,7 @@ import { GananciasPage } from "@/features/ganancias/components/ganancias-page";
 import { DocumentosPage } from "@/features/documentos/components/documentos-page";
 import { PortalPage } from "@/features/portal/components/portal-page";
 import { AgendaPage } from "@/features/agenda/components/agenda-page";
+import { ReclamosAdminPage } from "@/features/reclamos/components/reclamos-admin-page";
 import { PlanGate } from "@/shared/components/plan-gate";
 
 export function AdminPortalPage() {
@@ -31,6 +32,7 @@ export function AdminPortalPage() {
         <Route path="ganancias" element={<GananciasPage />} />
         <Route path="documentos" element={<DocumentosPage />} />
         <Route path="agenda" element={<AgendaPage />} />
+        <Route path="reclamos" element={<ReclamosAdminPage />} />
         <Route path="portal" element={<PlanGate requiredPlan="pro" fullPage><PortalPage /></PlanGate>} />
       </Route>
     </Routes>

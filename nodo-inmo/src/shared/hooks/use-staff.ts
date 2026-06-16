@@ -13,14 +13,14 @@ const DEFAULT_USERS: MockUser[] = [
     id: "1",
     name: "Ramiro Tule",
     email: "ramiro@nodoinmo.com",
-    role: "Nodo Administrador",
+    role: "Administrador",
     status: "Activo",
   },
   {
     id: "2",
     name: "Juan Colega",
     email: "juan@inmobiliaria.com",
-    role: "Nodo Colega",
+    role: "Colega",
     status: "Activo",
   },
 ];

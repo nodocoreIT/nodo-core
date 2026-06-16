@@ -18,6 +18,8 @@ import {
   HandCoins,
   LineChart,
   Lock,
+  Zap,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import { BrandMark } from "@/shared/components/brand-mark";
@@ -33,6 +35,7 @@ import {
 import { AgencyProfileForm } from "@/features/agency-profile/components/agency-profile-form";
 import { useSearchStore } from "@/shared/search/use-search-store";
 import { useAuth } from "@nodocore/shared-components";
+import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import { cn } from "@/shared/lib/utils";
 import { SettingsDialog } from "./settings-dialog";
 import { FeedbackFAB } from "@/features/feedback/components/feedback-node";
@@ -61,8 +64,18 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/ganancias", label: "Ganancias", icon: LineChart, adminOnly: true },
   { to: "/admin/documentos", label: "Documentos", icon: FolderOpen },
   { to: "/admin/agenda", label: "Agenda y Tareas", icon: Calendar },
+  { to: "/admin/reclamos", label: "Reclamos", icon: AlertCircle },
   { to: "/admin/portal", label: "Portales", icon: Building2, proOnly: true },
+  { to: "/admin/automatizaciones", label: "Automatizaciones", icon: Zap, proOnly: true },
 ];
+
+// JWT role → display name (matches settings-dialog role permission keys)
+const ROLE_DISPLAY: Record<string, string> = {
+  admin:   "Administrador",
+  agent:   "Vendedor",
+  tenant:  "Inquilino",
+  owner:   "Propietario",
+};
 
 // Top-bar search placeholder per searchable route.
 const SEARCH_PLACEHOLDERS: Record<string, string> = {
@@ -87,6 +100,8 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/ganancias": "Ganancias",
   "/admin/documentos": "Documentos",
   "/admin/agenda": "Agenda y Tareas",
+  "/admin/reclamos": "Reclamos",
+  "/admin/automatizaciones": "Automatizaciones",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -103,6 +118,7 @@ function initials(value: string): string {
 
 export function AdminLayout() {
   const { user, role, plan, signOut } = useAuth();
+  const { data: profile } = useOrgProfile();
   const { pathname } = useLocation();
   const resetSearch = useSearchStore((s) => s.reset);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -126,9 +142,16 @@ export function AdminLayout() {
     resetSearch();
   }, [pathname, resetSearch]);
 
-  const visibleNav = NAV_ITEMS.filter(
-    (item) => !item.adminOnly || role === "admin",
-  );
+  const rolePermissions = (profile?.theme_settings as Record<string, unknown> | null)?.rolePermissions as Record<string, string[]> | undefined;
+  const displayRole = ROLE_DISPLAY[role ?? ""] ?? "Colega";
+
+  const visibleNav = NAV_ITEMS.filter((item) => {
+    if (item.adminOnly && role !== "admin") return false;
+    if (rolePermissions?.[displayRole]) {
+      return rolePermissions[displayRole].includes(item.to);
+    }
+    return true;
+  });
 
   const placeholder = SEARCH_PLACEHOLDERS[pathname]
     ? (isMobile ? "Buscar..." : SEARCH_PLACEHOLDERS[pathname])

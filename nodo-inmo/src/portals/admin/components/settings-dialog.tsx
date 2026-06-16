@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Loader2, Mail, UserPlus, Image as ImageIcon, BrainCircuit, CheckCircle2, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/shared/lib/supabase";
@@ -363,6 +363,36 @@ function IpcSettingsSection() {
   );
 }
 
+// ── Role-visibility matrix constants ─────────────────────────────────────────
+
+const STAFF_ROLES = ["Administrador", "Vendedor", "Inquilino", "Propietario", "Colega"] as const;
+
+const MANAGED_NAV = [
+  { to: "/admin/dashboard",      label: "Inicio" },
+  { to: "/admin/properties",     label: "Propiedades" },
+  { to: "/admin/owners",         label: "Propietarios" },
+  { to: "/admin/tenants",        label: "Inquilinos" },
+  { to: "/admin/contracts",      label: "Contratos" },
+  { to: "/admin/payments",       label: "Pagos" },
+  { to: "/admin/caja",           label: "Caja" },
+  { to: "/admin/rendiciones",    label: "Rendiciones" },
+  { to: "/admin/ganancias",      label: "Ganancias" },
+  { to: "/admin/documentos",     label: "Documentos" },
+  { to: "/admin/agenda",         label: "Agenda y Tareas" },
+  { to: "/admin/reclamos",       label: "Reclamos" },
+  { to: "/admin/portal",         label: "Portales (Pro)" },
+  { to: "/admin/automatizaciones", label: "Automatizaciones (Pro)" },
+] as const;
+
+const ALL_PATHS = MANAGED_NAV.map((n) => n.to);
+
+// If a role has no entry → all sections visible (default open).
+function isAllowed(perms: Record<string, string[]>, role: string, path: string): boolean {
+  return perms[role] === undefined ? true : perms[role].includes(path);
+}
+
+// ── ──────────────────────────────────────────────────────────────────────────
+
 interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -382,6 +412,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     setAiKeySaved(true);
     setTimeout(() => setAiKeySaved(false), 2500);
   };
+  const { role: authRole } = useAuth();
+  const { data: profile } = useOrgProfile();
   const { settings, setSettings, resetSettings } = useThemeSettings();
   const { mutateAsync: upsertProfile } = useUpsertOrgProfile();
 
@@ -420,12 +452,55 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     [settings, upsertProfile, onOpenChange],
   );
 
-  // Dynamic Users state (mocked mapped to Node architecture logic)
+  // ── Role visibility permissions ─────────────────────────────────────────────
+  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
+  const [savingPerms, setSavingPerms] = useState(false);
+  const [permsSaved, setPermsSaved] = useState(false);
+
+  useEffect(() => {
+    if (profile?.theme_settings) {
+      const stored = (profile.theme_settings as Record<string, unknown>).rolePermissions;
+      if (stored && typeof stored === "object") {
+        setRolePermissions(stored as Record<string, string[]>);
+      }
+    }
+  }, [profile]);
+
+  const togglePermission = (roleName: string, path: string) => {
+    setRolePermissions((prev) => {
+      const current = prev[roleName] ?? [...ALL_PATHS];
+      const has = current.includes(path);
+      return {
+        ...prev,
+        [roleName]: has ? current.filter((p) => p !== path) : [...current, path],
+      };
+    });
+  };
+
+  const handleSavePermissions = async () => {
+    setSavingPerms(true);
+    try {
+      await upsertProfile({
+        theme_settings: {
+          ...((profile?.theme_settings as object) ?? {}),
+          rolePermissions,
+        } as any,
+      });
+      setPermsSaved(true);
+      setTimeout(() => setPermsSaved(false), 3000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSavingPerms(false);
+    }
+  };
+
+  // ── Dynamic Users state ─────────────────────────────────────────────────────
   const { users, inviteUser } = useStaff();
   const [newMember, setNewMember] = useState({
     name: "",
     email: "",
-    role: "Nodo Colega",
+    role: "Colega",
   });
   const [isInviting, setIsInviting] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState(false);
@@ -436,7 +511,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     setIsInviting(true);
     try {
       await inviteUser(newMember.name, newMember.email, newMember.role);
-      setNewMember({ name: "", email: "", role: "Nodo Colega" });
+      setNewMember({ name: "", email: "", role: "Colega" });
       setInviteSuccess(true);
       setTimeout(() => setInviteSuccess(false), 3000);
     } catch (err) {
@@ -1126,7 +1201,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="memberRole">Rol del Nodo</Label>
+                  <Label htmlFor="memberRole">Rol del Usuario</Label>
                   <select
                     id="memberRole"
                     value={newMember.role}
@@ -1135,12 +1210,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     }
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    <option value="Nodo Administrador">
-                      Nodo Administrador
-                    </option>
-                    <option value="Nodo Inquilino">Nodo Inquilino</option>
-                    <option value="Nodo Propietario">Nodo Propietario</option>
-                    <option value="Nodo Colega">Nodo Colega</option>
+                    <option value="Administrador">Administrador</option>
+                    <option value="Vendedor">Vendedor</option>
+                    <option value="Inquilino">Inquilino</option>
+                    <option value="Propietario">Propietario</option>
+                    <option value="Colega">Colega</option>
                   </select>
                 </div>
                 <div className="md:col-span-3 flex justify-end gap-2">
@@ -1208,6 +1282,68 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   </tbody>
                 </table>
               </div>
+
+              {/* Role visibility matrix — Superadmin only */}
+              {authRole === "admin" && (
+                <div className="space-y-3 pt-2">
+                  <div>
+                    <h4 className="text-sm font-bold text-navy">Visibilidad por Rol</h4>
+                    <p className="text-xs text-slate2">
+                      Configurá qué secciones del sistema puede ver cada rol. Los casilleros marcados son visibles.
+                    </p>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-md border border-border bg-card">
+                    <table className="w-full text-sm border-collapse min-w-[640px]">
+                      <thead>
+                        <tr className="bg-paper border-b border-border">
+                          <th className="p-3 text-left text-xs font-bold text-navy w-40">Sección</th>
+                          {STAFF_ROLES.map((r) => (
+                            <th key={r} className="p-3 text-center text-xs font-bold text-navy">
+                              {r}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {MANAGED_NAV.map(({ to, label }) => (
+                          <tr key={to} className="hover:bg-paper/50">
+                            <td className="p-3 text-xs text-slate2 font-medium">{label}</td>
+                            {STAFF_ROLES.map((r) => (
+                              <td key={r} className="p-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={isAllowed(rolePermissions, r, to)}
+                                  onChange={() => togglePermission(r, to)}
+                                  className="h-4 w-4 accent-brand cursor-pointer"
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3">
+                    {permsSaved && (
+                      <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Permisos guardados
+                      </span>
+                    )}
+                    <Button
+                      onClick={handleSavePermissions}
+                      disabled={savingPerms}
+                      size="sm"
+                      className="gap-2"
+                    >
+                      {savingPerms && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      Guardar permisos
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
