@@ -21,24 +21,43 @@ Deno.serve(async (req) => {
       return json({ error: "Missing auth header" }, 401);
     }
 
-    // Verify caller via their own JWT
+    // Admin client — service role lives server-side only
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
+
+    // Verify the caller's JWT
     const callerClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
     );
 
-    const {
-      data: { user },
-      error: userError,
-    } = await callerClient.auth.getUser();
-
+    const { data: { user }, error: userError } = await callerClient.auth.getUser();
     if (userError || !user) {
       return json({ error: "Unauthorized" }, 401);
     }
 
-    const orgId = user.app_metadata?.org_id as string | undefined;
-    const callerRole = user.app_metadata?.role as string | undefined;
+    let orgId = user.app_metadata?.org_id as string | undefined;
+    let callerRole = user.app_metadata?.role as string | undefined;
+
+    // Fallback: JWT claim may be stale (issued before the custom token hook ran).
+    // Check the database directly in that case.
+    if (!callerRole || !orgId) {
+      const { data: member } = await adminClient
+        .schema("shared")
+        .from("org_members")
+        .select("org_id, role")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (member) {
+        orgId = orgId ?? (member.org_id as string);
+        callerRole = callerRole ?? (member.role as string);
+      }
+    }
 
     if (callerRole !== "admin") {
       return json({ error: "Forbidden: admin role required" }, 403);
@@ -56,13 +75,6 @@ Deno.serve(async (req) => {
     if (!email || !redirectTo) {
       return json({ error: "email and redirectTo are required" }, 400);
     }
-
-    // Admin client — service role only lives server-side
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      { auth: { autoRefreshToken: false, persistSession: false } },
-    );
 
     // Send the invitation email
     const { data: inviteData, error: inviteError } =
@@ -86,7 +98,6 @@ Deno.serve(async (req) => {
           { onConflict: "org_id,user_id" },
         );
       if (memberError) {
-        // Non-fatal: invitation was sent; log and continue
         console.error("org_members upsert error:", memberError.message);
       }
     }
