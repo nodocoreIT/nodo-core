@@ -8,6 +8,11 @@ dist/
 .turbo/
 *.tsbuildinfo
 
+# Vite SPAs built into Next.js public/ — generated artifacts, do not commit
+nodo-landing/public/inmo/
+nodo-landing/public/autos/
+nodo-landing/public/clinica/
+
 # Environment variables — NEVER commit these
 .env
 .env.*

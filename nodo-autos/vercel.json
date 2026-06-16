@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/inmo/assets/:file*", "destination": "/assets/:file*" },
+    { "source": "/autos/assets/:file*", "destination": "/assets/:file*" },
     { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
   ]
 }
