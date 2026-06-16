@@ -1,0 +1,3 @@
+-- theme_settings is already included in 001_initial_schema.sql
+-- as a jsonb column in nodo_finanzas_personales.user_settings from day one.
+-- No additional migration needed per nodo-scaffold SKILL.md section 1.

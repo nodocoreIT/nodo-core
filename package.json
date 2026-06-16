@@ -17,7 +17,8 @@
     "dev:inmo": "turbo dev --filter=nodo-inmo",
     "dev:clinica": "turbo dev --filter=nodo-clinica",
     "dev:all": "turbo dev --filter=nodo-core --filter=nodo-inmo",
-    "dev:autos": "turbo dev --filter=nodo-autos"
+    "dev:autos": "turbo dev --filter=nodo-autos",
+    "dev:finanzas": "pnpm --filter nodo-finanzas dev"
   },
   "devDependencies": {
     "turbo": "latest"
