@@ -53,7 +53,7 @@ export default function Page() {
       <main>
         {/* Hero */}
         <section
-          className="relative overflow-hidden pt-[160px] pb-[clamp(56px,8vw,96px)]"
+          className="relative overflow-hidden pt-[clamp(90px,7vw,120px)] pb-[clamp(32px,5vw,56px)]"
           style={{ backgroundColor: "var(--color-navy-900)" }}
         >
           <div
@@ -122,7 +122,7 @@ export default function Page() {
         {/* Intro Copy */}
         {intro && (
           <section
-            className="py-[clamp(48px,5vw,72px)]"
+            className="pt-[clamp(24px,4vw,40px)] pb-[clamp(48px,5vw,72px)]"
             style={{
               backgroundColor: "var(--color-navy)",
               borderTop: "1px solid rgba(255,255,255,.08)",
@@ -145,7 +145,7 @@ export default function Page() {
         {/* Submodules Section */}
         <section
           id="submodulos"
-          className="py-[clamp(64px,8vw,112px)] relative"
+          className="pt-[clamp(32px,4vw,56px)] pb-[clamp(64px,8vw,112px)] relative"
           style={{
             backgroundColor: "var(--color-navy-900)",
             borderTop: "1px solid rgba(255,255,255,.08)",
@@ -181,7 +181,7 @@ export default function Page() {
                     <Sparkles className="h-6 w-6" />
                   </div>
                   <h3 className="font-display font-bold text-white text-[20px] mb-3">
-                    Clínica Virtual
+                    Nodo Clínica
                   </h3>
                   <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4">
                     Disponible

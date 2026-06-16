@@ -201,6 +201,9 @@ function LogoCustomUploader() {
           <p className="text-[10px] text-slate2">
             Formatos soportados: JPG, PNG o WebP. Tamaño máximo: 2 MB.
           </p>
+          <p className="text-[10px] text-slate2">
+            Tamaño recomendado: <span className="font-semibold">320 × 80 px</span> (PNG con fondo transparente). El logo se ajusta automáticamente al ancho del sidebar.
+          </p>
         </div>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}

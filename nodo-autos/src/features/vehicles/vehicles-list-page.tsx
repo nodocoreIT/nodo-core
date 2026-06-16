@@ -251,7 +251,7 @@ function VehicleCard({ vehicle: v, onView, onEdit, onDelete }: VehicleCardProps)
               {v.brand} {v.model}
             </p>
             {v.version && (
-              <p className="text-xs text-slate2">{v.version}</p>
+              <p className="text-xs text-slate2 mt-1">{v.version}</p>
             )}
           </div>
           <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold flex-shrink-0 ${STATUS_BADGE[v.status]}`}>

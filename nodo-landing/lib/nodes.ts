@@ -81,23 +81,6 @@ export const NODES: NodeDef[] = [
     Icon: HardHat,
     intro:
       "NODO Obra transforma la manera en que se administran los proyectos de construcción. A través de un software a medida, el inversor puede seguir el pulso de su obra en tiempo real: avances, registros fotográficos, gastos detallados y pagos, todo en un solo lugar. Se acabaron las llamadas para saber cómo va la obra, las planillas de Excel dispersas o los informes que llegan tarde. La información está siempre disponible, clara y transparente para todos los involucrados.",
-    highlights: [
-      {
-        title: "Avances en tiempo real",
-        description:
-          "Seguí el pulso de la obra desde cualquier dispositivo, sin llamados ni esperas.",
-      },
-      {
-        title: "Registro fotográfico",
-        description:
-          "Documentación visual del progreso, fechada y ordenada en un mismo lugar.",
-      },
-      {
-        title: "Gastos y pagos",
-        description:
-          "Control detallado de cada peso invertido, sin planillas sueltas.",
-      },
-    ],
   },
   {
     code: "Capital",
@@ -109,23 +92,6 @@ export const NODES: NodeDef[] = [
     Icon: Coins,
     intro:
       "NODO Capital es nuestra división financiera, y una de las más estratégicas del ecosistema. Nos enfocamos en la formación de grupos inversores, capitalizando el conocimiento y la experiencia de NODO para potenciar proyectos inmobiliarios y de construcción. Transformamos ahorros en activos reales y rentables. Si querés que tu capital trabaje de forma inteligente, NODO Capital te abre la puerta a oportunidades de inversión concretas, respaldadas por todo el ecosistema.",
-    highlights: [
-      {
-        title: "Grupos inversores",
-        description:
-          "Formamos y gestionamos grupos para potenciar proyectos inmobiliarios y de construcción.",
-      },
-      {
-        title: "Activos reales y rentables",
-        description:
-          "Transformamos ahorros en patrimonio que trabaja de forma inteligente.",
-      },
-      {
-        title: "Respaldo del ecosistema",
-        description:
-          "Oportunidades concretas avaladas por toda la estructura NODO.",
-      },
-    ],
   },
   {
     code: "IT",
@@ -137,23 +103,6 @@ export const NODES: NodeDef[] = [
     Icon: Cpu,
     intro:
       "NODO IT es el motor tecnológico que hace posible todo el ecosistema. Desde el desarrollo de software a medida hasta la gestión de infraestructura de red y plataformas corporativas, nuestro equipo trabaja para que cada nodo funcione de forma eficiente, segura y escalable. Pero lo que realmente nos diferencia es la conexión: NODO IT es la capa que permite que Inmo, Obra, Contable, Legal, Agro y Capital se hablen entre sí, compartan datos y operen como un único organismo. Cada nodo que sumás se integra automáticamente con los demás. Eso es la tecnología como eje, no como herramienta.",
-    highlights: [
-      {
-        title: "Software a medida",
-        description:
-          "Desarrollo de plataformas y sistemas adaptados a la operación de cada unidad.",
-      },
-      {
-        title: "Infraestructura y redes",
-        description:
-          "Gestión de infraestructura corporativa segura, escalable y siempre disponible.",
-      },
-      {
-        title: "Integración del ecosistema",
-        description:
-          "La capa que conecta cada nodo: se suman y se hablan entre sí de forma automática.",
-      },
-    ],
   },
   {
     code: "Legal",
@@ -165,23 +114,6 @@ export const NODES: NodeDef[] = [
     Icon: Scale,
     intro:
       "NODO Legal es el eje jurídico que atraviesa todo el ecosistema. Brindamos asesoramiento legal integral a todas nuestras unidades de negocio y a nuestros clientes, garantizando que cada operación, contrato e inversión esté respaldada con sólidos fundamentos legales. En una plataforma que mueve activos reales —propiedades, obras e inversiones— la solidez jurídica no es un detalle: es una condición indispensable.",
-    highlights: [
-      {
-        title: "Asesoramiento integral",
-        description:
-          "Cobertura jurídica para todas las unidades y para cada cliente del ecosistema.",
-      },
-      {
-        title: "Contratos y operaciones",
-        description:
-          "Cada operación e inversión respaldada con fundamentos legales sólidos.",
-      },
-      {
-        title: "Seguridad sobre activos reales",
-        description:
-          "Propiedades, obras e inversiones con respaldo jurídico desde el primer paso.",
-      },
-    ],
   },
   {
     code: "Salud",
@@ -221,23 +153,6 @@ export const NODES: NodeDef[] = [
     Icon: Wheat,
     intro:
       "NODO Agro lleva la inteligencia de la plataforma al sector productivo. Con el respaldo de nuestro equipo de ingeniería agronómica, brindamos soluciones integrales para negocios rurales: desde el asesoramiento especializado en compra de hacienda y animales, hasta la optimización de la rentabilidad y el seguimiento de operaciones agrícolas y ganaderas. Porque el campo también merece gestión inteligente, transparente y conectada.",
-    highlights: [
-      {
-        title: "Asesoramiento agronómico",
-        description:
-          "Equipo de ingeniería agronómica para decisiones de compra de hacienda y animales.",
-      },
-      {
-        title: "Operaciones agrícolas y ganaderas",
-        description:
-          "Seguimiento y optimización de la rentabilidad de cada operación.",
-      },
-      {
-        title: "Gestión conectada",
-        description:
-          "El campo dentro del ecosistema: transparente e integrado al resto de los nodos.",
-      },
-    ],
   },
   {
     code: "Contable",

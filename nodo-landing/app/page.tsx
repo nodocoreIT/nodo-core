@@ -271,17 +271,51 @@ function UnidadesSection() {
 
       {/* Units list */}
       <div className="flex flex-col">
-        {NODES.map((node, i) => (
-          <RevealOnScroll key={node.slug} delay={i * 40}>
-            <UnidadRow node={node} index={String(i + 1).padStart(2, "0")} />
-          </RevealOnScroll>
-        ))}
+        {NODES.filter((node) => !node.parentSlug).map((node, i) => {
+          const subnodes = NODES.filter((n) => n.parentSlug === node.slug);
+          const hasSubnodes = subnodes.length > 0;
+          return (
+            <div key={node.slug} className="border-b border-white/10">
+              <RevealOnScroll delay={i * 40}>
+                <UnidadRow
+                  node={node}
+                  index={String(i + 1).padStart(2, "0")}
+                  showBorder={!hasSubnodes}
+                />
+              </RevealOnScroll>
+              {hasSubnodes && (
+                <div className="pl-[94px] pr-2 pb-6 flex flex-wrap gap-3">
+                  {subnodes.map((subnode) => (
+                    <Link
+                      key={subnode.slug}
+                      href={
+                        subnode.slug === "clinica"
+                          ? "/nodo-clinica/login"
+                          : subnode.slug === "autos"
+                            ? "/nodo-autos/login"
+                            : `/nodo-${subnode.slug}`
+                      }
+                      className="inline-flex items-center gap-2.5 px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:border-brand/40 text-[13.5px] text-white transition-all duration-200 hover:bg-white/10 hover:translate-x-1"
+                    >
+                      <span className="text-brand font-bold">↳</span>
+                      <span className="font-semibold">Nodo {subnode.code}</span>
+                      <span className="text-white/30">|</span>
+                      <span className="text-[12.5px] text-brand-300 font-medium">
+                        Entrar al módulo
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </SectionWrapper>
   );
 }
 
-function UnidadRow({ node, index }: { node: NodeDef; index: string }) {
+function UnidadRow({ node, index, showBorder = true }: { node: NodeDef; index: string; showBorder?: boolean }) {
   const { Icon } = node;
   return (
     <Link
@@ -290,7 +324,7 @@ function UnidadRow({ node, index }: { node: NodeDef; index: string }) {
       className="unidad-row group grid items-center gap-6 py-5 px-2 cursor-pointer transition-all duration-200 rounded-sm hover:pl-4"
       style={{
         gridTemplateColumns: "70px 1fr 1.4fr auto",
-        borderBottom: "1px solid rgba(255,255,255,.1)",
+        borderBottom: showBorder ? "1px solid rgba(255,255,255,.1)" : "none",
       }}
     >
       {/* Index */}
