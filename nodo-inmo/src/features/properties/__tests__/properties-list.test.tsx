@@ -130,6 +130,8 @@ describe("PropertiesList", () => {
     expect(screen.getByText(/150\.000|150,000/)).toBeInTheDocument();
     // Rooms
     expect(screen.getByText("2")).toBeInTheDocument();
+    // Photo placeholder
+    expect(screen.getByText("Sin foto")).toBeInTheDocument();
   });
 
   it("renders multiple rows", () => {

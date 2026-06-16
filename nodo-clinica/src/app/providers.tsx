@@ -5,6 +5,8 @@ import {
   AuthProvider,
 } from "@nodocore/shared-components";
 import { supabase } from "@/shared/lib/supabase";
+import { useThemeSettings } from "@/shared/hooks/use-theme-settings";
+import { useClinicaThemeSync } from "@/shared/hooks/use-clinica-theme-sync";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,12 +28,25 @@ interface AppProvidersProps {
   children: ReactNode;
 }
 
+function ThemeInitializer({ children }: { children: ReactNode }) {
+  // Load theme_settings from Supabase profiles and sync into Zustand store.
+  // Supabase wins over localStorage so branding is consistent per user.
+  useClinicaThemeSync();
+
+  // Apply CSS custom properties to :root from the Zustand store.
+  useThemeSettings();
+
+  return <>{children}</>;
+}
+
 export function AppProviders({ children }: AppProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <SupabaseProvider client={supabase}>
         <AuthProvider config={AUTH_CONFIG}>
-          {children}
+          <ThemeInitializer>
+            {children}
+          </ThemeInitializer>
         </AuthProvider>
       </SupabaseProvider>
     </QueryClientProvider>

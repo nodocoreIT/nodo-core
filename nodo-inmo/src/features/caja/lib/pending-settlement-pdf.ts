@@ -1,7 +1,7 @@
 import { supabase } from "@/shared/lib/supabase";
 import {
   computeSettlementBreakdown,
-  type OwnerGroup,
+  type PropertyGroup,
 } from "@/features/caja/lib/caja-math";
 import {
   buildStatementData,
@@ -16,7 +16,7 @@ import type { SettlementWithOwner } from "@/features/caja/hooks/use-owner-settle
  * Uses computeSettlementBreakdown — display only, not the sealed snapshot.
  */
 export async function buildPendingStatementData(
-  group: OwnerGroup,
+  group: PropertyGroup,
   settlements: SettlementWithOwner[],
   agency: OrgProfileRow | null,
   logoUrl: string | null,
@@ -52,9 +52,10 @@ export async function buildPendingStatementData(
     .schema("nodo_inmo")
     .from("property_expenses")
     .select(
-      "id, amount, currency, expense_date, description, type, property:properties!property_expenses_property_id_fkey(owner_id)",
+      "id, amount, currency, expense_date, description, type, property_id, property:properties!property_expenses_property_id_fkey(owner_id)",
     )
     .eq("charged_to_owner", true)
+    .eq("property_id", group.property_id)
     .is("applied_settlement_id", null);
 
   if (expensesError) throw expensesError;
@@ -64,6 +65,10 @@ export async function buildPendingStatementData(
     const property = Array.isArray(raw)
       ? (raw[0] as { owner_id: string | null } | undefined)
       : (raw as { owner_id: string | null } | null);
+    
+    // El query original no trae property_id en expenses. 
+    // Wait, let's fix the query above to also fetch property_id.
+    // e.property no tiene property_id. We need to fetch property_id.
     return property?.owner_id === group.owner_id;
   });
 

@@ -21,7 +21,7 @@ const STATUS_LABEL: Record<VehicleStatus, string> = {
 };
 
 export function DashboardPage() {
-  const { vehicles, loadInitialData, loading } = useVehicleStore();
+  const { vehicles, loadInitialData, loading, error } = useVehicleStore();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -43,6 +43,18 @@ export function DashboardPage() {
     { label: "Vendidos", value: vendidos, icon: Tag, color: "text-slate2" },
     { label: "Publicados", value: publicados, icon: Globe, color: "text-brand" },
   ];
+
+  if (error) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+        <p className="font-semibold mb-1">Error cargando datos</p>
+        <pre className="whitespace-pre-wrap text-xs">{error}</pre>
+        <button onClick={() => loadInitialData(true)} className="mt-3 rounded px-3 py-1.5 bg-red-600 text-white text-xs hover:bg-red-700">
+          Reintentar
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

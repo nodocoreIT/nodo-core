@@ -2,7 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/shared/lib/supabase";
 import type { Database } from "@/shared/types/database";
 
-export type PropertyRow = Database["nodo_inmo"]["Tables"]["properties"]["Row"];
+export type PropertyRow = Database["nodo_inmo"]["Tables"]["properties"]["Row"] & {
+  status_changed_by_profile?: {
+    id: string;
+    full_name: string | null;
+  } | null;
+};
 
 export const PROPERTIES_QUERY_KEY = ["nodo_inmo", "properties"] as const;
 
@@ -17,11 +22,11 @@ export function useProperties() {
       const { data, error } = await supabase
         .schema("nodo_inmo")
         .from("properties")
-        .select("*")
+        .select("*, status_changed_by_profile")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as unknown as PropertyRow[];
     },
   });
 }

@@ -6,6 +6,7 @@ import { OWNER_SETTLEMENTS_QUERY_KEY } from "./use-owner-settlements";
 export interface SettleOwnerInput {
   owner_id: string;
   owner_name: string;
+  property_id: string;
   settlement_ids: string[];
   total: number;
   currency: string;
@@ -36,6 +37,7 @@ export function useSettleOwner() {
         .schema("nodo_inmo")
         .rpc("settle_owner", {
           p_owner_id: input.owner_id,
+          p_property_id: input.property_id,
           p_currency: input.currency,
           p_settlement_ids: input.settlement_ids,
         });

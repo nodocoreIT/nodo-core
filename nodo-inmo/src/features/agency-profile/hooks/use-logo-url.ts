@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/shared/lib/supabase";
 
 const BUCKET = "org-branding";
-/** Signed URL TTL in seconds (60 s — short-lived, minted at read time). */
-const TTL_SECONDS = 60;
+/** Signed URL TTL in seconds (1 h — refreshed by React Query before expiry). */
+const TTL_SECONDS = 3_600;
 
 /**
  * Generate a signed URL for a logo stored in the private org-branding bucket.
@@ -26,7 +26,7 @@ export function useLogoUrl(logoPath: string | null | undefined) {
       return data?.signedUrl ?? null;
     },
     enabled: !!logoPath,
-    // Stale immediately — URL TTL is 60 s, so refetch on every mount.
-    staleTime: 0,
+    // Refresh 5 minutes before the signed URL expires (TTL 3600 s).
+    staleTime: 55 * 60 * 1000,
   });
 }

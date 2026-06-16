@@ -34,6 +34,11 @@ export interface NodeDef {
   provisionable?: boolean;
   /** Whether the node is currently in development. */
   inDevelopment?: boolean;
+  /**
+   * Slug of the parent node. When set, this node is rendered as a satellite
+   * orbiting its parent rather than on the main Core orbit.
+   */
+  parentSlug?: string;
 }
 
 export const NODES: NodeDef[] = [
@@ -126,7 +131,7 @@ export const NODES: NodeDef[] = [
     code: "IT",
     slug: "it",
     label: "Nodo IT",
-    inDevelopment: true,
+    inDevelopment: false,
     description:
       "El motor tecnológico: software a medida e infraestructura corporativa.",
     Icon: Cpu,
@@ -247,6 +252,7 @@ export const NODES: NodeDef[] = [
     code: "Clínica",
     slug: "clinica",
     label: "Nodo Clínica",
+    parentSlug: "salud",
     description:
       "Plataforma HealthTech para telemedicina profesional: consultorios virtuales, recetas digitales e informes automatizados con IA.",
     Icon: Stethoscope,
@@ -275,6 +281,7 @@ export const NODES: NodeDef[] = [
     code: "Autos",
     slug: "autos",
     label: "Nodo Autos",
+    parentSlug: "it",
     description:
       "Panel de gestión de stock para concesionarias y agencias de autos: inventario, clientes, publicaciones y contratos de venta.",
     Icon: Car,

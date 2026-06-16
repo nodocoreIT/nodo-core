@@ -20,12 +20,14 @@ const W = 520;
 const H = 520;
 const CX = W / 2;
 const CY = H / 2;
-const R = 190; // orbit radius
+const R = 190;           // main orbit radius
+const SUB_ORBIT_R = 115; // how far a sub-node sits from its parent
 const CORE_R = 46;
 const HALO_R = CORE_R + 14;
 // Satellite diameter as a fraction of the container width → drives `cqw` sizing
 // so the HTML overlay scales exactly like the SVG backdrop.
 const SAT_DIAMETER_CQW = 15.5;
+const SUB_SAT_DIAMETER_CQW = 12.5; // sub-nodes are slightly smaller
 
 export default function EcosystemDiagram({
   dark = false,
@@ -41,13 +43,16 @@ export default function EcosystemDiagram({
         .filter((n): n is NodeDef => Boolean(n))
     : NODES;
 
-  const n = resolved.length;
-
   const stroke = dark ? "rgba(222,231,241,.34)" : "rgba(100,120,144,.55)";
   const shadowOpacity = dark ? 0.45 : 0.14;
 
-  const points = resolved.map((node, i) => {
-    const angle = ((-90 + (i * 360) / n) * Math.PI) / 180;
+  // Split into main-orbit nodes and sub-nodes (children of a parent node).
+  const mainNodeDefs = resolved.filter((n) => !n.parentSlug);
+  const subNodeDefs = resolved.filter((n) => n.parentSlug);
+  const mainCount = mainNodeDefs.length;
+
+  const mainPoints = mainNodeDefs.map((node, i) => {
+    const angle = ((-90 + (i * 360) / mainCount) * Math.PI) / 180;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
     return {
@@ -56,15 +61,40 @@ export default function EcosystemDiagram({
       sin,
       x: CX + R * cos,
       y: CY + R * sin,
-      // Percentage position for the HTML overlay.
       left: `${((CX + R * cos) / W) * 100}%`,
       top: `${((CY + R * sin) / H) * 100}%`,
+      isSubNode: false as const,
     };
   });
 
-  const activePoint = activeNodeSlug
-    ? points.find((p) => p.node.slug === activeNodeSlug)
-    : null;
+  // Sub-nodes are placed further along their parent's radial vector.
+  const subPoints = subNodeDefs
+    .map((node) => {
+      const parent = mainPoints.find((p) => p.node.slug === node.parentSlug);
+      if (!parent) return null;
+      const x = parent.x + parent.cos * SUB_ORBIT_R;
+      const y = parent.y + parent.sin * SUB_ORBIT_R;
+      return {
+        node,
+        cos: parent.cos,
+        sin: parent.sin,
+        x,
+        y,
+        left: `${(x / W) * 100}%`,
+        top: `${(y / H) * 100}%`,
+        parent,
+        isSubNode: true as const,
+      };
+    })
+    .filter((p): p is NonNullable<typeof p> => p !== null);
+
+  // Slugs of main-orbit nodes that have at least one child.
+  const parentSlugs = new Set(subNodeDefs.map((n) => n.parentSlug));
+
+  const activePoint =
+    activeNodeSlug
+      ? ([...mainPoints, ...subPoints].find((p) => p.node.slug === activeNodeSlug) ?? null)
+      : null;
 
   return (
     <div
@@ -100,7 +130,8 @@ export default function EcosystemDiagram({
           strokeWidth="1.5"
         />
 
-        {points.map((p, i) => (
+        {/* Lines from Core to main-orbit nodes */}
+        {mainPoints.map((p, i) => (
           <line
             key={`line-${i}`}
             x1={CX}
@@ -110,6 +141,38 @@ export default function EcosystemDiagram({
             stroke={p.node.slug === activeNodeSlug ? "var(--color-brand)" : stroke}
             strokeWidth={p.node.slug === activeNodeSlug ? "2" : "1.5"}
             opacity={p.node.inDevelopment ? 0.35 : 1}
+          />
+        ))}
+
+        {/* Small dashed ring around parent nodes that have children */}
+        {mainPoints
+          .filter((p) => parentSlugs.has(p.node.slug))
+          .map((p) => (
+            <circle
+              key={`parent-ring-${p.node.code}`}
+              cx={p.x}
+              cy={p.y}
+              r={40}
+              fill="none"
+              stroke={stroke}
+              strokeWidth="1"
+              strokeDasharray="2 5"
+              opacity={0.5}
+            />
+          ))}
+
+        {/* Lines from parent to sub-nodes */}
+        {subPoints.map((p, i) => (
+          <line
+            key={`subline-${i}`}
+            x1={p.parent.x}
+            y1={p.parent.y}
+            x2={p.x}
+            y2={p.y}
+            stroke={p.node.slug === activeNodeSlug ? "var(--color-brand)" : stroke}
+            strokeWidth="1.5"
+            strokeDasharray="2 5"
+            opacity={p.node.inDevelopment ? 0.35 : 0.8}
           />
         ))}
 
@@ -162,8 +225,8 @@ export default function EcosystemDiagram({
         </text>
       </svg>
 
-      {/* Interactive satellite overlay */}
-      {points.map((p) => (
+      {/* Interactive satellite overlay — main orbit */}
+      {mainPoints.map((p) => (
         <Satellite
           key={p.node.code}
           point={p}
@@ -171,6 +234,20 @@ export default function EcosystemDiagram({
           interactive={interactive}
           isActive={p.node.slug === activeNodeSlug}
           isLoginPage={isLoginPage}
+          diameterCqw={SAT_DIAMETER_CQW}
+        />
+      ))}
+
+      {/* Sub-nodes (children of a parent node) */}
+      {subPoints.map((p) => (
+        <Satellite
+          key={p.node.code}
+          point={p}
+          dark={dark}
+          interactive={interactive}
+          isActive={p.node.slug === activeNodeSlug}
+          isLoginPage={isLoginPage}
+          diameterCqw={SUB_SAT_DIAMETER_CQW}
         />
       ))}
     </div>
@@ -183,6 +260,8 @@ interface SatellitePoint {
   node: NodeDef;
   cos: number;
   sin: number;
+  /** SVG x coordinate — used to determine tooltip direction. */
+  x: number;
   left: string;
   top: string;
 }
@@ -193,14 +272,16 @@ function Satellite({
   interactive,
   isActive,
   isLoginPage,
+  diameterCqw = SAT_DIAMETER_CQW,
 }: {
   point: SatellitePoint;
   dark: boolean;
   interactive: boolean;
   isActive: boolean;
   isLoginPage: boolean;
+  diameterCqw?: number;
 }) {
-  const { node, cos, sin, left, top } = point;
+  const { node, cos, sin, x, left, top } = point;
   const { Icon } = node;
 
   const circleClasses = [
@@ -219,8 +300,8 @@ function Satellite({
     <span
       className={circleClasses}
       style={{
-        width: `${SAT_DIAMETER_CQW}cqw`,
-        height: `${SAT_DIAMETER_CQW}cqw`,
+        width: `${diameterCqw}cqw`,
+        height: `${diameterCqw}cqw`,
         boxShadow: dark
           ? "0 4px 12px rgba(0,0,0,.35)"
           : "0 4px 12px rgba(27,42,65,.14)",
@@ -228,10 +309,10 @@ function Satellite({
     >
       <Icon
         aria-hidden="true"
-        style={{ width: "4.4cqw", height: "4.4cqw" }}
+        style={{ width: `${(diameterCqw / SAT_DIAMETER_CQW) * 4.4}cqw`, height: `${(diameterCqw / SAT_DIAMETER_CQW) * 4.4}cqw` }}
         strokeWidth={1.75}
       />
-      <span className="font-semibold leading-none" style={{ fontSize: "2.5cqw" }}>
+      <span className="font-semibold leading-none" style={{ fontSize: `${(diameterCqw / SAT_DIAMETER_CQW) * 2.5}cqw` }}>
         {node.code}
       </span>
     </span>
@@ -249,17 +330,16 @@ function Satellite({
     );
   }
 
-  // Tooltip sits beside the node, pushed outward (away from the diagram center)
-  // into open space so it never overlaps the node or its neighbours.
-  // Right-half nodes get it on their right, left-half nodes on their left.
-  // It's also nudged vertically along the node's radial direction so the
-  // top/bottom nodes clear their diagonal neighbours.
-  const tipGap = SAT_DIAMETER_CQW / 2 + 2.5; // cqw from node center to tooltip edge
+  // Tooltip sits beside the node, pushed into open space.
+  // Direction is based on the node's actual x position relative to the SVG
+  // centre (CX). Sub-nodes on the left edge would clip if we sent the tooltip
+  // further left, so we always push toward the spacious side.
+  const tipGap = diameterCqw / 2 + 2.5; // cqw from node center to tooltip edge
   const tipY = `calc(-50% + ${(sin * 9).toFixed(2)}cqw)`;
-  const tipTransform =
-    cos >= 0
-      ? `translate(${tipGap.toFixed(2)}cqw, ${tipY})`
-      : `translate(calc(-100% - ${tipGap.toFixed(2)}cqw), ${tipY})`;
+  const tipOnRight = x >= CX; // right half → tooltip to the right
+  const tipTransform = tipOnRight
+    ? `translate(${tipGap.toFixed(2)}cqw, ${tipY})`
+    : `translate(calc(-100% - ${tipGap.toFixed(2)}cqw), ${tipY})`;
 
   // If node is in development, it's not clickable.
   if (node.inDevelopment) {

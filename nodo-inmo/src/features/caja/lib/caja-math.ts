@@ -40,6 +40,54 @@ export interface SettlementLike {
   owner?: { name: string } | null;
 }
 
+export interface PropertyGroup {
+  owner_id: string;
+  owner_name: string;
+  property_id: string;
+  property_address: string;
+  currency: string;
+  total: number;
+  settlement_ids: string[];
+}
+
+/**
+ * Group PENDING settlements by property (and currency), summing the amount owed.
+ * Settled rows are ignored.
+ */
+export function groupPendingByProperty(settlements: any[]): PropertyGroup[] {
+  const map = new Map<string, PropertyGroup>();
+
+  for (const s of settlements) {
+    if (s.status !== "pending") continue;
+    
+    // Extraer property_id de las relaciones anidadas
+    const propertyId = s.payment?.contract?.property?.id;
+    const propertyAddress = s.payment?.contract?.property?.address ?? "Propiedad sin dirección";
+    
+    // Si la rendición no tiene propiedad asociada (caso raro), usamos un fallback
+    const effectivePropId = propertyId ?? "no-prop";
+
+    const key = `${s.owner_id}:${effectivePropId}:${s.currency}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.total += s.amount;
+      existing.settlement_ids.push(s.id);
+    } else {
+      map.set(key, {
+        owner_id: s.owner_id,
+        owner_name: s.owner?.name ?? "—",
+        property_id: effectivePropId,
+        property_address: propertyAddress,
+        currency: s.currency,
+        total: s.amount,
+        settlement_ids: [s.id],
+      });
+    }
+  }
+
+  return Array.from(map.values());
+}
+
 export interface OwnerGroup {
   owner_id: string;
   owner_name: string;
@@ -52,11 +100,12 @@ export interface OwnerGroup {
  * Group PENDING settlements by owner (and currency), summing the amount owed.
  * Settled rows are ignored.
  */
-export function groupPendingByOwner(settlements: SettlementLike[]): OwnerGroup[] {
+export function groupPendingByOwner(settlements: any[]): OwnerGroup[] {
   const map = new Map<string, OwnerGroup>();
 
   for (const s of settlements) {
     if (s.status !== "pending") continue;
+
     const key = `${s.owner_id}:${s.currency}`;
     const existing = map.get(key);
     if (existing) {

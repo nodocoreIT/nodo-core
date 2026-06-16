@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import EcosystemDiagram from "@/components/EcosystemDiagram";
+import { Layers } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getNodeBySlug } from "@/lib/nodes";
 import {
@@ -13,6 +14,151 @@ import {
   requestPasswordReset,
   submitInmoRegistration,
 } from "@/app/actions";
+
+function NodeTransitionOverlay({
+  label,
+  code,
+  Icon,
+}: {
+  label: string;
+  code: string;
+  Icon: React.ElementType;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [barWidth, setBarWidth] = useState(0);
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      setMounted(true);
+      const t = setTimeout(() => setBarWidth(100), 60);
+      return () => clearTimeout(t);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden"
+      style={{ backgroundColor: "var(--color-navy-900)" }}
+    >
+      {/* Radial glow */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          opacity: mounted ? 1 : 0,
+          transition: "opacity 0.6s ease",
+          background:
+            "radial-gradient(55% 55% at 50% 52%, rgba(218,90,14,.22), transparent 70%)",
+        }}
+      />
+
+      {/* Main content */}
+      <div
+        className="relative flex flex-col items-center"
+        style={{
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? "translateY(0)" : "translateY(20px)",
+          transition: "opacity 0.45s ease, transform 0.45s ease",
+        }}
+      >
+        {/* Icon with pulsing rings */}
+        <div className="relative flex items-center justify-center">
+          <span
+            className="absolute rounded-full"
+            style={{
+              width: 128,
+              height: 128,
+              backgroundColor: "rgba(218,90,14,.12)",
+              animation: "nodo-ping 1.5s cubic-bezier(0,0,.2,1) infinite",
+            }}
+          />
+          <span
+            className="absolute rounded-full"
+            style={{
+              width: 100,
+              height: 100,
+              backgroundColor: "rgba(218,90,14,.08)",
+              animation: "nodo-ping 1.5s cubic-bezier(0,0,.2,1) 0.3s infinite",
+            }}
+          />
+          <span
+            className="relative flex items-center justify-center rounded-full"
+            style={{
+              width: 84,
+              height: 84,
+              backgroundColor: "rgba(218,90,14,.15)",
+              border: "1.5px solid rgba(218,90,14,.35)",
+            }}
+          >
+            <Icon
+              aria-hidden
+              style={{ width: 38, height: 38, color: "var(--color-brand)" }}
+              strokeWidth={1.6}
+            />
+          </span>
+        </div>
+
+        {/* Label */}
+        <p
+          className="mt-10 text-[12px] font-bold uppercase tracking-[.2em]"
+          style={{ color: "rgba(234,240,247,.4)" }}
+        >
+          Entrando a
+        </p>
+        <h2
+          className="mt-2 font-display font-extrabold text-white text-center"
+          style={{ fontSize: "clamp(28px,5vw,52px)", lineHeight: 1.06 }}
+        >
+          Nodo{" "}
+          <span style={{ color: "var(--color-brand)" }}>{code}</span>
+        </h2>
+
+        {/* Dots */}
+        <div className="mt-8 flex items-center gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="rounded-full"
+              style={{
+                width: 6,
+                height: 6,
+                backgroundColor: "var(--color-brand)",
+                opacity: 0.3,
+                animation: `nodo-bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div
+        className="absolute bottom-0 left-0 right-0"
+        style={{ height: 3, backgroundColor: "rgba(255,255,255,.07)" }}
+      >
+        <div
+          style={{
+            height: "100%",
+            backgroundColor: "var(--color-brand)",
+            width: `${barWidth}%`,
+            transition: "width 1.4s cubic-bezier(.4,0,.2,1)",
+          }}
+        />
+      </div>
+
+      <style>{`
+        @keyframes nodo-ping {
+          75%, to { transform: scale(1.7); opacity: 0; }
+        }
+        @keyframes nodo-bounce {
+          0%, 80%, 100% { transform: translateY(0); opacity: .3; }
+          40%            { transform: translateY(-6px); opacity: 1; }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 export default function LoginPage() {
   return (
@@ -67,6 +213,11 @@ function LoginForm() {
   const [nameError, setNameError] = useState("");
   const [generalError, setGeneralError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [transitionTarget, setTransitionTarget] = useState<{
+    label: string;
+    code: string;
+    Icon: React.ElementType;
+  } | null>(null);
   const [successModal, setSuccessModal] = useState<{
     open: boolean;
     type: "paciente" | "medico" | "patient_verify" | "forgot_verify";
@@ -152,24 +303,47 @@ function LoginForm() {
         setLoading(false);
         return;
       }
+      // Determine which nodo we're entering and build the redirect
+      let tLabel = "Core";
+      let tCode = "Core";
+      let TIcon: React.ElementType = Layers;
+
       if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
-        // Pass tokens in the hash so nodo-inmo's Supabase JS client
-        // can detect and store the session in localStorage.
-        const { access_token, refresh_token } = data.session!;
-        window.location.href = `/inmo/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+        tLabel = matchedNode?.label ?? "Nodo Inmo";
+        tCode = matchedNode?.code ?? "Inmo";
+        TIcon = matchedNode?.Icon ?? Layers;
       } else if (
         nodeParam === "nodo-clinica" ||
         nodeParam === "clinica-virtual" ||
         nodeParam === "clinica"
       ) {
-        const { access_token, refresh_token } = data.session!;
-        window.location.href = `/clinica/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+        tLabel = "Clínica Virtual";
+        tCode = "Clínica";
+        TIcon = matchedNode?.Icon ?? Layers;
       } else if (nodeParam === "nodo-autos" || nodeParam === "autos") {
-        const { access_token, refresh_token } = data.session!;
-        window.location.href = `/autos/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
-      } else {
-        router.push("/panel");
+        tLabel = matchedNode?.label ?? "Nodo Autos";
+        tCode = matchedNode?.code ?? "Autos";
+        TIcon = matchedNode?.Icon ?? Layers;
       }
+
+      setTransitionTarget({ label: tLabel, code: tCode, Icon: TIcon });
+
+      const { access_token, refresh_token } = data.session!;
+      setTimeout(() => {
+        if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
+          window.location.href = `/inmo/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+        } else if (
+          nodeParam === "nodo-clinica" ||
+          nodeParam === "clinica-virtual" ||
+          nodeParam === "clinica"
+        ) {
+          window.location.href = `/clinica/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+        } else if (nodeParam === "nodo-autos" || nodeParam === "autos") {
+          window.location.href = `/autos/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+        } else {
+          router.push("/panel");
+        }
+      }, 1550);
     } else {
       const originUrl =
         typeof window !== "undefined"
@@ -346,6 +520,14 @@ function LoginForm() {
 
   return (
     <>
+      {transitionTarget && (
+        <NodeTransitionOverlay
+          label={transitionTarget.label}
+          code={transitionTarget.code}
+          Icon={transitionTarget.Icon}
+        />
+      )}
+
       {/* Back button */}
       <Link
         href={

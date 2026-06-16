@@ -1,4 +1,4 @@
-import { History, Calendar } from "lucide-react";
+import { History, Calendar, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@nodocore/shared-components";
 import { useDashboardMetrics } from "../hooks/use-dashboard-metrics";
@@ -7,6 +7,7 @@ import { DashboardActionCard } from "./dashboard-action-card";
 import { MonthCollectionsSection } from "./month-collections-section";
 import { RecentReceiptsSection } from "./recent-receipts-section";
 import { formatMoney } from "@/features/contracts/lib/contract-labels";
+import { useUpcomingAdjustments } from "../hooks/use-upcoming-adjustments";
 
 function greetingName(user: ReturnType<typeof useAuth>["user"]): string {
   const fullName = (user?.user_metadata?.full_name as string | undefined) ?? "";
@@ -30,6 +31,7 @@ export function DashboardPage() {
   const metrics = useDashboardMetrics();
   const { data: tasks = [] } = useTasks();
   const pendingTasks = tasks.filter((t) => t.status !== "completada");
+  const { data: upcomingAdjustments = [] } = useUpcomingAdjustments();
 
   if (metrics.loading) {
     return (
@@ -153,6 +155,40 @@ export function DashboardPage() {
           </div>
         </section>
       ) : null}
+
+      {upcomingAdjustments.length > 0 && (
+        <section className="rounded-md border border-blue-200 bg-blue-50 px-5 py-4">
+          <div className="flex items-start gap-2">
+            <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-blue-900">
+                Próximos aumentos de alquiler
+              </h2>
+              <ul className="mt-2 space-y-1">
+                {upcomingAdjustments.map((adj) => (
+                  <li key={adj.contractId} className="text-sm text-blue-800">
+                    <span className="font-semibold">{adj.tenantName}</span>
+                    {" — "}
+                    {adj.propertyAddress}
+                    {" · Ajuste "}
+                    <span className="font-semibold">{adj.adjustmentIndex}</span>
+                    {" el "}
+                    <span className="font-semibold">
+                      {new Date(adj.nextAdjustmentDate + "T12:00:00").toLocaleDateString("es-AR", {
+                        day: "numeric",
+                        month: "long",
+                      })}
+                    </span>
+                    {" (alquiler actual: "}
+                    {formatMoney(adj.rentAmount, adj.currency)}
+                    {")"}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Current month collections */}
       <MonthCollectionsSection items={currentMonthCollections} />

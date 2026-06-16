@@ -1,0 +1,31 @@
+INSERT INTO nodo_inmo.contracts (
+  id,
+  org_id,
+  property_id,
+  tenant_id,
+  start_date,
+  end_date,
+  rent_amount,
+  currency,
+  adjustment_index,
+  adjustment_period_months,
+  contract_type,
+  status,
+  expenses_paid_by,
+  notes
+) VALUES (
+  gen_random_uuid(),
+  '27c8cee7-3158-43ca-a7d1-550fbd631a53',
+  'e9625562-775d-4821-8077-77538c27bd22',
+  '0b0be581-f08e-4aee-834a-31af68cf7c7d',
+  '2026-03-05',
+  '2028-03-05',
+  500000,
+  'ARS',
+  'IPC',
+  4,
+  'habitacional',
+  'active',
+  'tenant',
+  'Contrato de prueba automático para alerta cuatrimestral'
+);

@@ -477,8 +477,16 @@ const toCustomerUpdate = (updates: Partial<Customer>): Partial<CustomerRow> => {
   return row;
 };
 
-const normalizeError = (error: unknown, fallback: string) =>
-  error instanceof Error ? error.message : fallback;
+const normalizeError = (error: unknown, fallback: string): string => {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object') {
+    const e = error as Record<string, unknown>;
+    const msg = e.message ?? e.msg ?? e.error_description ?? fallback;
+    const code = e.code ?? e.status ?? '';
+    return code ? `[${code}] ${msg}` : String(msg);
+  }
+  return fallback;
+};
 
 // ─── Store interface ──────────────────────────────────────────────────────────
 

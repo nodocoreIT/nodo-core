@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Image as ImageIcon } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import { Input } from "@nodocore/shared-components";
 import { PaginationControls } from "@nodocore/shared-components";
@@ -10,10 +10,9 @@ import { useSearchStore } from "@/shared/search/use-search-store";
 import { matchesQuery } from "@/shared/search/matches-query";
 import { useUpdateProperty } from "@/features/properties/hooks/use-update-property";
 import { useDeleteProperty } from "@/features/properties/hooks/use-delete-property";
+import { useContacts } from "@/features/contacts/hooks/use-contacts";
 import { CreatePropertyDialog } from "./create-property-dialog";
 import { PropertyFormDialog } from "./property-form-dialog";
-import type { PropertyFormValues } from "./property-form-dialog";
-import { VoicePropertyButton } from "./voice-property-button";
 import { RegisterExpenseButton } from "@/features/property-expenses/components/register-expense-button";
 import { SharePropertyButton } from "./share-property-button";
 import {
@@ -48,6 +47,7 @@ import {
   STATUS_LABELS,
   formatPrice,
 } from "@/features/properties/lib/property-labels";
+import { usePropertyPhotos } from "../hooks/use-property-photos";
 import { formatCurrencyInput, parseCurrencyInput } from "@/shared/lib/format-money";
 import {
   PROVINCIAS,
@@ -66,6 +66,7 @@ interface Filters {
   priceMax: string;
   provincia: string;
   localidad: string;
+  owner_id: string;
 }
 
 const EMPTY_FILTERS: Filters = {
@@ -76,26 +77,37 @@ const EMPTY_FILTERS: Filters = {
   priceMax: "",
   provincia: "",
   localidad: "",
+  owner_id: "",
 };
 
 const ALL = "__all__";
+
+// ── Property thumbnail ────────────────────────────────────────────────────────
+
+function PropertyThumb({ path }: { path: string }) {
+  const { data: photos = [] } = usePropertyPhotos([path]);
+  const url = photos[0]?.url;
+  if (!url) return <div className="h-10 w-14 rounded bg-mist animate-pulse" />;
+  return (
+    <img
+      src={url}
+      alt=""
+      className="h-10 w-14 rounded object-cover border border-border"
+    />
+  );
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function PropertiesList() {
   const { data, isLoading, isError } = useProperties();
+  const { data: owners } = useContacts("owner");
   const query = useSearchStore((s) => s.query);
   const [createOpen, setCreateOpen] = useState(false);
   const [page, setPage] = useState(0);
-  const [voiceOpen, setVoiceOpen] = useState(false);
-  const [voiceDefaults, setVoiceDefaults] = useState<Partial<PropertyFormValues> | null>(null);
   const [editProperty, setEditProperty] = useState<PropertyRow | null>(null);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
 
-  const handleVoiceExtracted = (values: Partial<PropertyFormValues>) => {
-    setVoiceDefaults(values);
-    setVoiceOpen(true);
-  };
 
   const updateProperty = useUpdateProperty();
   const deleteProperty = useDeleteProperty();
@@ -151,6 +163,7 @@ export function PropertiesList() {
         }
         if (filters.provincia && p.provincia !== filters.provincia) return false;
         if (filters.localidad && p.localidad !== filters.localidad) return false;
+        if (filters.owner_id && p.owner_id !== filters.owner_id) return false;
         return true;
       }),
     [data, query, filters],
@@ -172,7 +185,6 @@ export function PropertiesList() {
     <div className="flex flex-col gap-4">
       {/* Action row */}
       <div className="flex items-center justify-end gap-2">
-        <VoicePropertyButton onExtracted={handleVoiceExtracted} />
         <Button onClick={() => setCreateOpen(true)} className="gap-2">
           <Plus className="h-4 w-4" />
           Nueva propiedad
@@ -206,6 +218,15 @@ export function PropertiesList() {
             { value: "other", label: "Otro" },
           ]}
           className="w-36"
+        />
+
+        <FilterSelect
+          label="Propietario"
+          value={filters.owner_id}
+          onChange={(v) => setFilter("owner_id", v)}
+          placeholder="Todos"
+          options={(owners ?? []).map((o) => ({ value: o.id, label: o.name }))}
+          className="w-44"
         />
 
         <FilterSelect
@@ -336,6 +357,7 @@ export function PropertiesList() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-14">Foto</TableHead>
                 <TableHead>Dirección</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Operación</TableHead>
@@ -348,6 +370,19 @@ export function PropertiesList() {
             <TableBody>
               {pagedRows.map((property) => (
                 <TableRow key={property.id}>
+                  <TableCell>
+                    {property.photos?.[0] ? (
+                      <PropertyThumb path={property.photos[0]} />
+                    ) : (
+                      <div
+                        className="flex h-10 w-14 flex-col items-center justify-center rounded border border-border bg-mist text-[9px] font-medium text-slate2 transition-colors"
+                        title="Sin imagen disponible"
+                      >
+                        <ImageIcon className="h-3.5 w-3.5 mb-0.5 text-slate2-300" />
+                        <span>Sin foto</span>
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="font-medium">
                     {property.address}
                   </TableCell>
@@ -359,7 +394,14 @@ export function PropertiesList() {
                     {OPERATION_LABELS[property.operation] ?? property.operation}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={property.status} />
+                    <div className="flex flex-col gap-0.5">
+                      <StatusBadge status={property.status} />
+                      {property.status !== "available" && property.status_changed_by_profile?.full_name && (
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                          por {property.status_changed_by_profile.full_name}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {formatPrice(property.sale_price, property.currency)}
@@ -398,21 +440,6 @@ export function PropertiesList() {
         onSuccess={() => setCreateOpen(false)}
       />
 
-      {/* Voice-dictated create dialog */}
-      {voiceDefaults !== null && (
-        <CreatePropertyDialog
-          open={voiceOpen}
-          onOpenChange={(open) => {
-            setVoiceOpen(open);
-            if (!open) setVoiceDefaults(null);
-          }}
-          defaultValues={voiceDefaults}
-          onSuccess={() => {
-            setVoiceOpen(false);
-            setVoiceDefaults(null);
-          }}
-        />
-      )}
 
       {/* Edit dialog */}
       {editProperty && (
@@ -536,6 +563,7 @@ function StatusBadge({ status }: { status: string }) {
   const colorMap: Record<string, string> = {
     available: "bg-green-100 text-green-800",
     reserved: "bg-yellow-100 text-yellow-800",
+    negotiation: "bg-amber-100 text-amber-800",
     rented: "bg-blue-100 text-blue-800",
     sold: "bg-slate-100 text-slate-700",
     inactive: "bg-red-100 text-red-700",
