@@ -12,7 +12,7 @@ export default function Page() {
       <main>
         {/* Hero */}
         <section
-          className="relative overflow-hidden pt-[160px] pb-[clamp(56px,8vw,96px)]"
+          className="relative overflow-hidden pt-[clamp(90px,7vw,120px)] pb-[clamp(32px,5vw,56px)]"
           style={{ backgroundColor: "var(--color-navy-900)" }}
         >
           <div
@@ -71,7 +71,7 @@ export default function Page() {
 
         {/* Intro */}
         <section
-          className="py-[clamp(48px,7vw,96px)]"
+          className="pt-[clamp(24px,4vw,48px)] pb-[clamp(48px,7vw,96px)]"
           style={{
             backgroundColor: "var(--color-navy)",
             borderTop: "1px solid rgba(255,255,255,.08)",
@@ -176,7 +176,7 @@ export default function Page() {
                     className="font-display font-bold text-white mb-1"
                     style={{ fontSize: 18 }}
                   >
-                    Clínica Virtual
+                    Nodo Clínica
                   </h3>
                   <p style={{ fontSize: 14, color: "rgba(234,240,247,.65)", lineHeight: 1.6 }}>
                     Portal médico completo con videoconsultas, agenda, recetas digitales e

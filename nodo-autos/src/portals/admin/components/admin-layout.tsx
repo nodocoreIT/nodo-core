@@ -181,7 +181,7 @@ export function AdminLayout() {
               <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate2">
                 Nodo Autos · Panel Admin
               </p>
-              <h1 className="text-base sm:text-xl font-bold text-navy">{title}</h1>
+              <h1 className="text-base sm:text-xl font-bold text-navy mt-1.5">{title}</h1>
             </div>
           </div>
         </header>

@@ -107,11 +107,21 @@ function NodeTransitionOverlay({
           Entrando a
         </p>
         <h2
-          className="mt-2 font-display font-extrabold text-white text-center"
+          className="mt-2 font-display font-extrabold text-white text-center flex items-center justify-center gap-x-3.5 gap-y-1"
           style={{ fontSize: "clamp(28px,5vw,52px)", lineHeight: 1.06 }}
         >
-          Nodo{" "}
-          <span style={{ color: "var(--color-brand)" }}>{code}</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logos/nodo%20nar.png"
+            alt="Nodo"
+            style={{
+              height: "0.78em",
+              width: "auto",
+              display: "inline-block",
+            }}
+          />
+          <span style={{ color: "#fff", fontWeight: 400 }}>|</span>
+          <span>{code}</span>
         </h2>
 
         {/* Dots */}
@@ -317,7 +327,7 @@ function LoginForm() {
         nodeParam === "clinica-virtual" ||
         nodeParam === "clinica"
       ) {
-        tLabel = "Clínica Virtual";
+        tLabel = "Clínica Virtualaaaaa";
         tCode = "Clínica";
         TIcon = matchedNode?.Icon ?? Layers;
       } else if (nodeParam === "nodo-autos" || nodeParam === "autos") {

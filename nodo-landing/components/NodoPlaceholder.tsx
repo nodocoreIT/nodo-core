@@ -4,6 +4,7 @@ import { Fragment, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import dynamic from "next/dynamic";
+import { Car, ArrowRight, ShoppingBag } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 import { getNodeBySlug } from "@/lib/nodes";
@@ -44,8 +45,9 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
   if (!node) notFound();
 
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [devOpen, setDevOpen] = useState(false);
 
-  const { Icon, code, description, intro, highlights } = node;
+  const { Icon, code, description, intro, highlights, inDevelopment } = node;
 
   return (
     <div style={{ backgroundColor: "var(--color-navy-900)" }}>
@@ -53,7 +55,7 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
       <main>
         {/* Hero */}
         <section
-          className="relative overflow-hidden pt-[160px] pb-[clamp(56px,8vw,96px)]"
+          className="relative overflow-hidden pt-[clamp(90px,7vw,120px)] pb-[clamp(32px,5vw,56px)]"
           style={{ backgroundColor: "var(--color-navy-900)" }}
         >
           <div
@@ -108,65 +110,90 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
               </p>
             )}
 
-            <div className="mt-10 flex flex-col items-center gap-4">
-              {slug === "inmo" ? (
-                <Link
-                  href="/nodo-inmo/login"
-                  className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150 shadow-md shadow-brand/15"
-                >
-                  Entrar a Inmo
-                </Link>
-              ) : slug === "autos" ? (
-                <Link
-                  href="/nodo-autos/login"
-                  className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150 shadow-md shadow-brand/15"
-                >
-                  Entrar al Concesionario
-                </Link>
-              ) : slug === "clinica" ? (
-                <Link
-                  href="/nodo-clinica/login"
-                  className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150 shadow-md shadow-brand/15"
-                >
-                  Entrar a Clínica
-                </Link>
-              ) : (
-                <>
-                  {/* Row 1 */}
+            {slug !== "it" && (
+              <div className="mt-10 flex flex-col items-center gap-4">
+                {slug === "inmo" ? (
                   <div className="flex flex-wrap items-center justify-center gap-4">
                     <Link
-                      href="https://nodoinmo.vercel.app/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center px-7 py-3.5 text-[16px] font-semibold rounded-md bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150"
+                      href="/nodo-inmo/login"
+                      className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150 shadow-md shadow-brand/15"
                     >
-                      Ver Demo
+                      Entrar a Inmo
                     </Link>
+                    <button
+                      onClick={() => setPdfOpen(true)}
+                      className="btn-ghost-light inline-flex items-center justify-center px-7 py-3.5 text-[16px] font-semibold rounded-md text-white cursor-pointer"
+                    >
+                      Ver Precios
+                    </button>
+                  </div>
+                ) : slug === "autos" ? (
+                  <div className="flex flex-wrap items-center justify-center gap-4">
                     <Link
-                      href="/"
+                      href="/nodo-autos/login"
+                      className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150 shadow-md shadow-brand/15"
+                    >
+                      Entrar al Concesionario
+                    </Link>
+                    <button
+                      onClick={() => setPdfOpen(true)}
+                      className="btn-ghost-light inline-flex items-center justify-center px-7 py-3.5 text-[16px] font-semibold rounded-md text-white cursor-pointer"
+                    >
+                      Ver Precios
+                    </button>
+                  </div>
+                ) : slug === "clinica" ? (
+                  <div className="flex flex-wrap items-center justify-center gap-4">
+                    <Link
+                      href="/nodo-clinica/login"
+                      className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150 shadow-md shadow-brand/15"
+                    >
+                      Entrar a Clínica
+                    </Link>
+                    <button
+                      onClick={() => setPdfOpen(true)}
+                      className="btn-ghost-light inline-flex items-center justify-center px-7 py-3.5 text-[16px] font-semibold rounded-md text-white cursor-pointer"
+                    >
+                      Ver Precios
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-center gap-4">
+                    {inDevelopment ? (
+                      <button
+                        onClick={() => setDevOpen(true)}
+                        className="btn-ghost-light inline-flex items-center justify-center gap-2 px-7 py-3.5 text-[16px] font-semibold rounded-md text-white/70 cursor-pointer"
+                      >
+                        <span aria-hidden>🚧</span>
+                        En construcción
+                      </button>
+                    ) : (
+                      <Link
+                        href="https://nodoinmo.vercel.app/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center px-7 py-3.5 text-[16px] font-semibold rounded-md bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150"
+                      >
+                        Ver Demo
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => setPdfOpen(true)}
                       className="btn-ghost-light inline-flex items-center justify-center px-7 py-3.5 text-[16px] font-semibold rounded-md text-white"
                     >
-                      Volver al inicio
-                    </Link>
+                      Ver Precios
+                    </button>
                   </div>
-
-                  {/* Row 2 */}
-                  <button
-                    onClick={() => setPdfOpen(true)}
-                    className="btn-ghost-light inline-flex items-center justify-center px-7 py-3.5 text-[16px] font-semibold rounded-md text-white"
-                  >
-                    Ver Precios
-                  </button>
-                </>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         </section>
 
         {/* Content */}
         {intro && (
           <section
-            className="py-[clamp(48px,7vw,96px)]"
+            className="pt-[clamp(24px,4vw,48px)] pb-[clamp(48px,7vw,96px)]"
             style={{
               backgroundColor: "var(--color-navy)",
               borderTop: "1px solid rgba(255,255,255,.08)",
@@ -216,10 +243,139 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
             </div>
           </section>
         )}
+
+        {/* Submodules Section for IT */}
+        {slug === "it" && (
+          <section
+            id="submodulos"
+            className="pt-[clamp(32px,4vw,56px)] pb-[clamp(64px,8vw,112px)] relative"
+            style={{
+              backgroundColor: "var(--color-navy-900)",
+              borderTop: "1px solid rgba(255,255,255,.08)",
+            }}
+          >
+            <div className="w-[min(1200px,92vw)] mx-auto">
+              <div className="text-center mb-12">
+                <p className="text-[13px] font-bold uppercase tracking-[.16em] text-brand mb-3">
+                  Arquitectura Modular
+                </p>
+                <h2 className="font-display font-extrabold text-white text-[clamp(28px,3vw,42px)]">
+                  Submódulos de NODO | IT
+                </h2>
+                <p className="text-slate2-300 max-w-xl mx-auto mt-4 text-[15px]">
+                  Desglosamos la infraestructura y software a medida en soluciones tecnológicas específicas.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                {/* Active Submodule: Nodo Autos */}
+                <div
+                  className="rounded-2xl p-8 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 text-left"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, var(--color-navy-700), var(--color-navy))",
+                    border: "1px solid rgba(218, 90, 14, 0.25)",
+                    boxShadow: "0 10px 30px -15px rgba(218, 90, 14, 0.15)",
+                  }}
+                >
+                  <div>
+                    <div className="h-12 w-12 rounded-xl bg-brand/15 text-brand flex items-center justify-center mb-6">
+                      <Car className="h-6 w-6" />
+                    </div>
+                    <h3 className="font-display font-bold text-white text-[20px] mb-3">
+                      Nodo Autos
+                    </h3>
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4">
+                      Disponible
+                    </span>
+                    <p className="text-[14.5px] leading-relaxed text-slate2-300 mb-6">
+                      Panel de gestión de stock para concesionarias y agencias de autos: inventario, clientes, publicaciones y contratos de venta.
+                    </p>
+                  </div>
+                  <Link
+                    href="/nodo-autos/login"
+                    className="inline-flex items-center gap-2 text-brand font-semibold text-[15px] hover:text-brand-300 transition-colors"
+                  >
+                    Acceder al módulo <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+
+                {/* Submodule: Nodo Ecommerce */}
+                <div
+                  className="rounded-2xl p-8 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 text-left"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, var(--color-navy-700), var(--color-navy))",
+                    border: "1px solid rgba(59, 130, 246, 0.25)",
+                    boxShadow: "0 10px 30px -15px rgba(59, 130, 246, 0.15)",
+                  }}
+                >
+                  <div>
+                    <div className="h-12 w-12 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center mb-6">
+                      <ShoppingBag className="h-6 w-6" />
+                    </div>
+                    <h3 className="font-display font-bold text-white text-[20px] mb-3">
+                      Nodo Ecommerce
+                    </h3>
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20 mb-4">
+                      Desarrollo a pedido
+                    </span>
+                    <p className="text-[14.5px] leading-relaxed text-slate2-300 mb-6">
+                      Todo para gestionar tu e-commerce de manera profesional: catálogo de productos, pasarelas de pago, envíos integrados y control de ventas.
+                    </p>
+                  </div>
+                  <Link
+                    href="/#contacto"
+                    className="inline-flex items-center gap-2 text-blue-400 font-semibold text-[15px] hover:text-blue-300 transition-colors"
+                  >
+                    Desarrollo a pedido <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
       </main>
       <Footer />
 
-      {pdfOpen && <PdfPricingModal onClose={() => setPdfOpen(false)} />}
+      {pdfOpen && <PdfPricingModal slug={slug} onClose={() => setPdfOpen(false)} />}
+
+      {devOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-6"
+          style={{
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            backgroundColor: "rgba(5,14,28,0.65)",
+          }}
+          onClick={() => setDevOpen(false)}
+        >
+          <div
+            className="flex flex-col items-center text-center gap-5 rounded-2xl px-10 py-12 shadow-2xl max-w-md w-full"
+            style={{
+              background: "var(--color-navy-900)",
+              border: "1px solid rgba(255,255,255,.1)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="text-5xl" aria-hidden>🚧</span>
+            <h2 className="font-display font-bold text-white text-xl">
+              En desarrollo
+            </h2>
+            <p className="text-white/65 leading-relaxed text-[15px]">
+              Estamos construyendo el sistema de gestión para{" "}
+              <span className="text-white font-semibold">{node!.label}</span>.
+              Próximamente vas a poder acceder desde acá.
+            </p>
+            <button
+              onClick={() => setDevOpen(false)}
+              className="mt-2 inline-flex items-center justify-center px-6 py-2.5 text-[14px] font-semibold rounded-md bg-white/10 text-white hover:bg-white/20 transition-colors"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
