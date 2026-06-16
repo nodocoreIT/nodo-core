@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/finanzas/assets/:file*", "destination": "/assets/:file*" },
+    { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
+  ]
+}

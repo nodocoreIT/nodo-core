@@ -7,6 +7,7 @@ import type { NextConfig } from "next";
 const NODO_INMO_URL = process.env.NODO_INMO_URL ?? "http://localhost:5173";
 const NODO_CLINICA_URL = process.env.NODO_CLINICA_URL ?? "http://localhost:5174";
 const NODO_AUTOS_URL = process.env.NODO_AUTOS_URL ?? "http://localhost:5175";
+const NODO_FINANZAS_URL = process.env.NODO_FINANZAS_URL ?? "http://localhost:5176";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -48,6 +49,9 @@ const nextConfig: NextConfig = {
           // ── nodo-autos ─────────────────────────────────────────────────────
           { source: "/autos", destination: `${NODO_AUTOS_URL}/autos` },
           { source: "/autos/:path*", destination: `${NODO_AUTOS_URL}/autos/:path*` },
+          // ── nodo-finanzas ──────────────────────────────────────────────────
+          { source: "/finanzas", destination: `${NODO_FINANZAS_URL}/finanzas` },
+          { source: "/finanzas/:path*", destination: `${NODO_FINANZAS_URL}/finanzas/:path*` },
         ],
       };
     }

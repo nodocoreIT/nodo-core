@@ -4,7 +4,7 @@ import { Fragment, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import dynamic from "next/dynamic";
-import { Car, ArrowRight, ShoppingBag } from "lucide-react";
+import { Car, ArrowRight, ShoppingBag, Coins } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 import { getNodeBySlug } from "@/lib/nodes";
@@ -267,7 +267,7 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
                 {/* Active Submodule: Nodo Autos */}
                 <div
                   className="rounded-2xl p-8 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 text-left"
@@ -297,6 +297,38 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
                     className="inline-flex items-center gap-2 text-brand font-semibold text-[15px] hover:text-brand-300 transition-colors"
                   >
                     Acceder al módulo <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+
+                {/* Submodule: Nodo Finanzas */}
+                <div
+                  className="rounded-2xl p-8 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 text-left"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, var(--color-navy-700), var(--color-navy))",
+                    border: "1px solid rgba(5, 150, 105, 0.25)",
+                    boxShadow: "0 10px 30px -15px rgba(5, 150, 105, 0.15)",
+                  }}
+                >
+                  <div>
+                    <div className="h-12 w-12 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center mb-6">
+                      <Coins className="h-6 w-6" />
+                    </div>
+                    <h3 className="font-display font-bold text-white text-[20px] mb-3">
+                      Nodo Finanzas
+                    </h3>
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4">
+                      Disponible
+                    </span>
+                    <p className="text-[14.5px] leading-relaxed text-slate2-300 mb-6">
+                      Control de finanzas personales: gastos, tarjetas de crédito, préstamos, planes de ahorro e informe mensual.
+                    </p>
+                  </div>
+                  <Link
+                    href="/nodo-finanzas"
+                    className="inline-flex items-center gap-2 text-emerald-400 font-semibold text-[15px] hover:text-emerald-300 transition-colors"
+                  >
+                    Ver módulo <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
 

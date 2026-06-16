@@ -193,6 +193,36 @@ export const NODES: NodeDef[] = [
     provisionable: true,
   },
   {
+    code: "Finanzas",
+    slug: "finanzas",
+    label: "Nodo Finanzas Personales",
+    parentSlug: "it",
+    inDevelopment: false,
+    description:
+      "Gestión de finanzas personales: cuentas, gastos, tarjetas, préstamos y mucho mas.",
+    Icon: Coins,
+    intro:
+      "Nodo Finanzas Personales es tu panel de control financiero. Registrá gastos diarios y fijos, gestioná tus tarjetas de crédito con lógica de cuotas, seguí préstamos y planes de ahorro, y visualizá tu situación financiera en un informe mensual detallado.",
+    highlights: [
+      {
+        title: "Control de gastos",
+        description:
+          "Registrá gastos diarios y fijos por rubro, con soporte para múltiples cuentas y formas de pago.",
+      },
+      {
+        title: "Tarjetas y cuotas",
+        description:
+          "Seguimiento completo de consumos en tarjetas de crédito con cálculo automático de períodos y cuotas.",
+      },
+      {
+        title: "Informe mensual",
+        description:
+          "Visualización gráfica de tu situación financiera: gastos por categoría, evolución diaria y balance del mes.",
+      },
+    ],
+    provisionable: false,
+  },
+  {
     code: "Autos",
     slug: "autos",
     label: "Nodo Automotores",
