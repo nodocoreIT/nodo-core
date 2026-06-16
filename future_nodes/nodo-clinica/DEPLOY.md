@@ -75,7 +75,7 @@ fly volumes create clinica_data --region gru --size 1 -a nodo-clinica
 
 - Paciente: `https://tu-app.fly.dev/login/paciente`
 - Médico: `https://tu-app.fly.dev/login/medico`
-- Cuentas demo: `paciente@demo.com` / `maurolluch@gmail.com` — contraseña `Probando1`
+- Cuentas demo: ver `docs/DATABASE.md` — `doc.demo1@nodo.demo` / `paciente1@nodo.demo` — contraseña `Probando1`
 
 ---
 

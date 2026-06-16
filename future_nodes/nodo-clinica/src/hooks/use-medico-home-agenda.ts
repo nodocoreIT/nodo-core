@@ -43,20 +43,31 @@ export function useMedicoHomeAgenda(doctorId: string) {
   const [availability, setAvailability] =
     useState<DoctorAvailability>(DEFAULT_AVAILABILITY);
   const [googleCalendarId, setGoogleCalendarId] = useState("");
+  const [manualTasks, setManualTasks] = useState<
+    Array<{ id: string; title: string; done: boolean }>
+  >([]);
 
   const todayKey = localDateKeyFromDate(new Date());
 
   const load = useCallback(async () => {
     try {
-      const [schedule, upcoming] = await Promise.all([
+      const [schedule, upcoming, tasksRes] = await Promise.all([
         clinicApi.getDoctorSchedule(doctorId),
         clinicApi.getDoctorQueue(doctorId),
+        clinicApi.getDoctorTasks(todayKey).catch(() => ({ tasks: [] })),
       ]);
 
       const avail: DoctorAvailability =
         schedule.availability ?? DEFAULT_AVAILABILITY;
       setAvailability(avail);
       setGoogleCalendarId(schedule.googleCalendarId ?? "");
+      setManualTasks(
+        tasksRes.tasks.map((t) => ({
+          id: t.id,
+          title: t.title,
+          done: t.done,
+        })),
+      );
 
       const nextKey = getNextAttendanceDateKey(avail);
       setNextDayKey(nextKey);
@@ -128,8 +139,16 @@ export function useMedicoHomeAgenda(doctorId: string) {
       });
     }
 
+    for (const task of manualTasks) {
+      items.push({
+        id: task.id,
+        label: task.title,
+        done: task.done,
+      });
+    }
+
     return items;
-  }, [todayAppts, todayBlocks]);
+  }, [todayAppts, todayBlocks, manualTasks]);
 
   return {
     loading,
