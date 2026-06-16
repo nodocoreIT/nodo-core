@@ -1,14 +1,18 @@
-/**
- * TenantPortalPage — minimal landing for tenants.
- * Full portal content is implemented in later slices.
- */
+import { Routes, Route, Navigate } from "react-router-dom";
+import { TenantLayout } from "./components/tenant-layout";
+import { TenantContractPage } from "./components/tenant-contract-page";
+import { TenantPaymentsPage } from "./components/tenant-payments-page";
+import { TenantReclamosPage } from "./components/tenant-reclamos-page";
+
 export function TenantPortalPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-paper">
-      <div className="text-center">
-        <h1 className="text-3xl text-navy">Portal Inquilino</h1>
-        <p className="mt-2 text-slate2">Tu espacio de inquilino</p>
-      </div>
-    </div>
+    <Routes>
+      <Route element={<TenantLayout />}>
+        <Route index element={<Navigate to="contrato" replace />} />
+        <Route path="contrato" element={<TenantContractPage />} />
+        <Route path="pagos" element={<TenantPaymentsPage />} />
+        <Route path="reclamos" element={<TenantReclamosPage />} />
+      </Route>
+    </Routes>
   );
 }

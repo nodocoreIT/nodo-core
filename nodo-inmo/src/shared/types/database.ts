@@ -488,6 +488,79 @@ export type Database = {
         }
         Relationships: []
       }
+      reclamos: {
+        Row: {
+          id: string
+          org_id: string
+          contact_id: string
+          property_id: string | null
+          contract_id: string | null
+          title: string
+          description: string
+          category: string
+          priority: string
+          status: string
+          admin_notes: string | null
+          resolved_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          contact_id: string
+          property_id?: string | null
+          contract_id?: string | null
+          title: string
+          description: string
+          category?: string
+          priority?: string
+          status?: string
+          admin_notes?: string | null
+          resolved_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          org_id?: string
+          contact_id?: string
+          property_id?: string | null
+          contract_id?: string | null
+          title?: string
+          description?: string
+          category?: string
+          priority?: string
+          status?: string
+          admin_notes?: string | null
+          resolved_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reclamos_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reclamos_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reclamos_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       owner_settlements: {
         Row: {
           amount: number

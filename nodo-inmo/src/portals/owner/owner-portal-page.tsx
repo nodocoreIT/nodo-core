@@ -1,14 +1,17 @@
-/**
- * OwnerPortalPage — minimal landing for property owners.
- * Full portal content is implemented in later slices.
- */
+import { Routes, Route, Navigate } from "react-router-dom";
+import { OwnerLayout } from "./components/owner-layout";
+import { OwnerHomePage } from "./components/owner-home-page";
+import { OwnerPropertiesPage } from "./components/owner-properties-page";
+import { OwnerSettlementsPage } from "./components/owner-settlements-page";
+
 export function OwnerPortalPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-paper">
-      <div className="text-center">
-        <h1 className="text-3xl text-navy">Portal Propietario</h1>
-        <p className="mt-2 text-slate2">Gestión de propiedades</p>
-      </div>
-    </div>
+    <Routes>
+      <Route element={<OwnerLayout />}>
+        <Route index element={<Navigate to="propiedades" replace />} />
+        <Route path="propiedades" element={<OwnerPropertiesPage />} />
+        <Route path="rendiciones" element={<OwnerSettlementsPage />} />
+      </Route>
+    </Routes>
   );
 }
