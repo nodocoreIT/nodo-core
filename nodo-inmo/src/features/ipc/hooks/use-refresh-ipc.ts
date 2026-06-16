@@ -2,10 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/shared/lib/supabase";
 import { IPC_QUERY_KEY } from "./use-current-ipc";
 
-interface DatosGobResponse {
-  data: [string, number][];   // [date_str, index_value][]
-  meta: unknown;
-}
+
 
 /**
  * Fetches IPC from Argentina's open data API (datos.gob.ar) and persists
