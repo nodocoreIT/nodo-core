@@ -133,7 +133,7 @@ export function BookAppointmentDialog({
 
       toast.success("Turno confirmado. Revisá tu correo para los detalles.");
       onOpenChange(false);
-      window.location.href = result.waitingRoomUrl;
+      window.location.assign(result.waitingRoomUrl);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al reservar");
     } finally {
