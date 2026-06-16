@@ -244,13 +244,13 @@ function LoginForm() {
     "Panel de administración para gestionar clientes, unidades de negocio y el roadmap del Core.";
 
   if (nodeParam === "nodo-clinica" || nodeParam === "clinica-virtual") {
-    activeNodeSlug = "salud"; // Connect to Salud in diagram
+    activeNodeSlug = "clinica"; // Connect to Clinica sub-node in diagram
     panelTitle = "NODO | Clínica Virtual";
     panelDesc =
       "Plataforma HealthTech para telemedicina profesional: consultorios virtuales, recetas digitales e informes automatizados con Inteligencia Artificial.";
   } else if (nodeParam === "nodo-autos" || nodeParam === "autos") {
     activeNodeSlug = "autos";
-    panelTitle = "NODO | Autos";
+    panelTitle = "NODO | Automotores";
     panelDesc =
       "Panel de gestión de stock para concesionarias y agencias: inventario, clientes, publicaciones y contratos de venta digitales.";
   } else if (matchedNode) {
@@ -321,7 +321,7 @@ function LoginForm() {
         tCode = "Clínica";
         TIcon = matchedNode?.Icon ?? Layers;
       } else if (nodeParam === "nodo-autos" || nodeParam === "autos") {
-        tLabel = matchedNode?.label ?? "Nodo Autos";
+        tLabel = matchedNode?.label ?? "Nodo Automotores";
         tCode = matchedNode?.code ?? "Autos";
         TIcon = matchedNode?.Icon ?? Layers;
       }

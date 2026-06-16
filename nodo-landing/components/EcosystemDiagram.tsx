@@ -96,6 +96,15 @@ export default function EcosystemDiagram({
       ? ([...mainPoints, ...subPoints].find((p) => p.node.slug === activeNodeSlug) ?? null)
       : null;
 
+  // Two-hop support: when active is a sub-node, resolve its parent too.
+  const activeSubPoint = isLoginPage
+    ? (subPoints.find((p) => p.node.slug === activeNodeSlug) ?? null)
+    : null;
+  const activeParentPoint = activeSubPoint
+    ? (mainPoints.find((p) => p.node.slug === activeSubPoint.node.parentSlug) ?? null)
+    : null;
+  const activeParentSlug = activeParentPoint?.node.slug ?? null;
+
   return (
     <div
       className={`relative ${className}`}
@@ -131,18 +140,22 @@ export default function EcosystemDiagram({
         />
 
         {/* Lines from Core to main-orbit nodes */}
-        {mainPoints.map((p, i) => (
-          <line
-            key={`line-${i}`}
-            x1={CX}
-            y1={CY}
-            x2={p.x}
-            y2={p.y}
-            stroke={p.node.slug === activeNodeSlug ? "var(--color-brand)" : stroke}
-            strokeWidth={p.node.slug === activeNodeSlug ? "2" : "1.5"}
-            opacity={p.node.inDevelopment ? 0.35 : 1}
-          />
-        ))}
+        {mainPoints.map((p, i) => {
+          const isActiveLine =
+            p.node.slug === activeNodeSlug || p.node.slug === activeParentSlug;
+          return (
+            <line
+              key={`line-${i}`}
+              x1={CX}
+              y1={CY}
+              x2={p.x}
+              y2={p.y}
+              stroke={isActiveLine ? "var(--color-brand)" : stroke}
+              strokeWidth={isActiveLine ? "2" : "1.5"}
+              opacity={p.node.inDevelopment ? 0.35 : 1}
+            />
+          );
+        })}
 
         {/* Small dashed ring around parent nodes that have children */}
         {mainPoints
@@ -178,6 +191,7 @@ export default function EcosystemDiagram({
 
         {activePoint && (
           <>
+            {/* Pulse on the active destination node */}
             <circle
               className="ecosystem-core-pulse"
               cx={activePoint.x}
@@ -185,21 +199,55 @@ export default function EcosystemDiagram({
               r={58}
               fill="#DA5A0E"
             />
+            {/* Also pulse on parent when active is a sub-node */}
+            {activeParentPoint && (
+              <circle
+                className="ecosystem-core-pulse"
+                cx={activeParentPoint.x}
+                cy={activeParentPoint.y}
+                r={58}
+                fill="#DA5A0E"
+              />
+            )}
+            {/* Traveling dot */}
             <circle r="7" fill="var(--color-brand)" style={{ filter: "drop-shadow(0 2px 4px rgba(218,90,14,0.4))" }}>
-              <animate
-                attributeName="cx"
-                from={CX}
-                to={activePoint.x}
-                dur="1.8s"
-                repeatCount="indefinite"
-              />
-              <animate
-                attributeName="cy"
-                from={CY}
-                to={activePoint.y}
-                dur="1.8s"
-                repeatCount="indefinite"
-              />
+              {activeParentPoint ? (
+                // Two-hop: Core → Parent → Child
+                <>
+                  <animate
+                    attributeName="cx"
+                    values={`${CX};${activeParentPoint.x};${activePoint.x}`}
+                    keyTimes="0;0.5;1"
+                    dur="2.4s"
+                    repeatCount="indefinite"
+                  />
+                  <animate
+                    attributeName="cy"
+                    values={`${CY};${activeParentPoint.y};${activePoint.y}`}
+                    keyTimes="0;0.5;1"
+                    dur="2.4s"
+                    repeatCount="indefinite"
+                  />
+                </>
+              ) : (
+                // Direct hop: Core → Node
+                <>
+                  <animate
+                    attributeName="cx"
+                    from={CX}
+                    to={activePoint.x}
+                    dur="1.8s"
+                    repeatCount="indefinite"
+                  />
+                  <animate
+                    attributeName="cy"
+                    from={CY}
+                    to={activePoint.y}
+                    dur="1.8s"
+                    repeatCount="indefinite"
+                  />
+                </>
+              )}
             </circle>
           </>
         )}
@@ -232,7 +280,7 @@ export default function EcosystemDiagram({
           point={p}
           dark={dark}
           interactive={interactive}
-          isActive={p.node.slug === activeNodeSlug}
+          isActive={p.node.slug === activeNodeSlug || p.node.slug === activeParentSlug}
           isLoginPage={isLoginPage}
           diameterCqw={SAT_DIAMETER_CQW}
         />
