@@ -1,4 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import postgres from "npm:postgres@3";
 import { corsHeaders } from "../_shared/cors.ts";
 
 // Display role → DB role (shared.org_members.role constraint)
@@ -15,18 +16,15 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Direct Postgres connection — bypasses REST schema exposure limits.
+  // shared.org_members is not in the REST exposed schemas list.
+  const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { prepare: false });
+
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return json({ error: "Missing auth header" }, 401);
     }
-
-    // Admin client — service role lives server-side only
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      { auth: { autoRefreshToken: false, persistSession: false } },
-    );
 
     // Verify the caller's JWT
     const callerClient = createClient(
@@ -40,27 +38,34 @@ Deno.serve(async (req) => {
       return json({ error: "Unauthorized" }, 401);
     }
 
+    // Read role + org from shared schema via direct Postgres (not REST)
     let orgId = user.app_metadata?.org_id as string | undefined;
     let callerRole = user.app_metadata?.role as string | undefined;
 
-    // Fallback: JWT claim may be stale (issued before the custom token hook ran).
-    // Check the database directly in that case.
     if (!callerRole || !orgId) {
-      const { data: member } = await adminClient
-        .schema("shared")
-        .from("org_members")
-        .select("org_id, role")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (member) {
-        orgId = orgId ?? (member.org_id as string);
-        callerRole = callerRole ?? (member.role as string);
+      const rows = await sql`
+        SELECT org_id::text, role
+        FROM shared.org_members
+        WHERE user_id = ${user.id}::uuid
+        LIMIT 1
+      `;
+      if (rows.length > 0) {
+        orgId = orgId ?? rows[0].org_id;
+        callerRole = callerRole ?? rows[0].role;
       }
     }
 
     if (callerRole !== "admin") {
-      return json({ error: "Forbidden: admin role required" }, 403);
+      return json({
+        error: "Forbidden: admin role required",
+        debug: {
+          user_id: user.id,
+          app_metadata_role: user.app_metadata?.role ?? null,
+          app_metadata_org_id: user.app_metadata?.org_id ?? null,
+          resolved_role: callerRole ?? null,
+          resolved_org_id: orgId ?? null,
+        },
+      }, 403);
     }
 
     const body = await req.json() as {
@@ -76,6 +81,13 @@ Deno.serve(async (req) => {
       return json({ error: "email and redirectTo are required" }, 400);
     }
 
+    // Admin client — service role lives server-side only
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
+
     // Send the invitation email
     const { data: inviteData, error: inviteError } =
       await adminClient.auth.admin.inviteUserByEmail(email, {
@@ -87,24 +99,21 @@ Deno.serve(async (req) => {
       return json({ error: inviteError.message }, 400);
     }
 
-    // Wire the new user into this org
+    // Wire the new user into this org via direct Postgres
     if (orgId) {
       const dbRole = DB_ROLES[memberRole] ?? "agent";
-      const { error: memberError } = await adminClient
-        .schema("shared")
-        .from("org_members")
-        .upsert(
-          { org_id: orgId, user_id: inviteData.user.id, role: dbRole },
-          { onConflict: "org_id,user_id" },
-        );
-      if (memberError) {
-        console.error("org_members upsert error:", memberError.message);
-      }
+      await sql`
+        INSERT INTO shared.org_members (org_id, user_id, role)
+        VALUES (${orgId}::uuid, ${inviteData.user.id}::uuid, ${dbRole})
+        ON CONFLICT (org_id, user_id) DO UPDATE SET role = EXCLUDED.role
+      `;
     }
 
     return json({ id: inviteData.user.id });
   } catch (err) {
     return json({ error: String(err) }, 500);
+  } finally {
+    await sql.end();
   }
 });
 
