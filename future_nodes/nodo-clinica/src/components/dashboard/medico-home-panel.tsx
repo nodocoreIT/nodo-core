@@ -70,8 +70,8 @@ export function MedicoHomePanel({ doctorId, doctorName }: MedicoHomePanelProps) 
         <DashboardActionCard
           badge="Agenda"
           title="Turnos y horarios"
-          description="Configurá días, horarios y duración de turnos para tus pacientes."
-          buttonLabel="Configurar agenda"
+          description="Agenda, perfil, cobros, recordatorios y apariencia del panel."
+          buttonLabel="Abrir configuración"
           href="/medico/configuracion"
           tone="amber"
         />

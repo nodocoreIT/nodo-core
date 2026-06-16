@@ -1,9 +1,10 @@
 import { randomBytes, randomUUID } from "crypto";
 import { promises as fs } from "fs";
-import path from "path";
 
 import type { DoctorAvailability } from "@/lib/clinic/schedule";
 import { DEFAULT_AVAILABILITY } from "@/lib/clinic/schedule";
+import { getClinicDataDir, getClinicDbPath } from "@/lib/clinic/data-dir";
+import type { DoctorThemeSettings } from "@/lib/clinic/theme-settings";
 
 export type SubscriptionStatus = "trial" | "active" | "expired";
 export type AppointmentStatus =
@@ -54,6 +55,8 @@ export interface LocalDoctor {
   payment?: DoctorPaymentSettings;
   reminderSettings?: DoctorReminderSettings;
   googleCalendarId?: string;
+  /** Colores, tipografía y marca del panel médico */
+  themeSettings?: DoctorThemeSettings;
   createdAt: string;
 }
 
@@ -116,7 +119,16 @@ export interface LocalClinicalNote {
   updatedAt: string;
 }
 
-/** Mensaje en sala general o DM entre médicos */
+/** Tarea manual del médico (además de turnos derivados de la agenda) */
+export interface DoctorTask {
+  id: string;
+  doctorId: string;
+  title: string;
+  /** ISO date YYYY-MM-DD */
+  dueDate?: string;
+  done: boolean;
+  createdAt: string;
+}
 export interface InterconsultMessage {
   id: string;
   fromDoctorId: string;
@@ -143,14 +155,11 @@ export interface ClinicDatabase {
   doctorPresence?: Record<string, DoctorPresenceEntry>;
   /** Última vez que el médico leyó el chat (ISO por doctorId) */
   nodoChatReadAt?: Record<string, string>;
+  doctorTasks?: DoctorTask[];
 }
 
-const DATA_DIR = process.env.CLINIC_DATA_DIR
-  ? path.resolve(process.env.CLINIC_DATA_DIR)
-  : process.env.VERCEL === "1"
-    ? "/tmp/clinic-data"
-    : path.join(process.cwd(), "data");
-const DB_PATH = path.join(DATA_DIR, "clinic.json");
+const DATA_DIR = getClinicDataDir();
+const DB_PATH = getClinicDbPath();
 
 const SEED: ClinicDatabase = {
   doctors: [
@@ -299,6 +308,7 @@ function normalizeDb(db: ClinicDatabase): ClinicDatabase {
   if (!db.interconsultMessages) db.interconsultMessages = [];
   if (!db.doctorPresence) db.doctorPresence = {};
   if (!db.nodoChatReadAt) db.nodoChatReadAt = {};
+  if (!db.doctorTasks) db.doctorTasks = [];
   return db;
 }
 
