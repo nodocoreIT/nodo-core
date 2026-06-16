@@ -12,6 +12,15 @@ const isDev = process.env.NODE_ENV !== "production";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "192.168.1.37"],
+  experimental: {
+    // Bundle the SPA index.html files into the Lambda so Route Handlers
+    // can serve them via readFileSync. On Vercel, public/ is on the CDN
+    // and not accessible from serverless functions unless explicitly traced.
+    outputFileTracingIncludes: {
+      "/inmo/[[...slug]]": ["./public/inmo/index.html"],
+      "/autos/[[...slug]]": ["./public/autos/index.html"],
+    },
+  },
   turbopack: {
     root: path.resolve(__dirname, ".."),
   },

@@ -9,11 +9,18 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const html = readFileSync(
-    path.join(process.cwd(), "public", "autos", "index.html"),
-    "utf-8",
-  );
-  return new NextResponse(html, {
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  });
+  try {
+    const html = readFileSync(
+      path.join(process.cwd(), "public", "autos", "index.html"),
+      "utf-8",
+    );
+    return new NextResponse(html, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  } catch {
+    return new NextResponse("Nodo Autos is not available — build may be missing.", {
+      status: 503,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
 }
