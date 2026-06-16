@@ -13,9 +13,9 @@ interface RequireAuthProps {
 }
 
 export function RequireAuth({ children }: RequireAuthProps) {
-  const { loading, session, role } = useAuth();
+  const { isLoading, session, role } = useAuth();
 
-  if (loading) return null;
+  if (isLoading) return null;
 
   if (!session) {
     return <Navigate to="/login" replace />;

@@ -72,7 +72,7 @@ export function VehicleFormPage() {
     reset,
     formState: { errors, isSubmitting },
   } = useForm<VehicleFormValues>({
-    resolver: zodResolver(vehicleSchema),
+    resolver: zodResolver(vehicleSchema) as import("react-hook-form").Resolver<VehicleFormValues>,
     defaultValues: {
       condition: "usado",
       status: "disponible",
