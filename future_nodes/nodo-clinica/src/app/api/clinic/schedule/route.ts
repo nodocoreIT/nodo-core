@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readDb, writeDb } from "@/lib/clinic/local-db";
 import type { DoctorPaymentSettings, DoctorReminderSettings } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
+import { mergeThemeSettings } from "@/lib/clinic/theme-settings";
 import {
   DEFAULT_AVAILABILITY,
   generateSlotsForDate,
@@ -40,6 +41,7 @@ function doctorOfficePayload(doctor: {
   payment?: DoctorPaymentSettings;
   reminderSettings?: DoctorReminderSettings;
   googleCalendarId?: string;
+  themeSettings?: import("@/lib/clinic/theme-settings").DoctorThemeSettings;
 }) {
   const availability = getAvailability(doctor);
   return {
@@ -52,6 +54,7 @@ function doctorOfficePayload(doctor: {
     reminderSettings: doctor.reminderSettings ?? { enabled: false, minutesBefore: 1440 },
     googleCalendarId: doctor.googleCalendarId ?? "",
     blockedDates: availability.blockedDates ?? [],
+    themeSettings: mergeThemeSettings(doctor.themeSettings),
   };
 }
 
@@ -137,6 +140,7 @@ export async function PUT(request: NextRequest) {
     blockedDates,
     googleCalendarId,
     reminderSettings,
+    themeSettings,
   } = body as {
     availability?: DoctorAvailability;
     signatureText?: string;
@@ -147,6 +151,7 @@ export async function PUT(request: NextRequest) {
     blockedDates?: string[];
     googleCalendarId?: string;
     reminderSettings?: DoctorReminderSettings;
+    themeSettings?: import("@/lib/clinic/theme-settings").DoctorThemeSettings;
   };
 
   await writeDb((db) => {
@@ -181,6 +186,9 @@ export async function PUT(request: NextRequest) {
     }
     if (reminderSettings !== undefined) doctor.reminderSettings = reminderSettings;
     if (googleCalendarId !== undefined) doctor.googleCalendarId = googleCalendarId;
+    if (themeSettings !== undefined) {
+      doctor.themeSettings = mergeThemeSettings(themeSettings);
+    }
   });
 
   return NextResponse.json({ ok: true });

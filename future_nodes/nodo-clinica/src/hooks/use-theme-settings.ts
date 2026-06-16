@@ -2,90 +2,87 @@
 
 import { useEffect } from "react";
 import { create } from "zustand";
+import {
+  DEFAULT_THEME_SETTINGS,
+  mergeThemeSettings,
+  type DoctorThemeSettings,
+} from "@/lib/clinic/theme-settings";
 
-export interface ThemeSettings {
-  primaryColor: string;
-  secondaryColor: string;
-  sidebarTextColor: string;
-  fontColor: string;
-  buttonFontColor: string;
-  borderRadius: "none" | "md" | "full";
-  fontFamily: "Inter" | "Roboto" | "Montserrat";
-  logoType: "default" | "custom" | "text";
-  brandText: string;
-}
-
-export const DEFAULT_SETTINGS: ThemeSettings = {
-  primaryColor: "#da5a0e",
-  secondaryColor: "#121e2f",
-  sidebarTextColor: "#9dacbe",
-  fontColor: "#16202e",
-  buttonFontColor: "#ffffff",
-  borderRadius: "md",
-  fontFamily: "Inter",
-  logoType: "default",
-  brandText: "nodo salud",
-};
+export type ThemeSettings = DoctorThemeSettings;
+export const DEFAULT_SETTINGS = DEFAULT_THEME_SETTINGS;
 
 interface ThemeStore {
-  settings: ThemeSettings;
-  setSettings: (newSettings: Partial<ThemeSettings>) => void;
+  settings: DoctorThemeSettings;
+  hydrated: boolean;
+  setSettings: (newSettings: Partial<DoctorThemeSettings>) => void;
+  hydrateSettings: (settings: Partial<DoctorThemeSettings>) => void;
   resetSettings: () => void;
 }
 
-const getInitialSettings = (): ThemeSettings => {
-  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+const persistLocal = (settings: DoctorThemeSettings) => {
+  try {
+    localStorage.setItem("nodo-theme-settings", JSON.stringify(settings));
+  } catch {
+    /* ignore */
+  }
+};
+
+const getInitialSettings = (): DoctorThemeSettings => {
+  if (typeof window === "undefined") return DEFAULT_THEME_SETTINGS;
   try {
     const stored = localStorage.getItem("nodo-theme-settings");
     if (stored) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+      return mergeThemeSettings(JSON.parse(stored));
     }
   } catch {
-    // ignored
+    /* ignore */
   }
-  return DEFAULT_SETTINGS;
+  return DEFAULT_THEME_SETTINGS;
 };
 
 export const useThemeStore = create<ThemeStore>((set) => ({
-  settings: DEFAULT_SETTINGS,
+  settings: DEFAULT_THEME_SETTINGS,
+  hydrated: false,
   setSettings: (newSettings) =>
     set((state) => {
-      const next = { ...state.settings, ...newSettings };
-      try {
-        localStorage.setItem("nodo-theme-settings", JSON.stringify(next));
-      } catch {
-        // ignored
-      }
-      return { settings: next };
+      const next = mergeThemeSettings({ ...state.settings, ...newSettings });
+      persistLocal(next);
+      return { settings: next, hydrated: true };
+    }),
+  hydrateSettings: (newSettings) =>
+    set(() => {
+      const next = mergeThemeSettings(newSettings);
+      persistLocal(next);
+      return { settings: next, hydrated: true };
     }),
   resetSettings: () => {
     try {
       localStorage.removeItem("nodo-theme-settings");
     } catch {
-      // ignored
+      /* ignore */
     }
-    set({ settings: DEFAULT_SETTINGS });
+    set({ settings: DEFAULT_THEME_SETTINGS, hydrated: true });
   },
 }));
 
-export function configureThemeDefaults(overrides: Partial<ThemeSettings>): void {
+export function configureThemeDefaults(overrides: Partial<DoctorThemeSettings>): void {
   if (typeof window === "undefined") return;
   try {
     const stored = localStorage.getItem("nodo-theme-settings");
     if (!stored) {
-      const merged = { ...DEFAULT_SETTINGS, ...overrides };
+      const merged = mergeThemeSettings(overrides);
       useThemeStore.setState({ settings: merged });
     }
   } catch {
-    // ignored
+    /* ignore */
   }
 }
 
 export function useThemeSettings() {
-  const { settings, setSettings, resetSettings } = useThemeStore();
+  const { settings, setSettings, hydrateSettings, resetSettings } = useThemeStore();
 
   useEffect(() => {
-    useThemeStore.setState({ settings: getInitialSettings() });
+    useThemeStore.setState({ settings: getInitialSettings(), hydrated: true });
   }, []);
 
   useEffect(() => {
@@ -135,5 +132,5 @@ export function useThemeSettings() {
     }
   }, [settings]);
 
-  return { settings, setSettings, resetSettings };
+  return { settings, setSettings, hydrateSettings, resetSettings };
 }

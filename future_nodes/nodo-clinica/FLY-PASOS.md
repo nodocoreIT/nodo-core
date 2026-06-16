@@ -53,7 +53,7 @@ Eso instala Fly CLI, crea el volumen si falta y despliega.
 | Paciente | https://nodo-clinica.fly.dev/login/paciente |
 | Médico | https://nodo-clinica.fly.dev/login/medico |
 
-**Demo:** `paciente@demo.com` / `maurolluch@gmail.com` — contraseña `Probando1`
+**Demo:** `doc.demo1@nodo.demo` / `paciente1@nodo.demo` — contraseña `Probando1`
 
 ---
 

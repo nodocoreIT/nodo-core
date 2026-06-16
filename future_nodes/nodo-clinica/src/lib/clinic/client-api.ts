@@ -306,6 +306,7 @@ export const clinicApi = {
     payment?: import("@/lib/clinic/local-db").DoctorPaymentSettings;
     reminderSettings?: import("@/lib/clinic/local-db").DoctorReminderSettings;
     googleCalendarId?: string;
+    themeSettings?: import("@/lib/clinic/theme-settings").DoctorThemeSettings;
   }) {
     const res = await fetch("/api/clinic/schedule", {
       method: "PUT",
@@ -516,5 +517,54 @@ export const clinicApi = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al marcar leído");
     return data as { readAt: string };
+  },
+
+  async getDoctorTasks(due?: string) {
+    const params = due ? `?due=${encodeURIComponent(due)}` : "";
+    const res = await fetch(`/api/clinic/tasks${params}`, fetchOpts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar tareas");
+    return data as {
+      tasks: Array<{
+        id: string;
+        doctorId: string;
+        title: string;
+        dueDate?: string;
+        done: boolean;
+        createdAt: string;
+      }>;
+    };
+  },
+
+  async saveDoctorTask(payload: {
+    title: string;
+    dueDate?: string;
+  }) {
+    const res = await fetch("/api/clinic/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al crear tarea");
+    return data;
+  },
+
+  async updateDoctorTask(payload: {
+    id: string;
+    title?: string;
+    dueDate?: string;
+    done?: boolean;
+  }) {
+    const res = await fetch("/api/clinic/tasks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al actualizar tarea");
+    return data;
   },
 };

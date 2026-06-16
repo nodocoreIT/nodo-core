@@ -196,7 +196,7 @@ export function MedicoHomeAgendaSidebar({
         <div className="p-2 space-y-1.5 max-h-[180px] overflow-y-auto">
           {!nextDayKey ? (
             <p className="text-xs text-slate2 py-3 text-center">
-              Configurá días en Agenda y perfil.
+              Configurá días en Configuración (ícono ⚙ junto a tu nombre).
             </p>
           ) : nextDayAppts.length === 0 ? (
             <p className="text-xs text-slate2 py-3 text-center">
@@ -322,7 +322,7 @@ export function MedicoHomeTasks({
                 href="/medico/configuracion"
                 className="text-brand font-semibold hover:underline"
               >
-                Agenda y perfil
+                Configuración
               </Link>{" "}
               para ver eventos personales del día acá.
             </p>
