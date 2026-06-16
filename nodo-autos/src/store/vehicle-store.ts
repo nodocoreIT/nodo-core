@@ -745,7 +745,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
                 action: 'update',
                 changes: Object.entries(updates).reduce(
                   (acc, [key, value]) => {
-                    acc[key] = { old: (previousVehicle as Record<string, unknown>)[key], new: value };
+                    acc[key] = { old: (previousVehicle as unknown as Record<string, unknown>)[key], new: value };
                     return acc;
                   },
                   {} as Record<string, { old: unknown; new: unknown }>,

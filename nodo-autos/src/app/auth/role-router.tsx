@@ -8,9 +8,9 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@nodocore/shared-components";
 
 export function RoleRouter() {
-  const { loading, session } = useAuth();
+  const { isLoading, session } = useAuth();
 
-  if (loading) return null;
+  if (isLoading) return null;
 
   if (!session) {
     return <Navigate to="/login" replace />;
