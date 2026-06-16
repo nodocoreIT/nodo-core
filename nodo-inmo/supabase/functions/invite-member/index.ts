@@ -43,10 +43,14 @@ Deno.serve(async (req) => {
     let callerRole = user.app_metadata?.role as string | undefined;
 
     if (!callerRole || !orgId) {
+      // Filter by the nodo-inmo product so cross-product roles (e.g. 'medico'
+      // from nodo-clinica on the same user account) don't bleed through.
       const rows = await sql`
-        SELECT org_id::text, role
-        FROM shared.org_members
-        WHERE user_id = ${user.id}::uuid
+        SELECT om.org_id::text, om.role
+        FROM shared.org_members om
+        JOIN shared.organizations o ON o.id = om.org_id
+        WHERE om.user_id = ${user.id}::uuid
+          AND o.product IN ('inmo', 'nodo-inmo')
         LIMIT 1
       `;
       if (rows.length > 0) {
