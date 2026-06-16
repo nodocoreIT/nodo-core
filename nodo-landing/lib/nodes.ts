@@ -7,6 +7,7 @@ import {
   Stethoscope,
   Wheat,
   Calculator,
+  Car,
   type LucideIcon,
 } from "lucide-react";
 
@@ -33,6 +34,11 @@ export interface NodeDef {
   provisionable?: boolean;
   /** Whether the node is currently in development. */
   inDevelopment?: boolean;
+  /**
+   * Slug of the parent node. When set, this node is rendered as a satellite
+   * orbiting its parent rather than on the main Core orbit.
+   */
+  parentSlug?: string;
 }
 
 export const NODES: NodeDef[] = [
@@ -125,7 +131,7 @@ export const NODES: NodeDef[] = [
     code: "IT",
     slug: "it",
     label: "Nodo IT",
-    inDevelopment: true,
+    inDevelopment: false,
     description:
       "El motor tecnológico: software a medida e infraestructura corporativa.",
     Icon: Cpu,
@@ -241,6 +247,64 @@ export const NODES: NodeDef[] = [
     description:
       "Gestión contable e impositiva: balances, liquidaciones de impuestos y cumplimiento fiscal.",
     Icon: Calculator,
+  },
+  {
+    code: "Clínica",
+    slug: "clinica",
+    label: "Nodo Clínica",
+    parentSlug: "salud",
+    description:
+      "Plataforma HealthTech para telemedicina profesional: consultorios virtuales, recetas digitales e informes automatizados con IA.",
+    Icon: Stethoscope,
+    intro:
+      "Digitaliza tu consultorio: agenda online, videoconsultas, prescripciones digitales y resúmenes SOAP generados con IA.",
+    highlights: [
+      {
+        title: "Videoconsultas",
+        description:
+          "Consultorios virtuales con Jitsi Meet, sin instalaciones.",
+      },
+      {
+        title: "IA Clínica",
+        description:
+          "Resúmenes SOAP automáticos desde la transcripción de la consulta.",
+      },
+      {
+        title: "Recetas digitales",
+        description:
+          "Emití prescripciones y pedidos de estudios con firma digital en PDF.",
+      },
+    ],
+    provisionable: true,
+  },
+  {
+    code: "Autos",
+    slug: "autos",
+    label: "Nodo Autos",
+    parentSlug: "it",
+    description:
+      "Panel de gestión de stock para concesionarias y agencias de autos: inventario, clientes, publicaciones y contratos de venta.",
+    Icon: Car,
+    intro:
+      "Administrá tu agencia desde un solo lugar: cargá vehículos, gestioná clientes, publicá en redes y generá contratos de venta.",
+    highlights: [
+      {
+        title: "Stock inteligente",
+        description:
+          "Inventario de vehículos con fotos, filtros avanzados y estado en tiempo real.",
+      },
+      {
+        title: "Publicación multicanal",
+        description:
+          "Publicá en Instagram, Facebook, MercadoLibre y tu sitio web desde un solo panel.",
+      },
+      {
+        title: "Contratos digitales",
+        description:
+          "Generá contratos de compraventa en PDF con datos del comprador y condiciones de pago.",
+      },
+    ],
+    provisionable: true,
   },
 ];
 

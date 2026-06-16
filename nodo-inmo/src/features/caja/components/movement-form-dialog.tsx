@@ -42,7 +42,6 @@ const schema = z.object({
   accountId: z.string().min(1, "Elegí una cuenta"),
   amount: z.string().min(1, "Monto requerido"),
   concept: z.string().min(1, "Concepto requerido"),
-  destinationAccountId: z.string().optional(),
   date: z.string().min(1, "Fecha requerida"),
 });
 
@@ -78,12 +77,6 @@ function movementToFormValues(
     accountId: resolveAccountId(movement, accounts, "cash_account_id", "category"),
     amount: formatCurrencyInput(String(Math.round(movement.amount)), currency),
     concept: movement.concept,
-    destinationAccountId: resolveAccountId(
-      movement,
-      accounts,
-      "destination_account_id",
-      "destination_category",
-    ),
     date: movement.date,
   };
 }
@@ -115,7 +108,6 @@ export function MovementFormDialog({
       accountId: "",
       amount: "",
       concept: "",
-      destinationAccountId: "",
       date: today,
     },
   });
@@ -123,11 +115,6 @@ export function MovementFormDialog({
   const accountId = form.watch("accountId");
   const selectedAccount = accounts.find((a) => a.id === accountId);
   const currency = selectedAccount?.currency ?? "ARS";
-
-  const destinationAccounts = useMemo(
-    () => accounts.filter((a) => a.id !== accountId),
-    [accounts, accountId],
-  );
 
   useEffect(() => {
     if (!open || accountsLoading) return;
@@ -142,7 +129,6 @@ export function MovementFormDialog({
       accountId: accounts[0]?.id ?? "",
       amount: "",
       concept: "",
-      destinationAccountId: "",
       date: today,
     });
   }, [open, movement, accounts, accountsLoading, form, today]);
@@ -169,10 +155,6 @@ export function MovementFormDialog({
     const account = accounts.find((a) => a.id === values.accountId);
     if (!account) return;
 
-    const destAccount = values.destinationAccountId
-      ? accounts.find((a) => a.id === values.destinationAccountId)
-      : undefined;
-
     const conceptoId = await resolveConceptoId(values.concept);
 
     const payload = {
@@ -183,8 +165,8 @@ export function MovementFormDialog({
       currency: account.currency,
       category: account.label,
       cash_account_id: account.id,
-      destination_account_id: destAccount?.id ?? null,
-      destination_category: destAccount?.label ?? null,
+      destination_account_id: null,
+      destination_category: null,
       concepto_id: conceptoId,
     };
 
@@ -313,35 +295,6 @@ export function MovementFormDialog({
                       disabled={conceptosLoading}
                     />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control as any}
-              name="destinationAccountId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Caja destino</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value ?? ""}
-                    disabled={accountsLoading || destinationAccounts.length === 0}
-                  >
-                    <FormControl>
-                      <SelectTrigger aria-label="Caja destino">
-                        <SelectValue placeholder="Opcional — elegí cuenta destino" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {destinationAccounts.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

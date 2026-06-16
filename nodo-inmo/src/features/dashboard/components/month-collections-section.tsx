@@ -56,6 +56,7 @@ export function MonthCollectionsSection({ items }: MonthCollectionsSectionProps)
           <TableHeader>
             <TableRow>
               <TableHead className="px-2 md:px-4">Inquilino</TableHead>
+              <TableHead className="px-2 md:px-4">Alertas</TableHead>
               <TableHead className="px-2 md:px-4">
                 <span className="hidden sm:inline">Estado de pago</span>
                 <span className="inline sm:hidden">Estado</span>
@@ -73,6 +74,24 @@ export function MonthCollectionsSection({ items }: MonthCollectionsSectionProps)
                 <TableCell className="px-2 md:px-4 py-3 max-w-[100px] sm:max-w-none">
                   <p className="font-semibold text-xs sm:text-sm text-navy truncate">{item.tenantName}</p>
                   <p className="text-[10px] sm:text-xs text-slate2 truncate">{item.propertyAddress}</p>
+                </TableCell>
+                <TableCell className="px-2 md:px-4 py-3">
+                  <div className="flex flex-col gap-1 items-start">
+                    {item.alerts.length === 0 && <span className="text-xs text-slate2">—</span>}
+                    {item.alerts.map((alert, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          "inline-flex rounded-pill px-2 py-0.5 text-[10px] sm:text-[10px] font-semibold whitespace-nowrap",
+                          alert.type === "expiration"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-blue-100 text-blue-700"
+                        )}
+                      >
+                        {alert.text}
+                      </span>
+                    ))}
+                  </div>
                 </TableCell>
                 <TableCell className="px-2 md:px-4 py-3">
                   <span

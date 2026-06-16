@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { PAGE_SIZE } from "@/shared/lib/constants";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Check, ChevronLeft, ChevronRight, Pencil, Trash2, Undo2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Pencil, Trash2, Undo2, FileText } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import {
   Table,
@@ -18,6 +18,7 @@ import {
   formatPeriod,
   type EffectiveStatus,
 } from "@/features/payments/lib/payment-labels";
+import { isOverdue } from "../lib/generate-installments";
 import {
   formatMoney,
   formatDate,
@@ -27,6 +28,15 @@ import { matchesQuery } from "@/shared/search/matches-query";
 import { cn } from "@/shared/lib/utils";
 import { PaymentCollectDialog } from "./payment-collect-dialog";
 import { useDeletePayments, useAnnulPayment } from "../hooks/use-delete-payment";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/shared/components/ui/dialog";
+import { PaymentReceiptViewer } from "./payment-receipt-viewer";
+import type { PaymentWithRelations } from "@/features/payments/hooks/use-payments";
 
 type Filter = "all" | "pending" | "overdue" | "paid";
 
@@ -63,6 +73,7 @@ export function PaymentsList() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const deletePayments = useDeletePayments();
   const annulPayment = useAnnulPayment();
+  const [viewPayment, setViewViewPayment] = useState<PaymentWithRelations | null>(null);
 
   useEffect(() => {
     const next: Filter =
@@ -73,7 +84,7 @@ export function PaymentsList() {
   }, [statusParam]);
 
   function isDeletable(status: EffectiveStatus): boolean {
-    return status === "pending" || status === "overdue";
+    return status === "pending" || status === "overdue" || status === "partial";
   }
 
   function resetPage() {
@@ -101,7 +112,15 @@ export function PaymentsList() {
   const filteredRows = useMemo(() => {
     return (data ?? []).filter((p) => {
       const eff = effectiveStatus(p);
-      if (filter !== "all" && eff !== filter) return false;
+      if (filter !== "all") {
+        if (filter === "pending") {
+          if (eff !== "pending" && !(eff === "partial" && !isOverdue(p))) return false;
+        } else if (filter === "overdue") {
+          if (eff !== "overdue" && !(eff === "partial" && isOverdue(p))) return false;
+        } else {
+          if (eff !== filter) return false;
+        }
+      }
       if (ownerFilter && p.contract?.property?.owner?.name !== ownerFilter) return false;
       if (monthFilter && p.due_date?.slice(0, 7) !== monthFilter) return false;
       return matchesQuery(
@@ -340,7 +359,16 @@ export function PaymentsList() {
                     <TableCell>{p.contract?.tenant?.name ?? "—"}</TableCell>
                     <TableCell>{p.contract?.property?.owner?.name ?? "—"}</TableCell>
                     <TableCell>{formatDate(p.due_date)}</TableCell>
-                    <TableCell>{formatMoney(p.amount, p.currency)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span>{formatMoney(p.amount, p.currency)}</span>
+                        {eff === "partial" && (
+                          <span className="text-2xs font-semibold text-destructive">
+                            Restan {formatMoney(p.amount - (p.paid_amount ?? 0), p.currency)}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell><StatusBadge status={eff} /></TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -348,6 +376,16 @@ export function PaymentsList() {
                           <span className="text-xs text-slate2">—</span>
                         ) : eff === "paid" ? (
                           <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              aria-label="Ver recibo"
+                              title="Ver recibo"
+                              onClick={() => setViewViewPayment(p)}
+                              className="text-slate2 hover:text-navy"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -372,6 +410,18 @@ export function PaymentsList() {
                           </>
                         ) : (
                           <>
+                            {eff === "partial" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label="Ver recibo"
+                                title="Ver recibo"
+                                onClick={() => setViewViewPayment(p)}
+                                className="text-slate2 hover:text-navy"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -449,6 +499,25 @@ export function PaymentsList() {
           }
         }}
       />
+
+      <Dialog
+        open={!!viewPayment}
+        onOpenChange={(open) => {
+          if (!open) setViewViewPayment(null);
+        }}
+      >
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Recibo de Cobro</DialogTitle>
+            <DialogDescription>
+              {viewPayment?.contract?.tenant?.name ?? "—"} ·{" "}
+              {viewPayment?.contract?.property?.address ?? "—"} ·{" "}
+              Periodo: {viewPayment?.period ?? "—"}
+            </DialogDescription>
+          </DialogHeader>
+          {viewPayment && <PaymentReceiptViewer payment={viewPayment} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -461,6 +530,7 @@ function StatusBadge({ status }: { status: EffectiveStatus }) {
     paid: "bg-green-100 text-green-800",
     overdue: "bg-red-100 text-red-700",
     cancelled: "bg-slate-100 text-slate-700",
+    partial: "bg-orange-100 text-orange-800",
   };
 
   return (

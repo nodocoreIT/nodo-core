@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Eye, CheckCheck, HandCoins, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, FileText, HandCoins, Loader2 } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import {
   Dialog,
@@ -20,27 +20,28 @@ import { useOwnerSettlements } from "@/features/caja/hooks/use-owner-settlements
 import { useSettleOwner } from "@/features/caja/hooks/use-settle-owner";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";
-import { groupPendingByOwner } from "@/features/caja/lib/caja-math";
+import { groupPendingByProperty } from "@/features/caja/lib/caja-math";
 import { buildPendingStatementData } from "@/features/caja/lib/pending-settlement-pdf";
+import { usePendingExpenses } from "@/features/caja/hooks/use-pending-expenses";
 import type { StatementData } from "@/features/caja/lib/settlement-statement-data";
 import { SettlementPdfViewer } from "./settlement-pdf-viewer";
 import { formatMoney } from "@/features/contracts/lib/contract-labels";
-import { cn } from "@/shared/lib/utils";
 
 export function RendicionesPage() {
   const { data, isLoading, isError } = useOwnerSettlements();
   const settleOwner = useSettleOwner();
   const { data: agency } = useOrgProfile();
   const { data: logoUrl } = useLogoUrl(agency?.logo_path);
+  const { data: expenses, isLoading: expensesLoading } = usePendingExpenses();
   const [previewLoadingKey, setPreviewLoadingKey] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewStatement, setPreviewStatement] = useState<StatementData | null>(null);
 
   const allSettlements = data ?? [];
-  const pendingGroups = groupPendingByOwner(allSettlements);
+  const pendingGroups = groupPendingByProperty(allSettlements);
 
   async function openPreview(group: (typeof pendingGroups)[number]) {
-    const key = `${group.owner_id}:${group.currency}`;
+    const key = `${group.owner_id}:${group.property_id}:${group.currency}`;
     setPreviewLoadingKey(key);
     try {
       const statement = await buildPendingStatementData(
@@ -74,7 +75,7 @@ export function RendicionesPage() {
         </Link>
       </div>
 
-      {isLoading && (
+      {(isLoading || expensesLoading) && (
         <div
           role="status"
           aria-label="Cargando rendiciones"
@@ -93,7 +94,7 @@ export function RendicionesPage() {
         </div>
       )}
 
-      {!isLoading && !isError && pendingGroups.length === 0 && (
+      {!isLoading && !expensesLoading && !isError && pendingGroups.length === 0 && (
         <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed border-mist py-16 text-center">
           <p className="text-sm font-medium text-slate2">
             No hay rendiciones pendientes
@@ -105,26 +106,45 @@ export function RendicionesPage() {
         </div>
       )}
 
-      {!isLoading && !isError && pendingGroups.length > 0 && (
+      {!isLoading && !expensesLoading && !isError && pendingGroups.length > 0 && (
         <div className="rounded-md border border-border bg-card shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Propietario</TableHead>
+                <TableHead>Propiedad</TableHead>
                 <TableHead>Cant. pagos</TableHead>
-                <TableHead className="text-right">Total neto a rendir</TableHead>
+                <TableHead className="text-right">Cobrado</TableHead>
+                <TableHead className="text-right">Gastos</TableHead>
+                <TableHead className="text-right">Total a rendir</TableHead>
                 <TableHead className="w-44 text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {pendingGroups.map((group) => {
-                const rowKey = `${group.owner_id}:${group.currency}`;
+                const rowKey = `${group.owner_id}:${group.property_id}:${group.currency}`;
                 const isPreviewLoading = previewLoadingKey === rowKey;
+
+                // Sumar los gastos que corresponden a esta propiedad y moneda
+                const propExpenses = (expenses ?? []).filter(
+                  (e) =>
+                    e.property_id === group.property_id &&
+                    e.currency === group.currency
+                );
+                const expensesTotal = propExpenses.reduce((acc, curr) => acc + curr.amount, 0);
+                
+                // Calculamos el neto final a rendir restando los gastos
+                // Nota: la comisión se resta en el desglose final, pero acá group.total 
+                // ya es el owner_share pre-calculado en owner_settlements.
+                const finalNet = group.total - expensesTotal;
 
                 return (
                   <TableRow key={rowKey}>
                     <TableCell className="font-semibold text-navy">
                       {group.owner_name}
+                    </TableCell>
+                    <TableCell className="text-sm text-slate2">
+                      {group.property_address}
                     </TableCell>
                     <TableCell>
                       <span className="inline-flex rounded-pill bg-mist px-2.5 py-0.5 text-xs font-semibold text-slate2">
@@ -132,44 +152,54 @@ export function RendicionesPage() {
                         {group.settlement_ids.length === 1 ? "cobro" : "cobros"}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right text-lg font-bold text-navy">
+                    <TableCell className="text-right font-medium">
                       {formatMoney(group.total, group.currency)}
                     </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {expensesTotal > 0 ? (
+                        <span className="text-destructive">- {formatMoney(expensesTotal, group.currency)}</span>
+                      ) : (
+                        <span className="text-slate2">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-navy">
+                      {formatMoney(finalNet, group.currency)}
+                    </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex flex-col items-end gap-2">
+                      <div className="flex items-center justify-end gap-1">
                         <Button
+                          variant="ghost"
                           size="sm"
-                          variant="outline"
-                          className="w-full gap-1.5 text-xs font-bold uppercase"
+                          aria-label={`Ver liquidación de ${group.owner_name}`}
+                          title="Ver liquidación"
                           disabled={isPreviewLoading}
-                          aria-label={`Ver PDF de ${group.owner_name}`}
                           onClick={() => void openPreview(group)}
+                          className="text-slate2 hover:text-navy"
                         >
                           {isPreviewLoading ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <Eye className="h-3.5 w-3.5" />
+                            <FileText className="h-4 w-4" />
                           )}
-                          Ver PDF
                         </Button>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          className={cn(
-                            "w-full gap-1.5 border-blue-600 text-xs font-bold uppercase text-blue-700 hover:bg-blue-50",
-                          )}
+                          aria-label={`Finalizar rendición de ${group.owner_name}`}
                           disabled={settleOwner.isPending}
+                          className="gap-1 text-green-700 hover:bg-green-50 hover:text-green-800"
                           onClick={() =>
                             settleOwner.mutate({
                               owner_id: group.owner_id,
                               owner_name: group.owner_name,
+                              property_id: group.property_id,
                               settlement_ids: group.settlement_ids,
                               total: group.total,
                               currency: group.currency,
                             })
                           }
                         >
-                          <CheckCheck className="h-3.5 w-3.5" />
+                          <Check className="h-4 w-4" />
                           Finalizar
                         </Button>
                       </div>

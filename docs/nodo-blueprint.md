@@ -128,7 +128,7 @@ const NODO_FINANZAS_URL = process.env.NODO_FINANZAS_URL ?? "http://localhost:517
 
 En `nodo-landing/.env.local`:
 ```
-NODO_FINANZAS_URL=http://localhost:5175
+NODO_FINANZAS_URL=http://localhost:5174
 ```
 
 En Vercel (producción):
@@ -154,7 +154,8 @@ En `nodo-finanzas/vite.config.ts`:
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5175, // usar el siguiente puerto disponible
+    port: 5174, // usar el siguiente puerto disponible (ver tabla al final)
+    strictPort: true, // fallar rápido si el puerto está ocupado
   },
 });
 ```
@@ -166,11 +167,10 @@ export default defineConfig({
 | App | Puerto |
 |-----|--------|
 | nodo-landing (Next.js) | 3000 |
-| nodo-inmo (Vite) | 5174 |
-| nodo-clinica (Vite) — demo | 5173 |
-| nodo-finanzas (Vite) | 5175 |
-| nodo-obra (Vite) | 5176 |
-| nodo-seguros (Vite) | 5177 |
+| nodo-inmo (Vite) | 5173 |
+| nodo-finanzas (Vite) | 5174 |
+| nodo-obra (Vite) | 5175 |
+| nodo-seguros (Vite) | 5176 |
 
 ---
 

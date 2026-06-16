@@ -26,17 +26,43 @@ vi.mock("@/shared/lib/supabase", () => ({
   },
 }));
 
-vi.mock("@nodocore/shared-components", () => ({
-  useAuth: () => ({
-    user: { email: "admin@nodo.com" },
-    role: "admin",
-    orgId: "org-abc",
-    signOut: vi.fn(),
-    session: {},
-    loading: false,
-  }),
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: { email: "admin@nodo.com" },
+      role: "admin",
+      orgId: "org-abc",
+      signOut: vi.fn(),
+      session: {},
+      loading: false,
+    }),
+    AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    // Native <select> mock for Radix Select (jsdom has no Pointer Events)
+    Select: ({ children, onValueChange, value }: {
+      children: React.ReactNode;
+      onValueChange?: (v: string) => void;
+      value?: string;
+    }) => (
+      <select value={value ?? ""} onChange={(e) => onValueChange?.(e.target.value)}>
+        {children}
+      </select>
+    ),
+    SelectTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    SelectValue: (_props: { placeholder?: string }) => null,
+    SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => {
+      // Mirror Radix's contract: an empty-string item value crashes at runtime.
+      if (value === "") {
+        throw new Error(
+          'A <SelectItem /> must have a value prop that is not an empty string.',
+        );
+      }
+      return <option value={value}>{children}</option>;
+    },
+  };
+});
 
 // Property + contact option sources
 vi.mock("@/features/properties/hooks/use-properties", () => ({
@@ -54,31 +80,6 @@ vi.mock("@/features/contacts/hooks/use-contacts", () => ({
           ? [{ id: "guar-1", name: "Ana García" }]
           : [],
   }),
-}));
-
-// Native <select> mock for Radix Select
-vi.mock("@nodocore/shared-components", () => ({
-  Select: ({ children, onValueChange, value }: {
-    children: React.ReactNode;
-    onValueChange?: (v: string) => void;
-    value?: string;
-  }) => (
-    <select value={value ?? ""} onChange={(e) => onValueChange?.(e.target.value)}>
-      {children}
-    </select>
-  ),
-  SelectTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SelectValue: (_props: { placeholder?: string }) => null,
-  SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => {
-    // Mirror Radix's contract: an empty-string item value crashes at runtime.
-    if (value === "") {
-      throw new Error(
-        'A <SelectItem /> must have a value prop that is not an empty string.',
-      );
-    }
-    return <option value={value}>{children}</option>;
-  },
 }));
 
 const mockMutateAsync = vi.fn();

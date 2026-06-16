@@ -1,5 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Loader2, Mail, UserPlus, Image as ImageIcon, BrainCircuit, CheckCircle2, AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/shared/lib/supabase";
 import { useAiSettings } from "@/shared/hooks/use-ai-settings";
 import {
   Dialog,
@@ -19,6 +21,7 @@ import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";
 import { useUpsertOrgProfile } from "@/features/agency-profile/hooks/use-upsert-org-profile";
 import { useStaff } from "@/shared/hooks/use-staff";
 import { BankAccountsSection } from "./bank-accounts-section";
+import { useAlertSettings } from "@/shared/hooks/use-alert-settings";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -211,6 +214,152 @@ function LogoCustomUploader() {
   );
 }
 
+function AlertsSettingsSection() {
+  const { settings, isLoading } = useAlertSettings();
+  const { mutateAsync: upsertProfile, isPending } = useUpsertOrgProfile();
+  const [contractExpirationMonths, setContractExpirationMonths] = useState(
+    settings.contractExpirationMonths.toString()
+  );
+  const [rentAdjustmentMonths, setRentAdjustmentMonths] = useState(
+    settings.rentAdjustmentMonths.toString()
+  );
+
+  const handleSave = async () => {
+    const parsedExp = parseInt(contractExpirationMonths, 10);
+    const parsedAdj = parseInt(rentAdjustmentMonths, 10);
+    if (isNaN(parsedExp) || isNaN(parsedAdj)) return;
+
+    await upsertProfile({
+      alert_settings: {
+        contractExpirationMonths: parsedExp,
+        rentAdjustmentMonths: parsedAdj,
+      },
+    });
+  };
+
+  if (isLoading) {
+    return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-brand" /></div>;
+  }
+
+  return (
+    <div className="space-y-6 max-w-md">
+      <div>
+        <h3 className="text-base font-bold text-navy">Configuración de Alertas</h3>
+        <p className="text-xs text-slate2">
+          Definí con cuánta anticipación querés que el sistema te avise sobre los vencimientos y ajustes de contratos en el panel principal.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-bold text-navy">
+            Vencimiento de Contrato (meses)
+          </Label>
+          <Input
+            type="number"
+            min={1}
+            max={12}
+            value={contractExpirationMonths}
+            onChange={(e) => setContractExpirationMonths(e.target.value)}
+          />
+          <p className="text-[10px] text-slate2">Ej: 2 para avisar dos meses antes del final del contrato.</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm font-bold text-navy">
+            Ajuste de Alquiler (meses)
+          </Label>
+          <Input
+            type="number"
+            min={1}
+            max={12}
+            value={rentAdjustmentMonths}
+            onChange={(e) => setRentAdjustmentMonths(e.target.value)}
+          />
+          <p className="text-[10px] text-slate2">Ej: 1 para avisar un mes antes del próximo ajuste por índice.</p>
+        </div>
+
+        <Button onClick={handleSave} disabled={isPending} className="w-full">
+          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Guardar Configuración
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function IpcSettingsSection() {
+  const queryClient = useQueryClient();
+  const [ipcValue, setIpcValue] = useState("");
+  const [success, setSuccess] = useState(false);
+
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: async (val: number) => {
+      const now = new Date();
+      const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+      
+      const { data, error } = await supabase.schema("shared").rpc("upsert_index_value", {
+        p_kind: "IPC",
+        p_period: period,
+        p_value: val,
+        p_source: "Manual",
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ipc", "current"] });
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      setIpcValue("");
+    }
+  });
+
+  const handleSave = async () => {
+    const parsed = parseFloat(ipcValue);
+    if (isNaN(parsed)) return;
+    try {
+      await mutateAsync(parsed);
+    } catch (err) {
+      console.error(err);
+      alert("Error al guardar el IPC manual");
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-md">
+      <div>
+        <h3 className="text-base font-bold text-navy">Carga Manual de IPC</h3>
+        <p className="text-xs text-slate2">
+          Si la actualización automática falla o trae un valor incorrecto, podés forzar el valor del mes actual acá.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-bold text-navy">
+            Valor del IPC (%)
+          </Label>
+          <Input
+            type="number"
+            step="0.01"
+            placeholder="Ej: 4.2"
+            value={ipcValue}
+            onChange={(e) => setIpcValue(e.target.value)}
+          />
+          <p className="text-[10px] text-slate2">Ingresá el porcentaje (ej. 4.2). Se aplicará para el mes actual.</p>
+        </div>
+
+        <Button onClick={handleSave} disabled={isPending || !ipcValue} className="w-full">
+          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Guardar IPC Manual
+        </Button>
+        {success && <p className="text-xs text-brand font-semibold text-center mt-2">¡IPC guardado con éxito!</p>}
+      </div>
+    </div>
+  );
+}
+
 interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -218,7 +367,7 @@ interface SettingsDialogProps {
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [activeTab, setActiveTab] = useState<
-    "profile" | "company" | "customization" | "users" | "ai"
+    "profile" | "company" | "customization" | "users" | "ai" | "alerts" | "ipc"
   >("profile");
   const { aiSettings, setAiSettings } = useAiSettings();
   const [apiKeyInput, setApiKeyInput] = useState(aiSettings.geminiApiKey);
@@ -231,6 +380,42 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     setTimeout(() => setAiKeySaved(false), 2500);
   };
   const { settings, setSettings, resetSettings } = useThemeSettings();
+  const { mutateAsync: upsertProfile } = useUpsertOrgProfile();
+
+  const [savingTheme, setSavingTheme] = useState(false);
+  const [themeSaved, setThemeSaved] = useState(false);
+  const [themeError, setThemeError] = useState<string | null>(null);
+
+  const handleSaveTheme = async () => {
+    setSavingTheme(true);
+    setThemeError(null);
+    setThemeSaved(false);
+    try {
+      await upsertProfile({ theme_settings: settings as any });
+      setThemeSaved(true);
+      setTimeout(() => setThemeSaved(false), 3000);
+    } catch (err) {
+      setThemeError(err instanceof Error ? err.message : "Error al guardar la configuración");
+    } finally {
+      setSavingTheme(false);
+    }
+  };
+
+  // Persist theme to Supabase when the dialog closes so all admins share branding.
+  const handleOpenChange = useCallback(
+    async (nextOpen: boolean) => {
+      if (!nextOpen) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await upsertProfile({ theme_settings: settings as any });
+        } catch {
+          // Best-effort — localStorage already has the settings as fallback.
+        }
+      }
+      onOpenChange(nextOpen);
+    },
+    [settings, upsertProfile, onOpenChange],
+  );
 
   // Dynamic Users state (mocked mapped to Node architecture logic)
   const { users, inviteUser } = useStaff();
@@ -259,7 +444,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[800px] flex flex-col p-0 overflow-hidden">
         {/* Header con tabs */}
         <div className="border-b border-border bg-paper p-6 pb-0 flex-shrink-0">
@@ -271,7 +456,15 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={resetSettings}
+                onClick={async () => {
+                  resetSettings();
+                  try {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    await upsertProfile({ theme_settings: null as any });
+                  } catch {
+                    // Best-effort
+                  }
+                }}
                 className="text-xs border-brand text-brand hover:bg-brand hover:text-white"
               >
                 Default Nodo (Restablecer)
@@ -335,6 +528,26 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             >
               Integraciones / IA
             </button>
+            <button
+              onClick={() => setActiveTab("alerts")}
+              className={`pb-3 text-sm font-semibold border-b-2 transition-all flex-shrink-0 ${
+                activeTab === "alerts"
+                  ? "border-brand text-brand"
+                  : "border-transparent text-slate2 hover:text-navy"
+              }`}
+            >
+              Alertas
+            </button>
+            <button
+              onClick={() => setActiveTab("ipc")}
+              className={`pb-3 text-sm font-semibold border-b-2 transition-all flex-shrink-0 ${
+                activeTab === "ipc"
+                  ? "border-brand text-brand"
+                  : "border-transparent text-slate2 hover:text-navy"
+              }`}
+            >
+              Índices
+            </button>
           </div>
         </div>
 
@@ -342,6 +555,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         <div className="flex-1 overflow-y-auto p-6">
           {/* TAB 0: Mi Perfil */}
           {activeTab === "profile" && <ProfileSettingsSection />}
+
+          {/* TAB: Alertas */}
+          {activeTab === "alerts" && <AlertsSettingsSection />}
+
+          {/* TAB: Indices */}
+          {activeTab === "ipc" && <IpcSettingsSection />}
 
           {/* TAB 1: Mi Perfil / Empresa */}
           {activeTab === "company" && (
@@ -719,6 +938,31 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       </span>
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Guardar Personalización Button */}
+              <div className="border-t border-border pt-6 flex flex-col gap-2">
+                <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-3">
+                  {themeSaved && (
+                    <span className="text-xs text-green-600 font-semibold flex items-center justify-end gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Configuración de branding guardada en la base de datos
+                    </span>
+                  )}
+                  {themeError && (
+                    <span className="text-xs text-destructive font-semibold text-right">
+                      {themeError}
+                    </span>
+                  )}
+                  <Button
+                    onClick={handleSaveTheme}
+                    disabled={savingTheme}
+                    className="w-full sm:w-auto"
+                  >
+                    {savingTheme && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Guardar Personalización
+                  </Button>
                 </div>
               </div>
             </div>

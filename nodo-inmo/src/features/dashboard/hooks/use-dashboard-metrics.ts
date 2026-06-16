@@ -5,6 +5,8 @@ import { useOwnerSettlements } from "@/features/caja/hooks/use-owner-settlements
 import { useContracts } from "@/features/contracts/hooks/use-contracts";
 import { effectiveStatus } from "@/features/payments/lib/payment-labels";
 import { groupPendingByOwner } from "@/features/caja/lib/caja-math";
+import { useAlertSettings, type AlertSettings } from "@/shared/hooks/use-alert-settings";
+import { isOverdue } from "@/features/payments/lib/generate-installments";
 import {
   collectionStatusForPayments,
   formatMonthSlash,
@@ -63,6 +65,7 @@ export interface MonthCollectionItem {
   balance: number;
   currency: string;
   payments: MonthCollectionPayment[];
+  alerts: { type: "expiration" | "adjustment"; text: string }[];
 }
 
 export interface RecentReceiptItem {
@@ -108,6 +111,7 @@ function startOfDayMinusDays(today: Date, days: number): Date {
   return d;
 }
 
+
 function buildPastMonthDebts(
   paymentRows: PaymentWithRelations[],
   today: Date,
@@ -127,6 +131,7 @@ function buildPastMonthDebts(
 function buildCurrentMonthCollections(
   paymentRows: PaymentWithRelations[],
   today: Date,
+  alertSettings: AlertSettings
 ): MonthCollectionItem[] {
   const current = paymentRows.filter((p) => isCurrentMonthPayment(p, today));
   const groups = new Map<string, PaymentWithRelations[]>();
@@ -146,6 +151,46 @@ function buildCurrentMonthCollections(
       const tenantName = first.contract?.tenant?.name ?? "—";
       const propertyAddress = first.contract?.property?.address ?? "—";
       const balance = payments.reduce((sum, p) => sum + remainingAmount(p), 0);
+      const contract = first.contract;
+
+      const alerts: { type: "expiration" | "adjustment"; text: string }[] = [];
+      if (contract) {
+        const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+        if (contract.end_date) {
+          const [endYear, endMonth, endDay] = contract.end_date.split("-").map(Number);
+          const startOfEndDate = new Date(endYear, endMonth - 1, endDay);
+          const diffTime = startOfEndDate.getTime() - startOfToday.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          const limitDays = alertSettings.contractExpirationMonths * 30;
+
+          if (diffDays >= 0 && diffDays <= limitDays) {
+            const text = diffDays === 0
+              ? "Vence hoy"
+              : diffDays === 1
+              ? "Vence en 1 día"
+              : `Vence en ${diffDays} días`;
+            alerts.push({ type: "expiration", text });
+          }
+        }
+
+        if (contract.next_adjustment_date) {
+          const [adjYear, adjMonth, adjDay] = contract.next_adjustment_date.split("-").map(Number);
+          const startOfAdjDate = new Date(adjYear, adjMonth - 1, adjDay);
+          const diffTime = startOfAdjDate.getTime() - startOfToday.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          const limitDays = alertSettings.rentAdjustmentMonths * 30;
+
+          if (diffDays >= 0 && diffDays <= limitDays) {
+            const text = diffDays === 0
+              ? "Ajuste hoy"
+              : diffDays === 1
+              ? "Ajuste en 1 día"
+              : `Ajuste en ${diffDays} días`;
+            alerts.push({ type: "adjustment", text });
+          }
+        }
+      }
 
       return {
         key,
@@ -158,6 +203,7 @@ function buildCurrentMonthCollections(
           id: p.id,
           remaining: remainingAmount(p),
         })),
+        alerts,
       };
     })
     .filter((item) => item.balance > 0)
@@ -186,6 +232,7 @@ export function useDashboardMetrics(today: Date = new Date()): DashboardMetrics 
   const payments = usePayments();
   const settlements = useOwnerSettlements();
   const contracts = useContracts();
+  const { settings: alertSettings } = useAlertSettings();
 
   const loading =
     payments.isLoading || settlements.isLoading || contracts.isLoading;
@@ -202,20 +249,21 @@ export function useDashboardMetrics(today: Date = new Date()): DashboardMetrics 
     ).length;
 
     // Overdue payments
-    const overdue = paymentRows.filter(
-      (p) => effectiveStatus(p, today) === "overdue",
-    );
+    const overdue = paymentRows.filter((p) => {
+      const eff = effectiveStatus(p, today);
+      return eff === "overdue" || (eff === "partial" && isOverdue(p, today));
+    });
     const overduePayments = {
       count: overdue.length,
       totalByCurrency: sumByCurrency(overdue, (p) => ({
-        amount: p.amount,
+        amount: remainingAmount(p),
         currency: p.currency,
       })),
       items: overdue.map((p) => ({
         id: p.id,
         tenantName: p.contract?.tenant?.name ?? "—",
         propertyAddress: p.contract?.property?.address ?? "—",
-        amount: p.amount,
+        amount: remainingAmount(p),
         currency: p.currency,
         dueDate: p.due_date,
       })),
@@ -257,6 +305,7 @@ export function useDashboardMetrics(today: Date = new Date()): DashboardMetrics 
     const currentMonthCollections = buildCurrentMonthCollections(
       paymentRows,
       today,
+      alertSettings
     );
     const recentReceipts = buildRecentReceipts(paymentRows);
 
@@ -271,5 +320,5 @@ export function useDashboardMetrics(today: Date = new Date()): DashboardMetrics 
       loading,
       error,
     };
-  }, [payments.data, settlements.data, contracts.data, today, loading, error]);
+  }, [payments.data, settlements.data, contracts.data, today, loading, error, alertSettings]);
 }

@@ -35,24 +35,28 @@ vi.mock("@/features/contacts/hooks/use-contacts", () => ({
   }),
 }));
 
-vi.mock("@nodocore/shared-components", () => ({
-  Select: ({ children, onValueChange, value }: {
-    children: React.ReactNode;
-    onValueChange?: (v: string) => void;
-    value?: string;
-  }) => (
-    <select value={value ?? ""} onChange={(e) => onValueChange?.(e.target.value)}>
-      {children}
-    </select>
-  ),
-  SelectTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SelectValue: () => null,
-  SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => {
-    if (value === "") throw new Error("empty SelectItem value");
-    return <option value={value}>{children}</option>;
-  },
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    Select: ({ children, onValueChange, value }: {
+      children: React.ReactNode;
+      onValueChange?: (v: string) => void;
+      value?: string;
+    }) => (
+      <select value={value ?? ""} onChange={(e) => onValueChange?.(e.target.value)}>
+        {children}
+      </select>
+    ),
+    SelectTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    SelectValue: () => null,
+    SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => {
+      if (value === "") throw new Error("empty SelectItem value");
+      return <option value={value}>{children}</option>;
+    },
+  };
+});
 
 import { ContractFormDialog } from "@/features/contracts/components/contract-form-dialog";
 

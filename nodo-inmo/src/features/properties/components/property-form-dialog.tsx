@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -46,6 +46,7 @@ import {
   parseCurrencyInput,
 } from "@/shared/lib/format-money";
 import { PhotoGallery } from "./photo-gallery";
+import { StagedPhotoUpload } from "./StagedPhotoUpload";
 import { cn } from "@/shared/lib/utils";
 import { Combobox } from "@nodocore/shared-components";
 import { PROVINCIAS, LOCALIDADES_BY_PROVINCIA, type Provincia } from "@/shared/data/argentina-geo";
@@ -60,7 +61,7 @@ const schema = z.object({
   property_type: z.enum(["apartment", "house", "commercial", "land", "other"], {
     error: "Seleccioná un tipo",
   }),
-  status: z.enum(["available", "reserved", "rented", "sold", "inactive"]),
+  status: z.enum(["available", "reserved", "rented", "sold", "inactive", "negotiation"]),
   currency: z.enum(["ARS", "USD"]),
   sale_price: z.string().optional(),
   total_sqm: z.string().optional(),
@@ -160,7 +161,7 @@ interface PropertyFormDialogProps {
   isPending?: boolean;
 }
 
-function buildPayload(values: PropertyFormValues) {
+function buildPayload(values: PropertyFormValues, photos?: string[]) {
   return {
     address: values.address,
     localidad: values.localidad || null,
@@ -185,6 +186,8 @@ function buildPayload(values: PropertyFormValues) {
     has_bbq: values.has_bbq,
     has_elevator: values.has_elevator,
     has_parking: values.has_parking,
+    photos: photos ?? [],
+    main_photo: (photos ?? [])[0] ?? null,
   };
 }
 
@@ -201,6 +204,7 @@ export function PropertyFormDialog({
 }: PropertyFormDialogProps) {
   const isEdit = !!property;
   const { data: owners = [] } = useContacts("owner");
+  const [stagedPhotos, setStagedPhotos] = useState<string[]>([]);
 
   const form = useForm<PropertyFormValues>({
     resolver: zodResolver(schema) as any,
@@ -257,8 +261,11 @@ export function PropertyFormDialog({
   }, [currency, form]);
 
   async function handleSubmit(values: PropertyFormValues) {
-    await onSubmit(buildPayload(values), property);
-    if (!isEdit) form.reset();
+    await onSubmit(buildPayload(values, isEdit ? undefined : stagedPhotos), property);
+    if (!isEdit) {
+      form.reset();
+      setStagedPhotos([]);
+    }
     onSuccess?.();
   }
 
@@ -432,6 +439,7 @@ export function PropertyFormDialog({
                       <SelectContent>
                         <SelectItem value="available">Disponible</SelectItem>
                         <SelectItem value="reserved">Reservada</SelectItem>
+                        <SelectItem value="negotiation">En tratativa</SelectItem>
                         <SelectItem value="rented">Alquilada</SelectItem>
                         <SelectItem value="sold">Vendida</SelectItem>
                         <SelectItem value="inactive">Inactiva</SelectItem>
@@ -683,9 +691,7 @@ export function PropertyFormDialog({
                 orgId={property.org_id}
               />
             ) : (
-              <p className="text-xs text-slate2">
-                Podrás agregar fotos una vez creada la propiedad.
-              </p>
+              <StagedPhotoUpload paths={stagedPhotos} onChange={setStagedPhotos} />
             )}
 
             <DialogFooter className="mt-2">

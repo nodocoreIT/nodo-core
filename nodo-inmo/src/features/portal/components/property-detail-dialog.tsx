@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Share2, Check, Home, Phone } from "lucide-react";
+import { Share2, Check, Home, Phone, MessageCircle, Mail, Copy } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -46,22 +46,68 @@ function buildShareText(property: PortalProperty): string {
 export function PropertyDetailDialog({ property, onClose }: PropertyDetailDialogProps) {
   const { data: photoUrl } = usePropertyPhotoUrl(property?.main_photo);
   const [copied, setCopied] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+
+  const isMobile = typeof window !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
   if (!property) return null;
 
-  async function handleShare() {
+  async function handleNativeShare() {
     const text = buildShareText(property!);
-    if (typeof navigator.share === "function") {
+    let filesArray: File[] = [];
+
+    if (photoUrl) {
       try {
-        await navigator.share({ text, title: property!.address });
-        return;
-      } catch {
-        // fall through to clipboard
+        const response = await fetch(photoUrl);
+        const blob = await response.blob();
+        const file = new File([blob], 'propiedad.jpg', { type: blob.type });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          filesArray = [file];
+        }
+      } catch (e) {
+        // failed to fetch or create file, proceed without it
       }
     }
+
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ 
+          text, 
+          title: property!.address,
+          ...(filesArray.length > 0 ? { files: filesArray } : {}) 
+        });
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  function handleShareClick() {
+    if (isMobile && typeof navigator.share === "function") {
+      handleNativeShare();
+    } else {
+      setShowShareMenu((prev) => !prev);
+    }
+  }
+
+  async function handleCopy() {
+    const text = buildShareText(property!);
     await navigator.clipboard.writeText(text);
     setCopied(true);
+    setShowShareMenu(false);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleWhatsApp() {
+    const text = buildShareText(property!);
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+    setShowShareMenu(false);
+  }
+
+  function handleMail() {
+    const text = buildShareText(property!);
+    window.location.href = `mailto:?subject=${encodeURIComponent(property!.address)}&body=${encodeURIComponent(text)}`;
+    setShowShareMenu(false);
   }
 
   const statusColor = STATUS_COLORS[property.status] ?? "bg-slate-100 text-slate-700";
@@ -71,9 +117,9 @@ export function PropertyDetailDialog({ property, onClose }: PropertyDetailDialog
 
   return (
     <Dialog open={!!property} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-2 pr-6">
             <div>
               <DialogTitle className="text-lg font-bold leading-tight">
                 {property.address}
@@ -88,18 +134,46 @@ export function PropertyDetailDialog({ property, onClose }: PropertyDetailDialog
                 <span className="text-[11px] text-slate2">{typeLabel}</span>
               </DialogDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0 gap-1.5"
-              onClick={() => void handleShare()}
-            >
-              {copied ? (
-                <><Check className="h-3.5 w-3.5 text-green-600" />¡Copiado!</>
-              ) : (
-                <><Share2 className="h-3.5 w-3.5" />Compartir</>
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1.5"
+                onClick={handleShareClick}
+              >
+                {copied ? (
+                  <><Check className="h-3.5 w-3.5 text-green-600" />¡Copiado!</>
+                ) : (
+                  <><Share2 className="h-3.5 w-3.5" />Compartir</>
+                )}
+              </Button>
+
+              {showShareMenu && !isMobile && (
+                <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-md border border-border bg-card p-1 shadow-md">
+                  <button
+                    onClick={handleWhatsApp}
+                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
+                  >
+                    <MessageCircle className="h-4 w-4 text-green-600" />
+                    WhatsApp
+                  </button>
+                  <button
+                    onClick={handleCopy}
+                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
+                  >
+                    <Copy className="h-4 w-4" />
+                    Copiar info
+                  </button>
+                  <button
+                    onClick={handleMail}
+                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
+                  >
+                    <Mail className="h-4 w-4" />
+                    Mail
+                  </button>
+                </div>
               )}
-            </Button>
+            </div>
           </div>
         </DialogHeader>
 

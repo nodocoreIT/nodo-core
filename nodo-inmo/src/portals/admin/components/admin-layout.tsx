@@ -37,6 +37,7 @@ import { cn } from "@/shared/lib/utils";
 import { SettingsDialog } from "./settings-dialog";
 import { FeedbackFAB } from "@/features/feedback/components/feedback-node";
 import { NotificationsBell } from "@/features/dashboard/components/notifications-bell";
+import { IPCBadge } from "@/features/ipc/components/IPCBadge";
 
 // ── Nav item definition ───────────────────────────────────────────────────────
 
@@ -138,7 +139,7 @@ export function AdminLayout() {
   const displayName = fullName || email;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-paper]">
+    <div className="flex h-[100dvh] overflow-hidden bg-paper">
       {/* Mobile Sidebar/Drawer Overlay */}
       {mobileMenuOpen && (
         <div
@@ -150,7 +151,7 @@ export function AdminLayout() {
       {/* ── Sidebar (Responsive: Sidebar on Desktop, Drawer on Mobile) ── */}
       <aside
         className={cn(
-          "fixed bottom-0 top-0 left-0 z-50 flex h-screen w-60 flex-shrink-0 flex-col bg-[var(--color-sidebar-bg)] transition-transform duration-300 ease-in-out border-r border-border md:static md:z-auto md:translate-x-0 md:flex",
+          "fixed bottom-0 top-0 left-0 z-50 flex h-[100dvh] w-60 flex-shrink-0 flex-col bg-[var(--color-sidebar-bg)] transition-transform duration-300 ease-in-out border-r border-border md:static md:z-auto md:translate-x-0 md:flex",
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -260,7 +261,8 @@ export function AdminLayout() {
             </div>
 
             {/* Mobile notification bell */}
-            <div className="flex items-center sm:hidden">
+            <div className="flex items-center gap-2 sm:hidden">
+              <IPCBadge />
               <NotificationsBell />
             </div>
           </div>
@@ -272,7 +274,8 @@ export function AdminLayout() {
                 <SearchInput placeholder={placeholder} />
               </div>
               {/* Desktop notification bell */}
-              <div className="hidden sm:block">
+              <div className="hidden sm:flex items-center gap-2">
+                <IPCBadge />
                 <NotificationsBell />
               </div>
             </div>
@@ -280,7 +283,8 @@ export function AdminLayout() {
 
           {/* Fallback for desktop when no search input exists */}
           {!placeholder && (
-            <div className="hidden sm:flex items-center justify-end ml-auto">
+            <div className="hidden sm:flex items-center justify-end gap-2 ml-auto">
+              <IPCBadge />
               <NotificationsBell />
             </div>
           )}

@@ -144,7 +144,7 @@ export async function GET(request: NextRequest) {
         plan: pending.plan,
         status: (isPatient || isInmo) ? "activo" : "onboarding",
         progress: (isPatient || isInmo) ? 100 : 0,
-        access_url: isInmo ? "https://nodoinmo.vercel.app/" : "http://localhost:5173/",
+        access_url: isInmo ? "/inmo" : "http://localhost:5173/",
         access_user: pending.email,
         access_password: pending.password,
       });

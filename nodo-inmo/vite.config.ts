@@ -6,6 +6,11 @@ import { resolve } from "path";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  base: "/inmo",
+  server: {
+    port: 5173,
+    strictPort: true, // fail fast if port is taken instead of picking a random one
+  },
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src"),

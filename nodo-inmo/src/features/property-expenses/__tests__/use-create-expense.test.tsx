@@ -48,9 +48,13 @@ vi.mock("@/shared/lib/supabase", () => ({
 
 // ── Mock useAuth ──────────────────────────────────────────────────────────────
 const mockUseAuth = vi.fn();
-vi.mock("@nodocore/shared-components", () => ({
-  useAuth: () => mockUseAuth(),
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    useAuth: () => mockUseAuth(),
+  };
+});
 
 // ── Import hooks AFTER mocks ──────────────────────────────────────────────────
 import { useCreateExpense } from "@/features/property-expenses/hooks/use-create-expense";

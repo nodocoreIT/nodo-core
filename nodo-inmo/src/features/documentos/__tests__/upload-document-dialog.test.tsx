@@ -22,27 +22,31 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 // ── Radix Select → native <select> (jsdom has no Pointer Events) ──────────────
-vi.mock("@nodocore/shared-components", () => ({
-  Select: ({ children, onValueChange, value }: {
-    children: ReactNode;
-    onValueChange?: (v: string) => void;
-    value?: string;
-  }) => (
-    <select value={value ?? ""} onChange={(e) => onValueChange?.(e.target.value)}>
-      {children}
-    </select>
-  ),
-  SelectTrigger: ({ children, id, "aria-label": ariaLabel }: {
-    children: ReactNode;
-    id?: string;
-    "aria-label"?: string;
-  }) => <label id={id}>{ariaLabel}</label>,
-  SelectValue: (_props: { placeholder?: string }) => null,
-  SelectContent: ({ children }: { children: ReactNode }) => <>{children}</>,
-  SelectItem: ({ value, children }: { value: string; children: ReactNode }) => (
-    <option value={value}>{children}</option>
-  ),
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    Select: ({ children, onValueChange, value }: {
+      children: ReactNode;
+      onValueChange?: (v: string) => void;
+      value?: string;
+    }) => (
+      <select value={value ?? ""} onChange={(e) => onValueChange?.(e.target.value)}>
+        {children}
+      </select>
+    ),
+    SelectTrigger: ({ children, id, "aria-label": ariaLabel }: {
+      children: ReactNode;
+      id?: string;
+      "aria-label"?: string;
+    }) => <label id={id}>{ariaLabel}</label>,
+    SelectValue: (_props: { placeholder?: string }) => null,
+    SelectContent: ({ children }: { children: ReactNode }) => <>{children}</>,
+    SelectItem: ({ value, children }: { value: string; children: ReactNode }) => (
+      <option value={value}>{children}</option>
+    ),
+  };
+});
 
 // ── Hook mocks (hoisted) ──────────────────────────────────────────────────────
 const mockMutateAsync = vi.fn();

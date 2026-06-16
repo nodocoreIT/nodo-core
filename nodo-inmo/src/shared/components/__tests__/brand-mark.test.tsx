@@ -9,6 +9,9 @@ import { describe, it, expect } from "vitest";
 import { BrandMark } from "@/shared/components/brand-mark";
 
 describe("BrandMark", () => {
+  const baseUrl = import.meta.env.BASE_URL || "/";
+  const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+
   it("renders the nodo + inmo wordmark", () => {
     render(<BrandMark />);
     expect(screen.getByText("nodo")).toBeInTheDocument();
@@ -18,13 +21,13 @@ describe("BrandMark", () => {
   it("uses the navy node mark on light backgrounds (default)", () => {
     const { container } = render(<BrandMark useLegacyIcon />);
     const img = container.querySelector("img");
-    expect(img?.getAttribute("src")).toBe("/brand/nodo-mark.png");
+    expect(img?.getAttribute("src")).toBe(`${normalizedBaseUrl}brand/nodo-mark.png`);
   });
 
   it("uses the white node mark on dark backgrounds", () => {
     const { container } = render(<BrandMark onDark useLegacyIcon />);
     const img = container.querySelector("img");
-    expect(img?.getAttribute("src")).toBe("/brand/nodo-mark-white.png");
+    expect(img?.getAttribute("src")).toBe(`${normalizedBaseUrl}brand/nodo-mark-white.png`);
   });
 
   it("colors the nodo wordmark navy on light and white on dark", () => {

@@ -44,51 +44,51 @@ vi.mock("@/shared/lib/supabase", () => ({
   },
 }));
 
-// ── Mock useAuth ──────────────────────────────────────────────────────────────
-vi.mock("@nodocore/shared-components", () => ({
-  useAuth: () => ({
-    user: { email: "admin@nodo.com" },
-    role: "admin",
-    orgId: "org-abc",
-    signOut: vi.fn(),
-    session: {},
-    loading: false,
-  }),
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
-// ── Mock Radix Select with native <select> ────────────────────────────────────
-vi.mock("@nodocore/shared-components", () => ({
-  Select: ({
-    children,
-    onValueChange,
-    value,
-  }: {
-    children: React.ReactNode;
-    onValueChange?: (v: string) => void;
-    value?: string;
-  }) => (
-    <select value={value ?? ""} onChange={(e) => onValueChange?.(e.target.value)}>
-      {children}
-    </select>
-  ),
-  SelectTrigger: ({
-    children,
-  }: {
-    children: React.ReactNode;
-    "aria-label"?: string;
-    id?: string;
-  }) => <>{children}</>,
-  SelectValue: (_props: { placeholder?: string }) => null,
-  SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SelectItem: ({
-    value,
-    children,
-  }: {
-    value: string;
-    children: React.ReactNode;
-  }) => <option value={value}>{children}</option>,
-}));
+// ── Mock useAuth + Radix Select with native <select> ─────────────────────────
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: { email: "admin@nodo.com" },
+      role: "admin",
+      orgId: "org-abc",
+      signOut: vi.fn(),
+      session: {},
+      loading: false,
+    }),
+    AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    Select: ({
+      children,
+      onValueChange,
+      value,
+    }: {
+      children: React.ReactNode;
+      onValueChange?: (v: string) => void;
+      value?: string;
+    }) => (
+      <select value={value ?? ""} onChange={(e) => onValueChange?.(e.target.value)}>
+        {children}
+      </select>
+    ),
+    SelectTrigger: ({
+      children,
+    }: {
+      children: React.ReactNode;
+      "aria-label"?: string;
+      id?: string;
+    }) => <>{children}</>,
+    SelectValue: (_props: { placeholder?: string }) => null,
+    SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    SelectItem: ({
+      value,
+      children,
+    }: {
+      value: string;
+      children: React.ReactNode;
+    }) => <option value={value}>{children}</option>,
+  };
+});
 
 // ── Mock AlertDialog with simple passthrough so jsdom can click buttons ───────
 vi.mock("@/shared/components/ui/alert-dialog", () => {
