@@ -504,18 +504,20 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   });
   const [isInviting, setIsInviting] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMember.name || !newMember.email) return;
     setIsInviting(true);
+    setInviteError(null);
     try {
       await inviteUser(newMember.name, newMember.email, newMember.role);
       setNewMember({ name: "", email: "", role: "Colega" });
       setInviteSuccess(true);
-      setTimeout(() => setInviteSuccess(false), 3000);
+      setTimeout(() => setInviteSuccess(false), 5000);
     } catch (err) {
-      console.error(err);
+      setInviteError(err instanceof Error ? err.message : "No se pudo enviar la invitación");
     } finally {
       setIsInviting(false);
     }
@@ -1237,9 +1239,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               {inviteSuccess && (
                 <div className="bg-emerald-50 text-emerald-800 text-sm p-3 rounded-md flex items-center gap-2 border border-emerald-200">
                   <Mail className="h-4 w-4 text-emerald-600" />
-                  <span>
-                    ¡Email de verificación enviado exitosamente al invitado!
-                  </span>
+                  <span>Invitación enviada. El usuario recibirá un email para activar su cuenta y elegir una contraseña.</span>
+                </div>
+              )}
+
+              {inviteError && (
+                <div className="bg-red-50 text-red-800 text-sm p-3 rounded-md flex items-center gap-2 border border-red-200">
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                  <span>{inviteError}</span>
                 </div>
               )}
 
