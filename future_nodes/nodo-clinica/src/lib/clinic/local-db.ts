@@ -1,9 +1,10 @@
 import { randomBytes, randomUUID } from "crypto";
 import { promises as fs } from "fs";
-import path from "path";
 
 import type { DoctorAvailability } from "@/lib/clinic/schedule";
-import { DEFAULT_AVAILABILITY } from "@/lib/clinic/schedule";
+import { getClinicDataDir, getClinicDbPath } from "@/lib/clinic/data-dir";
+import type { DoctorThemeSettings } from "@/lib/clinic/theme-settings";
+import { buildClinicSeed, CLINIC_SEED_VERSION } from "@/lib/clinic/seed";
 
 export type SubscriptionStatus = "trial" | "active" | "expired";
 export type AppointmentStatus =
@@ -54,6 +55,8 @@ export interface LocalDoctor {
   payment?: DoctorPaymentSettings;
   reminderSettings?: DoctorReminderSettings;
   googleCalendarId?: string;
+  /** Colores, tipografía y marca del panel médico */
+  themeSettings?: DoctorThemeSettings;
   createdAt: string;
 }
 
@@ -116,84 +119,49 @@ export interface LocalClinicalNote {
   updatedAt: string;
 }
 
+/** Tarea manual del médico (además de turnos derivados de la agenda) */
+export interface DoctorTask {
+  id: string;
+  doctorId: string;
+  title: string;
+  /** ISO date YYYY-MM-DD */
+  dueDate?: string;
+  done: boolean;
+  createdAt: string;
+}
+export interface InterconsultMessage {
+  id: string;
+  fromDoctorId: string;
+  fromDoctorName: string;
+  /** null = sala general de interconsultas */
+  toDoctorId: string | null;
+  content: string;
+  createdAt: string;
+}
+
+export interface DoctorPresenceEntry {
+  doctorId: string;
+  lastSeen: string;
+}
+
 export interface ClinicDatabase {
+  /** Control de reset demo al desplegar (ver CLINIC_SEED_VERSION) */
+  meta?: { seedVersion?: number };
   doctors: LocalDoctor[];
   patients: LocalPatient[];
   appointments: LocalAppointment[];
   documents: LocalDocument[];
   clinicalRecords: LocalClinicalRecord[];
   clinicalNotes: Record<string, LocalClinicalNote>;
+  interconsultMessages?: InterconsultMessage[];
+  doctorPresence?: Record<string, DoctorPresenceEntry>;
+  /** Última vez que el médico leyó el chat (ISO por doctorId) */
+  nodoChatReadAt?: Record<string, string>;
+  doctorTasks?: DoctorTask[];
 }
 
-const DATA_DIR = process.env.CLINIC_DATA_DIR
-  ? path.resolve(process.env.CLINIC_DATA_DIR)
-  : process.env.VERCEL === "1"
-    ? "/tmp/clinic-data"
-    : path.join(process.cwd(), "data");
-const DB_PATH = path.join(DATA_DIR, "clinic.json");
-
-const SEED: ClinicDatabase = {
-  doctors: [
-    {
-      id: "doc-mauro-001",
-      fullName: "Mauro Lluch",
-      email: "maurolluch@gmail.com",
-      password: "Probando1",
-      specialty: "Gastroenterología",
-      licenseNumber: "MN 98765",
-      subscriptionStatus: "active",
-      subscriptionPlan: "profesional",
-      availability: DEFAULT_AVAILABILITY,
-      signatureText: "Mauro Lluch — MN 98765",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: "doc-demo-001",
-      fullName: "Dra. María González",
-      email: "maria@demo.com",
-      password: "Probando1",
-      specialty: "Medicina General",
-      licenseNumber: "MN 12345",
-      subscriptionStatus: "active",
-      subscriptionPlan: "profesional",
-      availability: DEFAULT_AVAILABILITY,
-      signatureText: "Dra. María González — MN 12345",
-      createdAt: new Date().toISOString(),
-    },
-  ],
-  patients: [
-    {
-      id: "pat-demo-001",
-      fullName: "Juan Pérez",
-      email: "paciente@demo.com",
-      password: "Probando1",
-      phone: "11 5555-0001",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: "pat-demo-002",
-      fullName: "Laura Fernández",
-      email: "paciente2@demo.com",
-      password: "Probando1",
-      phone: "11 5555-0002",
-      createdAt: new Date().toISOString(),
-    },
-  ],
-  appointments: [],
-  documents: [],
-  clinicalRecords: [
-    {
-      id: "rec-001",
-      patientId: "pat-demo-001",
-      doctorId: "doc-mauro-001",
-      title: "Consulta previa — Control digestivo",
-      content: "Paciente refiere mejoría. Continuar tratamiento actual.",
-      recordType: "consultation",
-      createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
-    },
-  ],
-  clinicalNotes: {},
-};
+const DATA_DIR = getClinicDataDir();
+const DB_PATH = getClinicDbPath();
 
 let writeQueue: Promise<void> = Promise.resolve();
 
@@ -234,25 +202,44 @@ async function persistDb(db: ClinicDatabase): Promise<void> {
 }
 
 async function ensureDb(): Promise<ClinicDatabase> {
+  let db: ClinicDatabase | null = null;
+
   const fromBlob = await readFromBlob();
   if (fromBlob) {
+    db = normalizeDb(fromBlob);
+  } else {
     await fs.mkdir(DATA_DIR, { recursive: true });
-    await fs.writeFile(DB_PATH, JSON.stringify(fromBlob, null, 2), "utf-8");
-    return fromBlob;
+    try {
+      const raw = await fs.readFile(DB_PATH, "utf-8");
+      db = normalizeDb(JSON.parse(raw) as ClinicDatabase);
+    } catch {
+      db = null;
+    }
+  }
+
+  const version = db?.meta?.seedVersion ?? 0;
+  if (!db || version < CLINIC_SEED_VERSION) {
+    const seed = buildClinicSeed();
+    const normalized = normalizeDb(seed);
+    await persistDb(normalized);
+    return normalized;
   }
 
   await fs.mkdir(DATA_DIR, { recursive: true });
-  try {
-    const raw = await fs.readFile(DB_PATH, "utf-8");
-    const parsed = JSON.parse(raw) as ClinicDatabase;
-    await writeToBlob(parsed);
-    return parsed;
-  } catch {
-    const seed = structuredClone(SEED);
-    await fs.writeFile(DB_PATH, JSON.stringify(seed, null, 2), "utf-8");
-    return seed;
-  }
+  await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
+  await writeToBlob(db);
+  return db;
 }
+
+function normalizeDb(db: ClinicDatabase): ClinicDatabase {
+  if (!db.interconsultMessages) db.interconsultMessages = [];
+  if (!db.doctorPresence) db.doctorPresence = {};
+  if (!db.nodoChatReadAt) db.nodoChatReadAt = {};
+  if (!db.doctorTasks) db.doctorTasks = [];
+  return db;
+}
+
+export const ONLINE_THRESHOLD_MS = 90_000;
 
 export async function readDb(): Promise<ClinicDatabase> {
   return ensureDb();

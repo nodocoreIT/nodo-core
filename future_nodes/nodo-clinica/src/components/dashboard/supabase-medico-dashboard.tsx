@@ -2,7 +2,11 @@ import { DoctorDashboard } from "@/components/dashboard/doctor-dashboard";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
-export async function SupabaseMedicoDashboard() {
+export async function SupabaseMedicoDashboard({
+  embedded = false,
+}: {
+  embedded?: boolean;
+} = {}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -23,6 +27,7 @@ export async function SupabaseMedicoDashboard() {
           doctorSpecialty={profile.specialty ?? undefined}
           doctorLicense={profile.license_number ?? undefined}
           dataSource="supabase"
+          embedded={embedded}
         />
       );
     }

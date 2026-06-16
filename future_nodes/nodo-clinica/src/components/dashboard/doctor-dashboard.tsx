@@ -42,6 +42,7 @@ interface DoctorDashboardProps {
   doctorSpecialty?: string;
   doctorLicense?: string;
   dataSource?: DataSource;
+  embedded?: boolean;
 }
 
 function mapLocalToAppointment(apt: {
@@ -89,6 +90,7 @@ export function DoctorDashboard({
   doctorSpecialty,
   doctorLicense,
   dataSource = "supabase",
+  embedded = false,
 }: DoctorDashboardProps) {
   const router = useRouter();
   const {
@@ -528,11 +530,12 @@ export function DoctorDashboard({
     | undefined;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className={embedded ? "bg-paper" : "min-h-screen bg-slate-50"}>
+      {!embedded && (
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur-sm">
         <div className="flex items-center justify-between px-6 py-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-700">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand">
               <Stethoscope className="h-5 w-5 text-white" />
             </div>
             <div>
@@ -621,8 +624,60 @@ export function DoctorDashboard({
           </div>
         </div>
       </header>
+      )}
 
-      <div className="grid grid-cols-12 gap-4 p-4 max-w-[1600px] mx-auto">
+      {embedded && (
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <UserAvatar name={doctorName} photoUrl={doctorPhoto} size="sm" />
+            <div>
+              <p className="text-sm font-semibold text-navy">Dr/a. {doctorName}</p>
+              {doctorSpecialty && (
+                <p className="text-xs text-slate2">{doctorSpecialty}</p>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {hasActiveSession() && activeAppointment && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                onClick={() => finishConsultation(activeAppointment.id)}
+              >
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Finalizar consulta
+              </Button>
+            )}
+            {hasActiveSession() && activeAppointment && dataSource === "local" && (
+              <Button
+                size="sm"
+                className="bg-brand hover:bg-brand-600 text-white"
+                onClick={() =>
+                  openReportForPatient({
+                    appointmentId: activeAppointment.id,
+                    patientId: activeAppointment.patient_id,
+                    patientName:
+                      patientProfile?.profile?.full_name || "Paciente",
+                    patientEmail: patientProfile?.profile?.email,
+                  })
+                }
+              >
+                Informe clínico
+              </Button>
+            )}
+            {dataSource === "local" && (
+              <PatientSearchHeader
+                doctorId={doctorId}
+                onViewPatient={handleSelectSearchedPatient}
+              />
+            )}
+            <NotificationBell />
+          </div>
+        </div>
+      )}
+
+      <div className={`grid grid-cols-12 gap-4 ${embedded ? "" : "p-4 max-w-[1600px] mx-auto"}`}>
         {/* Cola de pacientes */}
         <div className="col-span-12 lg:col-span-3 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px]">
           <PatientQueue
