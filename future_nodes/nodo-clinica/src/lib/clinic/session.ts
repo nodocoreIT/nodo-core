@@ -47,7 +47,15 @@ export async function getSessionFromRequest(
   request: NextRequest
 ): Promise<ClinicSession | null> {
   const fromCookie = parseSession(request.cookies.get(COOKIE)?.value);
-  if (fromCookie) return fromCookie;
+  if (fromCookie) {
+    const db = await readDb();
+    if (fromCookie.role === "doctor") {
+      if (!db.doctors.some((d) => d.id === fromCookie.userId)) return null;
+    } else if (!db.patients.some((p) => p.id === fromCookie.userId)) {
+      return null;
+    }
+    return fromCookie;
+  }
 
   const userId = request.headers.get("x-clinic-user-id");
   const role = request.headers.get("x-clinic-role") as SessionRole | null;
