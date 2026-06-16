@@ -74,7 +74,17 @@ export const useStaffStore = create<StaffStore>((set) => ({
         body: { name, email, role, redirectTo },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Supabase wraps the real body in error.context — surface it
+        let detail = error.message;
+        try {
+          const body = await (error as any).context?.json?.();
+          if (body?.error) detail = body.error;
+        } catch {
+          // ignore parse failures
+        }
+        throw new Error(detail);
+      }
 
       // Replace the temp entry with the real user ID from Supabase
       const realId = (data as { id: string }).id;
