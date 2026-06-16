@@ -174,6 +174,30 @@ export function getUpcomingWorkingDateKeys(
   return keys;
 }
 
+/** Próximo día laborable con atención, estrictamente después de hoy. */
+export function getNextAttendanceDateKey(
+  availability: DoctorAvailability,
+): string | null {
+  const today = localDateKeyFromDate(new Date());
+  const keys = getUpcomingWorkingDateKeys(availability, 30);
+  return keys.find((k) => k > today) ?? null;
+}
+
+export function getScheduleBlocksForDate(
+  availability: DoctorAvailability,
+  date: Date,
+): DaySchedule[] {
+  const dow = date.getDay();
+  return normalizeAvailability(availability).days.filter(
+    (d) => d.dayOfWeek === dow,
+  );
+}
+
+export function formatDateKeyLabel(dateKey: string): string {
+  const d = parseLocalDate(dateKey);
+  return format(d, "EEEE d 'de' MMMM", { locale: es });
+}
+
 export function getAvailableDates(
   availability: DoctorAvailability,
   daysAhead = 28,

@@ -306,6 +306,7 @@ export const clinicApi = {
     payment?: import("@/lib/clinic/local-db").DoctorPaymentSettings;
     reminderSettings?: import("@/lib/clinic/local-db").DoctorReminderSettings;
     googleCalendarId?: string;
+    themeSettings?: import("@/lib/clinic/theme-settings").DoctorThemeSettings;
   }) {
     const res = await fetch("/api/clinic/schedule", {
       method: "PUT",
@@ -416,6 +417,154 @@ export const clinicApi = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al actualizar perfil");
+    return data;
+  },
+
+  async getInterconsultMessages(peerId: string | null = null) {
+    const params = peerId ? `?peerId=${encodeURIComponent(peerId)}` : "";
+    const res = await fetch(`/api/clinic/interconsult/messages${params}`, fetchOpts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar mensajes");
+    return data as {
+      messages: Array<{
+        id: string;
+        fromDoctorId: string;
+        fromDoctorName: string;
+        toDoctorId: string | null;
+        content: string;
+        createdAt: string;
+      }>;
+    };
+  },
+
+  async sendInterconsultMessage(content: string, toDoctorId: string | null = null) {
+    const res = await fetch("/api/clinic/interconsult/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      credentials: "include",
+      body: JSON.stringify({ content, toDoctorId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al enviar mensaje");
+    return data;
+  },
+
+  async getInterconsultPresence() {
+    const res = await fetch("/api/clinic/interconsult/presence", fetchOpts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar presencia");
+    return data as {
+      doctors: Array<{
+        id: string;
+        fullName: string;
+        specialty: string;
+        online: boolean;
+        lastSeen: string | null;
+      }>;
+    };
+  },
+
+  async pingInterconsultPresence() {
+    await fetch("/api/clinic/interconsult/presence", {
+      method: "POST",
+      headers: authHeaders(),
+      credentials: "include",
+    });
+  },
+
+  async searchNodoChatDirectory(q = "") {
+    const params = q ? `?q=${encodeURIComponent(q)}` : "";
+    const res = await fetch(`/api/clinic/interconsult/directory${params}`, fetchOpts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al buscar contactos");
+    return data as {
+      contacts: Array<{
+        id: string;
+        fullName: string;
+        role: string;
+        nodeSlug: string;
+        nodeLabel: string;
+        specialty?: string;
+        online: boolean;
+      }>;
+      currentPlan: string;
+    };
+  },
+
+  async getNodoChatUnread() {
+    const res = await fetch("/api/clinic/interconsult/unread", fetchOpts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar notificaciones");
+    return data as {
+      count: number;
+      items: Array<{
+        id: string;
+        fromDoctorId: string;
+        fromDoctorName: string;
+        toDoctorId: string | null;
+        content: string;
+        createdAt: string;
+      }>;
+    };
+  },
+
+  async markNodoChatRead() {
+    const res = await fetch("/api/clinic/interconsult/read", {
+      method: "POST",
+      headers: authHeaders(),
+      credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al marcar leído");
+    return data as { readAt: string };
+  },
+
+  async getDoctorTasks(due?: string) {
+    const params = due ? `?due=${encodeURIComponent(due)}` : "";
+    const res = await fetch(`/api/clinic/tasks${params}`, fetchOpts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar tareas");
+    return data as {
+      tasks: Array<{
+        id: string;
+        doctorId: string;
+        title: string;
+        dueDate?: string;
+        done: boolean;
+        createdAt: string;
+      }>;
+    };
+  },
+
+  async saveDoctorTask(payload: {
+    title: string;
+    dueDate?: string;
+  }) {
+    const res = await fetch("/api/clinic/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al crear tarea");
+    return data;
+  },
+
+  async updateDoctorTask(payload: {
+    id: string;
+    title?: string;
+    dueDate?: string;
+    done?: boolean;
+  }) {
+    const res = await fetch("/api/clinic/tasks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al actualizar tarea");
     return data;
   },
 };

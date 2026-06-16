@@ -2,5 +2,4 @@ packages:
   - 'packages/*'
   - 'nodo-landing'
   - 'nodo-inmo'
-  - 'nodo-clinica'
   - 'nodo-autos'

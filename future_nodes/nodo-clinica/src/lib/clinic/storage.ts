@@ -1,16 +1,12 @@
-import path from "path";
+import { getClinicDataDir, getClinicUploadsDir } from "@/lib/clinic/data-dir";
 import { promises as fs } from "fs";
 
 export function getDataDir(): string {
-  return process.env.CLINIC_DATA_DIR
-    ? path.resolve(process.env.CLINIC_DATA_DIR)
-    : process.env.VERCEL === "1"
-      ? "/tmp"
-      : path.join(process.cwd(), "data");
+  return getClinicDataDir();
 }
 
 export function getUploadsDir(): string {
-  return path.join(getDataDir(), "uploads");
+  return getClinicUploadsDir();
 }
 
 export async function ensureUploadsDir(): Promise<string> {

@@ -6,7 +6,7 @@ import { DoctorDashboard } from "@/components/dashboard/doctor-dashboard";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { Loader2 } from "lucide-react";
 
-export function LocalMedicoDashboard() {
+export function LocalMedicoDashboard({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
   const [doctor, setDoctor] = useState<{
     id: string;
@@ -32,8 +32,8 @@ export function LocalMedicoDashboard() {
 
   if (!doctor) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-brand" />
       </div>
     );
   }
@@ -45,6 +45,7 @@ export function LocalMedicoDashboard() {
       doctorSpecialty={doctor.specialty}
       doctorLicense={doctor.licenseNumber}
       dataSource="local"
+      embedded={embedded}
     />
   );
 }
