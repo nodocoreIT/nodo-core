@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/inmo/[[...slug]]": ["./public/inmo/index.html"],
     "/autos/[[...slug]]": ["./public/autos/index.html"],
+    "/finanzas/[[...slug]]": ["./public/finanzas/index.html"],
   },
   turbopack: {
     root: path.resolve(__dirname, ".."),
