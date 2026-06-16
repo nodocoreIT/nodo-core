@@ -30,6 +30,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "nodo-autos": "workspace:*",
+    "nodo-finanzas": "workspace:*",
     "nodo-inmo": "workspace:*",
     "tailwindcss": "^4",
     "typescript": "^5"

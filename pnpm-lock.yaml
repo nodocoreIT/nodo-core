@@ -462,6 +462,9 @@ importers:
       nodo-autos:
         specifier: workspace:*
         version: link:../nodo-autos
+      nodo-finanzas:
+        specifier: workspace:*
+        version: link:../nodo-finanzas
       nodo-inmo:
         specifier: workspace:*
         version: link:../nodo-inmo
