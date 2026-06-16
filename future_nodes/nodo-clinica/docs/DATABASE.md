@@ -4,6 +4,31 @@ Diseño alineado con **Nodo Core** (ecosistema multi-nodo) y el patrón de **nod
 
 ---
 
+## Cuentas demo (seed v1)
+
+Contraseña común: **`Probando1`**
+
+| Rol | Nombre | Email |
+|-----|--------|-------|
+| Médico | Dr. Demo 1 | `doc.demo1@nodo.demo` |
+| Médico | Dr. Demo 2 | `doc.demo2@nodo.demo` |
+| Paciente | Paciente 1 | `paciente1@nodo.demo` |
+| Paciente | Paciente 2 | `paciente2@nodo.demo` |
+
+Al incrementar `CLINIC_SEED_VERSION` en `src/lib/clinic/seed.ts`, la base se resetea en el próximo deploy (local + Vercel Blob).
+
+### Administración desde Nodo Core
+
+Los clientes reales se gestionan en **[nodocore.com.ar/panel/clientes](https://www.nodocore.com.ar/panel/clientes)** (`clients` + `client_units` con nodo `salud`). El flujo objetivo:
+
+1. Alta del cliente en el panel Core
+2. Unidad **nodo \| salud** con plan Pro y credenciales de acceso
+3. Provisioning crea/actualiza usuario en Nodo Clínica (fase Supabase) o sincroniza email en JSON local
+
+Hoy las cuentas demo viven en el seed; la integración panel → clínica es el paso 3 del roadmap.
+
+---
+
 ## Modo actual (local / demo)
 
 | Capa | Ubicación | Persiste reinicio |
