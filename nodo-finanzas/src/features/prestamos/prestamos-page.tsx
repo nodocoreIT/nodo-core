@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Plus,
   Edit,
@@ -77,7 +77,7 @@ export function PrestamosPage() {
   if (finanzas.loading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-paper z-50">
-        <Spinner label="Cargando préstamos..." />
+        <Spinner />
       </div>
     );
   }

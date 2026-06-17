@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -97,7 +97,7 @@ export function DetalleTarjetaPage() {
   if (finanzas.loading && !tarjeta) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Spinner label="Cargando..." />
+        <Spinner />
       </div>
     );
   }
@@ -341,7 +341,6 @@ export function DetalleTarjetaPage() {
       <ModalEditarConsumo
         open={!!consumoEditando}
         consumo={consumoEditando}
-        tarjetas={finanzas.tarjetas}
         onSave={handleSaveEdit}
         onCancel={() => setConsumoEditando(null)}
       />

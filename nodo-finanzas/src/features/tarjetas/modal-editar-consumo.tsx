@@ -1,13 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
-import type { ConsumoTarjeta, Tarjeta } from '@/types';
+import type { ConsumoTarjeta } from '@/types';
 
 interface ModalEditarConsumoProps {
   open: boolean;
   consumo: ConsumoTarjeta | null;
-  tarjetas: Tarjeta[];
   onSave: (cambios: Partial<ConsumoTarjeta>) => void;
   onCancel: () => void;
 }
@@ -15,7 +14,6 @@ interface ModalEditarConsumoProps {
 export function ModalEditarConsumo({
   open,
   consumo,
-  tarjetas,
   onSave,
   onCancel,
 }: ModalEditarConsumoProps) {

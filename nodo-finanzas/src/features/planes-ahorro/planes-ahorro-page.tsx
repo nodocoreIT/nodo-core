@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Plus,
   Edit,
@@ -227,7 +227,7 @@ export function PlanesAhorroPage() {
   if (finanzas.loading && finanzas.planesAhorro.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Spinner label="Cargando planes de ahorro..." />
+        <Spinner />
       </div>
     );
   }

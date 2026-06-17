@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Calendar, Check, X, Plus, Trash2 } from 'lucide-react';
@@ -126,7 +126,7 @@ export function GestionCuotasPlan({ plan, onClose }: Props) {
         <div className="flex-1 overflow-y-auto p-5">
           {loading && (
             <div className="text-center py-12">
-              <Spinner label="Cargando cuotas..." />
+              <Spinner />
             </div>
           )}
 

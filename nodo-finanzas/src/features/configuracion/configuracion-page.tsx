@@ -301,7 +301,7 @@ export function ConfiguracionPage() {
 
   // ─── Handlers: Delete ─────────────────────────────────────────────────────
 
-  function confirmarEliminar(tipo: typeof paraEliminar['tipo'], id: string, nombre: string) {
+  function confirmarEliminar(tipo: 'cuenta' | 'tarjeta' | 'categoria' | 'sueldo', id: string, nombre: string) {
     setParaEliminar({ tipo, id, nombre });
     setModalAbierto(true);
   }

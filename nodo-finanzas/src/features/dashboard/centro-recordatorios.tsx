@@ -228,9 +228,9 @@ export function CentroRecordatorios({ onNavigate }: Props) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {reminders.slice(0, 6).map((reminder) => (
-            <Card
+            <div
               key={reminder.id}
-              className={`group relative overflow-hidden transition-all hover:shadow-md border-l-4 cursor-pointer active:scale-[0.98] p-4 ${
+              className={`group relative overflow-hidden transition-all hover:shadow-md border-l-4 cursor-pointer active:scale-[0.98] rounded-xl shadow-sm border border-mist ${
                 reminder.isOverdue
                   ? 'border-l-red-500 bg-red-50/30'
                   : reminder.priority === 'high'
@@ -239,6 +239,7 @@ export function CentroRecordatorios({ onNavigate }: Props) {
               }`}
               onClick={() => handleAction(reminder)}
             >
+            <Card className="border-0 shadow-none rounded-none bg-transparent p-4">
               <button
                 onClick={(e) => handleDismiss(reminder.id, e)}
                 className="absolute top-2 right-2 p-1 text-slate2/40 hover:text-slate2 hover:bg-mist rounded-full opacity-0 group-hover:opacity-100 transition-all"
@@ -332,6 +333,7 @@ export function CentroRecordatorios({ onNavigate }: Props) {
                 </div>
               </div>
             </Card>
+            </div>
           ))}
         </div>
       )}
