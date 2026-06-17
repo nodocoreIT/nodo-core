@@ -163,31 +163,58 @@ export default function EcosystemDiagram({
           />
         ))}
 
-        {/* Parent → sub-node lines: draw animation on hover, trimmed to node edges */}
+        {/* Parent → sub-node lines: from parent center to sub-node edge */}
         {subPoints.map((p, i) => {
-          // Trim endpoints to circle borders so the line doesn't overlap the nodes.
-          const lx1 = p.parent.x + p.cos * SAT_R_SVG;
-          const ly1 = p.parent.y + p.sin * SAT_R_SVG;
-          const lx2 = p.x        - p.cos * SUB_SAT_R_SVG;
-          const ly2 = p.y        - p.sin * SUB_SAT_R_SVG;
-          const lineLen   = Math.sqrt((lx2 - lx1) ** 2 + (ly2 - ly1) ** 2);
+          // Line goes from parent CENTER → sub-node edge.
+          const lx2 = p.x - p.cos * SUB_SAT_R_SVG;
+          const ly2 = p.y - p.sin * SUB_SAT_R_SVG;
+          const totalLen  = Math.sqrt((lx2 - p.parent.x) ** 2 + (ly2 - p.parent.y) ** 2);
           const isHovered = shouldShowSub(p.node.parentSlug) && hoveredParentSlug === p.node.parentSlug;
-          const lineColor = p.node.slug === activeNodeSlug
-            ? "var(--color-brand)"
-            : dark ? "rgba(222,231,241,.75)" : "rgba(218,90,14,.8)";
+          const baseColor = dark ? "rgba(222,231,241,.3)" : "rgba(100,120,144,.4)";
           return (
-            <line
-              key={`subline-${i}`}
-              x1={lx1} y1={ly1} x2={lx2} y2={ly2}
-              stroke={lineColor}
-              strokeWidth="2"
-              style={{
-                strokeDasharray: lineLen,
-                strokeDashoffset: isHovered ? 0 : lineLen,
-                transition: `stroke-dashoffset 0.6s ease ${p.siblingIndex * 80}ms`,
-                opacity: p.node.inDevelopment ? 0.4 : 1,
-              }}
-            />
+            <g key={`subline-${i}`}>
+              {/* Gray base — draws in quickly when hovered */}
+              <line
+                x1={p.parent.x} y1={p.parent.y} x2={lx2} y2={ly2}
+                stroke={baseColor}
+                strokeWidth="1.5"
+                style={{
+                  strokeDasharray: totalLen,
+                  strokeDashoffset: isHovered ? 0 : totalLen,
+                  transition: `stroke-dashoffset 0.25s ease ${p.siblingIndex * 80}ms`,
+                  opacity: p.node.inDevelopment ? 0.4 : 1,
+                }}
+              />
+              {/* Orange overlay — grows progressively in sync with the dot */}
+              {isHovered && (
+                <line
+                  x1={p.parent.x} y1={p.parent.y} x2={lx2} y2={ly2}
+                  stroke="#DA5A0E"
+                  strokeWidth="2"
+                  strokeDasharray={totalLen}
+                  strokeDashoffset={totalLen}
+                  opacity={p.node.inDevelopment ? 0.4 : 1}
+                  style={{ filter: "drop-shadow(0 0 3px rgba(218,90,14,0.5))" }}
+                >
+                  <animate attributeName="stroke-dashoffset"
+                    from={totalLen} to={0}
+                    dur="1.1s" repeatCount="indefinite" />
+                </line>
+              )}
+              {/* Heartbeat ring at parent — fires when dot arrives (~0.72s into cycle) */}
+              {isHovered && (
+                <circle cx={p.parent.x} cy={p.parent.y}
+                  r={SAT_R_SVG} fill="none" stroke="#DA5A0E" strokeWidth="2" opacity="0"
+                >
+                  <animate attributeName="r"
+                    from={SAT_R_SVG} to={SAT_R_SVG + 22}
+                    dur="1.1s" begin="0.72s" repeatCount="indefinite" />
+                  <animate attributeName="opacity"
+                    values="0;0.75;0" keyTimes="0;0.15;1"
+                    dur="1.1s" begin="0.72s" repeatCount="indefinite" />
+                </circle>
+              )}
+            </g>
           );
         })}
 
@@ -198,8 +225,8 @@ export default function EcosystemDiagram({
             <circle key={`dot-${p.node.code}`} r="6" fill="#DA5A0E"
               style={{ filter: "drop-shadow(0 0 8px rgba(218,90,14,0.9))" }}
             >
-              <animate attributeName="cx" from={p.parent.x + p.cos * SAT_R_SVG} to={p.x - p.cos * SUB_SAT_R_SVG} dur="1.1s" repeatCount="indefinite" />
-              <animate attributeName="cy" from={p.parent.y + p.sin * SAT_R_SVG} to={p.y - p.sin * SUB_SAT_R_SVG} dur="1.1s" repeatCount="indefinite" />
+              <animate attributeName="cx" from={p.parent.x} to={p.x - p.cos * SUB_SAT_R_SVG} dur="1.1s" repeatCount="indefinite" />
+              <animate attributeName="cy" from={p.parent.y} to={p.y - p.sin * SUB_SAT_R_SVG} dur="1.1s" repeatCount="indefinite" />
               <animate attributeName="opacity" values="1;0.9;0" keyTimes="0;0.65;1" dur="1.1s" repeatCount="indefinite" />
             </circle>
           ))}
