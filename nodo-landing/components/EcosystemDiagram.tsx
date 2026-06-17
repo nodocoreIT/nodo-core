@@ -26,6 +26,9 @@ const SAT_DIAMETER_CQW = 15.5;
 const SUB_SAT_DIAMETER_CQW = 12.5;
 /** Angular spread (degrees) between siblings sharing the same parent. */
 const SIBLING_SPREAD_DEG = 50;
+/** Node radii in SVG units — used to trim lines to circle edges. */
+const SAT_R_SVG     = (SAT_DIAMETER_CQW     / 200) * W; // ~40
+const SUB_SAT_R_SVG = (SUB_SAT_DIAMETER_CQW / 200) * W; // ~32.5
 
 export default function EcosystemDiagram({
   dark = false,
@@ -150,9 +153,14 @@ export default function EcosystemDiagram({
           />
         ))}
 
-        {/* Parent → sub-node lines: draw animation on hover */}
+        {/* Parent → sub-node lines: draw animation on hover, trimmed to node edges */}
         {subPoints.map((p, i) => {
-          const lineLen  = Math.sqrt((p.x - p.parent.x) ** 2 + (p.y - p.parent.y) ** 2);
+          // Trim endpoints to circle borders so the line doesn't overlap the nodes.
+          const lx1 = p.parent.x + p.cos * SAT_R_SVG;
+          const ly1 = p.parent.y + p.sin * SAT_R_SVG;
+          const lx2 = p.x        - p.cos * SUB_SAT_R_SVG;
+          const ly2 = p.y        - p.sin * SUB_SAT_R_SVG;
+          const lineLen   = Math.sqrt((lx2 - lx1) ** 2 + (ly2 - ly1) ** 2);
           const isHovered = shouldShowSub(p.node.parentSlug) && hoveredParentSlug === p.node.parentSlug;
           const lineColor = p.node.slug === activeNodeSlug
             ? "var(--color-brand)"
@@ -160,7 +168,7 @@ export default function EcosystemDiagram({
           return (
             <line
               key={`subline-${i}`}
-              x1={p.parent.x} y1={p.parent.y} x2={p.x} y2={p.y}
+              x1={lx1} y1={ly1} x2={lx2} y2={ly2}
               stroke={lineColor}
               strokeWidth="2"
               style={{
@@ -180,8 +188,8 @@ export default function EcosystemDiagram({
             <circle key={`dot-${p.node.code}`} r="6" fill="#DA5A0E"
               style={{ filter: "drop-shadow(0 0 8px rgba(218,90,14,0.9))" }}
             >
-              <animate attributeName="cx" from={p.parent.x} to={p.x} dur="1.1s" repeatCount="indefinite" />
-              <animate attributeName="cy" from={p.parent.y} to={p.y} dur="1.1s" repeatCount="indefinite" />
+              <animate attributeName="cx" from={p.parent.x + p.cos * SAT_R_SVG} to={p.x - p.cos * SUB_SAT_R_SVG} dur="1.1s" repeatCount="indefinite" />
+              <animate attributeName="cy" from={p.parent.y + p.sin * SAT_R_SVG} to={p.y - p.sin * SUB_SAT_R_SVG} dur="1.1s" repeatCount="indefinite" />
               <animate attributeName="opacity" values="1;0.9;0" keyTimes="0;0.65;1" dur="1.1s" repeatCount="indefinite" />
             </circle>
           ))}
@@ -400,14 +408,16 @@ function Satellite({
       {...hoverProps}
     >
       {circle}
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute left-1/2 top-1/2 z-20 w-[170px] rounded-lg border border-white/10 bg-navy-900/95 px-3 py-2 text-left opacity-0 shadow-xl backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
-        style={{ transform: tipTransform }}
-      >
-        <span className="block text-[12px] font-bold text-brand-300">{tooltipTitle}</span>
-        <span className="mt-0.5 block text-[11.5px] leading-snug text-white/80">{tooltipDesc}</span>
-      </span>
+      {isVisible === undefined && (
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute left-1/2 top-1/2 z-20 w-[170px] rounded-lg border border-white/10 bg-navy-900/95 px-3 py-2 text-left opacity-0 shadow-xl backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
+          style={{ transform: tipTransform }}
+        >
+          <span className="block text-[12px] font-bold text-brand-300">{tooltipTitle}</span>
+          <span className="mt-0.5 block text-[11.5px] leading-snug text-white/80">{tooltipDesc}</span>
+        </span>
+      )}
     </Link>
   );
 }
