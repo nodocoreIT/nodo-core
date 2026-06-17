@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { NODES, type NodeDef } from "@/lib/nodes";
 
@@ -37,6 +38,8 @@ export default function EcosystemDiagram({
   activeNodeSlug,
   isLoginPage = false,
 }: EcosystemDiagramProps) {
+  const [hoveredParentSlug, setHoveredParentSlug] = useState<string | null>(null);
+
   const resolved: NodeDef[] = units
     ? units
         .map((u) => NODES.find((n) => n.code === u.code))
@@ -174,20 +177,28 @@ export default function EcosystemDiagram({
             />
           ))}
 
-        {/* Lines from parent to sub-nodes */}
-        {subPoints.map((p, i) => (
-          <line
-            key={`subline-${i}`}
-            x1={p.parent.x}
-            y1={p.parent.y}
-            x2={p.x}
-            y2={p.y}
-            stroke={p.node.slug === activeNodeSlug ? "var(--color-brand)" : stroke}
-            strokeWidth="1.5"
-            strokeDasharray="2 5"
-            opacity={p.node.inDevelopment ? 0.35 : 0.8}
-          />
-        ))}
+        {/* Lines from parent to sub-nodes — visible only when parent is hovered */}
+        {subPoints.map((p, i) => {
+          const subLineVisible = isLoginPage || !interactive
+            ? true
+            : hoveredParentSlug === p.node.parentSlug;
+          return (
+            <line
+              key={`subline-${i}`}
+              x1={p.parent.x}
+              y1={p.parent.y}
+              x2={p.x}
+              y2={p.y}
+              stroke={p.node.slug === activeNodeSlug ? "var(--color-brand)" : stroke}
+              strokeWidth="1.5"
+              strokeDasharray="2 5"
+              style={{
+                opacity: subLineVisible ? (p.node.inDevelopment ? 0.35 : 0.8) : 0,
+                transition: "opacity 0.2s ease",
+              }}
+            />
+          );
+        })}
 
         {activePoint && (
           <>
@@ -283,21 +294,38 @@ export default function EcosystemDiagram({
           isActive={p.node.slug === activeNodeSlug || p.node.slug === activeParentSlug}
           isLoginPage={isLoginPage}
           diameterCqw={SAT_DIAMETER_CQW}
+          isParentNode={interactive && !isLoginPage && parentSlugs.has(p.node.slug)}
+          onHoverChange={(hovered) =>
+            setHoveredParentSlug(hovered ? p.node.slug : null)
+          }
         />
       ))}
 
       {/* Sub-nodes (children of a parent node) */}
-      {subPoints.map((p) => (
-        <Satellite
-          key={p.node.code}
-          point={p}
-          dark={dark}
-          interactive={interactive}
-          isActive={p.node.slug === activeNodeSlug}
-          isLoginPage={isLoginPage}
-          diameterCqw={SUB_SAT_DIAMETER_CQW}
-        />
-      ))}
+      {subPoints.map((p, i) => {
+        const siblings = subPoints.filter(
+          (s) => s.node.parentSlug === p.node.parentSlug,
+        );
+        const siblingIndex = siblings.indexOf(p);
+        const subVisible = isLoginPage || !interactive
+          ? true
+          : hoveredParentSlug === p.node.parentSlug;
+        return (
+          <Satellite
+            key={p.node.code}
+            point={p}
+            dark={dark}
+            interactive={interactive}
+            isActive={p.node.slug === activeNodeSlug}
+            isLoginPage={isLoginPage}
+            diameterCqw={SUB_SAT_DIAMETER_CQW}
+            isVisible={subVisible}
+            explosionCos={p.cos}
+            explosionSin={p.sin}
+            subIndex={siblingIndex}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -321,6 +349,12 @@ function Satellite({
   isActive,
   isLoginPage,
   diameterCqw = SAT_DIAMETER_CQW,
+  isParentNode = false,
+  onHoverChange,
+  isVisible,
+  explosionCos,
+  explosionSin,
+  subIndex = 0,
 }: {
   point: SatellitePoint;
   dark: boolean;
@@ -328,6 +362,12 @@ function Satellite({
   isActive: boolean;
   isLoginPage: boolean;
   diameterCqw?: number;
+  isParentNode?: boolean;
+  onHoverChange?: (hovered: boolean) => void;
+  isVisible?: boolean;
+  explosionCos?: number;
+  explosionSin?: number;
+  subIndex?: number;
 }) {
   const { node, cos, sin, x, left, top } = point;
   const { Icon } = node;
@@ -366,12 +406,37 @@ function Satellite({
     </span>
   );
 
+  // Sub-node explosion animation style (only when isVisible is controlled)
+  const subNodeStyle: React.CSSProperties | undefined =
+    isVisible !== undefined
+      ? {
+          left,
+          top,
+          opacity: isVisible ? 1 : 0,
+          transform: isVisible
+            ? "translate(-50%, -50%) scale(1)"
+            : `translate(calc(-50% + ${((explosionCos ?? 0) * -18).toFixed(1)}px), calc(-50% + ${((explosionSin ?? 0) * -18).toFixed(1)}px)) scale(0.3)`,
+          transition: `opacity 0.25s cubic-bezier(0.34,1.56,0.64,1), transform 0.25s cubic-bezier(0.34,1.56,0.64,1)`,
+          transitionDelay: isVisible ? `${subIndex * 50}ms` : "0ms",
+          pointerEvents: isVisible ? undefined : "none",
+        }
+      : undefined;
+
+  // Hover handler wrappers for parent nodes
+  const hoverProps =
+    isParentNode && onHoverChange
+      ? {
+          onMouseEnter: () => onHoverChange(true),
+          onMouseLeave: () => onHoverChange(false),
+        }
+      : {};
+
   // Decorative mode: plain node, no link, no hover detail.
   if (!interactive) {
     return (
       <span
         className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
-        style={{ left, top }}
+        style={subNodeStyle ?? { left, top }}
       >
         {circle}
       </span>
@@ -394,7 +459,8 @@ function Satellite({
     return (
       <div
         className="group absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-not-allowed outline-none"
-        style={{ left, top }}
+        style={subNodeStyle ?? { left, top }}
+        {...hoverProps}
       >
         {circle}
         <span
@@ -431,7 +497,8 @@ function Satellite({
       aria-label={`${node.label}: ${node.description}`}
       prefetch
       className="group absolute z-10 -translate-x-1/2 -translate-y-1/2 outline-none"
-      style={{ left, top }}
+      style={subNodeStyle ?? { left, top }}
+      {...hoverProps}
     >
       {circle}
 
