@@ -19,13 +19,13 @@ const H = 520;
 const CX = W / 2;
 const CY = H / 2;
 const R = 190;
-const SUB_ORBIT_R = 148;
+const SUB_ORBIT_R = 100;
 const CORE_R = 46;
 const HALO_R = CORE_R + 14;
 const SAT_DIAMETER_CQW = 15.5;
 const SUB_SAT_DIAMETER_CQW = 12.5;
 /** Angular spread (degrees) between siblings sharing the same parent. */
-const SIBLING_SPREAD_DEG = 50;
+const SIBLING_SPREAD_DEG = 40;
 /** Node radii in SVG units — used to trim lines to circle edges. */
 const SAT_R_SVG     = (SAT_DIAMETER_CQW     / 200) * W; // ~40
 const SUB_SAT_R_SVG = (SUB_SAT_DIAMETER_CQW / 200) * W; // ~32.5
