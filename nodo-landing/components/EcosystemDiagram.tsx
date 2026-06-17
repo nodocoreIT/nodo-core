@@ -163,11 +163,11 @@ export default function EcosystemDiagram({
           />
         ))}
 
-        {/* Parent → sub-node lines: from parent center to sub-node edge */}
+        {/* Parent → sub-node lines: from parent center to child center */}
         {subPoints.map((p, i) => {
-          // Line goes from parent CENTER → sub-node edge.
-          const lx2 = p.x - p.cos * SUB_SAT_R_SVG;
-          const ly2 = p.y - p.sin * SUB_SAT_R_SVG;
+          // Line goes center → center; the HTML node overlay sits on top in z-order.
+          const lx2 = p.x;
+          const ly2 = p.y;
           const totalLen  = Math.sqrt((lx2 - p.parent.x) ** 2 + (ly2 - p.parent.y) ** 2);
           const isHovered = shouldShowSub(p.node.parentSlug) && hoveredParentSlug === p.node.parentSlug;
           const baseColor = dark ? "rgba(222,231,241,.3)" : "rgba(100,120,144,.4)";
@@ -225,8 +225,8 @@ export default function EcosystemDiagram({
             <circle key={`dot-${p.node.code}`} r="6" fill="#DA5A0E"
               style={{ filter: "drop-shadow(0 0 8px rgba(218,90,14,0.9))" }}
             >
-              <animate attributeName="cx" from={p.parent.x} to={p.x - p.cos * SUB_SAT_R_SVG} dur="1.1s" repeatCount="indefinite" />
-              <animate attributeName="cy" from={p.parent.y} to={p.y - p.sin * SUB_SAT_R_SVG} dur="1.1s" repeatCount="indefinite" />
+              <animate attributeName="cx" from={p.parent.x} to={p.x} dur="1.1s" repeatCount="indefinite" />
+              <animate attributeName="cy" from={p.parent.y} to={p.y} dur="1.1s" repeatCount="indefinite" />
               <animate attributeName="opacity" values="1;0.9;0" keyTimes="0;0.65;1" dur="1.1s" repeatCount="indefinite" />
             </circle>
           ))}
