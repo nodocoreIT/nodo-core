@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   CreditCard,
   Plus,
@@ -118,7 +118,7 @@ export function TarjetasPage() {
   if (finanzas.loading && finanzas.tarjetas.length === 0) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-paper z-50">
-        <Spinner label="Cargando tarjetas..." />
+        <Spinner />
       </div>
     );
   }

@@ -89,6 +89,7 @@ export function RubroGestion() {
       } else {
         const created = await crearRubro({
           ...data,
+          color: data.color ?? '',
           activo: true,
           esSistema: false,
         });

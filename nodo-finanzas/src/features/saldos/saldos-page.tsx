@@ -151,7 +151,6 @@ export function SaldosPage() {
     control: controlCuenta,
     reset: resetCuenta,
     watch: watchCuenta,
-    setValue: setCuentaVal,
     formState: { errors: errCuenta, isSubmitting: submitingCuenta },
   } = useForm<FormCuenta>({
     resolver: zodResolver(schemaCuenta),
@@ -227,6 +226,7 @@ export function SaldosPage() {
         cuentaDestinoId: data.cuentaDestinoId,
         monto: data.monto,
         descripcion: data.descripcion || 'Transferencia entre cuentas',
+        fecha: new Date().toISOString().split('T')[0],
       });
       toast.success('Transferencia realizada');
       resetTrans();

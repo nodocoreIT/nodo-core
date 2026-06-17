@@ -40,14 +40,14 @@ function normalizarNombre(nombre: string): string {
   return nombre.charAt(0).toUpperCase() + nombre.slice(1).toLowerCase();
 }
 
-interface TooltipProps {
+interface CustomTooltipProps {
   active?: boolean;
   payload?: Array<{ payload: Record<string, unknown> }>;
   label?: string;
   totalMensual: number;
 }
 
-function CustomTooltip({ active, payload, label, totalMensual }: TooltipProps) {
+function CustomTooltip({ active, payload, label, totalMensual }: CustomTooltipProps) {
   if (!active || !payload || !payload.length) return null;
   const data = payload[0].payload;
   const nombre = (data.name as string) || `Día ${(data.fecha as string) || label}`;
@@ -511,7 +511,7 @@ export function InformeMensualPage() {
                   />
                   <Tooltip
                     content={(props) => (
-                      <CustomTooltip {...props} totalMensual={totalMensual} />
+                      <CustomTooltip {...(props as unknown as CustomTooltipProps)} totalMensual={totalMensual} />
                     )}
                     cursor={{ fill: '#ecfdf5' }}
                   />
@@ -563,7 +563,7 @@ export function InformeMensualPage() {
                   />
                   <Tooltip
                     content={(props) => (
-                      <CustomTooltip {...props} totalMensual={totalMensual} />
+                      <CustomTooltip {...(props as unknown as CustomTooltipProps)} totalMensual={totalMensual} />
                     )}
                   />
                   <Area

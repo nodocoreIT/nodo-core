@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Calendar, Check, X, Plus, Trash2 } from 'lucide-react';
@@ -109,7 +109,7 @@ export function GestionCuotasProgramadas({ prestamo, onClose }: Props) {
         <div className="p-5">
           {loading && (
             <div className="text-center py-8">
-              <Spinner label="Cargando cuotas..." />
+              <Spinner />
             </div>
           )}
 
