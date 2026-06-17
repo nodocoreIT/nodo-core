@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { NODES, type NodeDef } from "@/lib/nodes";
 
@@ -39,6 +39,16 @@ export default function EcosystemDiagram({
   isLoginPage = false,
 }: EcosystemDiagramProps) {
   const [hoveredParentSlug, setHoveredParentSlug] = useState<string | null>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleHoverChange = (hovered: boolean, slug: string) => {
+    if (hovered) {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      setHoveredParentSlug(slug);
+    } else {
+      hideTimer.current = setTimeout(() => setHoveredParentSlug(null), 2000);
+    }
+  };
 
   const resolved: NodeDef[] = units
     ? units.map((u) => NODES.find((n) => n.code === u.code)).filter((n): n is NodeDef => Boolean(n))
@@ -238,7 +248,7 @@ export default function EcosystemDiagram({
           isLoginPage={isLoginPage}
           diameterCqw={SAT_DIAMETER_CQW}
           isParentNode={interactive && !isLoginPage && parentSlugs.has(p.node.slug)}
-          onHoverChange={(hovered) => setHoveredParentSlug(hovered ? p.node.slug : null)}
+          onHoverChange={(hovered) => handleHoverChange(hovered, p.node.slug)}
         />
       ))}
 
@@ -369,6 +379,7 @@ function Satellite({
     : `translate(calc(-100% - ${tipGap.toFixed(2)}cqw), ${tipY})`;
 
   if (node.inDevelopment) {
+
     return (
       <div
         className="group absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-not-allowed outline-none"
@@ -389,13 +400,10 @@ function Satellite({
   }
 
   let href = `/nodo-${node.slug}`;
-  let tooltipTitle = node.label;
-  let tooltipDesc = node.description;
 
   if (isLoginPage) {
     const loginSlug = node.slug === "salud" ? "nodo-clinica" : `nodo-${node.slug}`;
     href = `/${loginSlug}/login`;
-    tooltipDesc = `Ir a ${node.label.toLowerCase()}`;
   }
 
   return (
@@ -408,16 +416,6 @@ function Satellite({
       {...hoverProps}
     >
       {circle}
-      {isVisible === undefined && (
-        <span
-          role="tooltip"
-          className="pointer-events-none absolute left-1/2 top-1/2 z-20 w-[170px] rounded-lg border border-white/10 bg-navy-900/95 px-3 py-2 text-left opacity-0 shadow-xl backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
-          style={{ transform: tipTransform }}
-        >
-          <span className="block text-[12px] font-bold text-brand-300">{tooltipTitle}</span>
-          <span className="mt-0.5 block text-[11.5px] leading-snug text-white/80">{tooltipDesc}</span>
-        </span>
-      )}
     </Link>
   );
 }
