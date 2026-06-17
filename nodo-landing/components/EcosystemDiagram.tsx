@@ -19,13 +19,13 @@ const H = 520;
 const CX = W / 2;
 const CY = H / 2;
 const R = 190;
-const SUB_ORBIT_R = 115;
+const SUB_ORBIT_R = 148;
 const CORE_R = 46;
 const HALO_R = CORE_R + 14;
 const SAT_DIAMETER_CQW = 15.5;
 const SUB_SAT_DIAMETER_CQW = 12.5;
 /** Angular spread (degrees) between siblings sharing the same parent. */
-const SIBLING_SPREAD_DEG = 32;
+const SIBLING_SPREAD_DEG = 50;
 
 export default function EcosystemDiagram({
   dark = false,
@@ -162,11 +162,11 @@ export default function EcosystemDiagram({
               key={`subline-${i}`}
               x1={p.parent.x} y1={p.parent.y} x2={p.x} y2={p.y}
               stroke={lineColor}
-              strokeWidth="1.5"
+              strokeWidth="2"
               style={{
                 strokeDasharray: lineLen,
                 strokeDashoffset: isHovered ? 0 : lineLen,
-                transition: `stroke-dashoffset 0.45s ease ${p.siblingIndex * 60}ms`,
+                transition: `stroke-dashoffset 0.6s ease ${p.siblingIndex * 80}ms`,
                 opacity: p.node.inDevelopment ? 0.4 : 1,
               }}
             />
@@ -177,12 +177,12 @@ export default function EcosystemDiagram({
         {subPoints
           .filter((p) => hoveredParentSlug === p.node.parentSlug && (isLoginPage || interactive))
           .map((p) => (
-            <circle key={`dot-${p.node.code}`} r="5" fill="#DA5A0E"
-              style={{ filter: "drop-shadow(0 0 5px rgba(218,90,14,0.75))" }}
+            <circle key={`dot-${p.node.code}`} r="6" fill="#DA5A0E"
+              style={{ filter: "drop-shadow(0 0 8px rgba(218,90,14,0.9))" }}
             >
-              <animate attributeName="cx" from={p.parent.x} to={p.x} dur="0.9s" repeatCount="indefinite" />
-              <animate attributeName="cy" from={p.parent.y} to={p.y} dur="0.9s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="1;0.85;0" keyTimes="0;0.7;1" dur="0.9s" repeatCount="indefinite" />
+              <animate attributeName="cx" from={p.parent.x} to={p.x} dur="1.1s" repeatCount="indefinite" />
+              <animate attributeName="cy" from={p.parent.y} to={p.y} dur="1.1s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="1;0.9;0" keyTimes="0;0.65;1" dur="1.1s" repeatCount="indefinite" />
             </circle>
           ))}
 
@@ -332,7 +332,7 @@ function Satellite({
     transform: visible
       ? "translate(-50%, -50%) scale(1)"
       : "translate(-50%, -50%) scale(0.4)",
-    transition: `opacity 0.25s ease ${subIndex * 55}ms, transform 0.25s cubic-bezier(0.34,1.56,0.64,1) ${subIndex * 55}ms`,
+    transition: `opacity 0.3s ease ${subIndex * 70}ms, transform 0.35s cubic-bezier(0.34,1.56,0.64,1) ${subIndex * 70}ms`,
     pointerEvents: visible ? undefined : "none",
   };
 
