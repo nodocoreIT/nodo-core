@@ -25,10 +25,8 @@ const R = 190;           // main orbit radius
 const SUB_ORBIT_R = 115; // how far a sub-node sits from its parent
 const CORE_R = 46;
 const HALO_R = CORE_R + 14;
-// Satellite diameter as a fraction of the container width → drives `cqw` sizing
-// so the HTML overlay scales exactly like the SVG backdrop.
 const SAT_DIAMETER_CQW = 15.5;
-const SUB_SAT_DIAMETER_CQW = 12.5; // sub-nodes are slightly smaller
+const SUB_SAT_DIAMETER_CQW = 12.5;
 
 export default function EcosystemDiagram({
   dark = false,
@@ -49,7 +47,6 @@ export default function EcosystemDiagram({
   const stroke = dark ? "rgba(222,231,241,.34)" : "rgba(100,120,144,.55)";
   const shadowOpacity = dark ? 0.45 : 0.14;
 
-  // Split into main-orbit nodes and sub-nodes (children of a parent node).
   const mainNodeDefs = resolved.filter((n) => !n.parentSlug);
   const subNodeDefs = resolved.filter((n) => n.parentSlug);
   const mainCount = mainNodeDefs.length;
@@ -70,7 +67,6 @@ export default function EcosystemDiagram({
     };
   });
 
-  // Sub-nodes are placed further along their parent's radial vector.
   const subPoints = subNodeDefs
     .map((node) => {
       const parent = mainPoints.find((p) => p.node.slug === node.parentSlug);
@@ -91,7 +87,6 @@ export default function EcosystemDiagram({
     })
     .filter((p): p is NonNullable<typeof p> => p !== null);
 
-  // Slugs of main-orbit nodes that have at least one child.
   const parentSlugs = new Set(subNodeDefs.map((n) => n.parentSlug));
 
   const activePoint =
@@ -99,7 +94,6 @@ export default function EcosystemDiagram({
       ? ([...mainPoints, ...subPoints].find((p) => p.node.slug === activeNodeSlug) ?? null)
       : null;
 
-  // Two-hop support: when active is a sub-node, resolve its parent too.
   const activeSubPoint = isLoginPage
     ? (subPoints.find((p) => p.node.slug === activeNodeSlug) ?? null)
     : null;
@@ -113,7 +107,6 @@ export default function EcosystemDiagram({
       className={`relative ${className}`}
       style={{ containerType: "inline-size" }}
     >
-      {/* Static backdrop: orbit ring, connectors and core */}
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="absolute inset-0 h-full w-full"
@@ -177,11 +170,17 @@ export default function EcosystemDiagram({
             />
           ))}
 
-        {/* Lines from parent to sub-nodes — visible only when parent is hovered */}
+        {/* Lines from parent to sub-nodes — draw animation on hover */}
         {subPoints.map((p, i) => {
-          const subLineVisible = isLoginPage || !interactive
-            ? true
-            : hoveredParentSlug === p.node.parentSlug;
+          const lineLength = Math.sqrt(
+            Math.pow(p.x - p.parent.x, 2) + Math.pow(p.y - p.parent.y, 2),
+          );
+          const isHovered = hoveredParentSlug === p.node.parentSlug;
+          const lineColor = p.node.slug === activeNodeSlug
+            ? "var(--color-brand)"
+            : dark
+              ? "rgba(222,231,241,.7)"
+              : "rgba(100,120,144,.85)";
           return (
             <line
               key={`subline-${i}`}
@@ -189,12 +188,13 @@ export default function EcosystemDiagram({
               y1={p.parent.y}
               x2={p.x}
               y2={p.y}
-              stroke={p.node.slug === activeNodeSlug ? "var(--color-brand)" : stroke}
+              stroke={lineColor}
               strokeWidth="1.5"
-              strokeDasharray="2 5"
               style={{
-                opacity: subLineVisible ? (p.node.inDevelopment ? 0.35 : 0.8) : 0,
-                transition: "opacity 0.2s ease",
+                strokeDasharray: lineLength,
+                strokeDashoffset: isHovered ? 0 : lineLength,
+                transition: "stroke-dashoffset 0.4s ease",
+                opacity: p.node.inDevelopment ? 0.35 : 1,
               }}
             />
           );
@@ -202,7 +202,6 @@ export default function EcosystemDiagram({
 
         {activePoint && (
           <>
-            {/* Pulse on the active destination node */}
             <circle
               className="ecosystem-core-pulse"
               cx={activePoint.x}
@@ -210,7 +209,6 @@ export default function EcosystemDiagram({
               r={58}
               fill="#DA5A0E"
             />
-            {/* Also pulse on parent when active is a sub-node */}
             {activeParentPoint && (
               <circle
                 className="ecosystem-core-pulse"
@@ -220,10 +218,8 @@ export default function EcosystemDiagram({
                 fill="#DA5A0E"
               />
             )}
-            {/* Traveling dot */}
             <circle r="7" fill="var(--color-brand)" style={{ filter: "drop-shadow(0 2px 4px rgba(218,90,14,0.4))" }}>
               {activeParentPoint ? (
-                // Two-hop: Core → Parent → Child
                 <>
                   <animate
                     attributeName="cx"
@@ -241,7 +237,6 @@ export default function EcosystemDiagram({
                   />
                 </>
               ) : (
-                // Direct hop: Core → Node
                 <>
                   <animate
                     attributeName="cx"
@@ -284,7 +279,7 @@ export default function EcosystemDiagram({
         </text>
       </svg>
 
-      {/* Interactive satellite overlay — main orbit */}
+      {/* Main orbit satellites */}
       {mainPoints.map((p) => (
         <Satellite
           key={p.node.code}
@@ -301,31 +296,18 @@ export default function EcosystemDiagram({
         />
       ))}
 
-      {/* Sub-nodes (children of a parent node) */}
-      {subPoints.map((p, i) => {
-        const siblings = subPoints.filter(
-          (s) => s.node.parentSlug === p.node.parentSlug,
-        );
-        const siblingIndex = siblings.indexOf(p);
-        const subVisible = isLoginPage || !interactive
-          ? true
-          : hoveredParentSlug === p.node.parentSlug;
-        return (
-          <Satellite
-            key={p.node.code}
-            point={p}
-            dark={dark}
-            interactive={interactive}
-            isActive={p.node.slug === activeNodeSlug}
-            isLoginPage={isLoginPage}
-            diameterCqw={SUB_SAT_DIAMETER_CQW}
-            isVisible={subVisible}
-            explosionCos={p.cos}
-            explosionSin={p.sin}
-            subIndex={siblingIndex}
-          />
-        );
-      })}
+      {/* Sub-nodes — always visible */}
+      {subPoints.map((p) => (
+        <Satellite
+          key={p.node.code}
+          point={p}
+          dark={dark}
+          interactive={interactive}
+          isActive={p.node.slug === activeNodeSlug}
+          isLoginPage={isLoginPage}
+          diameterCqw={SUB_SAT_DIAMETER_CQW}
+        />
+      ))}
     </div>
   );
 }
@@ -336,7 +318,6 @@ interface SatellitePoint {
   node: NodeDef;
   cos: number;
   sin: number;
-  /** SVG x coordinate — used to determine tooltip direction. */
   x: number;
   left: string;
   top: string;
@@ -351,10 +332,6 @@ function Satellite({
   diameterCqw = SAT_DIAMETER_CQW,
   isParentNode = false,
   onHoverChange,
-  isVisible,
-  explosionCos,
-  explosionSin,
-  subIndex = 0,
 }: {
   point: SatellitePoint;
   dark: boolean;
@@ -364,12 +341,8 @@ function Satellite({
   diameterCqw?: number;
   isParentNode?: boolean;
   onHoverChange?: (hovered: boolean) => void;
-  isVisible?: boolean;
-  explosionCos?: number;
-  explosionSin?: number;
-  subIndex?: number;
 }) {
-  const { node, cos, sin, x, left, top } = point;
+  const { node, sin, x, left, top } = point;
   const { Icon } = node;
 
   const circleClasses = [
@@ -406,23 +379,6 @@ function Satellite({
     </span>
   );
 
-  // Sub-node explosion animation style (only when isVisible is controlled)
-  const subNodeStyle: React.CSSProperties | undefined =
-    isVisible !== undefined
-      ? {
-          left,
-          top,
-          opacity: isVisible ? 1 : 0,
-          transform: isVisible
-            ? "translate(-50%, -50%) scale(1)"
-            : `translate(calc(-50% + ${((explosionCos ?? 0) * -18).toFixed(1)}px), calc(-50% + ${((explosionSin ?? 0) * -18).toFixed(1)}px)) scale(0.3)`,
-          transition: `opacity 0.25s cubic-bezier(0.34,1.56,0.64,1), transform 0.25s cubic-bezier(0.34,1.56,0.64,1)`,
-          transitionDelay: isVisible ? `${subIndex * 50}ms` : "0ms",
-          pointerEvents: isVisible ? undefined : "none",
-        }
-      : undefined;
-
-  // Hover handler wrappers for parent nodes
   const hoverProps =
     isParentNode && onHoverChange
       ? {
@@ -431,35 +387,29 @@ function Satellite({
         }
       : {};
 
-  // Decorative mode: plain node, no link, no hover detail.
   if (!interactive) {
     return (
       <span
         className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
-        style={subNodeStyle ?? { left, top }}
+        style={{ left, top }}
       >
         {circle}
       </span>
     );
   }
 
-  // Tooltip sits beside the node, pushed into open space.
-  // Direction is based on the node's actual x position relative to the SVG
-  // centre (CX). Sub-nodes on the left edge would clip if we sent the tooltip
-  // further left, so we always push toward the spacious side.
-  const tipGap = diameterCqw / 2 + 2.5; // cqw from node center to tooltip edge
+  const tipGap = diameterCqw / 2 + 2.5;
   const tipY = `calc(-50% + ${(sin * 9).toFixed(2)}cqw)`;
-  const tipOnRight = x >= CX; // right half → tooltip to the right
+  const tipOnRight = x >= CX;
   const tipTransform = tipOnRight
     ? `translate(${tipGap.toFixed(2)}cqw, ${tipY})`
     : `translate(calc(-100% - ${tipGap.toFixed(2)}cqw), ${tipY})`;
 
-  // If node is in development, it's not clickable.
   if (node.inDevelopment) {
     return (
       <div
         className="group absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-not-allowed outline-none"
-        style={subNodeStyle ?? { left, top }}
+        style={{ left, top }}
         {...hoverProps}
       >
         {circle}
@@ -479,13 +429,11 @@ function Satellite({
     );
   }
 
-  // Determine link href and tooltip contents
   let href = `/nodo-${node.slug}`;
   let tooltipTitle = node.label;
   let tooltipDesc = node.description;
 
   if (isLoginPage) {
-    // On login page, switch portals using new dynamic routing
     const loginSlug = node.slug === "salud" ? "nodo-clinica" : `nodo-${node.slug}`;
     href = `/${loginSlug}/login`;
     tooltipDesc = `Ir a ${node.label.toLowerCase()}`;
@@ -497,7 +445,7 @@ function Satellite({
       aria-label={`${node.label}: ${node.description}`}
       prefetch
       className="group absolute z-10 -translate-x-1/2 -translate-y-1/2 outline-none"
-      style={subNodeStyle ?? { left, top }}
+      style={{ left, top }}
       {...hoverProps}
     >
       {circle}
