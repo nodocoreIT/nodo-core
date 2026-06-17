@@ -275,7 +275,7 @@ function Satellite({
   diameterCqw = SAT_DIAMETER_CQW,
   isParentNode = false,
   onHoverChange,
-  isVisible = true,
+  isVisible,          // undefined = main node (always visible, no animation)
   subIndex = 0,
 }: {
   point: SatellitePoint;
@@ -286,10 +286,11 @@ function Satellite({
   diameterCqw?: number;
   isParentNode?: boolean;
   onHoverChange?: (hovered: boolean) => void;
-  isVisible?: boolean;
+  isVisible?: boolean;  // only passed for sub-nodes
   subIndex?: number;
 }) {
   const { node, sin, x, left, top } = point;
+  const visible = isVisible ?? true; // main nodes are always visible
   const { Icon } = node;
 
   const circleClasses = [
@@ -327,12 +328,12 @@ function Satellite({
   // Visibility animation for sub-nodes.
   const visStyle: React.CSSProperties = {
     left, top,
-    opacity: isVisible ? 1 : 0,
-    transform: isVisible
+    opacity: visible ? 1 : 0,
+    transform: visible
       ? "translate(-50%, -50%) scale(1)"
       : "translate(-50%, -50%) scale(0.4)",
     transition: `opacity 0.25s ease ${subIndex * 55}ms, transform 0.25s cubic-bezier(0.34,1.56,0.64,1) ${subIndex * 55}ms`,
-    pointerEvents: isVisible ? undefined : "none",
+    pointerEvents: visible ? undefined : "none",
   };
 
   const baseStyle: React.CSSProperties = { left, top };
@@ -343,7 +344,10 @@ function Satellite({
 
   if (!interactive) {
     return (
-      <span className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2" style={visStyle}>
+      <span
+        className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+        style={isVisible !== undefined ? visStyle : baseStyle}
+      >
         {circle}
       </span>
     );
@@ -360,7 +364,7 @@ function Satellite({
     return (
       <div
         className="group absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-not-allowed outline-none"
-        style={visStyle}
+        style={isVisible !== undefined ? visStyle : baseStyle}
         {...hoverProps}
       >
         {circle}
