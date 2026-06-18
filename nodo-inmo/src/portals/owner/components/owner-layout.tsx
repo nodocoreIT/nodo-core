@@ -58,12 +58,12 @@ export function OwnerLayout() {
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        {/* Brand */}
-        <div className="flex h-16 flex-shrink-0 items-center justify-between px-5">
-          <BrandMark onDark iconClassName="h-6 w-6" />
+        {/* Brand — full sidebar width */}
+        <div className="relative flex h-16 w-full flex-shrink-0 items-center">
+          <BrandMark onDark fillWidth iconClassName="h-6 w-6" />
           <button
             type="button"
-            className="md:hidden text-[var(--color-sidebar-text)] hover:text-white"
+            className="absolute right-2 top-1/2 -translate-y-1/2 md:hidden text-[var(--color-sidebar-text)] hover:text-white"
             onClick={() => setMobileMenuOpen(false)}
             aria-label="Cerrar menú"
           >

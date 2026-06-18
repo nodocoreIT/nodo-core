@@ -12,6 +12,7 @@ export type PaymentWithRelations = PaymentRow & {
     commission_amount: number | null;
     end_date?: string | null;
     next_adjustment_date?: string | null;
+    archived_at?: string | null;
     property: {
       address: string;
       commission_rate: number | null;
@@ -36,7 +37,7 @@ export function usePayments() {
         .schema("nodo_inmo")
         .from("payments")
         .select(
-          "*, contract:contracts!payments_contract_id_fkey(rent_amount, commission_amount, end_date, next_adjustment_date, property:properties!contracts_property_id_fkey(address, commission_rate, owner:contacts!properties_owner_contact_id_fkey(name, commission_rate)), tenant:contacts!contracts_tenant_id_fkey(name))",
+          "*, contract:contracts!payments_contract_id_fkey(rent_amount, commission_amount, end_date, next_adjustment_date, archived_at, property:properties!contracts_property_id_fkey(address, commission_rate, owner:contacts!properties_owner_contact_id_fkey(name, commission_rate)), tenant:contacts!contracts_tenant_id_fkey(name))",
         )
         .order("due_date", { ascending: true });
 

@@ -1,4 +1,5 @@
 import type { PaymentWithRelations } from "@/features/payments/hooks/use-payments";
+import { isArchivedContract } from "@/features/contracts/lib/contract-archive";
 
 export type CollectionStatus = "sin_cobrar" | "pago_parcial";
 
@@ -22,6 +23,11 @@ export function formatMonthSlash(yyyyMm: string): string {
 
 export function isUnpaidPayment(payment: { status: string }): boolean {
   return payment.status !== "paid" && payment.status !== "cancelled";
+}
+
+/** Operational dashboard/cobros: exclude archived contracts. */
+export function isOperationalPayment(payment: PaymentWithRelations): boolean {
+  return !isArchivedContract(payment.contract);
 }
 
 export function remainingAmount(payment: {

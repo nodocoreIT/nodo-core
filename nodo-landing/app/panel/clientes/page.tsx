@@ -7,7 +7,12 @@ import { createClient } from "@/lib/supabase/client";
 import { NODES } from "@/lib/nodes";
 import { NODO_PLANS } from "@/lib/nodo-plans";
 
-type ClientStatus = "activo" | "onboarding" | "pausado";
+type ClientStatus =
+  | "activo"
+  | "onboarding"
+  | "pausado"
+  | "pending_review"
+  | "pending_onboarding";
 
 type Client = {
   id: string;
@@ -50,7 +55,21 @@ const STATUS_STYLES: Record<ClientStatus, { bg: string; color: string; label: st
   activo: { bg: "#E1F0E8", color: "#1F8A5B", label: "Activo" },
   onboarding: { bg: "#FCE9D8", color: "#B5630C", label: "Onboarding" },
   pausado: { bg: "var(--color-mist)", color: "var(--color-slate2)", label: "Pausado" },
+  pending_review: { bg: "#FCE9D8", color: "#B5630C", label: "Pendiente revisión" },
+  pending_onboarding: { bg: "#E8EEF8", color: "#2A6FDB", label: "Onboarding pendiente" },
 };
+
+const ALL_STATUSES: ClientStatus[] = [
+  "activo",
+  "pausado",
+  "pending_review",
+  "pending_onboarding",
+  "onboarding",
+];
+
+function statusStyle(status: string) {
+  return STATUS_STYLES[status as ClientStatus] ?? STATUS_STYLES.pausado;
+}
 
 function getInitials(name: string): string {
   return name.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
@@ -90,6 +109,8 @@ export default function ClientesPage() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
+  const [statusMenuUnitId, setStatusMenuUnitId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ ids: string[]; label: string } | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -102,6 +123,15 @@ export default function ClientesPage() {
   useEffect(() => {
     loadAll();
   }, []);
+
+  useEffect(() => {
+    if (!statusMenuUnitId) return;
+    function onDocClick() {
+      setStatusMenuUnitId(null);
+    }
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, [statusMenuUnitId]);
 
   async function loadAll() {
     const supabase = createClient();
@@ -416,6 +446,25 @@ export default function ClientesPage() {
     navigator.clipboard?.writeText(text);
   }
 
+  async function handleStatusChange(unitId: string, newStatus: ClientStatus) {
+    setStatusUpdating(unitId);
+    setStatusMenuUnitId(null);
+    const res = await fetch("/api/admin/client-unit-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ client_unit_id: unitId, status: newStatus }),
+    });
+    setStatusUpdating(null);
+    if (res.ok) {
+      setUnits((prev) =>
+        prev.map((u) => (u.id === unitId ? { ...u, status: newStatus } : u)),
+      );
+    } else {
+      const json = await res.json();
+      alert(json.error ?? "No se pudo actualizar el estado.");
+    }
+  }
+
   const inputStyle: React.CSSProperties = {
     width: "100%",
     border: "1px solid var(--color-mist)",
@@ -495,7 +544,7 @@ export default function ClientesPage() {
                   <th style={{ padding: "11px 16px", textAlign: "left", width: 40 }}>
                     <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Seleccionar todos" style={{ accentColor: "var(--color-brand)", cursor: "pointer" }} />
                   </th>
-                  {["Cliente", "Contacto", "Nodos", "Cliente desde", ""].map((col, i) => (
+                  {["Cliente", "Contacto", "Estado", "Nodos", "Cliente desde", ""].map((col, i) => (
                     <th key={col || `c-${i}`} style={{ padding: "11px 16px", textAlign: "left", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-slate2)", whiteSpace: "nowrap" }}>{col}</th>
                   ))}
                 </tr>
@@ -529,6 +578,92 @@ export default function ClientesPage() {
                           {!client.email && !client.phone && "—"}
                         </td>
 
+                        {/* Estado */}
+                        <td style={{ padding: "13px 16px", verticalAlign: "top" }}>
+                          {cu.length === 0 ? (
+                            <span style={{ fontSize: 13, color: "var(--color-slate2)" }}>—</span>
+                          ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              {cu.map((u) => {
+                                const st = statusStyle(u.status);
+                                const menuOpen = statusMenuUnitId === u.id;
+                                return (
+                                  <div key={u.id} style={{ position: "relative" }}>
+                                    <button
+                                      type="button"
+                                      disabled={statusUpdating === u.id}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setStatusMenuUnitId(menuOpen ? null : u.id);
+                                      }}
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 6,
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        background: st.bg,
+                                        color: st.color,
+                                        border: "1px solid transparent",
+                                        borderRadius: 999,
+                                        padding: "4px 10px",
+                                        cursor: statusUpdating === u.id ? "not-allowed" : "pointer",
+                                        opacity: statusUpdating === u.id ? 0.6 : 1,
+                                      }}
+                                    >
+                                      <span style={{ fontSize: 10, opacity: 0.85 }}>{u.unit_code}</span>
+                                      {statusUpdating === u.id ? "…" : st.label}
+                                    </button>
+                                    {menuOpen && (
+                                      <div
+                                        style={{
+                                          position: "absolute",
+                                          top: "100%",
+                                          left: 0,
+                                          marginTop: 4,
+                                          background: "white",
+                                          border: "1px solid var(--color-mist)",
+                                          borderRadius: 8,
+                                          boxShadow: "0 8px 24px rgba(18,30,47,.12)",
+                                          zIndex: 20,
+                                          minWidth: 180,
+                                          padding: 4,
+                                        }}
+                                      >
+                                        {ALL_STATUSES.map((s) => {
+                                          const opt = statusStyle(s);
+                                          return (
+                                            <button
+                                              key={s}
+                                              type="button"
+                                              onClick={() => handleStatusChange(u.id, s)}
+                                              style={{
+                                                display: "block",
+                                                width: "100%",
+                                                textAlign: "left",
+                                                border: "none",
+                                                background: u.status === s ? "var(--color-paper)" : "transparent",
+                                                padding: "8px 10px",
+                                                fontSize: 12.5,
+                                                fontWeight: 600,
+                                                color: opt.color,
+                                                cursor: "pointer",
+                                                borderRadius: 6,
+                                              }}
+                                            >
+                                              {opt.label}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </td>
+
                         {/* Nodos */}
                         <td style={{ padding: "13px 16px" }}>
                           {cu.length === 0 ? (
@@ -540,7 +675,7 @@ export default function ClientesPage() {
                             >
                               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                 {cu.map((u) => {
-                                  const st = STATUS_STYLES[u.status] ?? STATUS_STYLES.pausado;
+                                  const st = statusStyle(u.status);
                                   return (
                                     <span key={u.id} style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 11.5, background: "var(--color-mist-200)", borderRadius: 6, padding: "3px 8px", color: "var(--color-navy)", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 }}>
                                       nodo | {u.unit_code}
@@ -575,10 +710,10 @@ export default function ClientesPage() {
                       {/* Expanded: nodos detail + credentials */}
                       {isOpen && cu.length > 0 && (
                         <tr style={{ background: "var(--color-paper)" }}>
-                          <td colSpan={6} style={{ padding: "4px 16px 16px 66px" }}>
+                          <td colSpan={7} style={{ padding: "4px 16px 16px 66px" }}>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
                               {cu.map((u) => {
-                                const st = STATUS_STYLES[u.status] ?? STATUS_STYLES.pausado;
+                                const st = statusStyle(u.status);
                                 const show = revealed.has(u.id);
                                 return (
                                   <div key={u.id} style={{ background: "white", border: "1px solid var(--color-mist)", borderRadius: 10, padding: 14 }}>
@@ -740,8 +875,10 @@ export default function ClientesPage() {
                             <label style={labelStyle}>Estado</label>
                             <select value={u.status} onChange={(e) => updateFormUnit(u.key, { status: e.target.value as ClientStatus })} style={inputStyle}>
                               <option value="activo">Activo</option>
-                              <option value="onboarding">Onboarding</option>
                               <option value="pausado">Pausado</option>
+                              <option value="pending_review">Pendiente revisión</option>
+                              <option value="pending_onboarding">Onboarding pendiente</option>
+                              <option value="onboarding">Onboarding</option>
                             </select>
                           </div>
                           <div style={{ flex: 1 }}>

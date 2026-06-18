@@ -30,19 +30,23 @@ export type ContractWithRelations = ContractRow & {
 
 export const CONTRACTS_QUERY_KEY = ["nodo_inmo", "contracts"] as const;
 
+export type UseContractsOptions = {
+  /** Include archived (terminated) contracts. Default false. */
+  includeArchived?: boolean;
+};
+
 /**
  * Fetch contracts for the current org, embedding the property (with owner),
  * tenant (with DNI + address), and guarantors (with DNI + address) via
  * PostgREST resource embedding. RLS scopes rows to the org.
- *
- * Phase C: deepened select to include owner via properties FK, tenant DNI,
- * and guarantor DNI — required by the ContractLocación PDF mapper.
  */
-export function useContracts() {
+export function useContracts(options: UseContractsOptions = {}) {
+  const { includeArchived = false } = options;
+
   return useQuery<ContractWithRelations[]>({
-    queryKey: CONTRACTS_QUERY_KEY,
+    queryKey: [...CONTRACTS_QUERY_KEY, { includeArchived }],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .schema("nodo_inmo")
         .from("contracts")
         .select(
@@ -55,6 +59,12 @@ export function useContracts() {
           "guarantors:contract_guarantors(guarantor_id, guarantor:contacts!contract_guarantors_guarantor_id_fkey(name, dni, address))",
         )
         .order("created_at", { ascending: false });
+
+      if (!includeArchived) {
+        query = query.is("archived_at", null);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return (data ?? []) as unknown as ContractWithRelations[];

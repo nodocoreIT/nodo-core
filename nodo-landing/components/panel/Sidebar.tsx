@@ -28,9 +28,11 @@ type SidebarProps = {
   teamCount: number;
   expenseCount: number;
   ideaCount: number;
+  solicitudCount?: number;
 };
 
 const PLATFORM_ITEMS: NavItem[] = [
+  { label: "Solicitudes pendientes", href: "/panel/solicitudes" },
   { label: "Ideas", href: "/panel/ideas" },
   { label: "Tareas", href: "/panel/tareas" },
   { label: "Clientes", href: "/panel/clientes" },
@@ -58,6 +60,7 @@ export default function Sidebar({
   teamCount,
   expenseCount,
   ideaCount,
+  solicitudCount = 0,
 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -66,6 +69,7 @@ export default function Sidebar({
   const counts: Record<string, number> = {
     "/panel/ideas": ideaCount,
     "/panel/tareas": taskCount,
+    "/panel/solicitudes": solicitudCount,
     "/panel/clientes": clientCount,
     "/panel/caja": expenseCount,
     "/panel/equipo": teamCount,
@@ -162,7 +166,22 @@ export default function Sidebar({
                   }}
                 >
                   <span>{item.label}</span>
-                  {count !== undefined && (
+                  {item.href === "/panel/solicitudes" && solicitudCount > 0 ? (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        background: "#FCE9D8",
+                        color: "#B5630C",
+                        padding: "2px 8px",
+                        borderRadius: 999,
+                        minWidth: 22,
+                        textAlign: "center",
+                      }}
+                    >
+                      {solicitudCount}
+                    </span>
+                  ) : count !== undefined && count > 0 ? (
                     <span
                       style={{
                         fontSize: 12,
@@ -176,7 +195,7 @@ export default function Sidebar({
                     >
                       {count}
                     </span>
-                  )}
+                  ) : null}
                 </Link>
               );
             })}

@@ -186,9 +186,11 @@ export async function sendPatientVerificationEmail({
 export async function sendPasswordResetEmail({
   email,
   recoveryUrl,
+  nodeLabel,
 }: {
   email: string;
   recoveryUrl: string;
+  nodeLabel: string;
 }): Promise<void> {
   if (!isMailConfigured()) {
     throw new Error(
@@ -204,10 +206,10 @@ export async function sendPasswordResetEmail({
   });
 
   await transporter.sendMail({
-    from: `"NODO Clínica Virtual" <${USER}>`,
+    from: `"${nodeLabel}" <${USER}>`,
     to: email,
-    subject: `Recuperá tu cuenta en NODO | Clínica Virtual`,
-    text: `Hola,\n\nRecibimos una solicitud para restablecer la contraseña de tu cuenta en NODO | Clínica Virtual. Hacé clic en el siguiente enlace para crear una nueva contraseña:\n\n${recoveryUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO Clínica Virtual`,
+    subject: `Recuperá tu cuenta en ${nodeLabel}`,
+    text: `Hola,\n\nRecibimos una solicitud para restablecer la contraseña de tu cuenta en ${nodeLabel}. Hacé clic en el siguiente enlace para crear una nueva contraseña:\n\n${recoveryUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de ${nodeLabel}`,
     attachments: [
       {
         filename: "logo_compuesto.png",
@@ -223,7 +225,7 @@ export async function sendPasswordResetEmail({
         <h2 style="color:#DA5A0E;margin-top:0;font-size:20px;text-align:center;">Recuperá tu cuenta</h2>
         <p style="color:#647890;font-size:15px;line-height:1.5;">
           Hola,<br/><br/>
-          Recibimos una solicitud para restablecer la contraseña de tu cuenta en <strong>NODO | Clínica Virtual</strong>. Hacé clic en el botón de abajo para restablecerla:
+          Recibimos una solicitud para restablecer la contraseña de tu cuenta en <strong>${nodeLabel}</strong>. Hacé clic en el botón de abajo para restablecerla:
         </p>
         <div style="margin:24px 0;text-align:center;">
           <a href="${recoveryUrl}" style="background-color:#DA5A0E;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;font-size:15px;">
@@ -233,6 +235,126 @@ export async function sendPasswordResetEmail({
         <p style="color:#9DACBE;font-size:12px;line-height:1.4;">
           Si el botón no funciona, podés copiar y pegar este enlace en tu navegador:<br/>
           <a href="${recoveryUrl}" style="color:#DA5A0E;">${recoveryUrl}</a>
+        </p>
+      </div>
+    `,
+  });
+}
+
+export async function sendInmoStaffInviteEmail({
+  name,
+  email,
+  inviteUrl,
+  orgName,
+}: {
+  name: string;
+  email: string;
+  inviteUrl: string;
+  orgName: string;
+}): Promise<void> {
+  if (!isMailConfigured()) {
+    throw new Error(
+      "SMTP no configurado: faltan ZOHO_SMTP_USER y/o ZOHO_SMTP_PASSWORD."
+    );
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: HOST,
+    port: PORT,
+    secure: PORT === 465,
+    auth: { user: USER, pass: PASS },
+  });
+
+  await transporter.sendMail({
+    from: `"NODO Inmo" <${USER}>`,
+    to: email,
+    subject: `Invitación al equipo de ${orgName} en NODO | Inmo`,
+    text: `Hola ${name},\n\nTe invitaron a unirte al equipo de ${orgName} en NODO | Inmo. Para activar tu cuenta, elegí tu contraseña en el siguiente enlace:\n\n${inviteUrl}\n\nSi no esperabas esta invitación, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO Inmo`,
+    attachments: [
+      {
+        filename: "logo_compuesto.png",
+        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
+        cid: "nodologo",
+      },
+    ],
+    html: `
+      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;background-color:#F5F8FC;">
+        <div style="text-align:center;margin-bottom:20px;">
+          <img src="cid:nodologo" alt="NODO Core" style="height:32px;display:inline-block;"/>
+        </div>
+        <h2 style="color:#DA5A0E;margin-top:0;font-size:20px;text-align:center;">Te invitaron a NODO | Inmo</h2>
+        <p style="color:#647890;font-size:15px;line-height:1.5;">
+          Hola <strong>${name}</strong>,<br/><br/>
+          Te sumaron al equipo de <strong>${orgName}</strong>. Activá tu acceso y elegí tu contraseña:
+        </p>
+        <div style="margin:24px 0;text-align:center;">
+          <a href="${inviteUrl}" style="background-color:#DA5A0E;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;font-size:15px;">
+            Activar mi cuenta
+          </a>
+        </div>
+        <p style="color:#9DACBE;font-size:12px;line-height:1.4;">
+          Si el botón no funciona, copiá este enlace en tu navegador:<br/>
+          <a href="${inviteUrl}" style="color:#DA5A0E;">${inviteUrl}</a>
+        </p>
+      </div>
+    `,
+  });
+}
+
+export async function sendInmoStaffAddedEmail({
+  name,
+  email,
+  orgName,
+  loginUrl,
+}: {
+  name: string;
+  email: string;
+  orgName: string;
+  loginUrl: string;
+}): Promise<void> {
+  if (!isMailConfigured()) {
+    throw new Error(
+      "SMTP no configurado: faltan ZOHO_SMTP_USER y/o ZOHO_SMTP_PASSWORD."
+    );
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: HOST,
+    port: PORT,
+    secure: PORT === 465,
+    auth: { user: USER, pass: PASS },
+  });
+
+  await transporter.sendMail({
+    from: `"NODO Inmo" <${USER}>`,
+    to: email,
+    subject: `Te agregaron al equipo de ${orgName} en NODO | Inmo`,
+    text: `Hola ${name},\n\nTe agregaron al equipo de ${orgName} en NODO | Inmo. Ya podés ingresar con tu email y contraseña habituales:\n\n${loginUrl}\n\nSaludos,\nEl equipo de NODO Inmo`,
+    attachments: [
+      {
+        filename: "logo_compuesto.png",
+        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
+        cid: "nodologo",
+      },
+    ],
+    html: `
+      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;background-color:#F5F8FC;">
+        <div style="text-align:center;margin-bottom:20px;">
+          <img src="cid:nodologo" alt="NODO Core" style="height:32px;display:inline-block;"/>
+        </div>
+        <h2 style="color:#DA5A0E;margin-top:0;font-size:20px;text-align:center;">Acceso habilitado</h2>
+        <p style="color:#647890;font-size:15px;line-height:1.5;">
+          Hola <strong>${name}</strong>,<br/><br/>
+          Te agregaron al equipo de <strong>${orgName}</strong> en NODO | Inmo. Ingresá con tu email y contraseña habituales:
+        </p>
+        <div style="margin:24px 0;text-align:center;">
+          <a href="${loginUrl}" style="background-color:#DA5A0E;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;font-size:15px;">
+            Ingresar a NODO Inmo
+          </a>
+        </div>
+        <p style="color:#9DACBE;font-size:12px;line-height:1.4;">
+          Si el botón no funciona, copiá este enlace en tu navegador:<br/>
+          <a href="${loginUrl}" style="color:#DA5A0E;">${loginUrl}</a>
         </p>
       </div>
     `,
@@ -296,6 +418,140 @@ export async function sendInmoVerificationEmail({
           Si el botón no funciona, podés copiar y pegar este enlace en tu navegador:<br/>
           <a href="${verificationUrl}" style="color:#DA5A0E;">${verificationUrl}</a>
         </p>
+      </div>
+    `,
+  });
+}
+
+function createTransporter() {
+  if (!isMailConfigured()) {
+    throw new Error("SMTP no configurado.");
+  }
+  return nodemailer.createTransport({
+    host: HOST,
+    port: PORT,
+    secure: PORT === 465,
+    auth: { user: USER, pass: PASS },
+  });
+}
+
+export async function sendAdminNewRegistrationEmail({
+  clientName,
+  email,
+  unitCode,
+  plan,
+  origin,
+}: {
+  clientName: string;
+  email: string;
+  unitCode: string;
+  plan: string;
+  origin: string;
+}): Promise<void> {
+  const transporter = createTransporter();
+  const panelUrl = `${origin}/panel/solicitudes`;
+
+  await transporter.sendMail({
+    from: `"NODO Core · Registros" <${USER}>`,
+    to: CONTACT_TO,
+    subject: `Nueva solicitud de registro — ${unitCode}`,
+    text: `Nueva solicitud pendiente de revisión:\n\nNombre: ${clientName}\nEmail: ${email}\nNodo: ${unitCode}\nPlan: ${plan}\n\nRevisar en: ${panelUrl}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #DEE7F1;border-radius:14px;">
+        <h2 style="color:#1B2A41;margin-top:0;">Nueva solicitud de registro</h2>
+        <p style="color:#647890;line-height:1.5;">
+          <strong>Nombre:</strong> ${clientName}<br/>
+          <strong>Email:</strong> ${email}<br/>
+          <strong>Nodo:</strong> ${unitCode}<br/>
+          <strong>Plan:</strong> ${plan}
+        </p>
+        <a href="${panelUrl}" style="display:inline-block;margin-top:16px;background:#DA5A0E;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">
+          Revisar en Core Dashboard
+        </a>
+      </div>
+    `,
+  });
+}
+
+export async function sendAccountEnabledEmail({
+  nombre,
+  email,
+  nodeLabel,
+  loginUrl,
+}: {
+  nombre: string;
+  email: string;
+  nodeLabel: string;
+  loginUrl: string;
+}): Promise<void> {
+  const transporter = createTransporter();
+
+  await transporter.sendMail({
+    from: `"NODO Core · Activación" <${USER}>`,
+    to: email,
+    subject: `Tu acceso a ${nodeLabel} fue habilitado`,
+    text: `Hola ${nombre},\n\nTu cuenta en ${nodeLabel} fue habilitada. Configurá tu contraseña en el primer acceso:\n\n${loginUrl}\n\nSaludos,\nNODO Core`,
+    attachments: [
+      {
+        filename: "logo_compuesto.png",
+        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
+        cid: "nodologo",
+      },
+    ],
+    html: `
+      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;">
+        <h2 style="color:#DA5A0E;">¡Tu cuenta fue habilitada!</h2>
+        <p style="color:#647890;">Hola <strong>${nombre}</strong>, tu acceso a <strong>${nodeLabel}</strong> está listo.</p>
+        <p style="color:#647890;">Configurá tu contraseña en el primer acceso:</p>
+        <a href="${loginUrl}" style="display:inline-block;margin-top:12px;background:#DA5A0E;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">
+          Configurar contraseña e ingresar
+        </a>
+      </div>
+    `,
+  });
+}
+
+export async function sendActivationEmail({
+  nombre,
+  email,
+  nodeLabel,
+  activationUrl,
+}: {
+  nombre: string;
+  email: string;
+  nodeLabel: string;
+  activationUrl: string;
+}): Promise<void> {
+  const transporter = createTransporter();
+
+  await transporter.sendMail({
+    from: `"NODO Core · Activación" <${USER}>`,
+    to: email,
+    subject: `Tu acceso a ${nodeLabel} está listo — completá tu registro`,
+    text: `Hola ${nombre},\n\nTu solicitud fue aprobada. Completá tu registro en ${nodeLabel} usando este enlace:\n\n${activationUrl}\n\nEl enlace expira en 72 horas.\n\nSaludos,\nNODO Core`,
+    attachments: [
+      {
+        filename: "logo_compuesto.png",
+        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
+        cid: "nodologo",
+      },
+    ],
+    html: `
+      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;background:#F5F8FC;">
+        <div style="text-align:center;margin-bottom:20px;">
+          <img src="cid:nodologo" alt="NODO Core" style="height:32px;display:inline-block;"/>
+        </div>
+        <h2 style="color:#DA5A0E;margin-top:0;font-size:20px;text-align:center;">¡Tu acceso fue aprobado!</h2>
+        <p style="color:#647890;font-size:15px;line-height:1.5;">
+          Hola <strong>${nombre}</strong>,<br/><br/>
+          Tu solicitud para <strong>${nodeLabel}</strong> fue habilitada. Completá tu perfil y elegí tu plan para empezar:
+        </p>
+        <div style="margin:24px 0;text-align:center;">
+          <a href="${activationUrl}" style="background-color:#DA5A0E;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;font-size:15px;">
+            Completar registro
+          </a>
+        </div>
+        <p style="color:#9DACBE;font-size:12px;">Este enlace expira en 72 horas.</p>
       </div>
     `,
   });

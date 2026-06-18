@@ -7,6 +7,7 @@ export type PropertyRow = Database["nodo_inmo"]["Tables"]["properties"]["Row"] &
     id: string;
     full_name: string | null;
   } | null;
+  owner?: { id: string; name: string; commission_rate: number | null } | null;
 };
 
 export const PROPERTIES_QUERY_KEY = ["nodo_inmo", "properties"] as const;
@@ -22,7 +23,9 @@ export function useProperties() {
       const { data, error } = await supabase
         .schema("nodo_inmo")
         .from("properties")
-        .select("*, status_changed_by_profile")
+        .select(
+          "*, status_changed_by_profile, owner:contacts!properties_owner_contact_id_fkey(id, name, commission_rate)",
+        )
         .order("created_at", { ascending: false });
 
       if (error) throw error;

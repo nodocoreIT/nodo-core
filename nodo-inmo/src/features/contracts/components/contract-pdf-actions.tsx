@@ -15,7 +15,7 @@ import { Button } from "@nodocore/shared-components";
 import type { ContractWithRelations } from "@/features/contracts/hooks/use-contracts";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import type { OrgProfileRow } from "@/features/agency-profile/hooks/use-org-profile";
-import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";
+import { usePdfLogoUrl } from "@/features/agency-profile/hooks/use-pdf-logo-url";
 import { slugifyOwnerName } from "@/features/caja/lib/settlement-statement-data";
 import type { ContractPdfData } from "./contract-pdf-document";
 
@@ -110,7 +110,7 @@ interface ContractPdfActionsProps {
 
 export function ContractPdfActions({ contract }: ContractPdfActionsProps) {
   const { data: profile } = useOrgProfile();
-  const { data: logoUrl } = useLogoUrl(profile?.logo_path);
+  const { data: logoUrl } = usePdfLogoUrl();
 
   const [canShare, setCanShare] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);

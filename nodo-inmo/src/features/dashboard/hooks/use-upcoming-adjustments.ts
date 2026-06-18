@@ -43,6 +43,7 @@ export function useUpcomingAdjustments() {
         `)
         .eq("org_id", orgId!)
         .eq("status", "active")
+        .is("archived_at", null)
         .not("next_adjustment_date", "is", null)
         .gte("next_adjustment_date", today.toISOString().substring(0, 10))
         .lte("next_adjustment_date", inDays.toISOString().substring(0, 10))

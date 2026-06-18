@@ -3,6 +3,7 @@ import {
   computeBalance,
   computeTotals,
   groupPendingByOwner,
+  groupPendingByProperty,
   computeSettlementBreakdown,
 } from "@/features/caja/lib/caja-math";
 
@@ -59,6 +60,35 @@ describe("groupPendingByOwner", () => {
   it("ignores already-settled rows", () => {
     const juan = groupPendingByOwner(settlements).find((g) => g.owner_id === "o1");
     expect(juan?.settlement_ids).not.toContain("s4");
+  });
+});
+
+describe("groupPendingByProperty", () => {
+  it("computes gross collected, commission, and owner share per property", () => {
+    const groups = groupPendingByProperty([
+      {
+        id: "s1",
+        owner_id: "o1",
+        amount: 920000,
+        currency: "ARS",
+        status: "pending",
+        owner: { name: "Propietario Test" },
+        payment: {
+          amount: 1000000,
+          paid_amount: 1000000,
+          expenses_amount: 0,
+          contract: { property: { id: "p1", address: "Test 1234" } },
+        },
+      },
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({
+      gross_collected: 1000000,
+      commission: 80000,
+      total: 920000,
+      property_address: "Test 1234",
+    });
   });
 });
 

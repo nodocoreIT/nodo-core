@@ -34,7 +34,6 @@ export interface StatementData {
   logoUrl: string | null;
   ownerName: string;
   settledDate: string;
-  brandColor?: string;
 }
 
 export interface BuildStatementDataInput {
@@ -43,7 +42,6 @@ export interface BuildStatementDataInput {
   logoUrl: string | null;
   ownerName: string;
   settledDate: string;
-  brandColor?: string;
 }
 
 /**
@@ -53,7 +51,7 @@ export interface BuildStatementDataInput {
  * Handles null agency gracefully (R-A22 / R-C2) — every field defaults to "".
  */
 export function buildStatementData(input: BuildStatementDataInput): StatementData {
-  const { breakdown, agency, logoUrl, ownerName, settledDate, brandColor } = input;
+  const { breakdown, agency, logoUrl, ownerName, settledDate } = input;
 
   return {
     breakdown,
@@ -66,7 +64,6 @@ export function buildStatementData(input: BuildStatementDataInput): StatementDat
     logoUrl: logoUrl ?? null,
     ownerName,
     settledDate,
-    brandColor,
   };
 }
 

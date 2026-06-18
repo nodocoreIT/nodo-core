@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica",
     fontSize: 10,
     padding: 40,
-    color: "#1a1a2e",
+    color: "#000000",
     backgroundColor: "#ffffff",
   },
   // Header band
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   agencyName: {
     fontSize: 14,
     fontFamily: "Helvetica-Bold",
-    color: "#1a1a2e",
+    color: "#000000",
   },
   agencyDetail: {
     fontSize: 9,
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontFamily: "Helvetica-Bold",
-    color: "#1a1a2e",
+    color: "#000000",
     marginBottom: 6,
   },
   subtitle: {
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 11,
     fontFamily: "Helvetica-Bold",
-    color: "#1a1a2e",
+    color: "#000000",
     marginTop: 16,
     marginBottom: 8,
     paddingBottom: 4,
@@ -141,13 +141,13 @@ const styles = StyleSheet.create({
   },
   fieldValue: {
     fontSize: 10,
-    color: "#1a1a2e",
+    color: "#000000",
     flex: 1,
   },
   fieldValueBold: {
     fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    color: "#1a1a2e",
+    color: "#000000",
     flex: 1,
   },
   // Notes section

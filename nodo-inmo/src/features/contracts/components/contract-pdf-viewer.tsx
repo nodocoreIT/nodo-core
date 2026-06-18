@@ -3,7 +3,7 @@ import { Download, Share2, Loader2 } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import type { ContractWithRelations } from "@/features/contracts/hooks/use-contracts";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
-import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";
+import { usePdfLogoUrl } from "@/features/agency-profile/hooks/use-pdf-logo-url";
 import {
   buildContractPdfData,
   buildBlob,
@@ -16,9 +16,7 @@ interface ContractPdfViewerProps {
 
 export function ContractPdfViewer({ contract }: ContractPdfViewerProps) {
   const { data: profile, isLoading: profileLoading } = useOrgProfile();
-  const { data: logoUrl, isLoading: logoLoading } = useLogoUrl(
-    profile?.logo_path,
-  );
+  const { data: logoUrl, isLoading: logoLoading } = usePdfLogoUrl();
 
   const [blob, setBlob] = useState<Blob | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);

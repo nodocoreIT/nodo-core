@@ -22,7 +22,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     padding: 40,
     paddingBottom: 60,
-    color: "#1a1a2e",
+    color: "#000000",
     backgroundColor: "#ffffff",
   },
   // Header band
@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
   agencyName: {
     fontSize: 13,
     fontFamily: "Helvetica-Bold",
-    color: "#1a1a2e",
+    color: "#000000",
     marginBottom: 2,
   },
   agencyDetail: {
@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontFamily: "Helvetica-Bold",
-    color: "#1a1a2e",
+    color: "#000000",
     textAlign: "center",
     marginBottom: 4,
   },
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   clauseTitle: {
     fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    color: "#1a1a2e",
+    color: "#000000",
     marginBottom: 4,
   },
   clauseText: {

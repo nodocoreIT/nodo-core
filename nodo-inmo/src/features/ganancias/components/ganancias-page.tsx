@@ -19,8 +19,7 @@ import {
 import { useCashMovements } from "@/features/caja/hooks/use-cash-movements";
 import { useCashAccounts } from "@/shared/hooks/use-cash-accounts";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
-import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";
-import { useThemeStore } from "@/shared/hooks/use-theme-settings";
+import { usePdfLogoUrl } from "@/features/agency-profile/hooks/use-pdf-logo-url";
 import { formatMoney } from "@/features/contracts/lib/contract-labels";
 import {
   buildMonthlyBalance,
@@ -56,8 +55,7 @@ export function GananciasPage() {
   const { data: movements = [], isLoading, isError } = useCashMovements();
   const { accounts, isLoading: accountsLoading } = useCashAccounts();
   const { data: agency } = useOrgProfile();
-  const { settings } = useThemeStore();
-  const { data: logoUrl } = useLogoUrl(agency?.logo_path);
+  const { data: logoUrl } = usePdfLogoUrl();
   const [periodYm, setPeriodYm] = useState(currentPeriodYm);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -82,9 +80,8 @@ export function GananciasPage() {
       periodYm,
       summary,
       logoUrl: logoUrl ?? null,
-      brandColor: settings.primaryColor,
     }),
-    [agency, periodYm, summary, logoUrl, settings.primaryColor],
+    [agency, periodYm, summary, logoUrl],
   );
 
   async function handlePdf(download: boolean) {

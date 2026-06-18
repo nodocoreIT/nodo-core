@@ -67,7 +67,14 @@ vi.mock("@nodocore/shared-components", async (importOriginal) => {
 // Property + contact option sources
 vi.mock("@/features/properties/hooks/use-properties", () => ({
   useProperties: () => ({
-    data: [{ id: "prop-1", address: "Lavalle 100" }],
+    data: [
+      {
+        id: "prop-1",
+        address: "Lavalle 100",
+        commission_rate: null,
+        owner: { id: "owner-1", name: "Propietario Test", commission_rate: 8 },
+      },
+    ],
   }),
 }));
 
@@ -150,7 +157,30 @@ describe("CreateContractDialog", () => {
       start_date: "2026-01-01",
       end_date: "2028-01-01",
       rent_amount: 250000,
+      commission_amount: 20000,
       guarantor_ids: ["guar-1"],
+    });
+  });
+
+  it("auto-fills administración inmobiliaria from the property owner when a property is selected", async () => {
+    renderDialog();
+
+    const selects = screen.getAllByRole("combobox");
+    await userEvent.selectOptions(selects[0], "prop-1");
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/administraci[oó]n inmobiliaria/i)).toHaveValue("8");
+    });
+  });
+
+  it("shows the property owner in the propietario field", async () => {
+    renderDialog();
+
+    const selects = screen.getAllByRole("combobox");
+    await userEvent.selectOptions(selects[0], "prop-1");
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^propietario$/i)).toHaveValue("Propietario Test");
     });
   });
 

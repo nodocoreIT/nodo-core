@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AdminPortalPage } from "@/portals/admin/admin-portal-page";
+import { AuthCallbackPage } from "@/features/auth/callback/auth-callback-page";
 import { LoginPage } from "@/features/auth/login-page";
 import { useAuth } from "@/shared/hooks/use-auth";
 import { Spinner } from "@/components/ui/spinner";
@@ -20,6 +21,7 @@ export function AppRouter() {
   return (
     <BrowserRouter basename="/finanzas">
       <Routes>
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route
           path="/login"
           element={session ? <Navigate to="/admin/dashboard" replace /> : <LoginPage />}

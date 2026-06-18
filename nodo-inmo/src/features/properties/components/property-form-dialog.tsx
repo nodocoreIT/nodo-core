@@ -50,6 +50,7 @@ import { StagedPhotoUpload } from "./StagedPhotoUpload";
 import { cn } from "@/shared/lib/utils";
 import { Combobox } from "@nodocore/shared-components";
 import { PROVINCIAS, LOCALIDADES_BY_PROVINCIA, type Provincia } from "@/shared/data/argentina-geo";
+import { ADMINISTRACION_INMOBILIARIA_PERCENT } from "@/features/caja/lib/settlement-labels";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -205,6 +206,7 @@ export function PropertyFormDialog({
   const isEdit = !!property;
   const { data: owners = [] } = useContacts("owner");
   const [stagedPhotos, setStagedPhotos] = useState<string[]>([]);
+  const ownerChangedRef = useRef(false);
 
   const form = useForm<PropertyFormValues>({
     resolver: zodResolver(schema) as any,
@@ -247,6 +249,7 @@ export function PropertyFormDialog({
   });
 
   const currency = form.watch("currency") || "ARS";
+  const ownerId = form.watch("owner_id");
   const prevCurrencyRef = useRef(currency);
   const selectedProvincia = form.watch("provincia") as Provincia | undefined;
   useEffect(() => {
@@ -260,11 +263,25 @@ export function PropertyFormDialog({
     }
   }, [currency, form]);
 
+  useEffect(() => {
+    if (!ownerId) return;
+
+    const owner = owners.find((o) => o.id === ownerId);
+    if (!owner) return;
+
+    if (isEdit && !ownerChangedRef.current && property?.commission_rate != null) {
+      return;
+    }
+
+    form.setValue("commission_rate", String(owner.commission_rate ?? 10));
+  }, [ownerId, owners, isEdit, property?.commission_rate, form]);
+
   async function handleSubmit(values: PropertyFormValues) {
     await onSubmit(buildPayload(values, isEdit ? undefined : stagedPhotos), property);
     if (!isEdit) {
       form.reset();
       setStagedPhotos([]);
+      ownerChangedRef.current = false;
     }
     onSuccess?.();
   }
@@ -624,9 +641,10 @@ export function PropertyFormDialog({
                 <FormItem>
                   <FormLabel htmlFor="owner-select">Propietario</FormLabel>
                   <Select
-                    onValueChange={(v) =>
-                      field.onChange(v === NO_OWNER ? "" : v)
-                    }
+                    onValueChange={(v) => {
+                      ownerChangedRef.current = true;
+                      field.onChange(v === NO_OWNER ? "" : v);
+                    }}
                     value={field.value ? field.value : NO_OWNER}
                   >
                     <FormControl>
@@ -658,7 +676,7 @@ export function PropertyFormDialog({
                   const label =
                     operation === "sale"
                       ? "Honorarios por intermediación (%)"
-                      : "Comisión por alquiler (%)";
+                      : ADMINISTRACION_INMOBILIARIA_PERCENT;
                   return (
                     <FormItem>
                       <FormLabel htmlFor="commission-rate-input">

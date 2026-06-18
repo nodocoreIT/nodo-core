@@ -13,9 +13,9 @@ vi.mock("@/features/contracts/hooks/use-contracts", () => ({
   CONTRACTS_QUERY_KEY: ["nodo_inmo", "contracts"],
 }));
 
-const mockDeleteMutateAsync = vi.fn();
-vi.mock("@/features/contracts/hooks/use-delete-contract", () => ({
-  useDeleteContract: () => ({ mutateAsync: mockDeleteMutateAsync, isPending: false }),
+const mockArchiveMutateAsync = vi.fn();
+vi.mock("@/features/contracts/hooks/use-archive-contract", () => ({
+  useArchiveContract: () => ({ mutateAsync: mockArchiveMutateAsync, isPending: false }),
 }));
 
 vi.mock("@/features/contracts/hooks/use-update-contract", () => ({

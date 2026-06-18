@@ -19,13 +19,12 @@ import {
 import { useOwnerSettlements } from "@/features/caja/hooks/use-owner-settlements";
 import { useSettleOwner } from "@/features/caja/hooks/use-settle-owner";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
-import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";
+import { usePdfLogoUrl } from "@/features/agency-profile/hooks/use-pdf-logo-url";
 import { groupPendingByProperty } from "@/features/caja/lib/caja-math";
 import { buildPendingStatementData } from "@/features/caja/lib/pending-settlement-pdf";
 import { usePendingExpenses } from "@/features/caja/hooks/use-pending-expenses";
 import { buildStatementData, type SealedBreakdown, type StatementData } from "@/features/caja/lib/settlement-statement-data";
 import { handleDownload, handleShare } from "@/features/caja/lib/settlement-pdf-actions";
-import { useThemeStore } from "@/shared/hooks/use-theme-settings";
 import { SettlementPdfViewer } from "./settlement-pdf-viewer";
 import { formatMoney } from "@/features/contracts/lib/contract-labels";
 
@@ -33,10 +32,8 @@ export function RendicionesPage() {
   const { data, isLoading, isError } = useOwnerSettlements();
   const settleOwner = useSettleOwner();
   const { data: agency } = useOrgProfile();
-  const { data: logoUrl } = useLogoUrl(agency?.logo_path);
+  const { data: logoUrl } = usePdfLogoUrl();
   const { data: expenses, isLoading: expensesLoading } = usePendingExpenses();
-  const { settings } = useThemeStore();
-  const primaryColor = settings.primaryColor;
   const [previewLoadingKey, setPreviewLoadingKey] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewStatement, setPreviewStatement] = useState<StatementData | null>(null);
@@ -56,7 +53,6 @@ export function RendicionesPage() {
         allSettlements,
         agency ?? null,
         logoUrl ?? null,
-        primaryColor,
       );
       setPreviewStatement(statement);
       setPreviewOpen(true);
@@ -85,7 +81,6 @@ export function RendicionesPage() {
           logoUrl: logoUrl ?? null,
           ownerName: group.owner_name,
           settledDate: new Date().toISOString().slice(0, 10),
-          brandColor: primaryColor,
         });
         setFinalizedStatement(statement);
         setFinalizeOpen(true);
@@ -152,7 +147,8 @@ export function RendicionesPage() {
                 <TableHead>Propietario</TableHead>
                 <TableHead>Propiedad</TableHead>
                 <TableHead>Cant. pagos</TableHead>
-                <TableHead className="text-right">Cobrado</TableHead>
+                <TableHead className="text-right">Cobrado (bruto)</TableHead>
+                <TableHead className="text-right">Adm. inmo.</TableHead>
                 <TableHead className="text-right">Gastos</TableHead>
                 <TableHead className="text-right">Total a rendir</TableHead>
                 <TableHead className="w-44 text-right">Acciones</TableHead>
@@ -170,11 +166,11 @@ export function RendicionesPage() {
                     e.currency === group.currency
                 );
                 const expensesTotal = propExpenses.reduce((acc, curr) => acc + curr.amount, 0);
-                
-                // Calculamos el neto final a rendir restando los gastos
-                // Nota: la comisión se resta en el desglose final, pero acá group.total 
-                // ya es el owner_share pre-calculado en owner_settlements.
                 const finalNet = group.total - expensesTotal;
+                const commissionRate =
+                  group.gross_collected > 0
+                    ? Math.round((group.commission / group.gross_collected) * 10000) / 100
+                    : 0;
 
                 return (
                   <TableRow key={rowKey}>
@@ -191,11 +187,20 @@ export function RendicionesPage() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      {formatMoney(group.total, group.currency)}
+                      {formatMoney(group.gross_collected, group.currency)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-slate2">
+                      {group.commission > 0 ? (
+                        <span title={`${commissionRate}%`}>
+                          − {formatMoney(group.commission, group.currency)}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {expensesTotal > 0 ? (
-                        <span className="text-destructive">- {formatMoney(expensesTotal, group.currency)}</span>
+                        <span className="text-destructive">− {formatMoney(expensesTotal, group.currency)}</span>
                       ) : (
                         <span className="text-slate2">—</span>
                       )}

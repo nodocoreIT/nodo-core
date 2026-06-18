@@ -4,6 +4,8 @@ import { useAuth } from "@nodocore/shared-components";
 import type { Database } from "@/shared/types/database";
 import { syncContractInstallments } from "@/features/payments/lib/sync-contract-installments";
 import { PAYMENTS_QUERY_KEY } from "@/features/payments/hooks/use-payments";
+import { CASH_MOVEMENTS_QUERY_KEY } from "@/features/caja/hooks/use-cash-movements";
+import { OWNER_SETTLEMENTS_QUERY_KEY } from "@/features/caja/hooks/use-owner-settlements";
 import { CONTRACTS_QUERY_KEY } from "./use-contracts";
 
 type ContractUpdate = Database["nodo_inmo"]["Tables"]["contracts"]["Update"];
@@ -65,12 +67,15 @@ export function useUpdateContract() {
           rent_amount: updated.rent_amount,
           currency: updated.currency,
           status: updated.status,
+          expenses_amount: updated.expenses_amount ?? 0,
         });
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CONTRACTS_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: PAYMENTS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: CASH_MOVEMENTS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: OWNER_SETTLEMENTS_QUERY_KEY });
     },
   });
 }

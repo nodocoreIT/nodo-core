@@ -228,7 +228,7 @@ describe("PropietariosList — Edit row action", () => {
     await waitFor(() => {
       expect((screen.getByLabelText(/dni/i) as HTMLInputElement).value).toBe("25-88866544-3");
       expect((screen.getByLabelText(/teléfono/i) as HTMLInputElement).value).toBe("11-3333-0099");
-      expect((screen.getByLabelText(/comisión/i) as HTMLInputElement).value).toBe("8");
+      expect((screen.getByLabelText(/administraci[oó]n inmobiliaria/i) as HTMLInputElement).value).toBe("8");
     });
   });
 

@@ -12,19 +12,23 @@ const TTL_SECONDS = 3_600;
  * Signed URLs are scoped by the storage RLS policy (admin + org path check).
  * Mirrors use-receipt-url.ts from property-expenses.
  */
+export async function createLogoSignedUrl(
+  logoPath: string | null | undefined,
+): Promise<string | null> {
+  if (!logoPath) return null;
+
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(logoPath, TTL_SECONDS);
+
+  if (error) throw error;
+  return data?.signedUrl ?? null;
+}
+
 export function useLogoUrl(logoPath: string | null | undefined) {
   return useQuery<string | null>({
     queryKey: ["storage", "logo-url", logoPath],
-    queryFn: async () => {
-      if (!logoPath) return null;
-
-      const { data, error } = await supabase.storage
-        .from(BUCKET)
-        .createSignedUrl(logoPath, TTL_SECONDS);
-
-      if (error) throw error;
-      return data?.signedUrl ?? null;
-    },
+    queryFn: () => createLogoSignedUrl(logoPath),
     enabled: !!logoPath,
     // Refresh 5 minutes before the signed URL expires (TTL 3600 s).
     staleTime: 55 * 60 * 1000,

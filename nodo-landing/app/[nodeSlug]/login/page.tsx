@@ -14,6 +14,7 @@ import {
   requestPasswordReset,
   submitInmoRegistration,
 } from "@/app/actions";
+import { submitNodeRegistration } from "@/app/actions/registration";
 
 function NodeTransitionOverlay({
   label,
@@ -193,18 +194,30 @@ function LoginForm() {
   const modeParam = searchParams.get("mode") || "login";
   const roleParam = searchParams.get("role") || "paciente";
 
+  const isClinicaNode =
+    nodeParam === "nodo-clinica" ||
+    nodeParam === "clinica-virtual" ||
+    nodeParam === "clinica";
+  const isInmoNode = nodeParam === "nodo-inmo" || nodeParam === "inmo";
+  const isAutosNode = nodeParam === "nodo-autos" || nodeParam === "autos";
+  const isFinanzasNode =
+    nodeParam === "nodo-finanzas" || nodeParam === "finanzas";
+  const isSimpleRegisterNode = isInmoNode || isAutosNode || isFinanzasNode;
+
   // Modes: "login" or "register" (only for clinica-virtual)
   // Modes: "login", "register", "forgot" or "reset-password"
   const [authMode, setAuthMode] = useState<
-    "login" | "register" | "forgot" | "reset-password"
+    "login" | "register" | "forgot" | "reset-password" | "first-access"
   >(
     modeParam === "reset-password"
       ? "reset-password"
-      : modeParam === "register"
-        ? "register"
-        : "forgot" === modeParam
-          ? "forgot"
-          : "login",
+      : modeParam === "first-access"
+        ? "first-access"
+        : modeParam === "register"
+          ? "register"
+          : modeParam === "forgot"
+            ? "forgot"
+            : "login",
   );
   // Register role: "paciente" or "medico"
   const [registerRole, setRegisterRole] = useState<"paciente" | "medico">(
@@ -216,6 +229,7 @@ function LoginForm() {
   // Form states
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState("");
@@ -230,7 +244,7 @@ function LoginForm() {
   } | null>(null);
   const [successModal, setSuccessModal] = useState<{
     open: boolean;
-    type: "paciente" | "medico" | "patient_verify" | "forgot_verify";
+    type: "paciente" | "medico" | "patient_verify" | "forgot_verify" | "reset_success";
     message: string;
   }>({
     open: false,
@@ -246,6 +260,223 @@ function LoginForm() {
         : nodeParam;
 
   const matchedNode = getNodeBySlug(cleanSlug);
+
+  const registrationOrigin =
+    typeof window !== "undefined"
+      ? (process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? window.location.origin)
+      : "http://localhost:3000";
+
+  const urlError = searchParams.get("error");
+  const showResend = searchParams.get("resend") === "1";
+  const [resendLoading, setResendLoading] = useState(false);
+  const [recoveryBootstrapping, setRecoveryBootstrapping] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const params = new URLSearchParams(window.location.search);
+    return (
+      window.location.hash.includes("type=recovery") ||
+      params.has("code") ||
+      params.has("token_hash") ||
+      params.get("mode") === "reset-password"
+    );
+  });
+
+  useEffect(() => {
+    if (urlError && authMode !== "reset-password") {
+      setGeneralError(decodeURIComponent(urlError.replace(/\+/g, " ")));
+    }
+  }, [urlError, authMode]);
+
+  function clearRecoveryUrlError() {
+    setGeneralError("");
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("error")) {
+      url.searchParams.delete("error");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+    }
+  }
+
+  useEffect(() => {
+    const supabase = createClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setAuthMode("reset-password");
+        setRecoveryBootstrapping(false);
+        clearRecoveryUrlError();
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrapRecoverySession() {
+      const tokenHash = searchParams.get("token_hash");
+      const recoveryType = searchParams.get("type");
+      const shouldBootstrap =
+        modeParam === "reset-password" ||
+        window.location.hash.includes("type=recovery") ||
+        searchParams.has("code") ||
+        (tokenHash !== null && recoveryType === "recovery");
+
+      if (!shouldBootstrap) {
+        setRecoveryBootstrapping(false);
+        return;
+      }
+
+      setRecoveryBootstrapping(true);
+      const supabase = createClient();
+
+      if (tokenHash && recoveryType === "recovery") {
+        const { error } = await supabase.auth.verifyOtp({
+          type: "recovery",
+          token_hash: tokenHash,
+        });
+        if (cancelled) return;
+        if (error) {
+          setGeneralError(
+            "El enlace de recuperación expiró o ya fue usado. Solicitá uno nuevo.",
+          );
+          setRecoveryBootstrapping(false);
+          return;
+        }
+        setAuthMode("reset-password");
+        const url = new URL(window.location.href);
+        url.searchParams.delete("token_hash");
+        url.searchParams.delete("type");
+        window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+        clearRecoveryUrlError();
+        setRecoveryBootstrapping(false);
+        return;
+      }
+
+      const code = searchParams.get("code");
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (cancelled) return;
+        if (error) {
+          setGeneralError(
+            "El enlace de recuperación expiró o ya fue usado. Solicitá uno nuevo.",
+          );
+          setRecoveryBootstrapping(false);
+          return;
+        }
+        setAuthMode("reset-password");
+        const url = new URL(window.location.href);
+        url.searchParams.delete("code");
+        window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+        clearRecoveryUrlError();
+        setRecoveryBootstrapping(false);
+        return;
+      }
+
+      const hash = window.location.hash.substring(1);
+      if (hash) {
+        const params = new URLSearchParams(hash);
+        const accessToken = params.get("access_token");
+        const refreshToken = params.get("refresh_token");
+        const type = params.get("type");
+
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (cancelled) return;
+          if (error) {
+            setGeneralError("No se pudo validar el enlace de recuperación.");
+            setRecoveryBootstrapping(false);
+            return;
+          }
+        }
+
+        if (type === "recovery" || modeParam === "reset-password") {
+          setAuthMode("reset-password");
+          window.history.replaceState(
+            null,
+            "",
+            `${window.location.pathname}${window.location.search}`,
+          );
+          clearRecoveryUrlError();
+          setRecoveryBootstrapping(false);
+          return;
+        }
+      }
+
+      if (modeParam === "reset-password") {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (cancelled) return;
+        if (user) {
+          setAuthMode("reset-password");
+          clearRecoveryUrlError();
+        } else {
+          // La sesión puede llegar un instante después vía cookies / PASSWORD_RECOVERY.
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          if (cancelled) return;
+          const {
+            data: { user: retryUser },
+          } = await supabase.auth.getUser();
+          if (retryUser) {
+            setAuthMode("reset-password");
+            clearRecoveryUrlError();
+          }
+        }
+      }
+
+      setRecoveryBootstrapping(false);
+    }
+
+    bootstrapRecoverySession();
+    return () => {
+      cancelled = true;
+    };
+  }, [modeParam, searchParams]);
+
+  function unitCodeForResend(): string {
+    if (isAutosNode) return "Autos";
+    if (isFinanzasNode) return "Finanzas";
+    if (isInmoNode) return "Inmo";
+    if (registerRole === "paciente") return "Salud";
+    return "Clínica";
+  }
+
+  async function handleResendVerification() {
+    if (!email.trim()) {
+      setEmailError("Ingresá el correo con el que te registraste.");
+      return;
+    }
+    setResendLoading(true);
+    setGeneralError("");
+    try {
+      const res = await fetch("/api/registration/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          unitCode: unitCodeForResend(),
+          origin: registrationOrigin,
+        }),
+      });
+      const json = await res.json();
+      if (json.status === "error") {
+        setGeneralError(json.message);
+      } else {
+        setSuccessModal({
+          open: true,
+          type: "patient_verify",
+          message: json.message,
+        });
+      }
+    } catch {
+      setGeneralError("No se pudo reenviar el correo. Intentá de nuevo.");
+    } finally {
+      setResendLoading(false);
+    }
+  }
 
   // Set up details for the left panel based on nodeParam
   let activeNodeSlug: string | undefined = undefined;
@@ -287,7 +518,11 @@ function LoginForm() {
       setEmailError("Ingrese un correo válido.");
       valid = false;
     }
-    if (password.trim().length < 4) {
+    const needsPassword =
+      authMode === "login" ||
+      (authMode === "register" && isClinicaNode && registerRole === "paciente");
+
+    if (needsPassword && password.trim().length < 4) {
       setPasswordError(
         authMode === "login"
           ? "Ingrese su contraseña."
@@ -330,9 +565,13 @@ function LoginForm() {
         tLabel = "Clínica Virtualaaaaa";
         tCode = "Clínica";
         TIcon = matchedNode?.Icon ?? Layers;
-      } else if (nodeParam === "nodo-autos" || nodeParam === "autos") {
+      } else if (isAutosNode) {
         tLabel = matchedNode?.label ?? "Nodo Automotores";
         tCode = matchedNode?.code ?? "Autos";
+        TIcon = matchedNode?.Icon ?? Layers;
+      } else if (isFinanzasNode) {
+        tLabel = matchedNode?.label ?? "Nodo Finanzas Personales";
+        tCode = matchedNode?.code ?? "Finanzas";
         TIcon = matchedNode?.Icon ?? Layers;
       }
 
@@ -348,23 +587,21 @@ function LoginForm() {
           nodeParam === "clinica"
         ) {
           window.location.href = `/clinica/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
-        } else if (nodeParam === "nodo-autos" || nodeParam === "autos") {
+        } else if (isAutosNode) {
           window.location.href = `/autos/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+        } else if (isFinanzasNode) {
+          window.location.href = `/finanzas/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
         } else {
           router.push("/panel");
         }
       }, 1550);
     } else {
-      const originUrl =
-        typeof window !== "undefined"
-          ? window.location.origin
-          : "http://localhost:3000";
+      const originUrl = registrationOrigin;
 
-      if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
+      if (isInmoNode) {
         const result = await submitInmoRegistration(
           fullName,
           email,
-          password,
           originUrl,
         );
 
@@ -375,7 +612,30 @@ function LoginForm() {
           setGeneralError("");
           setSuccessModal({
             open: true,
-            type: "patient_verify", // Show the orange-themed envelope mail verification modal
+            type: "patient_verify",
+            message: result.message,
+          });
+          setLoading(false);
+        }
+      } else if (isAutosNode || isFinanzasNode) {
+        const unitCode = isAutosNode ? "Autos" : "Finanzas";
+        const plan = isAutosNode ? "autos" : "finanzas";
+        const result = await submitNodeRegistration({
+          unitCode,
+          fullName,
+          email,
+          plan,
+          origin: originUrl,
+        });
+
+        if (result.status === "error") {
+          setGeneralError(result.message);
+          setLoading(false);
+        } else {
+          setGeneralError("");
+          setSuccessModal({
+            open: true,
+            type: "patient_verify",
             message: result.message,
           });
           setLoading(false);
@@ -384,7 +644,6 @@ function LoginForm() {
         const result = await submitDoctorRegistration(
           fullName,
           email,
-          password,
           doctorPlan,
           originUrl,
         );
@@ -425,13 +684,20 @@ function LoginForm() {
     }
   }
 
+  const getOAuthRedirectPath = () => {
+    if (isInmoNode) return "/inmo";
+    if (isAutosNode) return "/autos";
+    if (isFinanzasNode) return "/finanzas/admin/dashboard";
+    return "/panel";
+  };
+
   const handleGoogleRegister = async () => {
     setLoading(true);
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/api/auth/callback?next=/panel`,
+        redirectTo: `${window.location.origin}/api/auth/callback?next=${getOAuthRedirectPath()}`,
       },
     });
     if (error) {
@@ -446,7 +712,7 @@ function LoginForm() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/api/auth/callback?next=/panel`,
+        redirectTo: `${window.location.origin}/api/auth/callback?next=${getOAuthRedirectPath()}`,
       },
     });
     if (error) {
@@ -466,15 +732,13 @@ function LoginForm() {
     }
 
     setLoading(true);
-    const originUrl =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "http://localhost:3000";
+    const originUrl = registrationOrigin;
 
     const result = await requestPasswordReset(
       email.trim(),
       nodeParam,
       originUrl,
+      typeof window !== "undefined" ? window.location.pathname : undefined,
     );
 
     if (result.status === "error") {
@@ -490,6 +754,75 @@ function LoginForm() {
     }
   }
 
+  async function handleFirstAccessSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setEmailError("");
+    setPasswordError("");
+    setGeneralError("");
+
+    if (!validEmail(email.trim())) {
+      setEmailError("Ingrese un correo válido.");
+      return;
+    }
+    if (password.trim().length < 8) {
+      setPasswordError("La contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setPasswordError("Las contraseñas no coinciden.");
+      return;
+    }
+
+    setLoading(true);
+    const res = await fetch("/api/auth/set-initial-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: email.trim(),
+        password: password.trim(),
+        nodeSlug: cleanSlug,
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      setGeneralError(json.error ?? "No se pudo configurar la contraseña.");
+      setLoading(false);
+      return;
+    }
+
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: password.trim(),
+    });
+
+    if (error || !data.session) {
+      setSuccessModal({
+        open: true,
+        type: "paciente",
+        message: "Contraseña configurada. Ya podés iniciar sesión.",
+      });
+      setAuthMode("login");
+      setLoading(false);
+      return;
+    }
+
+    // Reuse login redirect logic
+    const { access_token, refresh_token } = data.session;
+    setLoading(false);
+    if (isInmoNode) {
+      window.location.href = `/inmo/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+    } else if (isClinicaNode) {
+      window.location.href = `/clinica/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+    } else if (isAutosNode) {
+      window.location.href = `/autos/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+    } else if (isFinanzasNode) {
+      window.location.href = `/finanzas/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+    } else {
+      router.push("/panel");
+    }
+  }
+
   async function handleResetPasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
     setPasswordError("");
@@ -497,6 +830,10 @@ function LoginForm() {
 
     if (password.trim().length < 6) {
       setPasswordError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setPasswordError("Las contraseñas no coinciden.");
       return;
     }
 
@@ -510,15 +847,20 @@ function LoginForm() {
     if (error) {
       setGeneralError(error.message);
       setLoading(false);
-    } else {
-      setSuccessModal({
-        open: true,
-        type: "paciente",
-        message:
-          "Tu contraseña se ha restablecido con éxito. Ya podés ingresar.",
-      });
-      setLoading(false);
+      return;
     }
+
+    await supabase.auth.signOut();
+    setPassword("");
+    setConfirmPassword("");
+    setSuccessModal({
+      open: true,
+      type: "reset_success",
+      message:
+        "Tu contraseña se restableció correctamente. Ya podés iniciar sesión con tu nueva clave.",
+    });
+    setAuthMode("login");
+    setLoading(false);
   }
 
   const inputBase =
@@ -527,6 +869,56 @@ function LoginForm() {
   const inputError = "border-[#C0392B] shadow-[0_0_0_4px_rgba(192,57,43,.12)]";
   const inputFocus =
     "focus:border-brand focus:shadow-[0_0_0_4px_rgba(218,90,14,.16)]";
+
+  const simpleRegisterContent = isInmoNode
+    ? {
+        title: "Registrarse como dueño de inmobiliaria",
+        subtitle:
+          "Creá tu cuenta para gestionar propiedades, contratos y cobros.",
+        emailPlaceholder: "inmobiliaria@ejemplo.com",
+        submitLabel: "Crear cuenta de inmobiliaria",
+        idPrefix: "reg-inmo",
+      }
+    : isAutosNode
+      ? {
+          title: "Registrarse en NODO Automotores",
+          subtitle:
+            "Creá tu cuenta para administrar stock, clientes y ventas.",
+          emailPlaceholder: "concesionaria@ejemplo.com",
+          submitLabel: "Crear cuenta",
+          idPrefix: "reg-autos",
+        }
+      : isFinanzasNode
+        ? {
+            title: "Crear cuenta en Finanzas Personales",
+            subtitle:
+              "Registrá tus gastos, tarjetas y préstamos en un solo lugar.",
+            emailPlaceholder: "tu@email.com",
+            submitLabel: "Crear cuenta",
+            idPrefix: "reg-finanzas",
+          }
+        : null;
+
+  const googleIcon = (
+    <svg className="w-5 h-5 mr-2.5" viewBox="0 0 24 24" fill="currentColor">
+      <path
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+        fill="#34A853"
+      />
+      <path
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+        fill="#EA4335"
+      />
+    </svg>
+  );
 
   return (
     <>
@@ -628,10 +1020,7 @@ function LoginForm() {
         <main className="flex items-center justify-center p-8 bg-paper min-h-screen">
           <div className="w-[min(420px,100%)]">
             {/* If node is Clinica Virtual or Inmo, show Iniciar / Registrar toggle */}
-            {(nodeParam === "nodo-clinica" ||
-              nodeParam === "clinica-virtual" ||
-              nodeParam === "nodo-inmo" ||
-              nodeParam === "inmo") &&
+            {(isClinicaNode || isSimpleRegisterNode) &&
               (authMode === "login" || authMode === "register") && (
                 <div className="flex border-b border-mist mb-6">
                   <button
@@ -663,34 +1052,43 @@ function LoginForm() {
                 </div>
               )}
 
-            {authMode === "login" ? (
+            {recoveryBootstrapping ? (
+              <div className="text-center py-16">
+                <p className="text-slate2 text-[14.5px] font-medium">
+                  Validando enlace de recuperación…
+                </p>
+              </div>
+            ) : authMode === "login" ? (
               <div>
                 {/* Kicker */}
                 <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
-                  {nodeParam === "nodo-clinica" ||
-                  nodeParam === "clinica-virtual" ||
-                  nodeParam === "clinica"
+                  {isClinicaNode
                     ? "◎ Portal Clínica Virtual"
-                    : nodeParam === "nodo-inmo" || nodeParam === "inmo"
+                    : isInmoNode
                       ? "◎ Portal Inmobiliarias"
-                      : "◎ Acceso administradores"}
+                      : isAutosNode
+                        ? "◎ Portal Automotores"
+                        : isFinanzasNode
+                          ? "◎ Portal Finanzas Personales"
+                          : "◎ Acceso administradores"}
                 </span>
 
                 <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
                   Iniciar sesión
                 </h1>
                 <p className="text-slate2 text-[14.5px] mb-6">
-                  {nodeParam === "nodo-clinica" ||
-                  nodeParam === "clinica-virtual" ||
-                  nodeParam === "clinica"
+                  {isClinicaNode
                     ? "Ingrese sus credenciales de médico o paciente para acceder."
-                    : nodeParam === "nodo-inmo" || nodeParam === "inmo"
+                    : isInmoNode
                       ? "Ingrese sus credenciales de dueño de inmobiliaria para acceder."
-                      : "Ingrese sus credenciales para acceder al panel de Nodo Core."}
+                      : isAutosNode
+                        ? "Ingrese sus credenciales para acceder al panel de automotores."
+                        : isFinanzasNode
+                          ? "Ingrese sus credenciales para acceder a finanzas personales."
+                          : "Ingrese sus credenciales para acceder al panel de Nodo Core."}
                 </p>
 
-                {(nodeParam === "nodo-clinica" ||
-                  nodeParam === "clinica-virtual") && (
+                {(isClinicaNode || isSimpleRegisterNode) && (
                   <>
                     {/* Google Login for Patients */}
                     <button
@@ -940,6 +1338,93 @@ function LoginForm() {
                   </button>
                 </div>
               </form>
+            ) : authMode === "first-access" ? (
+              <form onSubmit={handleFirstAccessSubmit} noValidate>
+                <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
+                  ◎ Primer acceso
+                </span>
+                <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
+                  Configurá tu contraseña
+                </h1>
+                <p className="text-slate2 text-[14.5px] mb-6">
+                  Tu cuenta fue habilitada. Creá tu contraseña para ingresar a la aplicación.
+                </p>
+
+                <div className="mb-4">
+                  <label htmlFor="first-email" className="block text-[13px] font-semibold text-navy mb-1.5">
+                    Email
+                  </label>
+                  <input
+                    id="first-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setEmailError("");
+                    }}
+                    className={`${inputBase} ${emailError ? inputError : inputNormal} ${inputFocus}`}
+                  />
+                  {emailError && <p className="text-[12.5px] text-[#C0392B] mt-1.5">{emailError}</p>}
+                </div>
+
+                <div className="mb-4">
+                  <label htmlFor="first-pass" className="block text-[13px] font-semibold text-navy mb-1.5">
+                    Contraseña
+                  </label>
+                  <input
+                    id="first-pass"
+                    type="password"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setPasswordError("");
+                    }}
+                    className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label htmlFor="first-pass-confirm" className="block text-[13px] font-semibold text-navy mb-1.5">
+                    Repetir contraseña
+                  </label>
+                  <input
+                    id="first-pass-confirm"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      setPasswordError("");
+                    }}
+                    className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
+                  />
+                  {passwordError && <p className="text-[12.5px] text-[#C0392B] mt-1.5">{passwordError}</p>}
+                </div>
+
+                {generalError && (
+                  <p className="text-[13px] text-[#C0392B] mb-3 text-center">{generalError}</p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 disabled:opacity-60 cursor-pointer"
+                >
+                  {loading ? "Guardando…" : "Guardar e ingresar"}
+                </button>
+
+                <div className="text-center mt-5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("login");
+                      setGeneralError("");
+                    }}
+                    className="text-[13.5px] font-semibold text-brand hover:underline bg-transparent border-none cursor-pointer"
+                  >
+                    Volver al inicio de sesión
+                  </button>
+                </div>
+              </form>
             ) : authMode === "reset-password" ? (
               <form onSubmit={handleResetPasswordSubmit} noValidate>
                 <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
@@ -970,6 +1455,26 @@ function LoginForm() {
                     }}
                     className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
                   />
+                </div>
+
+                <div className="mb-4">
+                  <label
+                    htmlFor="reset-pass-confirm"
+                    className="block text-[13px] font-semibold text-navy mb-1.5"
+                  >
+                    Confirmar contraseña
+                  </label>
+                  <input
+                    id="reset-pass-confirm"
+                    type="password"
+                    placeholder="Repetí la contraseña"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      setPasswordError("");
+                    }}
+                    className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
+                  />
                   {passwordError && (
                     <p className="text-[12.5px] text-[#C0392B] mt-1.5">
                       {passwordError}
@@ -992,114 +1497,127 @@ function LoginForm() {
                 </button>
               </form>
             ) : (
-              /* Register Mode (only for Clinica Virtual & Inmo) */
+              /* Register Mode */
               <div>
-                {nodeParam === "inmo" ? (
-                  /* Inmo registration view (simplified) */
-                  <form onSubmit={handleSubmit} noValidate>
-                    <h2 className="font-display font-bold text-ink text-[22px] text-center mb-2">
-                      Registrarse como dueño de inmobiliaria
-                    </h2>
-                    <p className="text-slate2 text-[14px] text-center mb-6">
-                      Registrarse como dueño de inmobiliaria únicamente.
-                    </p>
-
-                    {/* Name */}
-                    <div className="mb-3">
-                      <label
-                        htmlFor="reg-inmo-name"
-                        className="block text-[13px] font-semibold text-navy mb-1.5"
-                      >
-                        Nombre completo
-                      </label>
-                      <input
-                        id="reg-inmo-name"
-                        type="text"
-                        placeholder="Juan Pérez"
-                        value={fullName}
-                        onChange={(e) => {
-                          setFullName(e.target.value);
-                          setNameError("");
-                        }}
-                        className={`${inputBase} ${nameError ? inputError : inputNormal} ${inputFocus}`}
-                      />
-                      {nameError && (
-                        <p className="text-[12.5px] text-[#C0392B] mt-1.5">
-                          {nameError}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Email */}
-                    <div className="mb-3">
-                      <label
-                        htmlFor="reg-inmo-email"
-                        className="block text-[13px] font-semibold text-navy mb-1.5"
-                      >
-                        Correo electrónico
-                      </label>
-                      <input
-                        id="reg-inmo-email"
-                        type="email"
-                        placeholder="inmobiliaria@ejemplo.com"
-                        value={email}
-                        onChange={(e) => {
-                          setEmail(e.target.value);
-                          setEmailError("");
-                        }}
-                        className={`${inputBase} ${emailError ? inputError : inputNormal} ${inputFocus}`}
-                      />
-                      {emailError && (
-                        <p className="text-[12.5px] text-[#C0392B] mt-1.5">
-                          {emailError}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Password */}
-                    <div className="mb-4">
-                      <label
-                        htmlFor="reg-inmo-pass"
-                        className="block text-[13px] font-semibold text-navy mb-1.5"
-                      >
-                        Contraseña
-                      </label>
-                      <input
-                        id="reg-inmo-pass"
-                        type="password"
-                        placeholder="Crea una contraseña segura"
-                        value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          setPasswordError("");
-                        }}
-                        className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
-                      />
-                      {passwordError && (
-                        <p className="text-[12.5px] text-[#C0392B] mt-1.5">
-                          {passwordError}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* General error */}
-                    {generalError && (
-                      <p className="text-[13px] text-[#C0392B] mb-4 text-center">
-                        {generalError}
+                {isSimpleRegisterNode && simpleRegisterContent ? (
+                  <div>
+                    <div className="text-center">
+                      <h2 className="font-display font-bold text-ink text-[22px] mb-2">
+                        {simpleRegisterContent.title}
+                      </h2>
+                      <p className="text-slate2 text-[14px] mb-6">
+                        {simpleRegisterContent.subtitle}
                       </p>
-                    )}
 
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      {loading
-                        ? "Registrando…"
-                        : "Crear cuenta de inmobiliaria"}
-                    </button>
-                  </form>
-                ) : (
+                      <button
+                        type="button"
+                        onClick={handleGoogleRegister}
+                        disabled={loading}
+                        className="w-full inline-flex items-center justify-center py-3 px-4 rounded-md border border-mist bg-white text-ink text-[14.5px] font-bold hover:bg-slate-50 transition-colors shadow-sm cursor-pointer disabled:opacity-60"
+                      >
+                        {googleIcon}
+                        Registrarse con Google
+                      </button>
+                    </div>
+
+                    <div className="relative my-6">
+                      <div
+                        className="absolute inset-0 flex items-center"
+                        aria-hidden="true"
+                      >
+                        <div className="w-full border-t border-mist" />
+                      </div>
+                      <div className="relative flex justify-center text-[11px] uppercase">
+                        <span className="bg-paper px-3 text-slate2 font-bold tracking-wider">
+                          o con correo electrónico
+                        </span>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleSubmit} noValidate>
+                      <div className="mb-3">
+                        <label
+                          htmlFor={`${simpleRegisterContent.idPrefix}-name`}
+                          className="block text-[13px] font-semibold text-navy mb-1.5"
+                        >
+                          Nombre completo
+                        </label>
+                        <input
+                          id={`${simpleRegisterContent.idPrefix}-name`}
+                          type="text"
+                          placeholder="Juan Pérez"
+                          value={fullName}
+                          onChange={(e) => {
+                            setFullName(e.target.value);
+                            setNameError("");
+                          }}
+                          className={`${inputBase} ${nameError ? inputError : inputNormal} ${inputFocus}`}
+                        />
+                        {nameError && (
+                          <p className="text-[12.5px] text-[#C0392B] mt-1.5">
+                            {nameError}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="mb-3">
+                        <label
+                          htmlFor={`${simpleRegisterContent.idPrefix}-email`}
+                          className="block text-[13px] font-semibold text-navy mb-1.5"
+                        >
+                          Correo electrónico
+                        </label>
+                        <input
+                          id={`${simpleRegisterContent.idPrefix}-email`}
+                          type="email"
+                          placeholder={simpleRegisterContent.emailPlaceholder}
+                          value={email}
+                          onChange={(e) => {
+                            setEmail(e.target.value);
+                            setEmailError("");
+                          }}
+                          className={`${inputBase} ${emailError ? inputError : inputNormal} ${inputFocus}`}
+                        />
+                        {emailError && (
+                          <p className="text-[12.5px] text-[#C0392B] mt-1.5">
+                            {emailError}
+                          </p>
+                        )}
+                      </div>
+
+                      <p className="text-slate2 text-[12px] mb-4 text-center">
+                        Te enviaremos un correo para verificar tu email. La contraseña la configurás después de la habilitación.
+                      </p>
+
+                      {generalError && (
+                        <p className="text-[13px] text-[#C0392B] mb-4 text-center">
+                          {generalError}
+                        </p>
+                      )}
+
+                      {(showResend || generalError.toLowerCase().includes("verific")) && (
+                        <button
+                          type="button"
+                          onClick={handleResendVerification}
+                          disabled={resendLoading || !email.trim()}
+                          className="w-full mb-4 py-2.5 rounded-md border border-brand text-brand text-[13.5px] font-semibold hover:bg-brand/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {resendLoading ? "Reenviando…" : "Reenviar correo de verificación"}
+                        </button>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        {loading
+                          ? "Registrando…"
+                          : simpleRegisterContent.submitLabel}
+                      </button>
+                    </form>
+                  </div>
+                ) : isClinicaNode ? (
                   /* Clinica Virtual registration view with role toggles */
                   <div>
                     {/* Role Toggle Selector */}
@@ -1420,7 +1938,7 @@ function LoginForm() {
                       </form>
                     )}
                   </div>
-                )}
+                ) : null}
               </div>
             )}
           </div>
@@ -1469,6 +1987,44 @@ function LoginForm() {
                   className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
                 >
                   Entendido
+                </button>
+              </>
+            ) : successModal.type === "reset_success" ? (
+              <>
+                <div className="h-14 w-14 bg-brand/10 text-brand rounded-full flex items-center justify-center mx-auto mb-5 border border-brand/20">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-7 w-7"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="font-display font-extrabold text-brand text-[21px] mb-2.5">
+                  Contraseña actualizada
+                </h3>
+                <p className="text-slate2 text-[14px] leading-relaxed mb-6">
+                  {successModal.message}
+                </p>
+                <button
+                  onClick={() => {
+                    setSuccessModal({
+                      open: false,
+                      type: "reset_success",
+                      message: "",
+                    });
+                    setAuthMode("login");
+                  }}
+                  className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
+                >
+                  Ir al inicio de sesión
                 </button>
               </>
             ) : successModal.type === "forgot_verify" ? (
@@ -1545,9 +2101,13 @@ function LoginForm() {
                       message: "",
                     });
                     router.push(
-                      nodeParam === "inmo"
+                      isInmoNode
                         ? "/nodo-inmo"
-                        : "/nodo-salud/clinica-virtual",
+                        : isAutosNode
+                          ? "/nodo-autos"
+                          : isFinanzasNode
+                            ? "/nodo-finanzas"
+                            : "/nodo-salud/clinica-virtual",
                     );
                   }}
                   className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"

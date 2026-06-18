@@ -52,6 +52,7 @@ export function useCreateContract() {
         rent_amount: contract.rent_amount,
         currency: contract.currency,
         status: contract.status,
+        expenses_amount: contract.expenses_amount ?? 0,
       });
 
       return contract;

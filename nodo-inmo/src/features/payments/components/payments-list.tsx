@@ -26,6 +26,7 @@ import {
 import { useSearchStore } from "@/shared/search/use-search-store";
 import { matchesQuery } from "@/shared/search/matches-query";
 import { cn } from "@/shared/lib/utils";
+import { isArchivedContract } from "@/features/contracts/lib/contract-archive";
 import { PaymentCollectDialog } from "./payment-collect-dialog";
 import { useDeletePayments, useAnnulPayment } from "../hooks/use-delete-payment";
 import {
@@ -111,6 +112,11 @@ export function PaymentsList() {
 
   const filteredRows = useMemo(() => {
     return (data ?? []).filter((p) => {
+      const archived = isArchivedContract(p.contract);
+      if (archived && (filter === "pending" || filter === "overdue")) {
+        return false;
+      }
+
       const eff = effectiveStatus(p);
       if (filter !== "all") {
         if (filter === "pending") {

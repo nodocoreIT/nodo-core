@@ -13,30 +13,30 @@
 
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { StatementData } from "@/features/caja/lib/settlement-statement-data";
+import { administracionInmobiliariaLabel } from "@/features/caja/lib/settlement-labels";
 import { formatDate } from "@/features/contracts/lib/contract-labels";
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-function createStyles(brand: string) {
-  return StyleSheet.create({
-    page: {
-      fontFamily: "Helvetica",
-      fontSize: 10,
-      padding: 40,
-      color: "#1a1a2e",
-      backgroundColor: "#ffffff",
-    },
-    // Header band
-    header: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "flex-start",
-      marginBottom: 24,
-      paddingBottom: 16,
-      borderBottomWidth: 2,
-      borderBottomColor: brand,
-      borderBottomStyle: "solid",
-    },
+const styles = StyleSheet.create({
+  page: {
+    fontFamily: "Helvetica",
+    fontSize: 10,
+    padding: 40,
+    color: "#000000",
+    backgroundColor: "#ffffff",
+  },
+  // Header band
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: "#000000",
+    borderBottomStyle: "solid",
+  },
     headerLeft: {
       flexDirection: "column",
       gap: 2,
@@ -49,7 +49,7 @@ function createStyles(brand: string) {
     agencyName: {
       fontSize: 14,
       fontFamily: "Helvetica-Bold",
-      color: brand,
+      color: "#000000",
     },
     agencyDetail: {
       fontSize: 9,
@@ -63,7 +63,7 @@ function createStyles(brand: string) {
     title: {
       fontSize: 18,
       fontFamily: "Helvetica-Bold",
-      color: brand,
+      color: "#000000",
       marginBottom: 6,
     },
     subtitle: {
@@ -119,7 +119,7 @@ function createStyles(brand: string) {
       flex: 1,
       fontSize: 11,
       fontFamily: "Helvetica-Bold",
-      color: "#1a1a2e",
+      color: "#000000",
     },
     cellLabelDeduction: {
       flex: 1,
@@ -135,7 +135,7 @@ function createStyles(brand: string) {
     cellAmountBold: {
       fontSize: 11,
       fontFamily: "Helvetica-Bold",
-      color: "#1a1a2e",
+      color: "#000000",
       textAlign: "right",
       minWidth: 100,
     },
@@ -162,8 +162,7 @@ function createStyles(brand: string) {
       fontSize: 8,
       color: "#94a3b8",
     },
-  });
-}
+});
 
 // ─── Money formatter (React-PDF compatible — no Intl formatting needed) ───────
 
@@ -179,9 +178,6 @@ function fmtAmount(amount: number, currency: string): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function SettlementStatementDocument(props: StatementData) {
-  const brand = props.brandColor ?? "#1a4d3e";
-  const styles = createStyles(brand);
-
   const {
     breakdown,
     currency,
@@ -272,10 +268,10 @@ export function SettlementStatementDocument(props: StatementData) {
             </Text>
           </View>
 
-          {/* Row 2: Commission */}
+          {/* Row 2: Agency administration fee */}
           <View style={styles.tableRow}>
             <Text style={styles.cellLabel}>
-              Comisión ({breakdown.commission_rate}%)
+              {administracionInmobiliariaLabel(breakdown.commission_rate)}
             </Text>
             <Text style={styles.cellAmount}>
               − {fmtAmount(breakdown.commission, currency)}

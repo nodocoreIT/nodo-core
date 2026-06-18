@@ -1,5 +1,6 @@
 import React from "react";
 import { supabase } from "@/shared/lib/supabase";
+import { createLogoSignedUrl } from "@/features/agency-profile/hooks/use-logo-url";
 import type { PaymentReceiptData } from "../components/payment-receipt-document";
 import type { PaymentWithRelations } from "../hooks/use-payments";
 import { buildCobroBreakdown } from "./cobro-breakdown";
@@ -8,30 +9,39 @@ function slugify(name: string): string {
   return name.toLowerCase().replace(/\s+/g, "_").slice(0, 30);
 }
 
+type AgencyForReceipt = {
+  legal_name?: string | null;
+  address?: string | null;
+  pdf_logo_path?: string | null;
+} | null;
+
 export async function buildReceiptData(
   payment: PaymentWithRelations,
-  agency: { legal_name?: string | null; address?: string | null } | null,
-  brandColor?: string,
+  agency: AgencyForReceipt,
   logoUrl?: string | null,
 ): Promise<PaymentReceiptData> {
-  let commissionFromCaja: number | null = null;
   let accountLabel: string | null = null;
 
   if (payment.status === "paid") {
     const { data } = await supabase
       .schema("nodo_inmo")
       .from("cash_movements")
-      .select("amount, category")
+      .select("category")
       .eq("payment_id", payment.id)
       .eq("source", "commission")
       .limit(1)
       .maybeSingle();
 
-    commissionFromCaja = data?.amount ?? null;
     accountLabel = data?.category ?? null;
   }
 
-  const breakdown = buildCobroBreakdown(payment, commissionFromCaja);
+  const breakdown = buildCobroBreakdown(payment);
+  const resolvedLogoUrl =
+    logoUrl !== undefined
+      ? logoUrl
+      : agency?.pdf_logo_path
+        ? await createLogoSignedUrl(agency.pdf_logo_path)
+        : null;
 
   return {
     agencyName: agency?.legal_name ?? "NODO INMO",
@@ -46,21 +56,15 @@ export async function buildReceiptData(
     rentAmount: breakdown.rentAmount,
     expensesAmount: breakdown.expensesAmount,
     grossAmount: breakdown.grossAmount,
-    commissionRate: breakdown.commissionRate,
-    commissionAmount: breakdown.commissionAmount,
-    ownerShare: breakdown.ownerShare,
-    brandColor,
-    logoUrl: logoUrl ?? null,
+    logoUrl: resolvedLogoUrl,
   };
 }
 
 export async function downloadPaymentReceipt(
   payment: PaymentWithRelations,
-  agency: { legal_name?: string | null; address?: string | null } | null,
-  brandColor?: string,
-  logoUrl?: string | null,
+  agency: AgencyForReceipt,
 ): Promise<void> {
-  const data = await buildReceiptData(payment, agency, brandColor, logoUrl);
+  const data = await buildReceiptData(payment, agency);
   const [{ pdf }, { PaymentReceiptDocument }] = await Promise.all([
     import("@react-pdf/renderer"),
     import("@/features/payments/components/payment-receipt-document"),

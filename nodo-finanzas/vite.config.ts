@@ -14,11 +14,18 @@ export default defineConfig({
   server: {
     port: 5176,
     strictPort: true,
+    origin: "http://localhost:3000",
   },
   resolve: {
+    dedupe: ["react", "react-dom", "react/jsx-runtime"],
     alias: {
       "@": resolve(__dirname, "./src"),
+      react: resolve(__dirname, "node_modules/react"),
+      "react-dom": resolve(__dirname, "node_modules/react-dom"),
     },
+  },
+  optimizeDeps: {
+    include: ["react", "react-dom", "react/jsx-runtime"],
   },
   test: {
     globals: true,

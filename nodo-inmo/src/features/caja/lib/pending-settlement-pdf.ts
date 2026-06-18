@@ -20,7 +20,6 @@ export async function buildPendingStatementData(
   settlements: SettlementWithOwner[],
   agency: OrgProfileRow | null,
   logoUrl: string | null,
-  brandColor?: string,
 ): Promise<StatementData> {
   const batch = settlements.filter(
     (s) =>
@@ -63,13 +62,6 @@ export async function buildPendingStatementData(
 
   const ownerExpenses = expenses ?? [];
 
-  const { data: ownerContact } = await supabase
-    .schema("nodo_inmo")
-    .from("contacts")
-    .select("commission_rate")
-    .eq("id", group.owner_id)
-    .maybeSingle();
-
   const breakdown = computeSettlementBreakdown(
     (payments ?? []).map((p) => ({
       id: p.id,
@@ -88,12 +80,18 @@ export async function buildPendingStatementData(
       description: e.description ?? "",
       type: e.type ?? "",
     })),
-    ownerContact?.commission_rate ?? 0,
+    0,
     group.currency,
   );
 
+  const effectiveRate =
+    breakdown.gross > 0
+      ? Math.round((breakdown.commission / breakdown.gross) * 10000) / 100
+      : 0;
+
   const sealedLike: SealedBreakdown = {
     ...breakdown,
+    commission_rate: effectiveRate,
     currency: group.currency,
     cobro_count: batch.length,
   };
@@ -104,6 +102,5 @@ export async function buildPendingStatementData(
     logoUrl,
     ownerName: group.owner_name,
     settledDate: new Date().toISOString().slice(0, 10),
-    brandColor,
   });
 }

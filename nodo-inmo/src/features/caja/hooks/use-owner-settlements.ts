@@ -8,6 +8,9 @@ export type OwnerSettlementRow =
 export type SettlementWithOwner = OwnerSettlementRow & {
   owner: { name: string } | null;
   payment: {
+    amount: number;
+    paid_amount: number | null;
+    expenses_amount: number | null;
     contract: {
       property: {
         id: string;
@@ -28,7 +31,7 @@ export function useOwnerSettlements() {
         .schema("nodo_inmo")
         .from("owner_settlements")
         .select(
-          "*, owner:contacts!owner_settlements_owner_id_fkey(name), payment:payments!inner(contract:contracts!inner(property:properties!inner(id, address)))",
+          "*, owner:contacts!owner_settlements_owner_id_fkey(name), payment:payments!inner(amount, paid_amount, expenses_amount, contract:contracts!inner(property:properties!inner(id, address)))",
         )
         .order("created_at", { ascending: false });
 
