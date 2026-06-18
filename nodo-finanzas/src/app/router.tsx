@@ -22,7 +22,7 @@ export function AppRouter() {
       <Routes>
         <Route
           path="/login"
-          element={session ? <Navigate to="/" replace /> : <LoginPage />}
+          element={session ? <Navigate to="/admin/dashboard" replace /> : <LoginPage />}
         />
         <Route
           path="/*"
