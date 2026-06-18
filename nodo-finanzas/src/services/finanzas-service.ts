@@ -1,4 +1,5 @@
 import { supabase, db } from '@/shared/lib/supabase';
+import { DolarService } from '@/services/dolar-service';
 import type {
   Cuenta,
   GastoFijo,
@@ -15,7 +16,8 @@ import type {
   Sueldo,
   MovimientoCuenta,
   PlanAhorro,
-  CuotaPlanAhorro
+  CuotaPlanAhorro,
+  TipoDolar,
 } from '@/types';
 
 export class FinanzasService {
@@ -997,6 +999,10 @@ export class FinanzasService {
       { id: '5', nombre: 'Mercado Pago', codigo: 'MERCADO_PAGO' as const, activa: true },
     ];
 
+    const tipoDolarConfig = await this.obtenerConfiguracion('tipo_dolar_seleccionado');
+    const tipoDolarSeleccionado: TipoDolar = (tipoDolarConfig as TipoDolar) || 'blue';
+    const cotizacionDolar = await this.obtenerCotizacionDolar(tipoDolarSeleccionado);
+
     return {
       cuentas,
       gastosFijos,
@@ -1004,9 +1010,9 @@ export class FinanzasService {
       tarjetas,
       consumosTarjetas,
       prestamos,
-      cotizacionDolar: null, // Se cargará desde useDolar
+      cotizacionDolar,
       configuracion: {
-        tipoDolarSeleccionado: 'blue',
+        tipoDolarSeleccionado,
         cuentasBancarias,
         categorias,
         formasDePago,
@@ -1330,6 +1336,41 @@ export class FinanzasService {
   }
 
   // === COTIZACIONES DÓLAR ===
+  /** Cache TTL: cotización en DB más vieja que esto se refresca desde la API. */
+  static readonly COTIZACION_CACHE_TTL_MS = 15 * 60 * 1000;
+
+  private static cotizacionCacheVigente(cotizacion: CotizacionDolar): boolean {
+    const edadMs = Date.now() - new Date(cotizacion.fechaActualizacion).getTime();
+    return edadMs >= 0 && edadMs < FinanzasService.COTIZACION_CACHE_TTL_MS;
+  }
+
+  static async obtenerCotizacionDolar(
+    tipo: TipoDolar,
+    forzarAPI = false,
+  ): Promise<CotizacionDolar | null> {
+    let cotizacion: CotizacionDolar | null = null;
+
+    if (!forzarAPI) {
+      cotizacion = await this.obtenerUltimaCotizacion(tipo);
+      if (cotizacion && !this.cotizacionCacheVigente(cotizacion)) {
+        cotizacion = null;
+      }
+    }
+
+    if (!cotizacion) {
+      cotizacion = await DolarService.obtenerCotizacion(tipo);
+      if (cotizacion) {
+        try {
+          await this.guardarCotizacion(cotizacion);
+        } catch (error) {
+          console.error('Error guardando cotización:', error);
+        }
+      }
+    }
+
+    return cotizacion;
+  }
+
   static async guardarCotizacion(cotizacion: CotizacionDolar): Promise<void> {
     const fechaHoy = new Date().toISOString().split('T')[0];
     const { data: existente } = await db
@@ -1339,7 +1380,7 @@ export class FinanzasService {
       .gte('fecha_actualizacion', fechaHoy + 'T00:00:00.000Z')
       .lt('fecha_actualizacion', fechaHoy + 'T23:59:59.999Z')
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (existente) {
       const { error } = await db
@@ -1370,6 +1411,10 @@ export class FinanzasService {
     }
   }
 
+  static async guardarCotizaciones(cotizaciones: CotizacionDolar[]): Promise<void> {
+    await Promise.all(cotizaciones.map((c) => this.guardarCotizacion(c)));
+  }
+
   static async obtenerUltimaCotizacion(tipo: string): Promise<CotizacionDolar | null> {
     const { data, error } = await db
       .from('cotizaciones_dolar')
@@ -1377,9 +1422,9 @@ export class FinanzasService {
       .eq('tipo', tipo)
       .order('fecha_actualizacion', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       throw new Error(`Error obteniendo cotización: ${error.message}`);
     }
 
@@ -1417,9 +1462,9 @@ export class FinanzasService {
       .from('configuracion_usuario')
       .select('valor')
       .eq('clave', clave)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       throw new Error(`Error obteniendo configuración: ${error.message}`);
     }
 
