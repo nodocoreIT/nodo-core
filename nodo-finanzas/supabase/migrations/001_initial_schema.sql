@@ -303,3 +303,7 @@ create policy "authenticated_all" on nodo_finanzas_personales.configuracion_usua
 revoke all on all tables in schema nodo_finanzas_personales from anon;
 grant select, insert, update, delete on all tables in schema nodo_finanzas_personales to authenticated;
 grant select, insert, update, delete on all tables in schema nodo_finanzas_personales to service_role;
+
+-- Expose schema via PostgREST (required for supabase-js .schema() calls)
+alter role authenticator set pgrst.db_schemas = 'public, nodo_inmo, nodo_core, nodo_finanzas_personales';
+notify pgrst, 'reload config';

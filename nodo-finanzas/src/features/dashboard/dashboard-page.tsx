@@ -1,6 +1,5 @@
-import { RefreshCw, TrendingUp, TrendingDown, AlertTriangle, HandCoins, CheckCircle, Bell } from 'lucide-react';
+import { TrendingUp, TrendingDown, HandCoins, CheckCircle, Bell } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { useDolar } from '@/hooks/use-dolar';
@@ -78,22 +77,6 @@ export function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-ink">Bienvenido</h1>
           <p className="text-sm text-slate2 capitalize">{fechaHoy}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {dolar.cotizacion && (
-            <span className="hidden sm:inline-flex items-center gap-1.5 bg-brand/10 text-brand text-xs font-semibold px-3 py-1.5 rounded-full">
-              USD {dolar.tipoDolarSeleccionado.toUpperCase()} · Venta ${dolar.cotizacion.venta.toFixed(0)}
-            </span>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            loading={dolar.loading}
-            onClick={() => dolar.obtenerCotizacion()}
-          >
-            <RefreshCw className="h-4 w-4" />
-            Actualizar dólar
-          </Button>
         </div>
       </div>
 
@@ -186,38 +169,6 @@ export function DashboardPage() {
           )}
         </Card>
       </div>
-
-      {/* Dolar rates */}
-      {dolar.cotizacion && (
-        <Card title="Cotización del Dólar">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="p-3 rounded-lg bg-mist/50 border border-mist">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">
-                {dolar.cotizacion.tipo.toUpperCase()}
-              </p>
-              <div className="flex items-center gap-3 mt-1">
-                <div>
-                  <p className="text-[9px] text-slate2">Compra</p>
-                  <p className="text-base font-black text-ink">${dolar.cotizacion.compra.toFixed(0)}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-slate2">Venta</p>
-                  <p className="text-base font-black text-brand">${dolar.cotizacion.venta.toFixed(0)}</p>
-                </div>
-              </div>
-              <p className="text-[9px] text-slate2 mt-1.5">
-                {formatearFecha(dolar.cotizacion.fechaActualizacion)}
-              </p>
-            </div>
-          </div>
-          {dolar.error && (
-            <div className="mt-3 flex items-center gap-2 text-red-600 text-xs bg-red-50 p-2 rounded-lg">
-              <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-              {dolar.error}
-            </div>
-          )}
-        </Card>
-      )}
 
       {/* Net balance card */}
       {(totalARS + (dolar.cotizacion ? dolar.convertirUSDaARS(totalUSD) : 0) - gastosMes) !== 0 && (
