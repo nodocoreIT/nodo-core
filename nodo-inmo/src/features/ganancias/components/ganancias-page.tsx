@@ -19,6 +19,8 @@ import {
 import { useCashMovements } from "@/features/caja/hooks/use-cash-movements";
 import { useCashAccounts } from "@/shared/hooks/use-cash-accounts";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
+import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";
+import { useThemeStore } from "@/shared/hooks/use-theme-settings";
 import { formatMoney } from "@/features/contracts/lib/contract-labels";
 import {
   buildMonthlyBalance,
@@ -54,6 +56,8 @@ export function GananciasPage() {
   const { data: movements = [], isLoading, isError } = useCashMovements();
   const { accounts, isLoading: accountsLoading } = useCashAccounts();
   const { data: agency } = useOrgProfile();
+  const { settings } = useThemeStore();
+  const { data: logoUrl } = useLogoUrl(agency?.logo_path);
   const [periodYm, setPeriodYm] = useState(currentPeriodYm);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -77,8 +81,10 @@ export function GananciasPage() {
       periodLabel: formatPeriodTitle(periodYm),
       periodYm,
       summary,
+      logoUrl: logoUrl ?? null,
+      brandColor: settings.primaryColor,
     }),
-    [agency, periodYm, summary],
+    [agency, periodYm, summary, logoUrl, settings.primaryColor],
   );
 
   async function handlePdf(download: boolean) {
@@ -95,6 +101,7 @@ export function GananciasPage() {
     { label: "Adm. Alquileres", totals: summary.admAlquileres, color: "border-green-500" },
     { label: "Contratos / Renov.", totals: summary.contratos, color: "border-blue-500" },
     { label: "Ventas Inmob.", totals: summary.ventas, color: "border-amber-500" },
+    { label: "Dirección Obra / Honor.", totals: summary.honorarios, color: "border-slate-400" },
   ];
 
   return (
@@ -178,7 +185,7 @@ export function GananciasPage() {
       {!isLoading && !accountsLoading && !isError && (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_300px]">
           <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {cards.map((card) => (
                 <div
                   key={card.label}

@@ -89,7 +89,6 @@ export const NODO_PLANS: NodoPlanConfig[] = [
       {
         label: "Automatizaciones",
         features: [
-          { text: "Bot WhatsApp 24/7: responde consultas automáticamente", minPlan: "pro" },
           { text: "Avisos de vencimiento, aumentos y mora por WhatsApp", minPlan: "pro" },
           { text: "Administración automática de redes sociales", minPlan: "pro" },
         ],

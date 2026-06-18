@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { formatMoney, formatDate } from "@/features/contracts/lib/contract-labels";
 import { formatPeriod } from "../lib/payment-labels";
 
@@ -18,78 +18,89 @@ export interface PaymentReceiptData {
   commissionRate: number;
   commissionAmount: number;
   ownerShare: number;
+  brandColor?: string;
+  logoUrl?: string | null;
 }
 
-const styles = StyleSheet.create({
-  page: { fontFamily: "Helvetica", fontSize: 10, padding: 48, color: "#1a1a2e" },
-  brand: { fontSize: 16, fontFamily: "Helvetica-Bold", textAlign: "center" },
-  sub: { fontSize: 9, textAlign: "center", color: "#475569" },
-  title: {
-    fontSize: 12,
-    fontFamily: "Helvetica-Bold",
-    textAlign: "center",
-    marginTop: 20,
-    marginBottom: 16,
-  },
-  line: { marginBottom: 6 },
-  label: { fontFamily: "Helvetica-Bold" },
-  detailBox: {
-    marginTop: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    borderStyle: "solid",
-    borderRadius: 4,
-  },
-  detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  detailLabel: { fontSize: 10, color: "#334155" },
-  detailAmount: { fontSize: 10, fontFamily: "Helvetica-Bold" },
-  divider: {
-    borderTopWidth: 1,
-    borderTopColor: "#cbd5e1",
-    borderTopStyle: "solid",
-    marginVertical: 8,
-  },
-  total: {
-    marginTop: 16,
-    fontSize: 12,
-    fontFamily: "Helvetica-Bold",
-    textAlign: "center",
-  },
-  adminSection: {
-    marginTop: 16,
-    padding: 12,
-    backgroundColor: "#f8fafc",
-    borderRadius: 4,
-  },
-  adminTitle: {
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    color: "#475569",
-    marginBottom: 6,
-    textTransform: "uppercase",
-  },
-  footer: {
-    position: "absolute",
-    bottom: 40,
-    left: 48,
-    right: 48,
-    fontSize: 8,
-    color: "#64748b",
-    textAlign: "center",
-  },
-});
+function createReceiptStyles(brand: string) {
+  return StyleSheet.create({
+    page: { fontFamily: "Helvetica", fontSize: 10, padding: 48, color: "#1a1a2e" },
+    brand: { fontSize: 16, fontFamily: "Helvetica-Bold", textAlign: "center", color: brand },
+    sub: { fontSize: 9, textAlign: "center", color: "#475569" },
+    title: {
+      fontSize: 12,
+      fontFamily: "Helvetica-Bold",
+      textAlign: "center",
+      marginTop: 20,
+      marginBottom: 16,
+      color: brand,
+    },
+    logo: { width: 80, height: 40, objectFit: "contain", alignSelf: "center", marginBottom: 4 },
+    line: { marginBottom: 6 },
+    label: { fontFamily: "Helvetica-Bold" },
+    detailBox: {
+      marginTop: 12,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: "#e2e8f0",
+      borderStyle: "solid",
+      borderRadius: 4,
+    },
+    detailRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 4,
+    },
+    detailLabel: { fontSize: 10, color: "#334155" },
+    detailAmount: { fontSize: 10, fontFamily: "Helvetica-Bold" },
+    divider: {
+      borderTopWidth: 1,
+      borderTopColor: "#cbd5e1",
+      borderTopStyle: "solid",
+      marginVertical: 8,
+    },
+    total: {
+      marginTop: 16,
+      fontSize: 12,
+      fontFamily: "Helvetica-Bold",
+      textAlign: "center",
+    },
+    adminSection: {
+      marginTop: 16,
+      padding: 12,
+      backgroundColor: "#f8fafc",
+      borderRadius: 4,
+    },
+    adminTitle: {
+      fontSize: 9,
+      fontFamily: "Helvetica-Bold",
+      color: "#475569",
+      marginBottom: 6,
+      textTransform: "uppercase",
+    },
+    footer: {
+      position: "absolute",
+      bottom: 40,
+      left: 48,
+      right: 48,
+      fontSize: 8,
+      color: "#64748b",
+      textAlign: "center",
+    },
+  });
+}
 
 export function PaymentReceiptDocument(data: PaymentReceiptData) {
+  const brand = data.brandColor ?? "#da5a0e";
+  const styles = createReceiptStyles(brand);
   const hasExpenses = data.expensesAmount > 0;
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        {data.logoUrl ? (
+          <Image src={data.logoUrl} style={styles.logo} />
+        ) : null}
         <Text style={styles.brand}>{data.agencyName}</Text>
         <Text style={styles.sub}>SERVICIOS INMOBILIARIOS</Text>
         {data.address ? <Text style={styles.sub}>{data.address}</Text> : null}

@@ -11,6 +11,8 @@ function slugify(name: string): string {
 export async function buildReceiptData(
   payment: PaymentWithRelations,
   agency: { legal_name?: string | null; address?: string | null } | null,
+  brandColor?: string,
+  logoUrl?: string | null,
 ): Promise<PaymentReceiptData> {
   let commissionFromCaja: number | null = null;
   let accountLabel: string | null = null;
@@ -47,14 +49,18 @@ export async function buildReceiptData(
     commissionRate: breakdown.commissionRate,
     commissionAmount: breakdown.commissionAmount,
     ownerShare: breakdown.ownerShare,
+    brandColor,
+    logoUrl: logoUrl ?? null,
   };
 }
 
 export async function downloadPaymentReceipt(
   payment: PaymentWithRelations,
   agency: { legal_name?: string | null; address?: string | null } | null,
+  brandColor?: string,
+  logoUrl?: string | null,
 ): Promise<void> {
-  const data = await buildReceiptData(payment, agency);
+  const data = await buildReceiptData(payment, agency, brandColor, logoUrl);
   const [{ pdf }, { PaymentReceiptDocument }] = await Promise.all([
     import("@react-pdf/renderer"),
     import("@/features/payments/components/payment-receipt-document"),

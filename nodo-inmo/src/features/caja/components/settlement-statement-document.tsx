@@ -17,153 +17,153 @@ import { formatDate } from "@/features/contracts/lib/contract-labels";
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const BRAND = "#1a4d3e";
-
-const styles = StyleSheet.create({
-  page: {
-    fontFamily: "Helvetica",
-    fontSize: 10,
-    padding: 40,
-    color: "#1a1a2e",
-    backgroundColor: "#ffffff",
-  },
-  // Header band
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 24,
-    paddingBottom: 16,
-    borderBottomWidth: 2,
-    borderBottomColor: BRAND,
-    borderBottomStyle: "solid",
-  },
-  headerLeft: {
-    flexDirection: "column",
-    gap: 2,
-  },
-  logo: {
-    width: 80,
-    height: 40,
-    objectFit: "contain",
-  },
-  agencyName: {
-    fontSize: 14,
-    fontFamily: "Helvetica-Bold",
-    color: BRAND,
-  },
-  agencyDetail: {
-    fontSize: 9,
-    color: "#64748b",
-    marginTop: 2,
-  },
-  // Title section
-  titleSection: {
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 18,
-    fontFamily: "Helvetica-Bold",
-    color: BRAND,
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 10,
-    color: "#475569",
-    marginBottom: 2,
-  },
-  // Table
-  table: {
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    borderStyle: "solid",
-    borderRadius: 4,
-  },
-  tableRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
-    borderBottomStyle: "solid",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  tableRowLast: {
-    flexDirection: "row",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  tableRowTotal: {
-    flexDirection: "row",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    backgroundColor: "#f8fafc",
-    borderTopWidth: 2,
-    borderTopColor: "#cbd5e1",
-    borderTopStyle: "solid",
-  },
-  tableRowDeduction: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
-    borderBottomStyle: "solid",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    paddingLeft: 24,
-  },
-  cellLabel: {
-    flex: 1,
-    fontSize: 10,
-    color: "#334155",
-  },
-  cellLabelBold: {
-    flex: 1,
-    fontSize: 11,
-    fontFamily: "Helvetica-Bold",
-    color: "#1a1a2e",
-  },
-  cellLabelDeduction: {
-    flex: 1,
-    fontSize: 9,
-    color: "#64748b",
-  },
-  cellAmount: {
-    fontSize: 10,
-    color: "#334155",
-    textAlign: "right",
-    minWidth: 100,
-  },
-  cellAmountBold: {
-    fontSize: 11,
-    fontFamily: "Helvetica-Bold",
-    color: "#1a1a2e",
-    textAlign: "right",
-    minWidth: 100,
-  },
-  cellAmountDeduction: {
-    fontSize: 9,
-    color: "#64748b",
-    textAlign: "right",
-    minWidth: 100,
-  },
-  // Footer
-  footer: {
-    position: "absolute",
-    bottom: 30,
-    left: 40,
-    right: 40,
-    borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
-    borderTopStyle: "solid",
-    paddingTop: 8,
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  footerText: {
-    fontSize: 8,
-    color: "#94a3b8",
-  },
-});
+function createStyles(brand: string) {
+  return StyleSheet.create({
+    page: {
+      fontFamily: "Helvetica",
+      fontSize: 10,
+      padding: 40,
+      color: "#1a1a2e",
+      backgroundColor: "#ffffff",
+    },
+    // Header band
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 24,
+      paddingBottom: 16,
+      borderBottomWidth: 2,
+      borderBottomColor: brand,
+      borderBottomStyle: "solid",
+    },
+    headerLeft: {
+      flexDirection: "column",
+      gap: 2,
+    },
+    logo: {
+      width: 80,
+      height: 40,
+      objectFit: "contain",
+    },
+    agencyName: {
+      fontSize: 14,
+      fontFamily: "Helvetica-Bold",
+      color: brand,
+    },
+    agencyDetail: {
+      fontSize: 9,
+      color: "#64748b",
+      marginTop: 2,
+    },
+    // Title section
+    titleSection: {
+      marginBottom: 20,
+    },
+    title: {
+      fontSize: 18,
+      fontFamily: "Helvetica-Bold",
+      color: brand,
+      marginBottom: 6,
+    },
+    subtitle: {
+      fontSize: 10,
+      color: "#475569",
+      marginBottom: 2,
+    },
+    // Table
+    table: {
+      marginTop: 16,
+      borderWidth: 1,
+      borderColor: "#e2e8f0",
+      borderStyle: "solid",
+      borderRadius: 4,
+    },
+    tableRow: {
+      flexDirection: "row",
+      borderBottomWidth: 1,
+      borderBottomColor: "#e2e8f0",
+      borderBottomStyle: "solid",
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+    },
+    tableRowLast: {
+      flexDirection: "row",
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+    },
+    tableRowTotal: {
+      flexDirection: "row",
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      backgroundColor: "#f8fafc",
+      borderTopWidth: 2,
+      borderTopColor: "#cbd5e1",
+      borderTopStyle: "solid",
+    },
+    tableRowDeduction: {
+      flexDirection: "row",
+      borderBottomWidth: 1,
+      borderBottomColor: "#f1f5f9",
+      borderBottomStyle: "solid",
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      paddingLeft: 24,
+    },
+    cellLabel: {
+      flex: 1,
+      fontSize: 10,
+      color: "#334155",
+    },
+    cellLabelBold: {
+      flex: 1,
+      fontSize: 11,
+      fontFamily: "Helvetica-Bold",
+      color: "#1a1a2e",
+    },
+    cellLabelDeduction: {
+      flex: 1,
+      fontSize: 9,
+      color: "#64748b",
+    },
+    cellAmount: {
+      fontSize: 10,
+      color: "#334155",
+      textAlign: "right",
+      minWidth: 100,
+    },
+    cellAmountBold: {
+      fontSize: 11,
+      fontFamily: "Helvetica-Bold",
+      color: "#1a1a2e",
+      textAlign: "right",
+      minWidth: 100,
+    },
+    cellAmountDeduction: {
+      fontSize: 9,
+      color: "#64748b",
+      textAlign: "right",
+      minWidth: 100,
+    },
+    // Footer
+    footer: {
+      position: "absolute",
+      bottom: 30,
+      left: 40,
+      right: 40,
+      borderTopWidth: 1,
+      borderTopColor: "#e2e8f0",
+      borderTopStyle: "solid",
+      paddingTop: 8,
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    footerText: {
+      fontSize: 8,
+      color: "#94a3b8",
+    },
+  });
+}
 
 // ─── Money formatter (React-PDF compatible — no Intl formatting needed) ───────
 
@@ -179,6 +179,9 @@ function fmtAmount(amount: number, currency: string): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function SettlementStatementDocument(props: StatementData) {
+  const brand = props.brandColor ?? "#1a4d3e";
+  const styles = createStyles(brand);
+
   const {
     breakdown,
     currency,
