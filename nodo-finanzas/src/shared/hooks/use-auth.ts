@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/shared/lib/supabase';
+import { redirectToLandingLogin } from '@/shared/lib/auth-redirect';
 import type { Session } from '@supabase/supabase-js';
 
 export function useAuth() {
@@ -13,7 +14,10 @@ export function useAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signOut = () => supabase.auth.signOut();
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    redirectToLandingLogin();
+  };
 
   return { session, loading: session === undefined, signOut };
 }

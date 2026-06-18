@@ -20,9 +20,14 @@ import {
   Lock,
   AlertCircle,
 } from "lucide-react";
-import { Button } from "@nodocore/shared-components";
+import {
+  Button,
+  GlobalSearchInput,
+  PortalHeaderActions,
+  PortalHeaderMobileActions,
+  useSearchStore,
+} from "@nodocore/shared-components";
 import { BrandMark } from "@/shared/components/brand-mark";
-import { SearchInput } from "@/shared/components/search-input";
 import { ProfileDialog } from "@/features/profile/components/profile-dialog";
 import {
   Dialog,
@@ -32,7 +37,6 @@ import {
   DialogDescription,
 } from "@/shared/components/ui/dialog";
 import { AgencyProfileForm } from "@/features/agency-profile/components/agency-profile-form";
-import { useSearchStore } from "@/shared/search/use-search-store";
 import { useAuth } from "@nodocore/shared-components";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import { cn } from "@/shared/lib/utils";
@@ -266,9 +270,9 @@ export function AdminLayout() {
       {/* ── Main area ── */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar — stacked on mobile, single line on desktop */}
-        <header className="flex flex-col sm:flex-row min-h-20 items-center justify-between gap-3 sm:gap-4 border-b border-border bg-[#EEF3F8] px-4 sm:px-6 py-3 shadow-sm flex-shrink-0">
+        <header className="flex flex-col sm:flex-row min-h-20 items-center gap-3 sm:gap-4 border-b border-border bg-[#EEF3F8] px-4 sm:px-6 py-3 shadow-sm flex-shrink-0">
           {/* Row 1 / Left Section */}
-          <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+          <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto sm:min-w-0 sm:flex-1">
             <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
@@ -286,34 +290,21 @@ export function AdminLayout() {
               </div>
             </div>
 
-            {/* Mobile notification bell */}
-            <div className="flex items-center gap-2 sm:hidden">
-              <IPCBadge />
-              <NotificationsBell />
-            </div>
+            <PortalHeaderMobileActions
+              metrics={<IPCBadge />}
+              notifications={<NotificationsBell />}
+            />
           </div>
 
-          {/* Row 2 / Right Section */}
-          {placeholder && (
-            <div className="w-full sm:w-auto flex-1 sm:max-w-xs md:max-w-md flex items-center gap-4 justify-between sm:justify-end">
-              <div className="w-full">
-                <SearchInput placeholder={placeholder} />
-              </div>
-              {/* Desktop notification bell */}
-              <div className="hidden sm:flex items-center gap-2">
-                <IPCBadge />
-                <NotificationsBell />
-              </div>
-            </div>
-          )}
-
-          {/* Fallback for desktop when no search input exists */}
-          {!placeholder && (
-            <div className="hidden sm:flex items-center justify-end gap-2 ml-auto">
-              <IPCBadge />
-              <NotificationsBell />
-            </div>
-          )}
+          <PortalHeaderActions
+            search={
+              placeholder ? (
+                <GlobalSearchInput placeholder={placeholder} />
+              ) : undefined
+            }
+            metrics={<IPCBadge />}
+            notifications={<NotificationsBell />}
+          />
         </header>
 
         {/* Content area */}

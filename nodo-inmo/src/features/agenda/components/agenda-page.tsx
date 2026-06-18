@@ -456,12 +456,12 @@ export function AgendaPage() {
             <div className="space-y-6">
               {/* Group 1: Overdue tasks (Atrasadas) */}
               {overdueTasks.length > 0 && (
-                <div className="space-y-3">
+                <div>
                   <h3 className="text-xs font-bold text-rose-600 uppercase tracking-wider flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
                     Tareas Atrasadas / Demoradas
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     {overdueTasks.map((task) => (
                       <TaskCard
                         key={task.id}
@@ -480,17 +480,17 @@ export function AgendaPage() {
               )}
 
               {/* Group 2: Today's Tasks (Día Seleccionado) */}
-              <div className="space-y-3">
+              <div>
                 <h3 className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-brand" />
                   Agenda para el Día Seleccionado
                 </h3>
                 {selectedDayTasks.length === 0 ? (
-                  <div className="p-8 text-center bg-card rounded-md border border-border border-dashed text-slate2 text-sm">
+                  <div className="p-8 text-center bg-card rounded-md border border-border border-dashed text-slate2 text-sm mt-4">
                     No tenés tareas agendadas para este día.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     {selectedDayTasks.map((task) => (
                       <TaskCard
                         key={task.id}
@@ -510,12 +510,12 @@ export function AgendaPage() {
 
               {/* Group 3: Upcoming Tasks (Próximas) */}
               {futureTasks.length > 0 && (
-                <div className="space-y-3">
+                <div>
                   <h3 className="text-xs font-bold text-slate2 uppercase tracking-wider flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full bg-slate-400" />
                     Próximas Tareas Agendadas
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     {futureTasks.map((task) => (
                       <TaskCard
                         key={task.id}

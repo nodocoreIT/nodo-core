@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
-import { useSearchStore } from "@/shared/search/use-search-store";
+import { useSearchStore } from "@nodocore/shared-components";
 
 const mockUsePayments = vi.fn();
 vi.mock("@/features/payments/hooks/use-payments", () => ({

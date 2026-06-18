@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Bell, X, Calendar } from 'lucide-react';
+import { NotificationBellButton } from '@nodocore/shared-components';
 import { useNotifications } from '@/hooks/use-notifications';
 import type { Notification } from '@/hooks/use-notifications';
 
@@ -26,19 +27,21 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="relative">
-      <button
+    <div className="relative shrink-0">
+      <NotificationBellButton
         onClick={() => setOpen((o) => !o)}
-        className="relative p-2 rounded-full text-slate2 hover:text-navy hover:bg-mist transition-colors focus:outline-none"
         aria-label="Notificaciones"
+        aria-expanded={open}
+        badge={
+          count > 0 ? (
+            <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-white">
+              {count > 9 ? '9+' : count}
+            </span>
+          ) : undefined
+        }
       >
         <Bell className="h-5 w-5" />
-        {count > 0 && (
-          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-white">
-            {count > 9 ? '9+' : count}
-          </span>
-        )}
-      </button>
+      </NotificationBellButton>
 
       {open && (
         <>

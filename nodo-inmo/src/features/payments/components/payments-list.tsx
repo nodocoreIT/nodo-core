@@ -23,7 +23,7 @@ import {
   formatMoney,
   formatDate,
 } from "@/features/contracts/lib/contract-labels";
-import { useSearchStore } from "@/shared/search/use-search-store";
+import { useSearchStore } from "@nodocore/shared-components";
 import { matchesQuery } from "@/shared/search/matches-query";
 import { cn } from "@/shared/lib/utils";
 import { isArchivedContract } from "@/features/contracts/lib/contract-archive";

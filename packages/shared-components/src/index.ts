@@ -13,6 +13,16 @@ export {
 // ─── Components ──────────────────────────────────────────────────────────────
 export { BrandMark, type BrandMarkProps } from "./components/brand-mark";
 export { SearchInput, type SearchInputProps } from "./components/search-input";
+export { GlobalSearchInput, type GlobalSearchInputProps } from "./components/global-search-input";
+export {
+  PortalHeaderActions,
+  PortalHeaderMobileActions,
+  type PortalHeaderActionsProps,
+} from "./components/portal-header-actions";
+export {
+  NotificationBellButton,
+  type NotificationBellButtonProps,
+} from "./components/notification-bell-button";
 export { PlanGate, type PlanTier } from "./components/plan-gate";
 export { RequireAuth } from "./components/require-auth";
 

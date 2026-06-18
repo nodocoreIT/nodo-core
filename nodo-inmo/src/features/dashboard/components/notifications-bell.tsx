@@ -1,14 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Bell,
-  AlertTriangle,
-  Calendar,
-  Info,
-  CreditCard,
-  ChevronRight,
-  Loader2,
-} from "lucide-react";
+import { Loader2, Bell, AlertTriangle, Calendar, Info, CreditCard, ChevronRight } from "lucide-react";
+import { NotificationBellButton } from "@nodocore/shared-components";
 import { useNotifications } from "@/features/dashboard/hooks/use-notifications";
 import type { NotificationKind } from "@/features/dashboard/lib/build-notifications";
 import { cn } from "@/shared/lib/utils";
@@ -71,28 +64,28 @@ export function NotificationsBell() {
 
   return (
     <div className="relative shrink-0" ref={dropdownRef}>
-      <button
-        type="button"
+      <NotificationBellButton
         onClick={() => setIsOpen((prev) => !prev)}
-        className="relative rounded-full p-2 text-navy transition-colors hover:bg-navy/5 hover:text-brand focus:outline-none"
         aria-label={
           loading
             ? "Cargando notificaciones"
             : `${count} notificación${count === 1 ? "" : "es"}`
         }
         aria-expanded={isOpen}
+        badge={
+          !loading && count > 0 ? (
+            <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-bold text-white ring-2 ring-[#EEF3F8]">
+              {formatBadgeCount(count)}
+            </span>
+          ) : undefined
+        }
       >
         {loading ? (
           <Loader2 className="h-5 w-5 animate-spin text-slate2" />
         ) : (
           <Bell className="h-5 w-5" />
         )}
-        {!loading && count > 0 ? (
-          <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-bold text-white ring-2 ring-[#EEF3F8]">
-            {formatBadgeCount(count)}
-          </span>
-        ) : null}
-      </button>
+      </NotificationBellButton>
 
       {isOpen ? (
         <div className="absolute right-0 z-50 mt-2 w-80 animate-in fade-in-50 slide-in-from-top-1 overflow-hidden rounded-md border border-border bg-card shadow-lg duration-200 sm:w-96">

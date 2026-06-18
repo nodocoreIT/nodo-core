@@ -6,7 +6,7 @@ import { PaginationControls } from "@nodocore/shared-components";
 import { PAGE_SIZE } from "@/shared/lib/constants";
 import { useProperties } from "@/features/properties/hooks/use-properties";
 import type { PropertyRow } from "@/features/properties/hooks/use-properties";
-import { useSearchStore } from "@/shared/search/use-search-store";
+import { useSearchStore } from "@nodocore/shared-components";
 import { matchesQuery } from "@/shared/search/matches-query";
 import { useUpdateProperty } from "@/features/properties/hooks/use-update-property";
 import { useDeleteProperty } from "@/features/properties/hooks/use-delete-property";

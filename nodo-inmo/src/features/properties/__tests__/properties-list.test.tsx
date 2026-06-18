@@ -54,7 +54,7 @@ vi.mock("@/features/property-expenses/components/register-expense-button", () =>
 }));
 
 import { PropertiesList } from "@/features/properties/components/properties-list";
-import { useSearchStore } from "@/shared/search/use-search-store";
+import { useSearchStore } from "@nodocore/shared-components";
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const client = new QueryClient({
