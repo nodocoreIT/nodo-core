@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h2 style="color:#003000;font-weight:bold;">Mis Obras</h2>
+    <p class="text-muted">Hola, {{ cliente.nombre }}</p>
+
+    <div class="row g-3 mt-2">
+        {% for obra in mis_obras %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow-sm border-0 h-100" style="border-radius:12px;">
+                <div class="card-body">
+                    <h5 class="fw-bold">{{ obra.nombre }}</h5>
+                    <p class="small text-muted mb-2">{{ obra.direccion_obra }}</p>
+                    <div class="progress mb-3" style="height:8px;">
+                        <div class="progress-bar bg-success" style="width:{{ obra.porcentaje_avance }}%"></div>
+                    </div>
+                    <a href="{% url 'detalle_obra_cliente' obra.id %}" class="btn btn-sm btn-outline-success w-100">
+                        Ver avance
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center text-muted py-5">No tenés obras activas asignadas.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

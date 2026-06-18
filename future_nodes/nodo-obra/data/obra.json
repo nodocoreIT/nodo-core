@@ -1,0 +1,346 @@
+{
+  "version": 5,
+  "staff": [
+    {
+      "id": "287edac8-5ce4-48dc-969a-2de330d827e4",
+      "fullName": "Dirección de Obra",
+      "email": "direccion@nodo.demo",
+      "password": "demo1234",
+      "role": "admin",
+      "createdAt": "2026-06-18T17:28:28.699Z"
+    }
+  ],
+  "clientes": [
+    {
+      "id": "c5e22ff4-62c6-4105-8064-6dff7e90031e",
+      "nombre": "María González",
+      "dni": "30123456",
+      "telefono": "11 5555-1234",
+      "email": "maria@ejemplo.com",
+      "domicilio": "Av. Libertador 1200, CABA",
+      "puedeVerPortal": true,
+      "portalEmail": "maria@ejemplo.com",
+      "portalPassword": "cliente1234",
+      "createdAt": "2026-06-18T17:28:28.699Z"
+    }
+  ],
+  "rubros": [
+    {
+      "id": "218e9833-1d67-4cd1-ba8c-dc9db7f457b3",
+      "nombre": "Albañilería"
+    },
+    {
+      "id": "5dfbeb79-0168-4a1c-a660-6a32bbcb94b9",
+      "nombre": "Electricidad"
+    },
+    {
+      "id": "3f7b30cb-2e02-4d3d-8172-8affdc3bfa83",
+      "nombre": "Plomería"
+    },
+    {
+      "id": "a72e46af-48a3-46ac-a1e6-a241e2f9be86",
+      "nombre": "Pintura"
+    },
+    {
+      "id": "447c95e5-a7fe-4521-961b-601e0f8ce112",
+      "nombre": "Herrería"
+    },
+    {
+      "id": "ce4a4d5c-35c5-45d9-9705-b89bd83a634b",
+      "nombre": "Carpintería"
+    }
+  ],
+  "proyectos": [
+    {
+      "id": "cca78ff5-9511-4ecb-9e07-8be366928cd5",
+      "nombre": "Refacción PH Palermo",
+      "clienteId": "c5e22ff4-62c6-4105-8064-6dff7e90031e",
+      "direccionObra": "Thames 1450, CABA",
+      "tipoInmueble": "PH",
+      "fechaInicio": "2025-03-01",
+      "plazoMeses": 4,
+      "encargado": "Ing. López",
+      "porcentajeContingencia": 10,
+      "presupuestoEstimado": 8500000,
+      "porcentajeComisionDireccion": 10,
+      "tipoHonorario": "PORCENTAJE",
+      "valorHonorario": 10,
+      "estado": "CURSO",
+      "notas": "Obra en ejecución — demolición terminada.",
+      "createdAt": "2026-06-18T17:28:28.699Z",
+      "avanceProgreso": 0,
+      "origenPresupuestoId": null,
+      "inmoPropertyId": null,
+      "inmoPropertyLabel": null
+    },
+    {
+      "id": "60ee434c-3846-4d11-b7fe-08011c4cb81b",
+      "nombre": "Casa Nordelta",
+      "clienteId": "c5e22ff4-62c6-4105-8064-6dff7e90031e",
+      "direccionObra": "Los Castores 320, Nordelta",
+      "tipoInmueble": "Casa",
+      "fechaInicio": "2025-06-01",
+      "plazoMeses": 8,
+      "encargado": "Arq. Martínez",
+      "porcentajeContingencia": 12,
+      "presupuestoEstimado": 22000000,
+      "porcentajeComisionDireccion": 10,
+      "tipoHonorario": "PORCENTAJE",
+      "valorHonorario": 10,
+      "estado": "PLAN",
+      "notas": "En planificación — presupuesto preliminar.",
+      "createdAt": "2026-06-18T17:28:28.699Z",
+      "avanceProgreso": 0,
+      "origenPresupuestoId": null,
+      "inmoPropertyId": null,
+      "inmoPropertyLabel": null
+    }
+  ],
+  "tareas": [
+    {
+      "id": "8d98b91a-b196-4cf9-bf01-e6bc02083aa6",
+      "proyectoId": "cca78ff5-9511-4ecb-9e07-8be366928cd5",
+      "titulo": "Revisar planos sanitarios",
+      "contenido": "",
+      "completada": true,
+      "fechaCreacion": "2026-06-18T17:28:28.699Z",
+      "fechaLimite": "2025-03-10",
+      "tipo": "operativa",
+      "presupuestoManoObra": 0,
+      "presupuestoMateriales": 0
+    },
+    {
+      "id": "7582154c-8dcc-49ab-bbad-5fa12e3c3489",
+      "proyectoId": "cca78ff5-9511-4ecb-9e07-8be366928cd5",
+      "titulo": "Coordinar visita cliente",
+      "contenido": "",
+      "completada": false,
+      "fechaCreacion": "2026-06-18T17:28:28.699Z",
+      "fechaLimite": "2025-06-20",
+      "tipo": "agenda",
+      "presupuestoManoObra": 0,
+      "presupuestoMateriales": 0
+    },
+    {
+      "id": "ccdb2b36-f434-447c-95f8-9686b1fcc582",
+      "proyectoId": "cca78ff5-9511-4ecb-9e07-8be366928cd5",
+      "titulo": "Pedido cemento — pendiente",
+      "contenido": "",
+      "completada": false,
+      "fechaCreacion": "2026-06-18T17:28:28.699Z",
+      "fechaLimite": null,
+      "tipo": "logistica",
+      "presupuestoManoObra": 0,
+      "presupuestoMateriales": 0
+    },
+    {
+      "id": "ca1c35de-d845-4a53-8b4f-e4beed480a33",
+      "proyectoId": "cca78ff5-9511-4ecb-9e07-8be366928cd5",
+      "titulo": "Rendir caja chica semana 24",
+      "contenido": "",
+      "completada": false,
+      "fechaCreacion": "2026-06-18T17:28:28.699Z",
+      "fechaLimite": null,
+      "tipo": "caja",
+      "presupuestoManoObra": 0,
+      "presupuestoMateriales": 0
+    },
+    {
+      "id": "90892d21-f11d-43d3-8357-f595e4441819",
+      "proyectoId": "60ee434c-3846-4d11-b7fe-08011c4cb81b",
+      "titulo": "Definir terminaciones",
+      "contenido": "",
+      "completada": false,
+      "fechaCreacion": "2026-06-18T17:28:28.699Z",
+      "fechaLimite": "2025-07-01",
+      "tipo": "propietario",
+      "presupuestoManoObra": 0,
+      "presupuestoMateriales": 0
+    },
+    {
+      "id": "a5ba48d6-7fb4-4617-ab39-30fa77efb436",
+      "proyectoId": "cca78ff5-9511-4ecb-9e07-8be366928cd5",
+      "titulo": "r a ver el caño roto",
+      "contenido": "",
+      "completada": false,
+      "fechaCreacion": "2026-06-18T18:13:23.441Z",
+      "fechaLimite": null,
+      "tipo": "operativa",
+      "presupuestoManoObra": 0,
+      "presupuestoMateriales": 0
+    }
+  ],
+  "gastos": [
+    {
+      "id": "0128c38c-21a7-4b92-a304-9e80e064f52c",
+      "proyectoId": "cca78ff5-9511-4ecb-9e07-8be366928cd5",
+      "rubroId": "218e9833-1d67-4cd1-ba8c-dc9db7f457b3",
+      "fecha": "2025-05-12",
+      "detalle": "Corralón — hierro y cemento",
+      "montoTicket": 420000,
+      "tipoComponente": "MATERIALES"
+    },
+    {
+      "id": "6e5224be-a2c5-4de8-86a6-e41bae584f4a",
+      "proyectoId": "cca78ff5-9511-4ecb-9e07-8be366928cd5",
+      "rubroId": "218e9833-1d67-4cd1-ba8c-dc9db7f457b3",
+      "fecha": "2025-05-28",
+      "detalle": "Albañilería — avance muro",
+      "montoTicket": 680000,
+      "tipoComponente": "MANO_OBRA"
+    },
+    {
+      "id": "263da924-9294-4cf5-b260-74d63db46f19",
+      "proyectoId": "cca78ff5-9511-4ecb-9e07-8be366928cd5",
+      "rubroId": "5dfbeb79-0168-4a1c-a660-6a32bbcb94b9",
+      "fecha": "2025-06-05",
+      "detalle": "Electricidad — materiales",
+      "montoTicket": 310000,
+      "tipoComponente": "MATERIALES"
+    },
+    {
+      "id": "4157c4fa-a8b6-40ec-b997-c361ddad4ed9",
+      "proyectoId": "60ee434c-3846-4d11-b7fe-08011c4cb81b",
+      "rubroId": "218e9833-1d67-4cd1-ba8c-dc9db7f457b3",
+      "fecha": "2026-06-18",
+      "detalle": "cemento",
+      "montoTicket": 320000,
+      "tipoComponente": "MATERIALES"
+    }
+  ],
+  "rubrosProgreso": [
+    {
+      "id": "cc8f70f7-ea1f-4277-b265-d0f7a151ebd9",
+      "proyectoId": "cca78ff5-9511-4ecb-9e07-8be366928cd5",
+      "nombre": "Albañilería",
+      "porcentajeAvance": 0
+    },
+    {
+      "id": "6d8579be-875e-46f6-bf6d-a12fef030e96",
+      "proyectoId": "cca78ff5-9511-4ecb-9e07-8be366928cd5",
+      "nombre": "Electricidad",
+      "porcentajeAvance": 0
+    },
+    {
+      "id": "e8e06452-33a9-4797-8a19-afc0454dac9a",
+      "proyectoId": "cca78ff5-9511-4ecb-9e07-8be366928cd5",
+      "nombre": "Plomería",
+      "porcentajeAvance": 0
+    },
+    {
+      "id": "ae50e7d0-6f2b-4152-a652-09a959356ef0",
+      "proyectoId": "cca78ff5-9511-4ecb-9e07-8be366928cd5",
+      "nombre": "Pintura",
+      "porcentajeAvance": 0
+    },
+    {
+      "id": "c57fb18c-a6a5-41a6-8c99-21ad573f1b0b",
+      "proyectoId": "60ee434c-3846-4d11-b7fe-08011c4cb81b",
+      "nombre": "Albañilería",
+      "porcentajeAvance": 0
+    },
+    {
+      "id": "1890e824-9bc7-496b-bdcd-aba63d034a50",
+      "proyectoId": "60ee434c-3846-4d11-b7fe-08011c4cb81b",
+      "nombre": "Electricidad",
+      "porcentajeAvance": 0
+    },
+    {
+      "id": "92c9e25a-4fff-447f-b272-d6dccde9798e",
+      "proyectoId": "60ee434c-3846-4d11-b7fe-08011c4cb81b",
+      "nombre": "Plomería",
+      "porcentajeAvance": 0
+    },
+    {
+      "id": "2533c1ce-957b-4320-844c-7f3fcf3aa370",
+      "proyectoId": "60ee434c-3846-4d11-b7fe-08011c4cb81b",
+      "nombre": "Pintura",
+      "porcentajeAvance": 0
+    }
+  ],
+  "presupuestos": [
+    {
+      "id": "c1a25f00-3c0a-4787-ba0a-2d81ec1cf231",
+      "titulo": "Ampliación quincho — Belgrano",
+      "clienteId": "c5e22ff4-62c6-4105-8064-6dff7e90031e",
+      "direccionObra": "Vuelta de Obligado 2100, CABA",
+      "tipoInmueble": "Casa",
+      "plazoMeses": 3,
+      "encargado": "Ing. López",
+      "porcentajeContingencia": 10,
+      "notas": "Incluye deck exterior y parrilla.",
+      "estado": "ENVIADO",
+      "proyectoId": null,
+      "createdAt": "2026-06-18T18:11:56.802Z",
+      "updatedAt": "2026-06-18T18:11:56.802Z",
+      "aprobadoAt": null,
+      "rubros": [
+        {
+          "id": "ebc0f736-06e6-4eb1-9ab1-785bc67f5e1a",
+          "rubroNombre": "Albañilería",
+          "manoObra": 1800000,
+          "materiales": 950000,
+          "notas": "Base y contrapiso"
+        },
+        {
+          "id": "61264bd9-2a8f-4950-ba31-70eaf2b3726b",
+          "rubroNombre": "Electricidad",
+          "manoObra": 420000,
+          "materiales": 280000,
+          "notas": "Iluminación perimetral"
+        },
+        {
+          "id": "05bc1e7c-85cb-4a86-a087-c5cb476d9116",
+          "rubroNombre": "Carpintería",
+          "manoObra": 890000,
+          "materiales": 1200000,
+          "notas": "Deck y cerramiento"
+        }
+      ],
+      "inmoPropertyId": null,
+      "inmoPropertyLabel": null
+    },
+    {
+      "id": "1fb4fb26-0c81-4b2e-8514-9a31938116f1",
+      "titulo": "Remodelación cocina — Recoleta",
+      "clienteId": "c5e22ff4-62c6-4105-8064-6dff7e90031e",
+      "direccionObra": "Ayacucho 1200, CABA",
+      "tipoInmueble": "Departamento",
+      "plazoMeses": 2,
+      "encargado": "Arq. Martínez",
+      "porcentajeContingencia": 8,
+      "notas": "Cliente pidió cotización alternativa sin muebles.",
+      "estado": "BORRADOR",
+      "proyectoId": null,
+      "createdAt": "2026-06-18T18:11:56.802Z",
+      "updatedAt": "2026-06-18T18:11:56.802Z",
+      "aprobadoAt": null,
+      "rubros": [
+        {
+          "id": "113e786b-8422-424f-9820-f3423a697999",
+          "rubroNombre": "Plomería",
+          "manoObra": 350000,
+          "materiales": 180000,
+          "notas": ""
+        },
+        {
+          "id": "b73afa9b-1373-4aa3-8861-3efff5194f2e",
+          "rubroNombre": "Electricidad",
+          "manoObra": 280000,
+          "materiales": 150000,
+          "notas": ""
+        },
+        {
+          "id": "177f2386-66b7-4b85-8a1f-7c4cf76ea049",
+          "rubroNombre": "Pintura",
+          "manoObra": 220000,
+          "materiales": 90000,
+          "notas": ""
+        }
+      ],
+      "inmoPropertyId": null,
+      "inmoPropertyLabel": null
+    }
+  ],
+  "fotosAvance": []
+}

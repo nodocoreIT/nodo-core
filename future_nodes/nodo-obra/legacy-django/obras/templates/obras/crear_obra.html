@@ -1,0 +1,406 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block content %}
+<div class="container mt-4" style="max-width: 750px;">
+    <div class="d-flex justify-content-between align-items-center mb-4 px-3">
+        <div class="text-center step-indicator active" id="ind-1">
+            <span class="badge rounded-circle p-2 bg-success text-white">1</span>
+            <p class="small fw-bold mb-0 mt-1" style="color: #003000;">Datos - Vinculación</p>
+        </div>
+        <div class="flex-grow-1 border-top mx-2 border-2" style="margin-top: -20px;"></div>
+        <div class="text-center step-indicator" id="ind-2">
+            <span class="badge rounded-circle p-2 bg-secondary text-white">2</span>
+            <p class="small fw-semibold text-muted mb-0 mt-1">Plazos - Prórroga</p>
+        </div>
+        <div class="flex-grow-1 border-top mx-2 border-2" style="margin-top: -20px;"></div>
+        <div class="text-center step-indicator" id="ind-3">
+            <span class="badge rounded-circle p-2 bg-secondary text-white">3</span>
+            <p class="small fw-semibold text-muted mb-0 mt-1">Rubros - Inicialización</p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0" style="border-radius: 12px;">
+        <div class="card-body p-4">
+            <form method="POST" id="wizard-form">
+                {% csrf_token %}
+                
+                <input type="hidden" name="crear_nueva_propiedad" id="id_crear_nueva_prop" value="false">
+                <input type="hidden" name="crear_nuevo_propietario" id="id_crear_nuevo_propietario" value="false">
+
+                <div class="wizard-step" id="step-1">
+                    <h5 class="fw-bold text-dark mb-3">Paso 1: Identificación y Vinculación</h5>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark small">Nombre identificatorio del Proyecto/Obra</label>
+                        <input type="text" name="nombre" class="form-control" placeholder="Ej: Refacción Cocina Quinta Toay" value="{{ obra.nombre|default:'' }}" style="border-radius: 8px;">
+                    </div>
+
+                    <div class="p-3 mb-3 bg-light rounded-3" style="border: 1px solid #e2e8f0;">
+                        <div id="wrapper-propietario-existente">
+                            <label class="form-label fw-semibold text-dark small">Asociar a Propietario (Cliente)</label>
+                            <div class="d-flex gap-2">
+                                <select name="propietario" id="id_select_propietario" class="form-select" style="border-radius: 8px;">
+                                    <option value="">-- Elegir Propietario --</option>
+                                    {% for prop in propietarios %}
+                                        <option value="{{ prop.id }}" {% if obra and obra.cliente and obra.cliente.id == prop.id %}selected{% endif %}>{{ prop.nombre }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" class="btn btn-outline-primary text-nowrap fw-bold btn-sm" onclick="mostrarAltaPropietario(true)">✨ Nuevo Cliente</button>
+                            </div>
+                        </div>
+
+                        <div id="wrapper-propietario-nuevo" class="d-none">
+                            <label class="form-label fw-semibold text-primary small">Dar de Alta un Nuevo Propietario (Cliente)</label>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <input type="text" name="nuevo_prop_nombre" id="id_nuevo_prop_nombre" class="form-control form-control-sm" placeholder="Nombre/s">
+                                </div>
+                                <div class="col-md-6">
+                                    <input type="text" name="nuevo_prop_apellido" id="id_nuevo_prop_apellido" class="form-control form-control-sm" placeholder="Apellido/s">
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="text" name="nuevo_prop_dni" id="id_nuevo_prop_dni" class="form-control form-control-sm" placeholder="DNI / CUIT">
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="text" name="nuevo_prop_telefono" id="id_nuevo_prop_telefono" class="form-control form-control-sm" placeholder="Teléfono / WhatsApp">
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="text" name="nuevo_prop_direccion_particular" id="id_nuevo_prop_direccion_particular" class="form-control form-control-sm" placeholder="Dirección Particular (Casa)">
+                                </div>
+                            </div>
+                            <div class="mt-2 text-end">
+                                <button type="button" class="btn btn-link text-secondary btn-sm p-0 text-decoration-none" onclick="mostrarAltaPropietario(false)">❌ Cancelar / Elegir Existente</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 mb-3 bg-light rounded-3" style="border: 1px dashed #cbd5e1;">
+                        <div id="wrapper-propiedad-existente">
+                            <label class="form-label fw-semibold text-dark small">Vincular a Propiedad Existente</label>
+                            <div class="d-flex gap-2">
+                                <select name="propiedad" id="id_select_propiedad" class="form-select" style="border-radius: 8px;">
+                                    <option value="">-- Elegir Propiedad --</option>
+                                    {% for p in propiedades %}
+                                        <option value="{{ p.id }}" {% if obra and obra.id == p.id %}selected{% endif %}>{{ p.direccion_obra }} ({{ p.tipo_inmueble }})</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" class="btn btn-outline-success text-nowrap fw-bold btn-sm" onclick="mostrarAltaPropiedad(true)">✨ Crear Nueva</button>
+                            </div>
+                        </div>
+
+                        <div id="wrapper-nueva-propiedad" class="d-none">
+                            <label class="form-label fw-semibold text-success small">Dar de Alta una Nueva Propiedad</label>
+                            <div class="row g-2">
+                                <div class="col-md-8">
+                                    <input type="text" name="nueva_prop_direccion" id="id_nueva_direccion" class="form-control form-control-sm" placeholder="Dirección exacta">
+                                </div>
+                                <div class="col-md-4">
+                                    <select name="nueva_prop_tipo" class="form-select form-select-sm">
+                                        <option value="Casa">Casa</option>
+                                        <option value="Departamento">Departamento</option>
+                                        <option value="Quinta">Quinta</option>
+                                        <option value="Local">Local / Oficina</option>
+                                        <option value="Terreno">Terreno</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mt-2 text-end">
+                                <button type="button" class="btn btn-link text-secondary btn-sm p-0 text-decoration-none" onclick="mostrarAltaPropiedad(false)">❌ Cancelar / Elegir Existente</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="wizard-step d-none" id="step-2">
+                    <h5 class="fw-bold text-dark mb-3">Paso 2: Tiempos y Cobertura</h5>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark small">Plazo Estimado Original (Meses)</label>
+                            <input type="number" name="plazo_meses" class="form-control" value="{{ obra.plazo_meses|default:'6' }}" style="border-radius: 8px;">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark small">Plazo de Contingencia (Meses Extra)</label>
+                            <input type="number" name="porcentaje_contingencia" class="form-control" value="{{ obra.porcentaje_contingencia|default:'1' }}" style="border-radius: 8px;">
+                            <span class="text-muted" style="font-size: 0.75rem;">Margen de seguridad en meses por imprevistos.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="wizard-step d-none" id="step-3">
+                    <h5 class="fw-bold text-dark mb-1">Paso 3: Estimaciones por Rubro</h5>
+                    <p class="text-muted small mb-3">Tildá los rubros activos para este proyecto. Al editar se pisarán con los nuevos valores ingresados.</p>
+                    
+                    <div class="mb-4 p-3 bg-light rounded-3" style="border: 1px solid #e2e8f0;">
+                        <div id="contenedor-rubros" class="d-flex flex-column gap-2">
+                            {% for rubro in list_of_rubros %}
+                                <div class="rubro-row p-2 bg-white rounded border" data-nombre-rubro="{{ rubro.nombre }}">
+                                    <div class="row align-items-center g-2">
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="rubros_activos" value="{{ rubro.nombre }}" id="check_base_{{ rubro.id }}" onchange="toggleInputs('base_{{ rubro.id }}')">
+                                                <label class="form-check-label small fw-bold text-success" for="check_base_{{ rubro.id }}">{{ rubro.nombre }}</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <input type="number" step="any" name="mo_{{ rubro.nombre }}" id="mo_base_{{ rubro.id }}" class="form-control form-control-sm" placeholder="Mano de Obra" disabled>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <input type="number" step="any" name="mat_{{ rubro.nombre }}" id="mat_base_{{ rubro.id }}" class="form-control form-control-sm" placeholder="Materiales" disabled>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% empty %}
+                                <p class="text-muted small text-center my-2">No hay rubros base cargados en el sistema.</p>
+                            {% endfor %}
+                        </div>
+
+                        <div class="mt-3 pt-2 border-top">
+                            <div class="input-group input-group-sm" style="max-width: 400px;">
+                                <input type="text" id="nombre_rubro_nuevo" class="form-control" placeholder="Ej: Herrería, Vidrios, Pileta...">
+                                <button class="btn btn-success text-white fw-bold" type="button" onclick="agregarRubroManual()">➕ Sumar Otro</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="text-muted opacity-25">
+                <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+                    <div>
+                        {% if es_edicion %}
+                            <button type="button" class="btn btn-outline-danger btn-sm fw-bold me-2" onclick="confirmarEliminarObra('{{ obra.id }}', '{{ obra.nombre|escapejs }}')">🗑️ Eliminar</button>
+                            {% if obra.estado != 'Finalizada' %}
+                                <button type="button" class="btn btn-outline-success btn-sm fw-bold" onclick="confirmarFinalizarObra('{{ obra.id }}')">✅ Finalizar Obra</button>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-light border fw-semibold text-secondary px-4 d-none" id="btn-anterior" onclick="cambiarPaso(-1)">Anterior</button>
+                        <a href="{% url 'dashboard_obras' %}" class="btn btn-light text-secondary border" id="btn-cancelar">Cancelar</a>
+                        
+                        <button type="button" class="btn text-white fw-bold px-4" style="background-color: #003000;" id="btn-siguiente" onclick="cambiarPaso(1)">Siguiente</button>
+                        <button type="submit" class="btn btn-success text-white fw-bold px-4 d-none" id="btn-guardar">{% if es_edicion %}Guardar Cambios{% else %}Inicializar Proyecto{% endif %}</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let pasoActual = 1;
+let contadorExtras = 0;
+
+function cambiarPaso(direccion) {
+    if (direccion === 1 && pasoActual === 1) {
+        const nombreInput = document.getElementsByName('nombre')[0];
+        const nombre = nombreInput ? nombreInput.value.trim() : '';
+        const esNuevaProp = document.getElementById('id_crear_nueva_prop').value === 'true';
+        const selectProp = document.getElementById('id_select_propiedad').value;
+        const dirNueva = document.getElementById('id_nueva_direccion').value.trim();
+        
+        const esNuevoPropio = document.getElementById('id_crear_nuevo_propietario').value === 'true';
+        const selectPropietario = document.getElementById('id_select_propietario').value;
+        const nomNuevo = document.getElementById('id_nuevo_prop_nombre').value.trim();
+
+        if (!nombre) {
+            alert('Por favor, ingresá el nombre de la obra.');
+            return;
+        }
+        if (!esNuevoPropio && !selectPropietario) {
+            alert('Seleccioná un propietario para asociar la obra o creá uno nuevo.');
+            return;
+        }
+        if (esNuevoPropio && !nomNuevo) {
+            alert('Ingresá el nombre del nuevo propietario.');
+            return;
+        }
+        if (!esNuevaProp && !selectProp) {
+            alert('Seleccioná una propiedad vinculada o creá una nueva.');
+            return;
+        }
+        if (esNuevaProp && !dirNueva) {
+            alert('Escribí la dirección de la nueva propiedad.');
+            return;
+        }
+    }
+
+    document.getElementById(`step-${pasoActual}`).classList.add('d-none');
+    
+    const indViejo = document.getElementById(`ind-${pasoActual}`).querySelector('.badge');
+    if (indViejo) indViejo.classList.replace('bg-success', 'bg-secondary');
+
+    pasoActual += direccion;
+
+    document.getElementById(`step-${pasoActual}`).classList.remove('d-none');
+    
+    const indNuevo = document.getElementById(`ind-${pasoActual}`).querySelector('.badge');
+    if (indNuevo) indNuevo.classList.replace('bg-secondary', 'bg-success');
+
+    document.getElementById('btn-anterior').classList.toggle('d-none', pasoActual === 1);
+    document.getElementById('btn-cancelar').classList.toggle('d-none', pasoActual !== 1);
+    document.getElementById('btn-siguiente').classList.toggle('d-none', pasoActual === 3);
+    document.getElementById('btn-guardar').classList.toggle('d-none', pasoActual !== 3);
+}
+
+function mostrarAltaPropiedad(activar) {
+    document.getElementById('id_crear_nueva_prop').value = activar ? 'true' : 'false';
+    document.getElementById('wrapper-nueva-propiedad').classList.toggle('d-none', !activar);
+    document.getElementById('wrapper-propiedad-existente').classList.toggle('d-none', activar);
+    if(activar) document.getElementById('id_select_propiedad').value = "";
+}
+
+function mostrarAltaPropietario(activar) {
+    document.getElementById('id_crear_nuevo_propietario').value = activar ? 'true' : 'false';
+    document.getElementById('wrapper-propietario-nuevo').classList.toggle('d-none', !activar);
+    document.getElementById('wrapper-propietario-existente').classList.toggle('d-none', activar);
+    if(activar) document.getElementById('id_select_propietario').value = "";
+}
+
+function toggleInputs(prefix) {
+    const check = document.getElementById('check_' + prefix);
+    const moInput = document.getElementById('mo_' + prefix);
+    const matInput = document.getElementById('mat_' + prefix);
+    if (moInput && matInput) {
+        moInput.disabled = !check.checked;
+        matInput.disabled = !check.checked;
+        if(!check.checked) { moInput.value = ''; matInput.value = ''; }
+    }
+}
+
+function agregarRubroManual() {
+    const inputNombre = document.getElementById('nombre_rubro_nuevo');
+    const nombreRubro = inputNombre.value.trim();
+    if (nombreRubro === '') return;
+
+    contadorExtras++;
+    const prefix = 'extra_' + contadorExtras;
+    const contenedor = document.getElementById('contenedor-rubros');
+
+    const nuevaFila = document.createElement('div');
+    nuevaFila.className = 'rubro-row p-2 bg-white rounded border';
+    nuevaFila.setAttribute('data-nombre-rubro', nombreRubro);
+    nuevaFila.innerHTML = `
+        <div class="row align-items-center g-2">
+            <div class="col-md-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="rubros_activos" value="${nombreRubro}" id="check_${prefix}" onchange="toggleInputs('${prefix}')" checked>
+                    <label class="form-check-label small fw-bold text-success" for="check_${prefix}">${nombreRubro}</label>
+                </div>
+            </div>
+            <div class="col-md-4"><input type="number" step="any" name="mo_${nombreRubro}" id="mo_${prefix}" class="form-control form-control-sm" placeholder="Mano de Obra"></div>
+            <div class="col-md-4"><input type="number" step="any" name="mat_${nombreRubro}" id="mat_${prefix}" class="form-control form-control-sm" placeholder="Materiales"></div>
+        </div>
+    `;
+    contenedor.appendChild(nuevaFila);
+    inputNombre.value = '';
+}
+
+function confirmarEliminarObra(id, nombre) {
+    if (confirm(`¿Estás completamente seguro de eliminar la obra "${nombre}"?`)) {
+        window.location.href = "/dashboard/obras/eliminar/" + id + "/";
+    }
+}
+
+// SINCRONIZADOR INTELIGENTE DE NUMEROS REPARADO
+document.addEventListener("DOMContentLoaded", function() {
+    const tareasGuardadas = {};
+
+    {% for titulo, datos in tareas_dict.items %}
+    {
+        let moRaw = "{{ datos.mo }}".trim();
+        let matRaw = "{{ datos.mat }}".trim();
+
+        let limpiarNumero = function(valorStr) {
+            if (!valorStr || valorStr === "None" || valorStr === "") return "0";
+            if (valorStr.includes('.') && valorStr.includes(',')) {
+                valorStr = valorStr.replace(/\./g, '').replace(',', '.');
+            } else if (valorStr.includes(',')) {
+                valorStr = valorStr.replace(',', '.');
+            } else if ((valorStr.match(/\./g) || []).length > 1) {
+                valorStr = valorStr.replace(/\./g, '');
+            }
+            return valorStr;
+        };
+
+        tareasGuardadas["{{ titulo|escapejs }}"] = { 
+            mo: limpiarNumero(moRaw), 
+            mat: limpiarNumero(matRaw) 
+        };
+    }
+    {% endfor %}
+
+    const normalizar = (texto) => {
+        return texto ? texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
+    };
+
+    const filas = document.querySelectorAll('.rubro-row');
+    const rubrosBaseProcesados = [];
+
+    filas.forEach(fila => {
+        const nombreRubroHTML = fila.getAttribute('data-nombre-rubro');
+        const checkbox = fila.querySelector('.form-check-input');
+        if (!nombreRubroHTML || !checkbox) return;
+
+        const rubroHTMLNorm = normalizar(nombreRubroHTML);
+
+        const claveEncontrada = Object.keys(tareasGuardadas).find(clave => {
+            const claveNorm = normalizar(clave);
+            return claveNorm === rubroHTMLNorm || claveNorm.startsWith(rubroHTMLNorm + " ");
+        });
+        
+        if (claveEncontrada) {
+            checkbox.checked = true;
+            rubrosBaseProcesados.push(claveEncontrada);
+            
+            // Reemplazo dinámico usando el nuevo prefijo base_
+            const idReal = checkbox.id.replace('check_', '');
+            const moInput = document.getElementById('mo_' + idReal);
+            const matInput = document.getElementById('mat_' + idReal);
+            
+            if (moInput && matInput) {
+                moInput.disabled = false;
+                let valMo = parseFloat(tareasGuardadas[claveEncontrada].mo) || 0;
+                moInput.value = valMo > 0 ? valMo : '';
+                
+                matInput.disabled = false;
+                let valMat = parseFloat(tareasGuardadas[claveEncontrada].mat) || 0;
+                matInput.value = valMat > 0 ? valMat : '';
+            }
+        }
+    });
+
+    Object.keys(tareasGuardadas).forEach(nombreRubro => {
+        if (!rubrosBaseProcesados.includes(nombreRubro)) {
+            if (nombreRubro.includes('[LÍMITE:') || nombreRubro.includes('[') || nombreRubro.includes('🚨') || nombreRubro.toLowerCase().includes('barras') || nombreRubro.trim() === '') return; 
+
+            const moVal = parseFloat(tareasGuardadas[nombreRubro].mo) || 0;
+            const matVal = parseFloat(tareasGuardadas[nombreRubro].mat) || 0;
+            if (moVal === 0 && matVal === 0) return; 
+
+            let nombreLimpio = nombreRubro.split(' - ')[0];
+            contadorExtras++;
+            const prefix = 'extra_' + contadorExtras;
+            const contenedor = document.getElementById('contenedor-rubros');
+
+            const nuevaFila = document.createElement('div');
+            nuevaFila.className = 'rubro-row p-2 bg-white rounded border';
+            nuevaFila.setAttribute('data-nombre-rubro', nombreLimpio);
+            nuevaFila.innerHTML = `
+                <div class="row align-items-center g-2">
+                    <div class="col-md-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="rubros_activos" value="${nombreLimpio}" id="check_${prefix}" onchange="toggleInputs('${prefix}')" checked>
+                            <label class="form-check-label small fw-bold text-success" for="check_${prefix}">${nombreLimpio}</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4"><input type="number" step="any" name="mo_${nombreLimpio}" id="mo_${prefix}" class="form-control form-control-sm" value="${moVal}"></div>
+                    <div class="col-md-4"><input type="number" step="any" name="mat_${nombreLimpio}" id="mat_${prefix}" class="form-control form-control-sm" value="${matVal}"></div>
+                </div>
+            `;
+            contenedor.appendChild(nuevaFila);
+        }
+    });
+});
+</script>
+{% endblock %}

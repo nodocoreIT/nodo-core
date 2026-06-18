@@ -1,0 +1,546 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block content %}
+<style>
+    :root {
+        --primary-obra: #003000;
+        --primary-light: #e6f0e6;
+        --success-custom: #10b981;
+        --danger-custom: #ef4444;
+        --warning-custom: #f59e0b;
+        --propietario-color: #eab308;
+        --propietario-bg: #fef9c3;
+        --dark-slate: #0f172a;
+        --text-muted-custom: #64748b;
+    }
+    .ficha-container { max-width: 1250px; margin: 0 auto; padding: 15px; font-family: 'Segoe UI', Roboto, sans-serif; }
+    .card-ficha { background: white; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; margin-bottom: 24px; overflow: hidden; }
+    .header-obra { background: var(--primary-obra); color: white; padding: 24px; border-bottom: 4px solid #004d00; }
+    
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; padding: 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+    .kpi-card { background: white; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; }
+    .kpi-title { font-size: 0.78rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted-custom); margin-bottom: 5px; }
+    .kpi-value { font-size: 1.35rem; font-weight: 700; color: var(--dark-slate); }
+    
+    .badge-estado-fin { padding: 6px 14px; border-radius: 30px; font-weight: 700; font-size: 0.8rem; text-transform: uppercase; }
+    .fin-en-fecha { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
+    .fin-desviado { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
+
+    .progress-bar-custom { height: 8px; background-color: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 6px; }
+    .progress-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+
+    .table-custom th { background: #f1f5f9; color: var(--dark-slate); font-weight: 700; font-size: 0.8rem; text-transform: uppercase; padding: 12px; }
+    .table-custom td { padding: 12px; vertical-align: middle; font-size: 0.88rem; border-bottom: 1px solid #f1f5f9; }
+</style>
+
+<div class="ficha-container">
+    
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <a href="{% url 'dashboard_obras' %}" style="color: var(--primary-obra); text-decoration: none; font-weight: 600; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 5px;">
+            <i class="fa-solid fa-arrow-left"></i> Volver al panel general de obras
+        </a>
+        <a href="{% url 'imprimir_reporte_obra' obra.id %}" target="_blank" class="btn btn-sm btn-outline-danger fw-bold shadow-sm bg-white">
+            <i class="fas fa-file-pdf me-1"></i> Exportar PDF Avance de Obra
+        </a>
+    </div>
+
+    <div class="card-ficha mb-4">
+        <div class="header-obra d-flex justify-content-between align-items-start align-items-md-center flex-wrap gap-3 mb-4">
+            <div>
+                <span class="text-uppercase tracking-wider small opacity-75" style="letter-spacing: 1px; font-weight: 600;">Centro de Control de Obra</span>
+                <h2 class="fw-bold m-0" style="font-size: 1.6rem;">{{ obra.nombre }}</h2>
+                <p class="m-0 opacity-75 small mt-1"><i class="fa-solid fa-location-dot me-1"></i> {{ obra.direccion|default:"Dirección no cargada" }}</p>
+            </div>
+            
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <a href="{% url 'crear_obra_pantalla' %}?id={{ obra.id }}" class="btn btn-sm btn-light border fw-semibold text-secondary d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-sliders text-muted"></i> Configurar Obra
+                </a>
+
+                <div>
+                    {% if estado_financiero == "en-fecha" or estado_financiero == "en-orden" %}
+                        <span class="badge-estado-fin fin-en-fecha m-0"><i class="fa-solid fa-circle-check me-1"></i> Presupuesto en Orden</span>
+                    {% else %}
+                        <span class="badge-estado-fin fin-desviado m-0"><i class="fa-solid fa-triangle-exclamation me-1"></i> Presupuesto Excedido</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 p-3 pt-0">
+        <div class="col-12 col-md-4 d-flex gap-3">
+            <div class="card p-3 border-0 shadow-sm flex-fill bg-white d-flex align-items-center justify-content-center" style="border-radius: 12px; min-height: 120px;">
+                <small class="text-uppercase text-muted fw-bold d-block mb-2" style="font-size: 0.65rem; letter-spacing: 0.5px;">Avance</small>
+                
+                <div class="position-relative d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <svg class="position-absolute w-100 h-100" viewBox="0 0 36 36">
+                        <path class="text-light" stroke-width="3" stroke="#eaedf1" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        <path class="text-success" id="circulo-progreso-general" stroke-dasharray="{{ avance_progreso|default:0 }}, 100" stroke-width="3" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    </svg>
+                    <span class="fw-bold" id="texto-progreso-general" style="font-size: 0.8rem;">{{ avance_progreso|default:0 }}%</span>
+                </div>
+            </div>
+            <div class="card p-3 border-0 shadow-sm flex-fill bg-white d-flex align-items-center justify-content-center" style="border-radius: 12px; min-height: 120px;">
+                <small class="text-uppercase text-muted fw-bold d-block mb-2" style="font-size: 0.65rem; letter-spacing: 0.5px;">Caja</small>
+                {% widthratio total_gastado presupuesto 100 as calculo_porcentaje %}
+                <div class="position-relative d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <svg class="position-absolute w-100 h-100" viewBox="0 0 36 36">
+                        <path class="text-light" stroke-width="3" stroke="#eaedf1" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        <path class="{% if saldo_disponible < 0 %}text-danger{% else %}text-primary{% endif %}" stroke-dasharray="{{ calculo_porcentaje|default:0 }}, 100" stroke-width="3" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    </svg>
+                    <span class="fw-bold" style="font-size: 0.8rem;">{{ calculo_porcentaje|default:0 }}%</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-8 d-flex gap-2">
+            <div class="card p-3 border-0 shadow-sm flex-fill bg-white d-flex flex-column justify-content-center" style="border-radius: 12px;">
+                <small class="text-muted fw-bold" style="font-size: 0.65rem;">PRESUPUESTO</small>
+                <span class="fw-bold" style="font-size: 1.1rem; color: #1e293b;">${{ presupuesto|intcomma }}</span>
+            </div>
+            <div class="card p-3 border-0 shadow-sm flex-fill bg-white d-flex flex-column justify-content-center" style="border-radius: 12px;">
+                <small class="text-muted fw-bold" style="font-size: 0.65rem;">GASTADO</small>
+                <span class="fw-bold" style="font-size: 1.1rem; color: #dc3545;">${{ total_gastado|intcomma }}</span>
+            </div>
+            <div class="card p-3 border-0 shadow-sm flex-fill {% if saldo_disponible < 0 %}bg-danger-subtle{% else %}bg-success-subtle{% endif %} d-flex flex-column justify-content-center" style="border-radius: 12px;">
+                <small class="fw-bold opacity-75" style="font-size: 0.65rem;">SALDO</small>
+                <span class="fw-bold" style="font-size: 1.1rem; color: #000;">${{ saldo_disponible|intcomma }}</span>
+            </div>
+        </div>
+    </div>
+
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            
+            <div class="card p-3 mb-4 border shadow-sm">
+                <h5 class="fw-bold mb-3" style="color: #2b3e50;">
+                    <i class="fa-solid fa-chart-pie me-1"></i> Progreso y Gasto por Rubro
+                </h5>
+                
+                {% for rubro in rubros_progreso_lista %}
+                <div class="mb-3 border-bottom pb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-semibold text-dark text-uppercase" style="font-size: 0.9rem;">
+                            <i class="fa-solid fa-layer-group text-muted me-1"></i> {{ rubro.nombre }}
+                        </span>
+                        <span class="text-muted fw-bold">${{ rubro.monto_gasto|intcomma }}</span>
+                    </div>
+                    
+                    <div class="d-flex align-items-center gap-3">
+                        <input type="range" 
+                            class="form-range avance-slider" 
+                            min="0" 
+                            max="100" 
+                            value="{{ rubro.porcentaje_avance }}" 
+                            data-rubro-id="{{ rubro.id }}">
+                            
+                        <span id="badge-val-{{ rubro.id }}" class="badge bg-light text-success border fw-bold text-center" style="min-width: 55px; font-size: 0.85rem;">
+                            {{ rubro.porcentaje_avance }}%
+                        </span>
+                    </div>
+                </div>
+                {% empty %}
+                    <p class="text-muted small my-2">No hay rubros cargados en esta obra.</p>
+                {% endfor %}
+            </div>
+
+            <div class="card-ficha p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <div>
+                        <h5 class="fw-bold m-0" style="color: var(--primary-obra); font-size: 1.05rem;">
+                            <i class="fa-solid fa-receipt me-2" style="color: var(--success-custom);"></i>Historial de Tickets Inyectados
+                        </h5>
+                        <small class="text-muted">Comprobantes y rendiciones semanales cargadas a la fecha.</small>
+                    </div>
+                    <a href="{% url 'carga_rapida_obra' obra.id %}" class="btn btn-sm btn-success fw-bold shadow-sm">
+                        <i class="fa-solid fa-plus me-1"></i> Cargar Gasto / Ticket
+                    </a>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-custom m-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Rubro</th>
+                                <th>Detalle</th>
+                                <th class="text-center">Recibo</th>
+                                <th class="text-center">Acción</th> <th class="text-end">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for gasto in gastos %}
+                            <tr>
+                                <td class="fw-bold text-muted">{{ gasto.fecha|date:"d/m/Y" }}</td>
+                                <td>
+                                    <span class="badge" style="background-color: var(--primary-light); color: var(--primary-obra);">
+                                        {{ gasto.tarea_rubro.nombre|default:"Gasto General" }}
+                                    </span>
+                                </td>
+                                <td>{{ gasto.detalle }}</td>
+                                <td class="text-center">
+                                    {% if gasto.tipo_componente == "MANO_OBRA" %}
+                                        <a href="{% url 'imprimir_reporte_obra' obra.id %}?gasto_id={{ gasto.id }}" target="_blank" class="btn btn-xs btn-outline-primary" style="font-size: 0.7rem;">
+                                            <i class="fa-solid fa-print"></i>
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted small" style="font-size: 0.75rem;">Adm</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <form action="{% url 'eliminar_gasto_rapido' gasto.id %}" method="POST" onsubmit="return confirm('¿Borrar ticket?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-link text-danger p-0" title="Eliminar" style="font-size: 0.9rem;">
+                                            <i class="fa-solid fa-xmark"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                                <td class="text-end fw-bold text-dark">${{ gasto.monto_ticket|intcomma }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="6" class="text-center text-muted py-4">No hay comprobantes cargados.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% csrf_token %}        
+        </div>
+
+                <div class="col-lg-4">
+                    <div class="card card-ficha p-4 mb-4 border-0 shadow-sm">
+                        <h5 class="fw-bold mb-3" style="color: #2b3e50;">
+                            <i class="fa-solid fa-helmet-safety me-2"></i> Pendientes Internos
+                        </h5>
+                        <div class="list-group list-group-flush">
+                            {% for tarea in tareas_operativas %}
+                                <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-3 {% if tarea.completada %}bg-light{% endif %}">
+                                    <div class="d-flex align-items-center">
+                                        <input type="checkbox" class="form-check-input me-3 mt-0" style="width: 1.2em; height: 1.2em; cursor: pointer;"
+                                            onclick="tildarTareaPendiente(this, {{ tarea.id }}, 'tarea')" {% if tarea.completada %}checked{% endif %}>
+                                        <span class="{% if tarea.completada %}text-decoration-line-through text-muted{% else %}fw-semibold text-dark{% endif %}">
+                                            {{ tarea.titulo }}
+                                        </span>
+                                    </div>
+                                    {% if tarea.completada %}
+                                        <i class="fa-solid fa-circle-check text-success fs-5"></i>
+                                    {% else %}
+                                        <i class="fa-solid fa-hourglass-half text-warning fs-5"></i>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="card card-ficha p-4 mb-4 border-0 shadow-sm">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold mb-0" style="color: #2b3e50;">
+                                <i class="fa-solid fa-gavel me-2"></i> Definiciones Propietario
+                            </h5>
+                            
+                            <button type="button" class="btn btn-sm btn-outline-warning" 
+                                    data-bs-toggle="modal" data-bs-target="#modalPropietario">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            {% for tarea in definiciones_propietario %}
+                                <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-3 {% if tarea.completada %}bg-light{% endif %}">
+                                    <div class="d-flex align-items-center">
+                                        <input type="checkbox" class="form-check-input me-3 mt-0" style="width: 1.2em; height: 1.2em; cursor: pointer;"
+                                            onclick="tildarTareaPendiente(this, {{ tarea.id }}, 'definicion')" {% if tarea.completada %}checked{% endif %}>
+                                        <span class="{% if tarea.completada %}text-decoration-line-through text-muted{% else %}fw-semibold text-dark{% endif %}">
+                                            {{ tarea.titulo }}
+                                        </span>
+                                    </div>
+                                    {% if tarea.completada %}
+                                        <i class="fa-solid fa-circle-check text-success fs-5"></i>
+                                    {% else %}
+                                        <i class="fa-solid fa-hourglass-half text-warning fs-5"></i>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+            </div>
+    </div>
+</div>
+
+<div id="modalPendienteFicha" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px;">
+        <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-bullhorn text-warning"></i> Cargar Requerimiento</h5>
+        
+        <form method="POST" action="">
+            {% csrf_token %}
+            <input type="hidden" name="agregar_pendiente_ficha" value="1">
+            
+            <div class="mb-2">
+                <label class="small fw-bold text-muted d-block mb-1">¿Qué debe definir el propietario?</label>
+                <input type="text" name="titulo" required class="form-control form-control-sm" placeholder="Ej: Elegir cerámicos para el baño principal">
+            </div>
+            
+            <div class="mb-3">
+                <label class="small fw-bold text-muted d-block mb-1">Destinatario / Tipo de tarea:</label>
+                <select name="tipo" class="form-select form-select-sm" required>
+                    <option value="propietario" selected>⚠️ Propietario (Elegir terminaciones/colores)</option>
+                    <option value="logistica">🚚 Logística Interna (Fletes/Materiales)</option>
+                    <option value="agenda">📅 Agenda / Reunión General</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="small fw-bold text-muted d-block mb-1">Fecha Límite (Opcional):</label>
+                <input type="date" name="fecha_limite" class="form-control form-control-sm">
+            </div>
+
+            <div class="text-end">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="cerrarModalPendiente()">Cancelar</button>
+                <button type="submit" class="btn btn-sm btn-warning fw-bold text-dark">Exigir</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+
+<div class="modal fade" id="modalPropietario" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" action="{% url 'crear_tarea_desde_ficha' obra.id %}">
+            {% csrf_token %}
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Agregar nueva tarea</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                
+                <div class="modal-body">
+                    <input type="text" name="titulo" class="form-control mb-3" placeholder="Título de la tarea" required>
+                    
+                    <label class="form-label">¿Para quién es esta tarea?</label>
+                    <select name="tipo" class="form-select" required>
+                        <option value="propietario">Definiciones del Propietario</option>
+                        <option value="operativa">Tarea Nuestra / Interna</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-warning">Guardar Tarea</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+        <div class="col-lg-8">
+            </div>
+        <div class="col-lg-4">
+            </div>
+    </div> <div class="card-ficha p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold m-0" style="color: var(--primary-obra);">
+                <i class="fa-solid fa-camera me-2"></i>Avance Visual de Obra
+            </h5>
+            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalFoto">
+                <i class="fa-solid fa-upload"></i> Cargar Foto
+            </button>
+        </div>
+        
+        <div class="row g-3">
+            {% for foto in fotos_avance %}
+            <div class="col-6 col-md-4 col-lg-2"> 
+                <div class="card h-100 shadow-sm border-0" style="cursor: pointer;" onclick="ampliarFoto('{{ foto.imagen.url }}')">
+                    <img src="{{ foto.imagen.url }}" class="card-img-top" style="height: 120px; object-fit: cover;">
+                    <div class="card-body p-2">
+                        <small class="d-block fw-bold text-primary">{{ foto.fecha_avance|date:"d/m/Y" }}</small>
+                        <p class="small m-0 text-muted" style="font-size: 0.75rem;">{{ foto.descripcion }}</p>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-muted italic p-3">No hay fotos cargadas aún.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+<div class="modal fade" id="modalFoto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" action="{% url 'subir_foto_avance' obra.id %}" enctype="multipart/form-data" class="modal-content">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5 class="modal-title">Cargar Avance Visual</h5>
+            </div>
+            <div class="modal-body">
+                <input type="date" name="fecha" class="form-control mb-2" required>
+                <input type="text" name="descripcion" class="form-control mb-2" placeholder="Descripción..." required>
+                <input type="file" name="imagen" class="form-control" accept="image/*" required>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-success">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<script type="text/javascript">
+    console.log("Token CSRF encontrado:", document.querySelector('[name=csrfmiddlewaretoken]')?.value);
+
+    // 1. Funciones de Modales
+    function abrirModalPendiente() { 
+        const modal = document.getElementById('modalPendienteFicha');
+        if (modal) modal.style.display = 'flex'; 
+    }
+    function cerrarModalPendiente() { 
+        const modal = document.getElementById('modalPendienteFicha');
+        if (modal) modal.style.display = 'none'; 
+    }
+
+    // 2. Inicialización de Sliders
+    document.addEventListener('DOMContentLoaded', () => {
+        const sliders = document.querySelectorAll('.avance-slider');
+        sliders.forEach(slider => {
+            slider.addEventListener('input', function() {
+                const rubroId = this.getAttribute('data-rubro-id');
+                const badge = document.getElementById(`badge-val-${rubroId}`);
+                if (badge) badge.innerText = `${this.value}%`;
+            });
+
+            slider.addEventListener('change', function() {
+                actualizarProgresoRubro(this);
+            });
+        });
+    });
+
+    // 3. Control de Checkboxes (Tareas y Definiciones)
+    function tildarTareaPendiente(elemento, tareaId, tipo) {
+        // 1. Obtener el token de forma segura
+        const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (!csrfElement) {
+            console.error("No se encontró el token CSRF. Revisa que el formulario esté en el HTML.");
+            return;
+        }
+        const csrfToken = csrfElement.value;
+        
+        // 2. Asegurar que el checkbox tenga el estado correcto
+        const nuevoEstado = elemento.checked;
+
+        // 3. Ejecutar fetch con manejo estricto de errores
+        fetch("/obra/toggle-tarea/", {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json', 
+                'X-CSRFToken': csrfToken 
+            },
+            body: JSON.stringify({
+                id: parseInt(tareaId),
+                tipo: String(tipo),
+                completado: Boolean(nuevoEstado)
+            })
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload(); 
+            } else {
+                // Aquí capturamos por qué el servidor dice "Bad Request"
+                response.text().then(text => console.error("Respuesta del servidor:", text));
+                elemento.checked = !nuevoEstado; // Revertir visualmente
+                alert("Error al procesar: El servidor rechazó la solicitud.");
+            }
+        })
+        .catch(err => {
+            console.error('Error de red:', err);
+            elemento.checked = !nuevoEstado;
+        });
+    }
+
+    // 4. Guardar Progreso General Manual
+    function guardarProgresoGeneral(obraId) {
+        const valorInput = document.getElementById('input-progreso-manual').value;
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const progreso = parseInt(valorInput);
+
+        if (isNaN(progreso) || progreso < 0 || progreso > 100) {
+            alert('Por favor, ingresá un número válido entre 0 y 100.');
+            return;
+        }
+
+        fetch("{% url 'actualizar_progreso_obra_manual' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                obra_id: obraId,  
+                rubro_id: null,
+                porcentaje_avance: progreso
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const txt = document.getElementById('texto-progreso-general');
+                const cir = document.getElementById('circulo-progreso-general');
+                
+                if (txt) txt.innerText = `${data.nuevo_avance_general}%`;
+                if (cir) cir.setAttribute('stroke-dasharray', `${data.nuevo_avance_general}, 100`);
+                
+                alert('¡Progreso actualizado con éxito!');
+            } else {
+                alert('Error al guardar: ' + data.message);
+            }
+        })
+        .catch(err => console.error('Error:', err));
+    } // <-- ¡Esta llave cerraba la función que antes estaba abierta!
+
+    // 5. Actualizar Progreso por Rubro
+    function actualizarProgresoRubro(inputElement) {
+        const rubroId = inputElement.getAttribute('data-rubro-id');
+        const nuevoValor = parseInt(inputElement.value);
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        fetch("{% url 'actualizar_progreso_obra_manual' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                obra_id: "{{ obra.id }}",
+                rubro_id: rubroId,
+                porcentaje_avance: nuevoValor
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const txt = document.getElementById('texto-progreso-general');
+                const cir = document.getElementById('circulo-progreso-general');
+                const inputManual = document.getElementById('input-progreso-manual');
+                
+                if (txt) txt.innerText = `${data.nuevo_avance_general}%`;
+                if (cir) cir.setAttribute('stroke-dasharray', `${data.nuevo_avance_general}, 100`);
+                if (inputManual) inputManual.value = data.nuevo_avance_general;
+            } else {
+                alert('Error al guardar: ' + data.message);
+            }
+        })
+        .catch(err => console.error('Error:', err));
+    }
+
+
+function ampliarFoto(url) {
+        const modal = document.createElement('div');
+        modal.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center; cursor:pointer;";
+        modal.innerHTML = `<img src="${url}" style="max-width:90%; max-height:90%; border-radius:8px;">`;
+        modal.onclick = () => modal.remove();
+        document.body.appendChild(modal);
+}
+
+</script>
+
+{% endblock %}
