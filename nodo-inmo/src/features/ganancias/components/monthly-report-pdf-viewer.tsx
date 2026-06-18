@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Download, Share2, Loader2 } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
-import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";
+import { usePdfLogoUrl } from "@/features/agency-profile/hooks/use-pdf-logo-url";
 import type { MonthlyReportData } from "./monthly-report-document";
 import {
   downloadMonthlyReport,
@@ -26,7 +26,7 @@ async function buildBlob(data: MonthlyReportData, logoUrl: string | null): Promi
 
 export function MonthlyReportPdfViewer({ data }: MonthlyReportPdfViewerProps) {
   const { data: profile, isLoading: profileLoading } = useOrgProfile();
-  const { data: logoUrl, isLoading: logoLoading } = useLogoUrl(profile?.logo_path);
+  const { data: logoUrl, isLoading: logoLoading } = usePdfLogoUrl();
 
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);

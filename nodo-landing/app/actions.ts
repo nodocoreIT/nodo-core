@@ -10,6 +10,9 @@ import {
   sendInmoVerificationEmail,
   isMailConfigured,
 } from "@/lib/mail";
+import { submitNodeRegistration } from "@/app/actions/registration";
+import { getNodeLoginPath, getNodeMailLabel } from "@/lib/nodes";
+import { resolveRegistrationOrigin } from "@/lib/registration/origin";
 
 export type ContactFormState = {
   status: "idle" | "success" | "error";
@@ -81,102 +84,17 @@ export type DoctorRegState = {
 export async function submitDoctorRegistration(
   fullName: string,
   email: string,
-  password: string,
   plan: string,
   origin: string,
 ): Promise<DoctorRegState> {
-  if (!fullName || !email || !password || !plan) {
-    return { status: "error", message: "Todos los campos son obligatorios." };
-  }
-
-  try {
-    const admin = createAdminClient();
-
-    // 1. Check if email is already in clients and has Salud unit
-    const { data: existingClient, error: clientErr } = await admin
-      .from("clients")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (clientErr) {
-      console.error("Supabase select client error:", clientErr);
-      return { status: "error", message: "Error al verificar el correo." };
-    }
-
-    if (existingClient) {
-      const { data: existingUnit, error: unitErr } = await admin
-        .from("client_units")
-        .select("id")
-        .eq("client_id", existingClient.id)
-        .eq("unit_code", "salud")
-        .maybeSingle();
-
-      if (unitErr) {
-        console.error("Supabase select unit error:", unitErr);
-        return {
-          status: "error",
-          message: "Error al verificar las unidades del cliente.",
-        };
-      }
-
-      if (existingUnit) {
-        return {
-          status: "error",
-          message:
-            "Este correo electrónico ya tiene registrado NODO | Clinica Virtual.",
-        };
-      }
-    }
-
-    // 2. Delete any existing pending registrations for this email
-    await admin.from("pending_registrations").delete().eq("email", email);
-
-    // 3. Insert into pending_registrations
-    const { data: pending, error: insertErr } = await admin
-      .from("pending_registrations")
-      .insert({
-        full_name: fullName,
-        email,
-        password,
-        plan,
-      })
-      .select("verification_token")
-      .single();
-
-    if (insertErr || !pending) {
-      console.error("Supabase insert pending error:", insertErr);
-      return { status: "error", message: "Error al registrar la solicitud." };
-    }
-
-    // 4. Send verification email
-    if (isMailConfigured()) {
-      await sendRegistrationVerificationEmail({
-        nombre: fullName,
-        email,
-        plan,
-        token: pending.verification_token,
-        origin,
-      });
-    } else {
-      console.warn(
-        "Mail not configured. Verification URL token would be: ",
-        pending.verification_token,
-      );
-    }
-
-    return {
-      status: "success",
-      message:
-        "Te enviamos un correo de verificación. Por favor revisá tu casilla para activar tu cuenta.",
-    };
-  } catch (err) {
-    console.error("Doctor registration error:", err);
-    return {
-      status: "error",
-      message: "Hubo un problema al procesar el registro. Intente nuevamente.",
-    };
-  }
+  const result = await submitNodeRegistration({
+    unitCode: "Salud",
+    fullName,
+    email,
+    plan,
+    origin,
+  });
+  return { status: result.status === "idle" ? "error" : result.status, message: result.message };
 }
 
 export async function submitPatientRegistration(
@@ -185,103 +103,22 @@ export async function submitPatientRegistration(
   password: string,
   origin: string,
 ): Promise<DoctorRegState> {
-  if (!fullName || !email || !password) {
-    return { status: "error", message: "Todos los campos son obligatorios." };
-  }
-
-  try {
-    const admin = createAdminClient();
-
-    // 1. Check if email is already in clients
-    const { data: existingClient, error: clientErr } = await admin
-      .from("clients")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (clientErr) {
-      console.error("Supabase select client error:", clientErr);
-      return { status: "error", message: "Error al verificar el correo." };
-    }
-
-    if (existingClient) {
-      const { data: existingUnit, error: unitErr } = await admin
-        .from("client_units")
-        .select("id")
-        .eq("client_id", existingClient.id)
-        .eq("unit_code", "salud")
-        .eq("plan", "paciente")
-        .maybeSingle();
-
-      if (unitErr) {
-        console.error("Supabase select unit error:", unitErr);
-        return {
-          status: "error",
-          message: "Error al verificar las unidades del paciente.",
-        };
-      }
-
-      if (existingUnit) {
-        return {
-          status: "error",
-          message: "Este correo electrónico ya está registrado como paciente.",
-        };
-      }
-    }
-
-    // 2. Delete any existing pending registrations for this email
-    await admin.from("pending_registrations").delete().eq("email", email);
-
-    // 3. Insert into pending_registrations with plan = 'paciente'
-    const { data: pending, error: insertErr } = await admin
-      .from("pending_registrations")
-      .insert({
-        full_name: fullName,
-        email,
-        password,
-        plan: "paciente",
-      })
-      .select("verification_token")
-      .single();
-
-    if (insertErr || !pending) {
-      console.error("Supabase insert pending error:", insertErr);
-      return { status: "error", message: "Error al registrar la solicitud." };
-    }
-
-    // 4. Send verification email for patient
-    if (isMailConfigured()) {
-      await sendPatientVerificationEmail({
-        nombre: fullName,
-        email,
-        token: pending.verification_token,
-        origin,
-      });
-    } else {
-      console.warn(
-        "Mail not configured. Verification URL token would be: ",
-        pending.verification_token,
-      );
-    }
-
-    return {
-      status: "success",
-      message:
-        "Te enviamos un correo de verificación. Por favor revisá tu casilla para activar tu cuenta de paciente.",
-    };
-  } catch (err) {
-    console.error("Patient registration error:", err);
-    return {
-      status: "error",
-      message: "Hubo un problema al procesar el registro. Intente nuevamente.",
-    };
-  }
+  const result = await submitNodeRegistration({
+    unitCode: "Salud",
+    fullName,
+    email,
+    plan: "paciente",
+    origin,
+    password,
+  });
+  return { status: result.status === "idle" ? "error" : result.status, message: result.message };
 }
 
 export async function requestPasswordReset(
   email: string,
   nodeSlug: string,
   origin: string,
+  loginPathOverride?: string,
 ): Promise<{ status: "success" | "error"; message: string }> {
   if (!email) {
     return { status: "error", message: "El correo electrónico es obligatorio." };
@@ -289,9 +126,13 @@ export async function requestPasswordReset(
 
   try {
     const admin = createAdminClient();
+    const nodeLabel = getNodeMailLabel(nodeSlug);
+    const loginPath = loginPathOverride?.trim() || getNodeLoginPath(nodeSlug);
+    const baseOrigin = resolveRegistrationOrigin(origin);
 
-    // 1. Generate the recovery link
-    const redirectToUrl = `${origin}/login?node=${nodeSlug}&mode=reset-password`;
+    // Supabase PKCE recovery lands on /auth/confirm with token_hash, then we redirect to node login.
+    const loginReturn = `${loginPath}?mode=reset-password`;
+    const redirectToUrl = `${baseOrigin}/auth/confirm?next=${encodeURIComponent(loginReturn)}`;
     let { data, error } = await admin.auth.admin.generateLink({
       type: "recovery",
       email: email.trim(),
@@ -350,6 +191,7 @@ export async function requestPasswordReset(
       await sendPasswordResetEmail({
         email: email.trim(),
         recoveryUrl: data.properties.action_link,
+        nodeLabel,
       });
     } else {
       console.warn(
@@ -374,97 +216,14 @@ export async function requestPasswordReset(
 export async function submitInmoRegistration(
   fullName: string,
   email: string,
-  password: string,
   origin: string,
 ): Promise<{ status: "success" | "error"; message: string }> {
-  if (!fullName || !email || !password) {
-    return { status: "error", message: "Todos los campos son obligatorios." };
-  }
-
-  try {
-    const admin = createAdminClient();
-
-    // 1. Check if email is already in clients and has Inmo unit
-    const { data: existingClient, error: clientErr } = await admin
-      .from("clients")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (clientErr) {
-      console.error("Supabase select client error:", clientErr);
-      return { status: "error", message: "Error al verificar el correo." };
-    }
-
-    if (existingClient) {
-      const { data: existingUnit, error: unitErr } = await admin
-        .from("client_units")
-        .select("id")
-        .eq("client_id", existingClient.id)
-        .eq("unit_code", "inmo")
-        .maybeSingle();
-
-      if (unitErr) {
-        console.error("Supabase select unit error:", unitErr);
-        return {
-          status: "error",
-          message: "Error al verificar las unidades del cliente.",
-        };
-      }
-
-      if (existingUnit) {
-        return {
-          status: "error",
-          message: "Este correo electrónico ya tiene registrado NODO | Inmo.",
-        };
-      }
-    }
-
-    // 2. Delete any existing pending registrations for this email
-    await admin.from("pending_registrations").delete().eq("email", email);
-
-    // 3. Insert into pending_registrations with plan = 'inmo'
-    const { data: pending, error: insertErr } = await admin
-      .from("pending_registrations")
-      .insert({
-        full_name: fullName,
-        email,
-        password,
-        plan: "inmo",
-      })
-      .select("verification_token")
-      .single();
-
-    if (insertErr || !pending) {
-      console.error("Supabase insert pending error:", insertErr);
-      return { status: "error", message: "Error al registrar la solicitud." };
-    }
-
-    // 4. Send verification email using Zoho SMTP
-    if (isMailConfigured()) {
-      await sendInmoVerificationEmail({
-        nombre: fullName,
-        email,
-        token: pending.verification_token,
-        origin,
-      });
-    } else {
-      console.warn(
-        "Mail not configured. Verification URL token would be: ",
-        pending.verification_token,
-      );
-    }
-
-    return {
-      status: "success",
-      message:
-        "Te enviamos un correo de verificación. Por favor revisá tu casilla para activar tu cuenta de inmobiliaria.",
-    };
-  } catch (err) {
-    console.error("Inmo registration error:", err);
-    return {
-      status: "error",
-      message: "Hubo un problema al procesar el registro. Intente nuevamente.",
-    };
-  }
+  const result = await submitNodeRegistration({
+    unitCode: "Inmo",
+    fullName,
+    email,
+    plan: "inmo",
+    origin,
+  });
+  return { status: result.status === "idle" ? "error" : result.status, message: result.message };
 }

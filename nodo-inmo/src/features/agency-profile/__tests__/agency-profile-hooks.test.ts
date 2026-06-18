@@ -220,7 +220,7 @@ describe("useLogoUrl", () => {
     rerender({ path: "org-abc/logo-uuid-test.jpg" });
 
     // The hook should have attempted to create the signed URL
-    expect(mockCreateSignedUrl).toHaveBeenCalledWith("org-abc/logo-uuid-test.jpg", 60);
+    expect(mockCreateSignedUrl).toHaveBeenCalledWith("org-abc/logo-uuid-test.jpg", 3600);
   });
 
   it("is disabled when path is null — does not call createSignedUrl", async () => {

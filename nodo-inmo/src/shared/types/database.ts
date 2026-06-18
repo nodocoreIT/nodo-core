@@ -315,6 +315,7 @@ export type Database = {
           currency: string
           deposit_amount: number | null
           end_date: string
+          expenses_amount: number
           expenses_paid_by: string
           id: string
           next_adjustment_date: string | null
@@ -328,6 +329,7 @@ export type Database = {
           status: string
           tenant_id: string
           updated_at: string
+          archived_at: string | null
         }
         Insert: {
           adjustment_index?: string
@@ -338,6 +340,7 @@ export type Database = {
           currency?: string
           deposit_amount?: number | null
           end_date: string
+          expenses_amount?: number
           expenses_paid_by?: string
           id?: string
           next_adjustment_date?: string | null
@@ -351,6 +354,7 @@ export type Database = {
           status?: string
           tenant_id: string
           updated_at?: string
+          archived_at?: string | null
         }
         Update: {
           adjustment_index?: string
@@ -361,6 +365,7 @@ export type Database = {
           currency?: string
           deposit_amount?: number | null
           end_date?: string
+          expenses_amount?: number
           expenses_paid_by?: string
           id?: string
           next_adjustment_date?: string | null
@@ -374,6 +379,7 @@ export type Database = {
           status?: string
           tenant_id?: string
           updated_at?: string
+          archived_at?: string | null
         }
         Relationships: [
           {
@@ -455,6 +461,7 @@ export type Database = {
           email: string | null
           legal_name: string | null
           logo_path: string | null
+          pdf_logo_path: string | null
           org_id: string
           phone: string | null
           theme_settings: Json | null
@@ -468,6 +475,7 @@ export type Database = {
           email?: string | null
           legal_name?: string | null
           logo_path?: string | null
+          pdf_logo_path?: string | null
           org_id: string
           phone?: string | null
           theme_settings?: Json | null
@@ -481,6 +489,7 @@ export type Database = {
           email?: string | null
           legal_name?: string | null
           logo_path?: string | null
+          pdf_logo_path?: string | null
           org_id?: string
           phone?: string | null
           theme_settings?: Json | null

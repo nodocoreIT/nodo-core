@@ -15,84 +15,57 @@ export interface PaymentReceiptData {
   rentAmount: number;
   expensesAmount: number;
   grossAmount: number;
-  commissionRate: number;
-  commissionAmount: number;
-  ownerShare: number;
-  brandColor?: string;
   logoUrl?: string | null;
 }
 
-function createReceiptStyles(brand: string) {
-  return StyleSheet.create({
-    page: { fontFamily: "Helvetica", fontSize: 10, padding: 48, color: "#1a1a2e" },
-    brand: { fontSize: 16, fontFamily: "Helvetica-Bold", textAlign: "center", color: brand },
-    sub: { fontSize: 9, textAlign: "center", color: "#475569" },
-    title: {
-      fontSize: 12,
-      fontFamily: "Helvetica-Bold",
-      textAlign: "center",
-      marginTop: 20,
-      marginBottom: 16,
-      color: brand,
-    },
-    logo: { width: 80, height: 40, objectFit: "contain", alignSelf: "center", marginBottom: 4 },
-    line: { marginBottom: 6 },
-    label: { fontFamily: "Helvetica-Bold" },
-    detailBox: {
-      marginTop: 12,
-      padding: 12,
-      borderWidth: 1,
-      borderColor: "#e2e8f0",
-      borderStyle: "solid",
-      borderRadius: 4,
-    },
-    detailRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      marginBottom: 4,
-    },
-    detailLabel: { fontSize: 10, color: "#334155" },
-    detailAmount: { fontSize: 10, fontFamily: "Helvetica-Bold" },
-    divider: {
-      borderTopWidth: 1,
-      borderTopColor: "#cbd5e1",
-      borderTopStyle: "solid",
-      marginVertical: 8,
-    },
-    total: {
-      marginTop: 16,
-      fontSize: 12,
-      fontFamily: "Helvetica-Bold",
-      textAlign: "center",
-    },
-    adminSection: {
-      marginTop: 16,
-      padding: 12,
-      backgroundColor: "#f8fafc",
-      borderRadius: 4,
-    },
-    adminTitle: {
-      fontSize: 9,
-      fontFamily: "Helvetica-Bold",
-      color: "#475569",
-      marginBottom: 6,
-      textTransform: "uppercase",
-    },
-    footer: {
-      position: "absolute",
-      bottom: 40,
-      left: 48,
-      right: 48,
-      fontSize: 8,
-      color: "#64748b",
-      textAlign: "center",
-    },
-  });
-}
+const styles = StyleSheet.create({
+  page: { fontFamily: "Helvetica", fontSize: 10, padding: 48, color: "#000000" },
+  brand: { fontSize: 16, fontFamily: "Helvetica-Bold", textAlign: "center", color: "#000000" },
+  sub: { fontSize: 9, textAlign: "center", color: "#475569" },
+  title: {
+    fontSize: 12,
+    fontFamily: "Helvetica-Bold",
+    textAlign: "center",
+    marginTop: 20,
+    marginBottom: 16,
+    color: "#000000",
+  },
+  logo: { width: 80, height: 40, objectFit: "contain", alignSelf: "center", marginBottom: 4 },
+  line: { marginBottom: 6 },
+  label: { fontFamily: "Helvetica-Bold", color: "#000000" },
+  detailBox: {
+    marginTop: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderStyle: "solid",
+    borderRadius: 4,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  detailLabel: { fontSize: 10, color: "#000000" },
+  detailAmount: { fontSize: 10, fontFamily: "Helvetica-Bold", color: "#000000" },
+  divider: {
+    borderTopWidth: 1,
+    borderTopColor: "#cbd5e1",
+    borderTopStyle: "solid",
+    marginVertical: 8,
+  },
+  footer: {
+    position: "absolute",
+    bottom: 40,
+    left: 48,
+    right: 48,
+    fontSize: 8,
+    color: "#64748b",
+    textAlign: "center",
+  },
+});
 
 export function PaymentReceiptDocument(data: PaymentReceiptData) {
-  const brand = data.brandColor ?? "#da5a0e";
-  const styles = createReceiptStyles(brand);
   const hasExpenses = data.expensesAmount > 0;
 
   return (
@@ -128,7 +101,9 @@ export function PaymentReceiptDocument(data: PaymentReceiptData) {
         </Text>
 
         <View style={styles.detailBox}>
-          <Text style={{ fontFamily: "Helvetica-Bold", marginBottom: 8 }}>DETALLE DEL COBRO</Text>
+          <Text style={{ fontFamily: "Helvetica-Bold", marginBottom: 8, color: "#000000" }}>
+            DETALLE DEL COBRO
+          </Text>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Alquiler ({formatPeriod(data.period)})</Text>
             <Text style={styles.detailAmount}>
@@ -154,25 +129,7 @@ export function PaymentReceiptDocument(data: PaymentReceiptData) {
           </View>
         </View>
 
-        <View style={styles.adminSection}>
-          <Text style={styles.adminTitle}>Desglose administrativo</Text>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>
-              Comisión inmobiliaria ({data.commissionRate}%)
-            </Text>
-            <Text style={styles.detailAmount}>
-              {formatMoney(data.commissionAmount, data.currency)}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Neto propietario</Text>
-            <Text style={styles.detailAmount}>
-              {formatMoney(data.ownerShare, data.currency)}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={{ marginTop: 40, textAlign: "center" }}>
+        <Text style={{ marginTop: 40, textAlign: "center", color: "#000000" }}>
           Firma y Sello Aclaratorio
         </Text>
 

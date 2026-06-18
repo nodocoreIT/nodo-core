@@ -46,8 +46,22 @@ export interface PropertyGroup {
   property_id: string;
   property_address: string;
   currency: string;
+  /** Net owner share before property-expense deductions. */
   total: number;
+  /** Gross collected (rent + expenses on cobros). */
+  gross_collected: number;
+  /** Agency commission withheld from gross. */
+  commission: number;
   settlement_ids: string[];
+}
+
+function paymentGross(payment: {
+  amount: number;
+  paid_amount?: number | null;
+  expenses_amount?: number | null;
+}): number {
+  const rent = payment.paid_amount ?? payment.amount;
+  return rent + (payment.expenses_amount ?? 0);
 }
 
 /**
@@ -67,10 +81,15 @@ export function groupPendingByProperty(settlements: any[]): PropertyGroup[] {
     // Si la rendición no tiene propiedad asociada (caso raro), usamos un fallback
     const effectivePropId = propertyId ?? "no-prop";
 
+    const gross = s.payment ? paymentGross(s.payment) : s.amount;
+    const commission = gross - s.amount;
+
     const key = `${s.owner_id}:${effectivePropId}:${s.currency}`;
     const existing = map.get(key);
     if (existing) {
       existing.total += s.amount;
+      existing.gross_collected += gross;
+      existing.commission += commission;
       existing.settlement_ids.push(s.id);
     } else {
       map.set(key, {
@@ -80,6 +99,8 @@ export function groupPendingByProperty(settlements: any[]): PropertyGroup[] {
         property_address: propertyAddress,
         currency: s.currency,
         total: s.amount,
+        gross_collected: gross,
+        commission,
         settlement_ids: [s.id],
       });
     }

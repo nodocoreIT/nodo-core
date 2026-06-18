@@ -13,7 +13,7 @@ import { FileText } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import type { ContractWithRelations } from "@/features/contracts/hooks/use-contracts";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
-import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";
+import { usePdfLogoUrl } from "@/features/agency-profile/hooks/use-pdf-logo-url";
 import { buildContractDocumentData } from "@/features/contracts/lib/contract-locacion-data";
 import {
   handleDownload,
@@ -26,7 +26,7 @@ interface ContractLocacionButtonProps {
 
 export function ContractLocacionButton({ contract }: ContractLocacionButtonProps) {
   const { data: profile } = useOrgProfile();
-  const { data: logoUrl } = useLogoUrl(profile?.logo_path);
+  const { data: logoUrl } = usePdfLogoUrl();
   const [isGenerating, setIsGenerating] = useState(false);
 
   function buildData() {

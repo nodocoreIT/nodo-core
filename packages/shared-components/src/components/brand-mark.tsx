@@ -30,6 +30,8 @@ export interface BrandMarkProps {
   secondaryColor?: string;
   /** Product suffix shown next to "nodo" in default mode. */
   productSuffix?: string;
+  /** Scale logo/image to the container width (sidebar header). */
+  fillWidth?: boolean;
   /** Force legacy image rendering (useful for test environments). */
   useLegacyIcon?: boolean;
 }
@@ -44,6 +46,7 @@ export function BrandMark({
   primaryColor = "var(--color-brand)",
   secondaryColor = "var(--color-navy)",
   productSuffix,
+  fillWidth = false,
   useLegacyIcon = false,
 }: BrandMarkProps) {
   // Text-only logo
@@ -60,7 +63,8 @@ export function BrandMark({
       <span
         className={cn(
           "font-display font-bold tracking-tight py-1 block whitespace-normal break-words leading-tight",
-          onDark ? "max-w-[180px] md:max-w-[200px] text-white" : "max-w-full text-navy",
+          fillWidth ? "w-full text-left" : onDark ? "max-w-[180px] md:max-w-[200px]" : "max-w-full",
+          onDark ? "text-white" : "text-navy",
           fontSizeClass,
           className
         )}
@@ -73,11 +77,21 @@ export function BrandMark({
   // Custom logo image
   if (mode === "custom" && logoUrl) {
     return (
-      <span className={cn("inline-flex items-center gap-2", className)}>
+      <span
+        className={cn(
+          fillWidth ? "flex h-16 w-full min-w-0 items-center" : "inline-flex items-center gap-2",
+          className
+        )}
+      >
         <img
           src={logoUrl}
           alt="Logo"
-          className="h-10 w-auto max-w-[180px] md:max-w-[200px] flex-shrink-0 object-contain"
+          className={cn(
+            "object-contain",
+            fillWidth
+              ? "block h-full w-full"
+              : "h-10 w-auto max-w-[180px] md:max-w-[200px] flex-shrink-0"
+          )}
         />
       </span>
     );
@@ -102,7 +116,12 @@ export function BrandMark({
 
   // Default: SVG icon + wordmark
   return (
-    <span className={cn("inline-flex items-center gap-2", className)}>
+    <span
+      className={cn(
+        fillWidth ? "flex w-full min-w-0 items-center gap-2 px-5" : "inline-flex items-center gap-2",
+        className
+      )}
+    >
       <span
         className="flex items-center justify-center p-1.5 rounded-md"
         style={{ backgroundColor: secondaryColor }}

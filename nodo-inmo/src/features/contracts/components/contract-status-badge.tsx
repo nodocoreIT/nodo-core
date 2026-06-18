@@ -4,7 +4,21 @@
  */
 import { CONTRACT_STATUS_LABELS } from "@/features/contracts/lib/contract-labels";
 
-export function ContractStatusBadge({ status }: { status: string }) {
+export function ContractStatusBadge({
+  status,
+  archivedAt,
+}: {
+  status: string;
+  archivedAt?: string | null;
+}) {
+  if (archivedAt) {
+    return (
+      <span className="inline-flex items-center rounded-pill bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+        Archivado
+      </span>
+    );
+  }
+
   const label = CONTRACT_STATUS_LABELS[status] ?? status;
 
   const colorMap: Record<string, string> = {

@@ -22,11 +22,19 @@ interface BrandMarkProps {
   className?: string;
   /** Extra classes on the icon (size overrides). */
   iconClassName?: string;
+  /** Scale logo/image to the container width (sidebar header). */
+  fillWidth?: boolean;
   /** Force legacy image rendering for unit test suites */
   useLegacyIcon?: boolean;
 }
 
-export function BrandMark({ onDark, className, iconClassName, useLegacyIcon = false }: BrandMarkProps) {
+export function BrandMark({
+  onDark,
+  className,
+  iconClassName,
+  fillWidth = false,
+  useLegacyIcon = false,
+}: BrandMarkProps) {
   const baseUrl = import.meta.env.BASE_URL || "/";
   const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   let settings: ThemeSettings = DEFAULT_SETTINGS;
@@ -61,9 +69,10 @@ export function BrandMark({ onDark, className, iconClassName, useLegacyIcon = fa
       <span
         className={cn(
           "font-display font-bold tracking-tight py-1 block whitespace-normal break-words leading-tight",
-          onDark ? "max-w-[180px] md:max-w-[200px] text-white" : "max-w-full text-navy",
+          fillWidth ? "w-full text-left" : onDark ? "max-w-[180px] md:max-w-[200px]" : "max-w-full",
+          onDark ? "text-white" : "text-navy",
           fontSizeClass,
-          className
+          className,
         )}
       >
         {settings.brandText}
@@ -74,11 +83,21 @@ export function BrandMark({ onDark, className, iconClassName, useLegacyIcon = fa
   // If custom logo image is chosen AND we have a valid uploaded logo url
   if (settings.logoType === "custom" && logoUrl) {
     return (
-      <span className={cn("inline-flex items-center gap-2", className)}>
+      <span
+        className={cn(
+          fillWidth ? "flex h-16 w-full min-w-0 items-center" : "inline-flex items-center gap-2",
+          className,
+        )}
+      >
         <img
           src={logoUrl}
           alt="Logo"
-          className="h-10 w-auto max-w-[180px] md:max-w-[200px] flex-shrink-0 object-contain"
+          className={cn(
+            "object-contain",
+            fillWidth
+              ? "block h-full w-full"
+              : "h-10 w-auto max-w-[180px] md:max-w-[200px] flex-shrink-0",
+          )}
         />
       </span>
     );
@@ -105,7 +124,12 @@ export function BrandMark({ onDark, className, iconClassName, useLegacyIcon = fa
 
   // Default logo fall-through: render custom building icon styled with secondaryColor
   return (
-    <span className={cn("inline-flex items-center gap-2", className)}>
+    <span
+      className={cn(
+        fillWidth ? "flex w-full min-w-0 items-center gap-2" : "inline-flex items-center gap-2",
+        className,
+      )}
+    >
       <span 
         className="flex items-center justify-center p-1.5 rounded-md"
         style={{ backgroundColor: settings.secondaryColor }}

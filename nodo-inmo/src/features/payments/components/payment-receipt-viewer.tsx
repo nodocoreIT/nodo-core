@@ -3,8 +3,7 @@ import { Download, Share2, Loader2 } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import type { PaymentWithRelations } from "../hooks/use-payments";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
-import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";
-import { useThemeStore } from "@/shared/hooks/use-theme-settings";
+import { usePdfLogoUrl } from "@/features/agency-profile/hooks/use-pdf-logo-url";
 import { buildReceiptData } from "../lib/payment-receipt-pdf";
 
 function slugify(name: string): string {
@@ -17,8 +16,7 @@ interface PaymentReceiptViewerProps {
 
 export function PaymentReceiptViewer({ payment }: PaymentReceiptViewerProps) {
   const { data: agency, isLoading: agencyLoading } = useOrgProfile();
-  const { settings } = useThemeStore();
-  const { data: logoUrl } = useLogoUrl(agency?.logo_path);
+  const { data: logoUrl, isLoading: logoLoading } = usePdfLogoUrl();
 
   const [blob, setBlob] = useState<Blob | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -27,7 +25,7 @@ export function PaymentReceiptViewer({ payment }: PaymentReceiptViewerProps) {
   const [canShare, setCanShare] = useState(false);
 
   useEffect(() => {
-    if (agencyLoading) return;
+    if (agencyLoading || logoLoading) return;
 
     let objectUrl: string | null = null;
     setIsGenerating(true);
@@ -35,7 +33,7 @@ export function PaymentReceiptViewer({ payment }: PaymentReceiptViewerProps) {
 
     void (async () => {
       try {
-        const data = await buildReceiptData(payment, agency ?? null, settings.primaryColor, logoUrl ?? null);
+        const data = await buildReceiptData(payment, agency ?? null, logoUrl ?? null);
         const [{ pdf }, { PaymentReceiptDocument }] = await Promise.all([
           import("@react-pdf/renderer"),
           import("@/features/payments/components/payment-receipt-document"),
@@ -59,7 +57,7 @@ export function PaymentReceiptViewer({ payment }: PaymentReceiptViewerProps) {
     return () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [payment, agency, agencyLoading, logoUrl, settings]);
+  }, [payment, agency, agencyLoading, logoUrl, logoLoading]);
 
   useEffect(() => {
     if (
@@ -102,7 +100,7 @@ export function PaymentReceiptViewer({ payment }: PaymentReceiptViewerProps) {
     }
   }
 
-  const showSpinner = agencyLoading || isGenerating;
+  const showSpinner = agencyLoading || logoLoading || isGenerating;
 
   return (
     <div className="flex flex-col gap-3">

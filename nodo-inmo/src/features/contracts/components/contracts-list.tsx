@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
-import { Plus, Pencil, Trash2, FileText, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, Loader2 } from "lucide-react";
+import { Plus, Pencil, Archive, FileText, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, Loader2 } from "lucide-react";
 import { PaginationControls } from "@nodocore/shared-components";
 import { Button } from "@nodocore/shared-components";
 import { useContracts } from "@/features/contracts/hooks/use-contracts";
 import type { ContractWithRelations } from "@/features/contracts/hooks/use-contracts";
-import { useDeleteContract } from "@/features/contracts/hooks/use-delete-contract";
+import { useArchiveContract } from "@/features/contracts/hooks/use-archive-contract";
 import { useSendWhatsApp } from "@/features/contracts/hooks/use-send-whatsapp";
 import { useUpdateContract } from "@/features/contracts/hooks/use-update-contract";
 import { ContractFormDialog } from "./contract-form-dialog";
@@ -47,14 +47,15 @@ import {
 import { PAGE_SIZE } from "@/shared/lib/constants";
 
 export function ContractsList() {
-  const { data, isLoading, isError } = useContracts();
+  const [showArchived, setShowArchived] = useState(false);
+  const { data, isLoading, isError } = useContracts({ includeArchived: showArchived });
   const query = useSearchStore((s) => s.query);
   const [createOpen, setCreateOpen] = useState(false);
   const [editContract, setEditContract] =
     useState<ContractWithRelations | null>(null);
   const [viewContract, setViewContract] =
     useState<ContractWithRelations | null>(null);
-  const deleteContract = useDeleteContract();
+  const archiveContract = useArchiveContract();
   const updateContract = useUpdateContract();
   const { sendFromContract, loadingId } = useSendWhatsApp();
   const [whatsappResult, setWhatsappResult] = useState<{ id: string; ok: boolean; msg: string } | null>(null);
@@ -117,7 +118,19 @@ export function ContractsList() {
   return (
     <div className="flex flex-col gap-6">
       {/* Action row */}
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-between gap-3">
+        <label className="flex items-center gap-2 text-sm text-slate2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => {
+              setShowArchived(e.target.checked);
+              setPage(0);
+            }}
+            className="accent-brand"
+          />
+          Ver contratos archivados
+        </label>
         <Button onClick={() => setCreateOpen(true)} className="gap-2">
           <Plus className="h-4 w-4" />
           Nuevo contrato
@@ -296,43 +309,48 @@ export function ContractsList() {
                     / {contract.adjustment_period_months}m
                   </TableCell>
                   <TableCell>
-                    <ContractStatusBadge status={contract.status} />
+                    <ContractStatusBadge
+                      status={contract.status}
+                      archivedAt={contract.archived_at}
+                    />
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label="Avisar aumento por WhatsApp"
-                        title={
-                          contract.tenant?.phone
-                            ? "Enviar aviso de aumento por WhatsApp"
-                            : "Sin teléfono registrado"
-                        }
-                        disabled={!contract.tenant?.phone || loadingId === contract.id}
-                        className={
-                          whatsappResult?.id === contract.id
-                            ? whatsappResult.ok
-                              ? "text-green-600"
-                              : "text-red-500"
-                            : "text-green-700 hover:text-green-800 hover:bg-green-50"
-                        }
-                        onClick={async () => {
-                          const result = await sendFromContract(contract);
-                          setWhatsappResult({
-                            id: contract.id,
-                            ok: result.success,
-                            msg: result.error ?? "Mensaje enviado",
-                          });
-                          setTimeout(() => setWhatsappResult(null), 4000);
-                        }}
-                      >
-                        {loadingId === contract.id
-                          ? <Loader2 className="h-4 w-4 animate-spin" />
-                          : <MessageCircle className="h-4 w-4" />
-                        }
-                        <span className="sr-only">Enviar aviso WhatsApp</span>
-                      </Button>
+                      {!contract.archived_at && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label="Avisar aumento por WhatsApp"
+                          title={
+                            contract.tenant?.phone
+                              ? "Enviar aviso de aumento por WhatsApp"
+                              : "Sin teléfono registrado"
+                          }
+                          disabled={!contract.tenant?.phone || loadingId === contract.id}
+                          className={
+                            whatsappResult?.id === contract.id
+                              ? whatsappResult.ok
+                                ? "text-green-600"
+                                : "text-red-500"
+                              : "text-green-700 hover:text-green-800 hover:bg-green-50"
+                          }
+                          onClick={async () => {
+                            const result = await sendFromContract(contract);
+                            setWhatsappResult({
+                              id: contract.id,
+                              ok: result.success,
+                              msg: result.error ?? "Mensaje enviado",
+                            });
+                            setTimeout(() => setWhatsappResult(null), 4000);
+                          }}
+                        >
+                          {loadingId === contract.id
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <MessageCircle className="h-4 w-4" />
+                          }
+                          <span className="sr-only">Enviar aviso WhatsApp</span>
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -343,20 +361,24 @@ export function ContractsList() {
                         <FileText className="h-4 w-4" />
                         <span className="sr-only">Ver PDF</span>
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label="Editar"
-                        onClick={() => setEditContract(contract)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                        <span className="sr-only">Editar</span>
-                      </Button>
-                      <DeleteAction
-                        onConfirm={() =>
-                          deleteContract.mutateAsync(contract.id)
-                        }
-                      />
+                      {!contract.archived_at && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Editar"
+                            onClick={() => setEditContract(contract)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                            <span className="sr-only">Editar</span>
+                          </Button>
+                          <ArchiveAction
+                            onConfirm={() =>
+                              archiveContract.mutateAsync(contract.id)
+                            }
+                          />
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -412,7 +434,10 @@ export function ContractsList() {
             <DialogDescription>
               {viewContract?.tenant?.name ?? "—"} ·{" "}
               {viewContract?.property?.address ?? "—"} ·{" "}
-              <ContractStatusBadge status={viewContract?.status ?? ""} />
+              <ContractStatusBadge
+                status={viewContract?.status ?? ""}
+                archivedAt={viewContract?.archived_at}
+              />
             </DialogDescription>
           </DialogHeader>
           {viewContract && <ContractPdfViewer contract={viewContract} />}
@@ -422,27 +447,29 @@ export function ContractsList() {
   );
 }
 
-// ── Delete action ───────────────────────────────────────────────────────────────
+// ── Archive action ────────────────────────────────────────────────────────────
 
-function DeleteAction({ onConfirm }: { onConfirm: () => void }) {
+function ArchiveAction({ onConfirm }: { onConfirm: () => void }) {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="sm" aria-label="Eliminar">
-          <Trash2 className="h-4 w-4 text-destructive" />
-          <span className="sr-only">Eliminar</span>
+        <Button variant="ghost" size="sm" aria-label="Archivar contrato">
+          <Archive className="h-4 w-4 text-slate2" />
+          <span className="sr-only">Archivar contrato</span>
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>¿Eliminar este contrato?</AlertDialogTitle>
+          <AlertDialogTitle>¿Archivar este contrato?</AlertDialogTitle>
           <AlertDialogDescription>
-            Esta acción no se puede deshacer.
+            El contrato dejará de aparecer en el dashboard y en cobros pendientes.
+            Las cuotas ya cobradas se conservan en el historial. Las cuotas
+            pendientes se cancelan.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>Eliminar</AlertDialogAction>
+          <AlertDialogAction onClick={onConfirm}>Archivar</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

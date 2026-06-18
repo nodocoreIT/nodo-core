@@ -56,8 +56,8 @@ vi.mock(
 );
 
 // Stub dialogs/hooks not under test in list
-vi.mock("@/features/contracts/hooks/use-delete-contract", () => ({
-  useDeleteContract: () => ({ mutateAsync: vi.fn(), isPending: false }),
+vi.mock("@/features/contracts/hooks/use-archive-contract", () => ({
+  useArchiveContract: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock("@/features/contracts/hooks/use-update-contract", () => ({
   useUpdateContract: () => ({ mutateAsync: vi.fn(), isPending: false }),

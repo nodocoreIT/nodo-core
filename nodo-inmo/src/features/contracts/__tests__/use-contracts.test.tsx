@@ -9,6 +9,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+const mockIs = vi.fn();
 const mockOrder = vi.fn();
 const mockSelect = vi.fn();
 const mockFrom = vi.fn();
@@ -32,7 +33,8 @@ function wrapper({ children }: { children: React.ReactNode }) {
 describe("useContracts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockOrder.mockResolvedValue({ data: [], error: null });
+    mockIs.mockResolvedValue({ data: [], error: null });
+    mockOrder.mockReturnValue({ is: mockIs });
     mockSelect.mockReturnValue({ order: mockOrder });
     mockFrom.mockReturnValue({ select: mockSelect });
     mockSchema.mockReturnValue({ from: mockFrom });
@@ -52,6 +54,7 @@ describe("useContracts", () => {
     expect(selectArg).toContain("guarantors:contract_guarantors");
     expect(selectArg).toContain("dni");
     expect(mockOrder).toHaveBeenCalledWith("created_at", { ascending: false });
+    expect(mockIs).toHaveBeenCalledWith("archived_at", null);
   });
 
   it("returns data from a successful query", async () => {
@@ -78,7 +81,7 @@ describe("useContracts", () => {
         signing_date: null,
       },
     ];
-    mockOrder.mockResolvedValue({ data: fixture, error: null });
+    mockIs.mockResolvedValue({ data: fixture, error: null });
 
     const { result } = renderHook(() => useContracts(), { wrapper });
 

@@ -8,6 +8,7 @@ export interface SyncInstallmentsContract {
   rent_amount: number;
   currency: string;
   status: string;
+  expenses_amount?: number;
 }
 
 /**
@@ -40,6 +41,7 @@ export async function syncContractInstallments(
     amount: d.amount,
     currency: d.currency,
     status: d.status,
+    expenses_amount: contract.expenses_amount ?? 0,
   }));
 
   const { error } = await supabase
@@ -48,5 +50,19 @@ export async function syncContractInstallments(
     .upsert(rows, { onConflict: "contract_id,period", ignoreDuplicates: true });
 
   if (error) throw error;
+
+  // Keep pending installments aligned with the current contract rent.
+  const { error: syncError } = await supabase
+    .schema("nodo_inmo")
+    .from("payments")
+    .update({
+      amount: contract.rent_amount,
+      expenses_amount: contract.expenses_amount ?? 0,
+    })
+    .eq("contract_id", contract.id)
+    .eq("status", "pending");
+
+  if (syncError) throw syncError;
+
   return { inserted: rows.length };
 }

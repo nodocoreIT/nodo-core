@@ -142,6 +142,21 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
                       Ver Precios
                     </button>
                   </div>
+                ) : slug === "finanzas" ? (
+                  <div className="flex flex-wrap items-center justify-center gap-4">
+                    <Link
+                      href="/nodo-finanzas/login"
+                      className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[.98] transition-all duration-150 shadow-md shadow-emerald-600/15"
+                    >
+                      Entrar al módulo
+                    </Link>
+                    <button
+                      onClick={() => setPdfOpen(true)}
+                      className="btn-ghost-light inline-flex items-center justify-center px-7 py-3.5 text-[16px] font-semibold rounded-md text-white cursor-pointer"
+                    >
+                      Ver Precios
+                    </button>
+                  </div>
                 ) : slug === "clinica" ? (
                   <div className="flex flex-wrap items-center justify-center gap-4">
                     <Link
@@ -325,10 +340,10 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
                     </p>
                   </div>
                   <Link
-                    href="/nodo-finanzas"
+                    href="/nodo-finanzas/login"
                     className="inline-flex items-center gap-2 text-emerald-400 font-semibold text-[15px] hover:text-emerald-300 transition-colors"
                   >
-                    Ver módulo <ArrowRight className="h-4 w-4" />
+                    Acceder al módulo <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
 

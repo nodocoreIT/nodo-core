@@ -35,6 +35,14 @@ import { useProperties } from "@/features/properties/hooks/use-properties";
 import { useContacts } from "@/features/contacts/hooks/use-contacts";
 import type { ContractWithRelations } from "@/features/contracts/hooks/use-contracts";
 import { formatCurrencyInput, parseCurrencyInput } from "@/shared/lib/format-money";
+import {
+  commissionRateFromProperty,
+  resolveCommissionRatePercent,
+} from "@/features/contracts/lib/resolve-commission-rate";
+import {
+  ADMINISTRACION_INMOBILIARIA,
+  ADMINISTRACION_INMOBILIARIA_PERCENT,
+} from "@/features/caja/lib/settlement-labels";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +55,7 @@ const schema = z.object({
   currency: z.enum(["ARS", "USD"]),
   deposit_amount: z.string().optional(),
   commission_rate: z.string().optional(),
+  expenses_amount: z.string().optional(),
   expenses_paid_by: z.enum(["tenant", "owner"]),
   adjustment_index: z.enum(["IPC", "ICL", "fixed", "USD"]),
   adjustment_period_months: z.string().min(1, "Periodicidad requerida"),
@@ -67,9 +76,16 @@ function toStr(v: number | string | null | undefined): string {
 }
 
 function commissionRateFromContract(contract?: ContractWithRelations): string {
-  if (!contract?.commission_amount || !contract.rent_amount) return "10";
-  const rate = (contract.commission_amount / contract.rent_amount) * 100;
-  return String(Math.round(rate * 100) / 100);
+  const rate = resolveCommissionRatePercent({
+    contractCommissionAmount: contract?.commission_amount,
+    contractRentAmount: contract?.rent_amount,
+    propertyCommissionRate: (contract?.property as { commission_rate?: number | null } | null)
+      ?.commission_rate,
+    ownerCommissionRate: (
+      contract?.property?.owner as { commission_rate?: number | null } | null | undefined
+    )?.commission_rate,
+  });
+  return String(rate);
 }
 
 function buildPayload(values: ContractFormValues, guarantorIds: string[]) {
@@ -87,6 +103,7 @@ function buildPayload(values: ContractFormValues, guarantorIds: string[]) {
     currency: values.currency,
     deposit_amount: parseCurrencyInput(values.deposit_amount),
     commission_amount: commissionAmount,
+    expenses_amount: parseCurrencyInput(values.expenses_amount) ?? 0,
     expenses_paid_by: values.expenses_paid_by,
     adjustment_index: values.adjustment_index,
     adjustment_period_months: Number(values.adjustment_period_months),
@@ -125,6 +142,7 @@ export function ContractFormDialog({
   const { data: properties = [] } = useProperties();
   const { data: tenants = [] } = useContacts("tenant");
   const { data: guarantors = [] } = useContacts("guarantor");
+  const propertyChangedRef = useRef(false);
 
   const [guarantorIds, setGuarantorIds] = useState<string[]>(
     contract?.guarantors?.map((g) => g.guarantor_id) ?? [],
@@ -141,6 +159,10 @@ export function ContractFormDialog({
       currency: (contract?.currency as any) ?? "ARS",
       deposit_amount: formatCurrencyInput(contract?.deposit_amount, contract?.currency as any ?? "ARS"),
       commission_rate: commissionRateFromContract(contract),
+      expenses_amount: formatCurrencyInput(
+        (contract as { expenses_amount?: number | null } | undefined)?.expenses_amount,
+        (contract?.currency as any) ?? "ARS",
+      ),
       expenses_paid_by: (contract?.expenses_paid_by as any) ?? "tenant",
       adjustment_index: (contract?.adjustment_index as any) ?? "IPC",
       adjustment_period_months: toStr(contract?.adjustment_period_months) || "12",
@@ -153,6 +175,7 @@ export function ContractFormDialog({
   });
 
   const currency = form.watch("currency") || "ARS";
+  const propertyId = form.watch("property_id");
   const rentAmount = form.watch("rent_amount") || "";
   const commissionRate = form.watch("commission_rate") || "";
   const computedCommission = useMemo(() => {
@@ -161,11 +184,20 @@ export function ContractFormDialog({
     if (!rent || !rate) return null;
     return Math.round((rent * rate) / 100);
   }, [rentAmount, commissionRate]);
+  const selectedProperty = useMemo(
+    () => properties.find((p) => p.id === propertyId),
+    [properties, propertyId],
+  );
+  const ownerDisplayName =
+    selectedProperty?.owner?.name ??
+    contract?.property?.owner?.name ??
+    "";
   const prevCurrencyRef = useRef(currency);
   useEffect(() => {
     if (prevCurrencyRef.current !== currency) {
       const rent = form.getValues("rent_amount");
       const deposit = form.getValues("deposit_amount");
+      const expenses = form.getValues("expenses_amount");
 
       if (rent) {
         form.setValue("rent_amount", formatCurrencyInput(rent.replace(/\D/g, ""), currency));
@@ -173,9 +205,33 @@ export function ContractFormDialog({
       if (deposit) {
         form.setValue("deposit_amount", formatCurrencyInput(deposit.replace(/\D/g, ""), currency));
       }
+      if (expenses) {
+        form.setValue(
+          "expenses_amount",
+          formatCurrencyInput(expenses.replace(/\D/g, ""), currency),
+        );
+      }
       prevCurrencyRef.current = currency;
     }
   }, [currency, form]);
+
+  useEffect(() => {
+    if (!propertyId || properties.length === 0) return;
+
+    const property = properties.find((p) => p.id === propertyId);
+    if (!property) return;
+
+    if (
+      isEdit &&
+      !propertyChangedRef.current &&
+      contract?.commission_amount != null
+    ) {
+      return;
+    }
+
+    const rate = commissionRateFromProperty(property);
+    form.setValue("commission_rate", String(rate));
+  }, [propertyId, properties, isEdit, contract?.commission_amount, form]);
 
   function toggleGuarantor(id: string) {
     setGuarantorIds((prev) =>
@@ -188,6 +244,7 @@ export function ContractFormDialog({
     if (!isEdit) {
       form.reset();
       setGuarantorIds([]);
+      propertyChangedRef.current = false;
     }
     onSuccess?.();
   }
@@ -216,7 +273,13 @@ export function ContractFormDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel htmlFor="property-select">Propiedad</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select
+                    onValueChange={(value) => {
+                      propertyChangedRef.current = true;
+                      field.onChange(value);
+                    }}
+                    value={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger id="property-select" aria-label="Propiedad">
                         <SelectValue placeholder="Seleccioná" />
@@ -225,7 +288,9 @@ export function ContractFormDialog({
                     <SelectContent>
                       {properties.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
-                          {p.address}
+                          {p.owner?.name
+                            ? `${p.address} — ${p.owner.name}`
+                            : p.address}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -234,6 +299,23 @@ export function ContractFormDialog({
                 </FormItem>
               )}
             />
+
+            {/* Owner (derived from property) */}
+            <FormItem>
+              <FormLabel htmlFor="owner-display">Propietario</FormLabel>
+              <FormControl>
+                <Input
+                  id="owner-display"
+                  aria-label="Propietario"
+                  readOnly
+                  disabled
+                  value={ownerDisplayName}
+                  placeholder={
+                    propertyId ? "Sin propietario asignado" : "Seleccioná una propiedad"
+                  }
+                />
+              </FormControl>
+            </FormItem>
 
             {/* Tenant */}
             <FormField
@@ -349,7 +431,7 @@ export function ContractFormDialog({
               />
             </div>
 
-            {/* Deposit + commission */}
+            {/* Deposit + administración inmobiliaria */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control as any}
@@ -379,11 +461,13 @@ export function ContractFormDialog({
                 name="commission_rate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel htmlFor="commission-input">Comisión (%)</FormLabel>
+                    <FormLabel htmlFor="commission-input">
+                      {ADMINISTRACION_INMOBILIARIA_PERCENT}
+                    </FormLabel>
                     <FormControl>
                       <Input
                         id="commission-input"
-                        aria-label="Comisión porcentaje"
+                        aria-label={ADMINISTRACION_INMOBILIARIA_PERCENT}
                         type="text"
                         inputMode="decimal"
                         placeholder="10"
@@ -396,7 +480,8 @@ export function ContractFormDialog({
                     </FormControl>
                     {computedCommission != null ? (
                       <p className="text-xs text-slate2">
-                        ≈ {formatCurrencyInput(String(computedCommission), currency)} según el alquiler
+                        ≈ {formatCurrencyInput(String(computedCommission), currency)} de{" "}
+                        {ADMINISTRACION_INMOBILIARIA.toLowerCase()} según el alquiler
                       </p>
                     ) : null}
                     <FormMessage />
@@ -475,6 +560,32 @@ export function ContractFormDialog({
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control as any}
+                name="expenses_amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel htmlFor="expenses-amount-input">Valor de expensas</FormLabel>
+                    <FormControl>
+                      <Input
+                        id="expenses-amount-input"
+                        aria-label="Valor de expensas"
+                        type="text"
+                        placeholder={currency === "ARS" ? "$ 0" : "US$ 0"}
+                        value={field.value}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\D/g, "");
+                          field.onChange(formatCurrencyInput(raw, currency));
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control as any}
                 name="status"

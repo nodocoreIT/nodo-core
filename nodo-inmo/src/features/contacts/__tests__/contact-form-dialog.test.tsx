@@ -102,7 +102,7 @@ describe("ContactFormDialog — create mode with defaultRole='owner'", () => {
       />,
       { wrapper },
     );
-    expect(screen.getByLabelText(/comisión/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/administraci[oó]n inmobiliaria/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/alquileres/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/obra|construcc/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/ventas/i)).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe("ContactFormDialog — create mode with defaultRole='owner'", () => {
       />,
       { wrapper },
     );
-    expect(screen.queryByLabelText(/comisión/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/administraci[oó]n inmobiliaria/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/alquileres/i)).not.toBeInTheDocument();
   });
 
@@ -210,7 +210,7 @@ describe("ContactFormDialog — edit mode", () => {
     expect((screen.getByLabelText(/nombre/i) as HTMLInputElement).value).toBe("Roberto Contacto");
     expect((screen.getByLabelText(/dni/i) as HTMLInputElement).value).toBe("25-88866544-3");
     expect((screen.getByLabelText(/teléfono/i) as HTMLInputElement).value).toBe("11-3333-0099");
-    expect((screen.getByLabelText(/comisión/i) as HTMLInputElement).value).toBe("8");
+    expect((screen.getByLabelText(/administraci[oó]n inmobiliaria/i) as HTMLInputElement).value).toBe("8");
   });
 
   it("shows role checkboxes in edit mode", () => {
@@ -253,7 +253,7 @@ describe("ContactFormDialog — edit mode", () => {
       />,
       { wrapper },
     );
-    expect(screen.getByLabelText(/comisión/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/administraci[oó]n inmobiliaria/i)).toBeInTheDocument();
   });
 
   it("submits updated roles when role checkbox toggled", async () => {

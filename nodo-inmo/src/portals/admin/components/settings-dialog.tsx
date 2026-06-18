@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Loader2, Mail, UserPlus, Image as ImageIcon, BrainCircuit, CheckCircle2, AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { Loader2, Mail, UserPlus, Image as ImageIcon, BrainCircuit, CheckCircle2, AlertTriangle, Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/shared/lib/supabase";
 import { useAiSettings } from "@/shared/hooks/use-ai-settings";
@@ -19,7 +19,7 @@ import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import { useUploadLogo } from "@/features/agency-profile/hooks/use-upload-logo";
 import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";
 import { useUpsertOrgProfile } from "@/features/agency-profile/hooks/use-upsert-org-profile";
-import { useStaff } from "@/shared/hooks/use-staff";
+import { useStaff, type StaffUser } from "@/shared/hooks/use-staff";
 import { BankAccountsSection } from "./bank-accounts-section";
 import { useAlertSettings } from "@/shared/hooks/use-alert-settings";
 import { useForm } from "react-hook-form";
@@ -27,6 +27,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useUpdateProfile } from "@/features/profile/hooks/use-update-profile";
 import { useAuth } from "@nodocore/shared-components";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/components/ui/alert-dialog";
 import {
   Form,
   FormControl,
@@ -149,7 +159,7 @@ function LogoCustomUploader() {
     if (!file) return;
     setError(null);
     try {
-      const path = await uploadLogo({ file });
+      const path = await uploadLogo({ file, variant: "logo" });
       await upsertProfile({ logo_path: path });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al subir el logo");
@@ -202,7 +212,87 @@ function LogoCustomUploader() {
             Formatos soportados: JPG, PNG o WebP. Tamaño máximo: 2 MB.
           </p>
           <p className="text-[10px] text-slate2">
-            Tamaño recomendado: <span className="font-semibold">320 × 80 px</span> (PNG con fondo transparente). El logo se ajusta automáticamente al ancho del sidebar.
+            Tamaño recomendado: <span className="font-semibold">480 × 128 px</span> (PNG con fondo transparente, proporción 15:4). El logo ocupa todo el ancho del sidebar sin deformarse.
+          </p>
+        </div>
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      {isPending && (
+        <div className="flex items-center gap-2 text-xs text-brand font-semibold">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Subiendo y guardando logo...
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PdfLogoUploader() {
+  const { data: profile } = useOrgProfile();
+  const { mutateAsync: uploadLogo, isPending: isUploading } = useUploadLogo();
+  const { mutateAsync: upsertProfile, isPending: isSaving } = useUpsertOrgProfile();
+  const { data: logoUrl } = useLogoUrl(profile?.pdf_logo_path);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    try {
+      const path = await uploadLogo({ file, variant: "pdf-logo" });
+      await upsertProfile({ pdf_logo_path: path });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al subir el logo");
+    }
+  };
+
+  const handleClearLogo = async () => {
+    setError(null);
+    try {
+      await upsertProfile({ pdf_logo_path: null });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al eliminar el logo");
+    }
+  };
+
+  const isPending = isUploading || isSaving;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        {logoUrl ? (
+          <div className="relative group rounded-md overflow-hidden border border-border bg-white p-2">
+            <img src={logoUrl} alt="Logo para PDFs" className="h-16 w-auto object-contain" />
+            <button
+              onClick={handleClearLogo}
+              disabled={isPending}
+              type="button"
+              className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white font-semibold text-xs rounded-md"
+            >
+              Eliminar
+            </button>
+          </div>
+        ) : (
+          <div className="h-16 w-16 bg-border flex items-center justify-center rounded-md text-slate2">
+            <ImageIcon className="h-6 w-6" />
+          </div>
+        )}
+        <div className="flex-1 space-y-1">
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleFileChange}
+            disabled={isPending}
+            className="text-xs file:mr-4 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-brand/10 file:text-brand hover:file:bg-brand/20 cursor-pointer"
+          />
+          <p className="text-[10px] text-slate2">
+            Formatos soportados: JPG, PNG o WebP. Tamaño máximo: 2 MB.
+          </p>
+          <p className="text-[10px] text-slate2">
+            Recomendado: logo con <span className="font-semibold">fondo blanco o sólido</span> (no transparente). Se usa en recibos, liquidaciones, contratos y reportes PDF.
           </p>
         </div>
       </div>
@@ -363,9 +453,7 @@ function IpcSettingsSection() {
   );
 }
 
-// ── Role-visibility matrix constants ─────────────────────────────────────────
-
-const STAFF_ROLES = ["Administrador", "Vendedor", "Inquilino", "Propietario", "Colega"] as const;
+// ── Section visibility constants ─────────────────────────────────────────────
 
 const MANAGED_NAV = [
   { to: "/admin/dashboard",      label: "Inicio" },
@@ -386,9 +474,12 @@ const MANAGED_NAV = [
 
 const ALL_PATHS = MANAGED_NAV.map((n) => n.to);
 
-// If a role has no entry → all sections visible (default open).
-function isAllowed(perms: Record<string, string[]>, role: string, path: string): boolean {
-  return perms[role] === undefined ? true : perms[role].includes(path);
+function defaultSections(): string[] {
+  return [...ALL_PATHS];
+}
+
+function getUserSections(perms: Record<string, string[]>, userId: string): string[] {
+  return perms[userId] ?? defaultSections();
 }
 
 // ── ──────────────────────────────────────────────────────────────────────────
@@ -398,10 +489,27 @@ interface SettingsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type SettingsTabId =
+  | "profile"
+  | "company"
+  | "customization"
+  | "users"
+  | "ai"
+  | "alerts"
+  | "ipc";
+
+const SETTINGS_TABS: { id: SettingsTabId; label: string }[] = [
+  { id: "profile", label: "Mi Perfil" },
+  { id: "company", label: "Datos de Empresa" },
+  { id: "users", label: "Usuarios y Roles" },
+  { id: "customization", label: "Personalización" },
+  { id: "ai", label: "Integraciones / IA" },
+  { id: "alerts", label: "Alertas" },
+  { id: "ipc", label: "Índices" },
+];
+
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-  const [activeTab, setActiveTab] = useState<
-    "profile" | "company" | "customization" | "users" | "ai" | "alerts" | "ipc"
-  >("profile");
+  const [activeTab, setActiveTab] = useState<SettingsTabId>("profile");
   const { aiSettings, setAiSettings } = useAiSettings();
   const [apiKeyInput, setApiKeyInput] = useState(aiSettings.geminiApiKey);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -412,7 +520,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     setAiKeySaved(true);
     setTimeout(() => setAiKeySaved(false), 2500);
   };
-  const { role: authRole } = useAuth();
+  const { role: authRole, user: authUser } = useAuth();
   const { data: profile } = useOrgProfile();
   const { settings, setSettings, resetSettings } = useThemeSettings();
   const { mutateAsync: upsertProfile } = useUpsertOrgProfile();
@@ -452,70 +560,132 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     [settings, upsertProfile, onOpenChange],
   );
 
-  // ── Role visibility permissions ─────────────────────────────────────────────
-  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
+  // ── User section visibility ─────────────────────────────────────────────────
+  const [userPermissions, setUserPermissions] = useState<Record<string, string[]>>({});
+  const [draftSections, setDraftSections] = useState<string[]>(defaultSections);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [savingPerms, setSavingPerms] = useState(false);
   const [permsSaved, setPermsSaved] = useState(false);
 
   useEffect(() => {
     if (profile?.theme_settings) {
-      const stored = (profile.theme_settings as Record<string, unknown>).rolePermissions;
+      const stored = (profile.theme_settings as Record<string, unknown>).userPermissions;
       if (stored && typeof stored === "object") {
-        setRolePermissions(stored as Record<string, string[]>);
+        setUserPermissions(stored as Record<string, string[]>);
       }
     }
   }, [profile]);
 
-  const togglePermission = (roleName: string, path: string) => {
-    setRolePermissions((prev) => {
-      const current = prev[roleName] ?? [...ALL_PATHS];
-      const has = current.includes(path);
-      return {
-        ...prev,
-        [roleName]: has ? current.filter((p) => p !== path) : [...current, path],
-      };
+  const toggleSection = (path: string) => {
+    setDraftSections((prev) =>
+      prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path],
+    );
+  };
+
+  const persistUserPermissions = async (next: Record<string, string[]>) => {
+    setUserPermissions(next);
+    await upsertProfile({
+      theme_settings: {
+        ...((profile?.theme_settings as object) ?? {}),
+        userPermissions: next,
+      } as any,
     });
   };
 
   const handleSavePermissions = async () => {
+    if (!selectedUserId) return;
     setSavingPerms(true);
+    setMemberActionError(null);
     try {
-      await upsertProfile({
-        theme_settings: {
-          ...((profile?.theme_settings as object) ?? {}),
-          rolePermissions,
-        } as any,
-      });
+      const selected = users.find((u) => u.id === selectedUserId);
+      if (selected && selected.role !== newMember.role) {
+        await updateMemberRole(selectedUserId, newMember.role);
+      }
+      const next = { ...userPermissions, [selectedUserId]: draftSections };
+      await persistUserPermissions(next);
       setPermsSaved(true);
       setTimeout(() => setPermsSaved(false), 3000);
     } catch (err) {
-      console.error(err);
+      setMemberActionError(
+        err instanceof Error ? err.message : "No se pudieron guardar los cambios",
+      );
     } finally {
       setSavingPerms(false);
     }
   };
 
+  const handleSelectUser = (user: StaffUser) => {
+    setSelectedUserId(user.id);
+    setNewMember({ name: user.name, email: user.email, role: user.role });
+    setDraftSections(getUserSections(userPermissions, user.id));
+    setMemberActionError(null);
+  };
+
+  const handleNewUser = () => {
+    setSelectedUserId(null);
+    setNewMember({ name: "", email: "", role: "Colega" });
+    setDraftSections(defaultSections());
+  };
+
   // ── Dynamic Users state ─────────────────────────────────────────────────────
-  const { users, inviteUser } = useStaff();
+  const { users, loading: usersLoading, error: usersError, fetchMembers, inviteUser, updateMemberRole, removeMember } = useStaff();
   const [newMember, setNewMember] = useState({
     name: "",
     email: "",
     role: "Colega",
   });
   const [isInviting, setIsInviting] = useState(false);
-  const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [inviteSuccessMessage, setInviteSuccessMessage] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [memberActionError, setMemberActionError] = useState<string | null>(null);
+  const [userToDelete, setUserToDelete] = useState<StaffUser | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
+
+  useEffect(() => {
+    if (open && activeTab === "users" && authRole === "admin") {
+      void fetchMembers();
+    }
+  }, [open, activeTab, authRole, fetchMembers]);
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    setDeletingUser(true);
+    setMemberActionError(null);
+    try {
+      await removeMember(userToDelete.id);
+      const nextPerms = { ...userPermissions };
+      delete nextPerms[userToDelete.id];
+      await persistUserPermissions(nextPerms);
+      if (selectedUserId === userToDelete.id) {
+        handleNewUser();
+      }
+      setUserToDelete(null);
+    } catch (err) {
+      setMemberActionError(
+        err instanceof Error ? err.message : "No se pudo eliminar el usuario",
+      );
+    } finally {
+      setDeletingUser(false);
+    }
+  };
 
   const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMember.name || !newMember.email) return;
     setIsInviting(true);
     setInviteError(null);
+    setInviteSuccessMessage(null);
     try {
-      await inviteUser(newMember.name, newMember.email, newMember.role);
-      setNewMember({ name: "", email: "", role: "Colega" });
-      setInviteSuccess(true);
-      setTimeout(() => setInviteSuccess(false), 5000);
+      const { id: userId, invited } = await inviteUser(newMember.name, newMember.email, newMember.role);
+      const next = { ...userPermissions, [userId]: draftSections };
+      await persistUserPermissions(next);
+      handleNewUser();
+      setInviteSuccessMessage(
+        invited
+          ? "Invitación enviada por correo. La persona recibirá un enlace para activar la cuenta y elegir su contraseña."
+          : "Usuario agregado a este nodo Inmo. Le enviamos un correo para avisarle que ya puede ingresar con su email y contraseña habituales.",
+      );
+      setTimeout(() => setInviteSuccessMessage(null), 5000);
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "No se pudo enviar la invitación");
     } finally {
@@ -525,114 +695,77 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[800px] flex flex-col p-0 overflow-hidden">
-        {/* Header con tabs */}
-        <div className="border-b border-border bg-paper p-6 pb-0 flex-shrink-0">
-          <DialogHeader className="mb-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mr-6">
-              <DialogTitle className="text-xl">
-                Configuración del Panel
-              </DialogTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  resetSettings();
-                  try {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    await upsertProfile({ theme_settings: null as any });
-                  } catch {
-                    // Best-effort
-                  }
-                }}
-                className="text-xs border-brand text-brand hover:bg-brand hover:text-white"
+      <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[800px] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden">
+          <nav
+            aria-label="Secciones de configuración"
+            className="hidden sm:flex sm:w-52 md:w-56 flex-shrink-0 flex-col border-r border-border bg-paper overflow-y-auto"
+          >
+            {SETTINGS_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors border-l-2 ${
+                  activeTab === tab.id
+                    ? "border-brand bg-brand/5 text-brand"
+                    : "border-transparent text-slate2 hover:bg-white hover:text-navy"
+                }`}
               >
-                Default Nodo (Restablecer)
-              </Button>
-            </div>
-            <DialogDescription className="text-xs sm:text-sm">
-              Personalizá los datos de tu empresa, el look & feel del panel y
-              los accesos de tu equipo.
-            </DialogDescription>
-          </DialogHeader>
+                {tab.label}
+              </button>
+            ))}
+          </nav>
 
-          {/* Selector de Tabs */}
-          <div className="flex gap-4 border-b border-border overflow-x-auto scrollbar-none whitespace-nowrap -mx-6 px-6">
-            <button
-              onClick={() => setActiveTab("profile")}
-              className={`pb-3 text-sm font-semibold border-b-2 transition-all flex-shrink-0 ${
-                activeTab === "profile"
-                  ? "border-brand text-brand"
-                  : "border-transparent text-slate2 hover:text-navy"
-              }`}
-            >
-              Mi Perfil
-            </button>
-            <button
-              onClick={() => setActiveTab("company")}
-              className={`pb-3 text-sm font-semibold border-b-2 transition-all flex-shrink-0 ${
-                activeTab === "company"
-                  ? "border-brand text-brand"
-                  : "border-transparent text-slate2 hover:text-navy"
-              }`}
-            >
-              Datos de Empresa
-            </button>
-            <button
-              onClick={() => setActiveTab("users")}
-              className={`pb-3 text-sm font-semibold border-b-2 transition-all flex-shrink-0 ${
-                activeTab === "users"
-                  ? "border-brand text-brand"
-                  : "border-transparent text-slate2 hover:text-navy"
-              }`}
-            >
-              Gestión de Usuarios y Roles
-            </button>
-            <button
-              onClick={() => setActiveTab("customization")}
-              className={`pb-3 text-sm font-semibold border-b-2 transition-all flex-shrink-0 ${
-                activeTab === "customization"
-                  ? "border-brand text-brand"
-                  : "border-transparent text-slate2 hover:text-navy"
-              }`}
-            >
-              Personalización del Panel
-            </button>
-            <button
-              onClick={() => setActiveTab("ai")}
-              className={`pb-3 text-sm font-semibold border-b-2 transition-all flex-shrink-0 ${
-                activeTab === "ai"
-                  ? "border-brand text-brand"
-                  : "border-transparent text-slate2 hover:text-navy"
-              }`}
-            >
-              Integraciones / IA
-            </button>
-            <button
-              onClick={() => setActiveTab("alerts")}
-              className={`pb-3 text-sm font-semibold border-b-2 transition-all flex-shrink-0 ${
-                activeTab === "alerts"
-                  ? "border-brand text-brand"
-                  : "border-transparent text-slate2 hover:text-navy"
-              }`}
-            >
-              Alertas
-            </button>
-            <button
-              onClick={() => setActiveTab("ipc")}
-              className={`pb-3 text-sm font-semibold border-b-2 transition-all flex-shrink-0 ${
-                activeTab === "ipc"
-                  ? "border-brand text-brand"
-                  : "border-transparent text-slate2 hover:text-navy"
-              }`}
-            >
-              Índices
-            </button>
+        <div className="flex flex-1 min-h-0 flex-col min-w-0">
+          <div className="bg-paper p-6 pb-4 flex-shrink-0">
+            <DialogHeader>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mr-6">
+                <DialogTitle className="text-xl">
+                  Configuración del Panel
+                </DialogTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    resetSettings();
+                    try {
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      await upsertProfile({ theme_settings: null as any });
+                    } catch {
+                      // Best-effort
+                    }
+                  }}
+                  className="text-xs border-brand text-brand hover:bg-brand hover:text-white"
+                >
+                  Default Nodo (Restablecer)
+                </Button>
+              </div>
+              <DialogDescription className="text-xs sm:text-sm">
+                Personalizá los datos de tu empresa, el look & feel del panel y
+                los accesos de tu equipo.
+              </DialogDescription>
+            </DialogHeader>
           </div>
-        </div>
 
-        {/* Content (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-6">
+          <div className="sm:hidden border-b border-border px-4 py-3 flex-shrink-0">
+            <label htmlFor="settings-section" className="sr-only">
+              Sección de configuración
+            </label>
+            <select
+              id="settings-section"
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value as SettingsTabId)}
+              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm font-semibold text-navy"
+            >
+              {SETTINGS_TABS.map((tab) => (
+                <option key={tab.id} value={tab.id}>
+                  {tab.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6">
           {/* TAB 0: Mi Perfil */}
           {activeTab === "profile" && <ProfileSettingsSection />}
 
@@ -923,6 +1056,21 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 )}
               </div>
 
+              {/* Logo para PDFs */}
+              <div className="space-y-2 border-t border-border pt-6">
+                <Label className="text-base font-bold text-navy">
+                  Logo para PDFs
+                </Label>
+                <p className="text-xs text-slate2">
+                  Logo separado para recibos, liquidaciones, contratos y reportes.
+                  Distinto al del panel: conviene usar una versión con fondo sólido
+                  para que se vea bien al imprimir.
+                </p>
+                <div className="bg-paper p-4 rounded-md border border-border">
+                  <PdfLogoUploader />
+                </div>
+              </div>
+
               {/* Estilo de Bordes */}
               <div className="space-y-2 border-t border-border pt-6">
                 <Label className="text-base font-bold text-navy">
@@ -1174,9 +1322,20 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
               {/* Formulario de invitación rápida */}
               <form
-                onSubmit={handleInviteUser}
+                onSubmit={selectedUserId ? (e) => e.preventDefault() : handleInviteUser}
                 className="bg-paper p-4 rounded-md border border-border gap-4 grid grid-cols-1 md:grid-cols-3 items-end"
               >
+                {selectedUserId && (
+                  <div className="md:col-span-3 flex items-center justify-between gap-2 rounded-md border border-brand/30 bg-brand/5 px-3 py-2">
+                    <p className="text-xs text-navy">
+                      Editando accesos de{" "}
+                      <strong>{newMember.name}</strong> ({newMember.role})
+                    </p>
+                    <Button type="button" variant="ghost" size="sm" onClick={handleNewUser} className="text-xs">
+                      + Nuevo usuario
+                    </Button>
+                  </div>
+                )}
                 <div className="space-y-1">
                   <Label htmlFor="memberName">Nombre completo</Label>
                   <Input
@@ -1186,7 +1345,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     onChange={(e) =>
                       setNewMember({ ...newMember, name: e.target.value })
                     }
-                    required
+                    disabled={!!selectedUserId}
+                    required={!selectedUserId}
                   />
                 </div>
                 <div className="space-y-1">
@@ -1199,7 +1359,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     onChange={(e) =>
                       setNewMember({ ...newMember, email: e.target.value })
                     }
-                    required
+                    disabled={!!selectedUserId}
+                    required={!selectedUserId}
                   />
                 </div>
                 <div className="space-y-1">
@@ -1210,36 +1371,97 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     onChange={(e) =>
                       setNewMember({ ...newMember, role: e.target.value })
                     }
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    disabled={
+                      !!selectedUserId &&
+                      users.find((u) => u.id === selectedUserId)?.role === "Administrador"
+                    }
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <option value="Administrador">Administrador</option>
+                    {selectedUserId &&
+                      users.find((u) => u.id === selectedUserId)?.role === "Administrador" && (
+                        <option value="Administrador">Administrador</option>
+                      )}
                     <option value="Vendedor">Vendedor</option>
                     <option value="Inquilino">Inquilino</option>
                     <option value="Propietario">Propietario</option>
                     <option value="Colega">Colega</option>
                   </select>
                 </div>
+
+                {authRole === "admin" && (
+                  <div className="md:col-span-3 space-y-2 border-t border-border pt-4">
+                    <div>
+                      <h4 className="text-sm font-bold text-navy">Secciones visibles</h4>
+                      <p className="text-xs text-slate2">
+                        Marcá qué partes del panel verá este usuario. El rol se define arriba.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                      {MANAGED_NAV.map(({ to, label }) => (
+                        <label
+                          key={to}
+                          className="flex items-center gap-2 text-sm text-slate2 cursor-pointer hover:text-navy"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={draftSections.includes(to)}
+                            onChange={() => toggleSection(to)}
+                            className="h-4 w-4 accent-brand cursor-pointer"
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="md:col-span-3 flex justify-end gap-2">
-                  <Button type="submit" disabled={isInviting} className="gap-2">
-                    {isInviting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Invitando...
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="h-4 w-4" />
-                        Invitar Usuario
-                      </>
-                    )}
-                  </Button>
+                  {selectedUserId ? (
+                    <>
+                      {permsSaved && (
+                        <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1 self-center">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Accesos guardados
+                        </span>
+                      )}
+                      <Button
+                        type="button"
+                        onClick={handleSavePermissions}
+                        disabled={savingPerms}
+                        className="gap-2"
+                      >
+                        {savingPerms ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Guardando...
+                          </>
+                        ) : (
+                          "Guardar cambios"
+                        )}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button type="submit" disabled={isInviting} className="gap-2">
+                      {isInviting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Invitando...
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="h-4 w-4" />
+                          Invitar Usuario
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </form>
 
-              {inviteSuccess && (
+              {inviteSuccessMessage && (
                 <div className="bg-emerald-50 text-emerald-800 text-sm p-3 rounded-md flex items-center gap-2 border border-emerald-200">
                   <Mail className="h-4 w-4 text-emerald-600" />
-                  <span>Invitación enviada. El usuario recibirá un email para activar su cuenta y elegir una contraseña.</span>
+                  <span>{inviteSuccessMessage}</span>
                 </div>
               )}
 
@@ -1250,109 +1472,138 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 </div>
               )}
 
+              {memberActionError && (
+                <div className="bg-red-50 text-red-800 text-sm p-3 rounded-md flex items-center gap-2 border border-red-200">
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                  <span>{memberActionError}</span>
+                </div>
+              )}
+
+              {usersError && (
+                <div className="bg-amber-50 text-amber-900 text-sm p-3 rounded-md border border-amber-200">
+                  {usersError}
+                </div>
+              )}
+
               {/* Tabla de Usuarios */}
               <div className="border border-border rounded-md overflow-x-auto bg-card">
-                <table className="w-full text-left border-collapse text-sm min-w-[600px]">
+                <table className="w-full text-left border-collapse text-sm">
                   <thead>
                     <tr className="bg-paper border-b border-border text-navy font-bold">
                       <th className="p-3">Nombre</th>
-                      <th className="p-3">Email</th>
                       <th className="p-3">Rol asignado</th>
                       <th className="p-3">Estado</th>
+                      {authRole === "admin" && (
+                        <th className="p-3 text-right">Acciones</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border text-slate2">
-                    {users.map((user) => (
-                      <tr key={user.id} className="hover:bg-paper/50">
-                        <td className="p-3 font-semibold text-navy">
-                          {user.name}
-                        </td>
-                        <td className="p-3">{user.email}</td>
-                        <td className="p-3">
-                          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-navy/10 text-navy">
-                            {user.role}
-                          </span>
-                        </td>
-                        <td className="p-3">
-                          <span
-                            className={`px-2 py-0.5 text-xs font-semibold rounded-md ${
-                              user.status === "Activo"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : "bg-amber-50 text-amber-700 border border-amber-200"
-                            }`}
-                          >
-                            {user.status}
-                          </span>
+                    {usersLoading && (
+                      <tr>
+                        <td colSpan={authRole === "admin" ? 4 : 3} className="p-6 text-center text-slate2">
+                          <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                         </td>
                       </tr>
-                    ))}
+                    )}
+                    {!usersLoading &&
+                      users.map((user) => {
+                        const isSelf = authUser?.id === user.id;
+                        const isAdminUser = user.role === "Administrador";
+                        return (
+                          <tr
+                            key={user.id}
+                            className={`transition-colors ${
+                              selectedUserId === user.id ? "bg-brand/10" : "hover:bg-paper/50"
+                            }`}
+                          >
+                            <td className="p-3 font-semibold text-navy">{user.name}</td>
+                            <td className="p-3">
+                              <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-navy/10 text-navy">
+                                {user.role}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <span
+                                className={`px-2 py-0.5 text-xs font-semibold rounded-md ${
+                                  user.status === "Activo"
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-amber-50 text-amber-700 border border-amber-200"
+                                }`}
+                              >
+                                {user.status}
+                              </span>
+                            </td>
+                            {authRole === "admin" && (
+                              <td className="p-3">
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 gap-1"
+                                    onClick={() => handleSelectUser(user)}
+                                    aria-label={`Editar ${user.name}`}
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Editar
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 gap-1 text-destructive hover:text-destructive"
+                                    disabled={isSelf || isAdminUser}
+                                    onClick={() => setUserToDelete(user)}
+                                    aria-label={`Eliminar ${user.name}`}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Eliminar
+                                  </Button>
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
+                {authRole === "admin" && (
+                  <p className="text-[11px] text-slate2 px-3 py-2 border-t border-border">
+                    Usá <strong>Editar</strong> para cambiar el rol y las secciones visibles.{" "}
+                    <strong>Eliminar</strong> quita el acceso al panel (no borra administradores ni tu propia cuenta).
+                  </p>
+                )}
               </div>
 
-              {/* Role visibility matrix — Superadmin only */}
-              {authRole === "admin" && (
-                <div className="space-y-3 pt-2">
-                  <div>
-                    <h4 className="text-sm font-bold text-navy">Visibilidad por Rol</h4>
-                    <p className="text-xs text-slate2">
-                      Configurá qué secciones del sistema puede ver cada rol. Los casilleros marcados son visibles.
-                    </p>
-                  </div>
-
-                  <div className="overflow-x-auto rounded-md border border-border bg-card">
-                    <table className="w-full text-sm border-collapse min-w-[640px]">
-                      <thead>
-                        <tr className="bg-paper border-b border-border">
-                          <th className="p-3 text-left text-xs font-bold text-navy w-40">Sección</th>
-                          {STAFF_ROLES.map((r) => (
-                            <th key={r} className="p-3 text-center text-xs font-bold text-navy">
-                              {r}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {MANAGED_NAV.map(({ to, label }) => (
-                          <tr key={to} className="hover:bg-paper/50">
-                            <td className="p-3 text-xs text-slate2 font-medium">{label}</td>
-                            {STAFF_ROLES.map((r) => (
-                              <td key={r} className="p-3 text-center">
-                                <input
-                                  type="checkbox"
-                                  checked={isAllowed(rolePermissions, r, to)}
-                                  onChange={() => togglePermission(r, to)}
-                                  className="h-4 w-4 accent-brand cursor-pointer"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-3">
-                    {permsSaved && (
-                      <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        Permisos guardados
-                      </span>
-                    )}
-                    <Button
-                      onClick={handleSavePermissions}
-                      disabled={savingPerms}
-                      size="sm"
-                      className="gap-2"
+              <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Eliminar usuario del equipo?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {userToDelete
+                        ? `${userToDelete.name} (${userToDelete.email}) dejará de acceder a este nodo Inmo. La cuenta de auth no se borra del sistema.`
+                        : ""}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deletingUser}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      disabled={deletingUser}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        void handleDeleteUser();
+                      }}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
-                      {savingPerms && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                      Guardar permisos
-                    </Button>
-                  </div>
-                </div>
-              )}
+                      {deletingUser ? "Eliminando..." : "Eliminar"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

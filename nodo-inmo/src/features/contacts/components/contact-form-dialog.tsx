@@ -25,6 +25,7 @@ import type {
   ContactRow,
   ContactRole,
 } from "@/features/contacts/hooks/use-contacts";
+import { ADMINISTRACION_INMOBILIARIA_PERCENT } from "@/features/caja/lib/settlement-labels";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -301,12 +302,12 @@ export function ContactFormDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel htmlFor="contact-commission-input">
-                        Comisión (%)
+                        {ADMINISTRACION_INMOBILIARIA_PERCENT}
                       </FormLabel>
                       <FormControl>
                         <Input
                           id="contact-commission-input"
-                          aria-label="Comisión (%)"
+                          aria-label={ADMINISTRACION_INMOBILIARIA_PERCENT}
                           type="number"
                           min={0}
                           max={100}

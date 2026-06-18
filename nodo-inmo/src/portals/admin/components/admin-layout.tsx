@@ -18,7 +18,6 @@ import {
   HandCoins,
   LineChart,
   Lock,
-  Zap,
   AlertCircle,
 } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
@@ -66,7 +65,6 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/agenda", label: "Agenda y Tareas", icon: Calendar },
   { to: "/admin/reclamos", label: "Reclamos", icon: AlertCircle },
   { to: "/admin/portal", label: "Portales", icon: Building2, proOnly: true },
-  { to: "/admin/automatizaciones", label: "Automatizaciones", icon: Zap, proOnly: true },
 ];
 
 // JWT role → display name (matches settings-dialog role permission keys)
@@ -101,7 +99,6 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/documentos": "Documentos",
   "/admin/agenda": "Agenda y Tareas",
   "/admin/reclamos": "Reclamos",
-  "/admin/automatizaciones": "Automatizaciones",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -142,11 +139,17 @@ export function AdminLayout() {
     resetSearch();
   }, [pathname, resetSearch]);
 
-  const rolePermissions = (profile?.theme_settings as Record<string, unknown> | null)?.rolePermissions as Record<string, string[]> | undefined;
+  const themeSettings = profile?.theme_settings as Record<string, unknown> | null;
+  const userPermissions = themeSettings?.userPermissions as Record<string, string[]> | undefined;
+  const rolePermissions = themeSettings?.rolePermissions as Record<string, string[]> | undefined;
   const displayRole = ROLE_DISPLAY[role ?? ""] ?? "Colega";
+  const userId = user?.id;
 
   const visibleNav = NAV_ITEMS.filter((item) => {
     if (item.adminOnly && role !== "admin") return false;
+    if (userId && userPermissions?.[userId]) {
+      return userPermissions[userId].includes(item.to);
+    }
     if (rolePermissions?.[displayRole]) {
       return rolePermissions[displayRole].includes(item.to);
     }
@@ -178,12 +181,12 @@ export function AdminLayout() {
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        {/* Brand mark */}
-        <div className="flex h-16 flex-shrink-0 items-center justify-between px-5">
-          <BrandMark onDark iconClassName="h-6 w-6" />
+        {/* Brand mark — full sidebar width */}
+        <div className="relative flex h-16 w-full flex-shrink-0 items-center">
+          <BrandMark onDark fillWidth iconClassName="h-6 w-6" />
           <button
             type="button"
-            className="md:hidden text-[var(--color-sidebar-text)] hover:text-white"
+            className="absolute right-2 top-1/2 -translate-y-1/2 md:hidden text-[var(--color-sidebar-text)] hover:text-white"
             onClick={() => setMobileMenuOpen(false)}
             aria-label="Cerrar menú"
           >
@@ -252,7 +255,7 @@ export function AdminLayout() {
           <Button
             variant="outline"
             onClick={() => signOut()}
-            className="mt-2 w-full justify-center gap-2 border-[var(--color-sidebar-border)] bg-transparent text-[var(--color-sidebar-text)] hover:bg-brand/10 hover:text-brand hover:border-brand"
+            className="mt-2 w-full cursor-pointer justify-center gap-2 border-[var(--color-sidebar-border)] bg-transparent text-[var(--color-sidebar-text)] hover:bg-brand/10 hover:text-brand hover:border-brand"
           >
             <LogOut className="h-4 w-4" />
             Cerrar sesión

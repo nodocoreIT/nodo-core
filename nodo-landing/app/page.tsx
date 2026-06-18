@@ -293,7 +293,9 @@ function UnidadesSection() {
                           ? "/nodo-clinica/login"
                           : subnode.slug === "autos"
                             ? "/nodo-autos/login"
-                            : `/nodo-${subnode.slug}`
+                            : subnode.slug === "finanzas"
+                              ? "/nodo-finanzas/login"
+                              : `/nodo-${subnode.slug}`
                       }
                       className="inline-flex items-center gap-2.5 px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:border-brand/40 text-[13.5px] text-white transition-all duration-200 hover:bg-white/10 hover:translate-x-1"
                     >

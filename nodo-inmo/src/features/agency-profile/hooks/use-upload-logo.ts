@@ -14,6 +14,8 @@ function sanitizeFilename(name: string): string {
 
 export interface UploadLogoInput {
   file: File;
+  /** Storage key prefix — "logo" for app sidebar, "pdf-logo" for PDF documents. */
+  variant?: "logo" | "pdf-logo";
 }
 
 /**
@@ -30,10 +32,10 @@ export function useUploadLogo() {
   const { orgId } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ file }: UploadLogoInput) => {
+    mutationFn: async ({ file, variant = "logo" }: UploadLogoInput) => {
       if (!orgId) throw new Error("No org_id — user not fully provisioned");
 
-      const key = `${orgId}/logo-${crypto.randomUUID()}-${sanitizeFilename(file.name)}`;
+      const key = `${orgId}/${variant}-${crypto.randomUUID()}-${sanitizeFilename(file.name)}`;
 
       const { data, error } = await supabase.storage
         .from(BUCKET)

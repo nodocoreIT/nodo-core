@@ -1,5 +1,97 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getNodeRegistrationConfig, isSelfServicePlan } from "@/lib/registration/node-config";
+import { ensureLandingAuthUser } from "@/lib/registration/provision";
+
+const ONBOARDING_TTL_HOURS = 72;
+
+type PendingRow = {
+  id: string;
+  email: string;
+  full_name: string;
+  plan: string;
+  unit_code: string | null;
+  password: string | null;
+  verified_at: string | null;
+  expires_at: string | null;
+};
+
+async function redirectForVerifiedUnit(
+  request: NextRequest,
+  params: {
+    clientUnitId: string;
+    unitCode: string;
+    redirectSlug: string;
+    plan: string;
+    selfService: boolean;
+  },
+): Promise<NextResponse> {
+  const admin = createAdminClient();
+  const { clientUnitId, unitCode, redirectSlug, plan, selfService } = params;
+
+  const { data: unit } = await admin
+    .from("client_units")
+    .select("status")
+    .eq("id", clientUnitId)
+    .maybeSingle();
+
+  if (unit?.status === "activo" && selfService) {
+    return NextResponse.redirect(
+      new URL(
+        `/registro/verificado?node=${redirectSlug}${plan === "paciente" ? "&role=paciente" : ""}`,
+        request.url,
+      ),
+    );
+  }
+
+  if (unit?.status === "pending_review") {
+    return NextResponse.redirect(
+      new URL(`/registro/verificado?node=${redirectSlug}&status=pending_review`, request.url),
+    );
+  }
+
+  if (unit?.status === "activo") {
+    return NextResponse.redirect(
+      new URL(`/registro/verificado?node=${redirectSlug}&status=existing`, request.url),
+    );
+  }
+
+  if (!selfService && (unit?.status === "pending_onboarding" || unit?.status === "onboarding")) {
+    const { data: existingToken } = await admin
+      .from("activation_tokens")
+      .select("token, expires_at, used_at")
+      .eq("client_unit_id", clientUnitId)
+      .is("used_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingToken?.token) {
+      return NextResponse.redirect(
+        new URL(`/onboarding?token=${existingToken.token}`, request.url),
+      );
+    }
+
+    const expiresAt = new Date(Date.now() + ONBOARDING_TTL_HOURS * 60 * 60 * 1000);
+    const { data: tokenRow } = await admin
+      .from("activation_tokens")
+      .insert({
+        client_unit_id: clientUnitId,
+        expires_at: expiresAt.toISOString(),
+      })
+      .select("token")
+      .single();
+
+    if (tokenRow?.token) {
+      return NextResponse.redirect(new URL(`/onboarding?token=${tokenRow.token}`, request.url));
+    }
+  }
+
+  return NextResponse.redirect(
+    new URL(`/registro/verificado?node=${redirectSlug}&status=existing`, request.url),
+  );
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -10,10 +102,9 @@ export async function GET(request: NextRequest) {
   }
 
   const admin = createAdminClient();
-  let nodeSlug = "";
+  let redirectSlug = "salud";
 
   try {
-    // 1. Find the pending registration request
     const { data: pending, error: selectErr } = await admin
       .from("pending_registrations")
       .select("*")
@@ -21,153 +112,192 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     if (selectErr || !pending) {
-      console.error("Error finding pending registration:", selectErr);
       return NextResponse.redirect(
-        new URL("/login?error=Token+de+verificacion+invalido+o+expirado", request.url)
+        new URL(
+          "/login?error=Token+de+verificacion+invalido.+Si+ya+verificaste,+inicia+sesion+o+solicita+un+nuevo+correo.",
+          request.url,
+        ),
       );
     }
 
-    const isPatient = pending.plan === "paciente";
-    const isInmo = pending.plan === "inmo";
-    nodeSlug = isInmo ? "nodo-inmo" : "nodo-clinica";
+    const row = pending as PendingRow;
+    const unitCode = row.unit_code ?? "Salud";
+    const cfg = getNodeRegistrationConfig(unitCode);
+    redirectSlug = cfg?.slug ?? "salud";
+    const selfService = isSelfServicePlan(unitCode, row.plan);
 
-    // 2. Double check if client already exists
+    if (row.expires_at && !row.verified_at && new Date(row.expires_at) < new Date()) {
+      return NextResponse.redirect(
+        new URL(
+          `/${redirectSlug}/login?error=El+enlace+de+verificacion+expiro.+Solicita+un+nuevo+correo.&resend=1`,
+          request.url,
+        ),
+      );
+    }
+
+    const { data: existingAccess } = await admin
+      .from("node_email_access")
+      .select("client_unit_id")
+      .eq("email", row.email)
+      .eq("unit_code", unitCode)
+      .maybeSingle();
+
+    if (row.verified_at && existingAccess?.client_unit_id) {
+      return redirectForVerifiedUnit(request, {
+        clientUnitId: existingAccess.client_unit_id,
+        unitCode,
+        redirectSlug,
+        plan: row.plan,
+        selfService,
+      });
+    }
+
     const { data: existingClient } = await admin
       .from("clients")
       .select("id")
-      .eq("email", pending.email)
+      .eq("email", row.email)
       .maybeSingle();
 
     let clientId = existingClient?.id;
 
     if (!clientId) {
-      // 3. Create the client record
       const { data: newClient, error: clientErr } = await admin
         .from("clients")
         .insert({
-          name: pending.full_name,
-          email: pending.email,
+          name: row.full_name,
+          email: row.email,
+          phone: pending.phone ?? null,
         })
         .select("id")
         .single();
 
       if (clientErr || !newClient) {
-        console.error("Error creating client from pending:", clientErr);
         return NextResponse.redirect(
-          new URL(`/${nodeSlug}/login?error=Error+al+crear+la+cuenta`, request.url)
+          new URL(`/${redirectSlug}/login?error=Error+al+crear+la+cuenta`, request.url),
         );
       }
       clientId = newClient.id;
     }
 
-    // 3.5 Create user in Supabase Auth so they can log in and reset passwords
-    let authUser: { id: string } | null = null;
-    const userRole = isPatient ? "paciente" : (isInmo ? "inmo" : "medico");
-    try {
-      const { data: newUser, error: authErr } = await admin.auth.admin.createUser({
-        email: pending.email,
-        password: pending.password,
-        email_confirm: true,
-        user_metadata: {
-          full_name: pending.full_name,
-        },
-        app_metadata: {
-          role: userRole,
-        }
-      });
-
-      if (authErr) {
-        if (authErr.message.includes("already") || authErr.message.includes("registered")) {
-          // Find the existing user to get their ID and update role
-          const { data: listData } = await admin.auth.admin.listUsers();
-          const matchedUser = listData?.users?.find(u => u.email?.toLowerCase() === pending.email.toLowerCase());
-          if (matchedUser) {
-            authUser = { id: matchedUser.id };
-            await admin.auth.admin.updateUserById(matchedUser.id, {
-              app_metadata: { role: userRole }
-            });
-          }
-        } else {
-          console.error("Auth user creation error:", authErr);
-        }
-      } else if (newUser?.user) {
-        authUser = { id: newUser.user.id };
-      }
-    } catch (authEx) {
-      console.error("Auth user creation exception:", authEx);
-    }
-
-    // 3.6 Insert into node-specific database schemas
-    if (!isInmo && authUser?.id) {
-      const clinicaAdmin = createAdminClient("nodo_clinica");
-      const nameParts = pending.full_name.trim().split(/\s+/);
-      const firstName = nameParts[0] || "";
-      const lastName = nameParts.slice(1).join(" ") || "";
-
-      if (isPatient) {
-        const dni = "TEMP-" + Math.floor(Math.random() * 100000000);
-        const { error: patErr } = await clinicaAdmin
-          .from("patients")
-          .insert({
-            user_id: authUser.id,
-            first_name: firstName,
-            last_name: lastName,
-            dni: dni,
-            email: pending.email,
-          });
-        if (patErr) {
-          console.error("Error inserting patient into nodo_clinica.patients:", patErr);
-        }
-      } else {
-        // Doctor / Professional
-        const { error: profErr } = await clinicaAdmin
-          .from("professionals")
-          .insert({
-            user_id: authUser.id,
-            first_name: firstName,
-            last_name: lastName,
-            specialty: "General",
-            license_number: "TEMP-" + Math.floor(Math.random() * 100000),
-          });
-        if (profErr) {
-          console.error("Error inserting professional into nodo_clinica.professionals:", profErr);
-        }
-      }
-    }
-
-    // 4. Create the client unit for NODO Salud or NODO Inmo
-    const { error: unitErr } = await admin
+    const { data: existingUnit } = await admin
       .from("client_units")
-      .insert({
-        client_id: clientId,
-        unit_code: isInmo ? "inmo" : "salud",
-        plan: pending.plan,
-        status: (isPatient || isInmo) ? "activo" : "onboarding",
-        progress: (isPatient || isInmo) ? 100 : 0,
-        access_url: isInmo ? "/inmo" : "http://localhost:5173/",
-        access_user: pending.email,
-        access_password: pending.password,
-      });
+      .select("id, status")
+      .eq("client_id", clientId)
+      .eq("unit_code", unitCode)
+      .maybeSingle();
 
-    if (unitErr) {
-      console.error("Error creating client unit from pending:", unitErr);
+    if (existingUnit?.status === "pending_review" || existingUnit?.status === "activo") {
+      await admin
+        .from("pending_registrations")
+        .update({ verified_at: row.verified_at ?? new Date().toISOString() })
+        .eq("id", row.id);
       return NextResponse.redirect(
-        new URL(`/${nodeSlug}/login?error=Error+al+vincular+el+nodo`, request.url)
+        new URL(`/registro/verificado?node=${redirectSlug}&status=existing`, request.url),
       );
     }
 
-    // 5. Delete the pending registration request
-    await admin.from("pending_registrations").delete().eq("id", pending.id);
+    const unitStatus = selfService ? "activo" : "pending_onboarding";
+    const unitProgress = selfService ? 100 : 0;
 
-    // 6. Redirect to verified success screen
-    return NextResponse.redirect(
-      new URL(`/nodo-salud/clinica-virtual/verificado?node=${isInmo ? "inmo" : "salud"}${isPatient ? "&role=paciente" : ""}`, request.url)
-    );
+    let clientUnitId = existingUnit?.id;
+
+    if (!clientUnitId) {
+      const { data: newUnit, error: unitErr } = await admin
+        .from("client_units")
+        .insert({
+          client_id: clientId,
+          unit_code: unitCode,
+          plan: row.plan,
+          status: unitStatus,
+          progress: unitProgress,
+          access_url: cfg?.accessUrl ?? null,
+          access_user: selfService ? row.email : null,
+          access_password: selfService ? row.password : null,
+        })
+        .select("id")
+        .single();
+
+      if (unitErr || !newUnit) {
+        return NextResponse.redirect(
+          new URL(`/${redirectSlug}/login?error=Error+al+vincular+el+nodo`, request.url),
+        );
+      }
+      clientUnitId = newUnit.id;
+    } else if (!selfService) {
+      await admin
+        .from("client_units")
+        .update({ status: "pending_onboarding", progress: 0 })
+        .eq("id", clientUnitId);
+    }
+
+    const accessRow = {
+      email: row.email,
+      unit_code: unitCode,
+      client_id: clientId,
+      client_unit_id: clientUnitId,
+      status: unitStatus,
+    };
+    const { data: existingAccessRow } = await admin
+      .from("node_email_access")
+      .select("id")
+      .eq("email", row.email)
+      .eq("unit_code", unitCode)
+      .maybeSingle();
+
+    if (existingAccessRow) {
+      await admin.from("node_email_access").update(accessRow).eq("id", existingAccessRow.id);
+    } else {
+      await admin.from("node_email_access").insert(accessRow);
+    }
+
+    if (selfService && row.password) {
+      const userRole =
+        row.plan === "paciente" ? "paciente" : row.plan === "inmo" ? "inmo" : "medico";
+
+      await ensureLandingAuthUser(
+        admin,
+        row.email,
+        row.password,
+        row.full_name,
+        userRole,
+      );
+    }
+
+    await admin
+      .from("pending_registrations")
+      .update({ verified_at: new Date().toISOString() })
+      .eq("id", row.id);
+
+    if (selfService) {
+      return NextResponse.redirect(
+        new URL(
+          `/registro/verificado?node=${redirectSlug}${row.plan === "paciente" ? "&role=paciente" : ""}`,
+          request.url,
+        ),
+      );
+    }
+
+    const expiresAt = new Date(Date.now() + ONBOARDING_TTL_HOURS * 60 * 60 * 1000);
+    const { data: tokenRow, error: tokenErr } = await admin
+      .from("activation_tokens")
+      .insert({
+        client_unit_id: clientUnitId,
+        expires_at: expiresAt.toISOString(),
+      })
+      .select("token")
+      .single();
+
+    if (tokenErr || !tokenRow) {
+      return NextResponse.redirect(
+        new URL(`/${redirectSlug}/login?error=Error+al+generar+onboarding`, request.url),
+      );
+    }
+
+    return NextResponse.redirect(new URL(`/onboarding?token=${tokenRow.token}`, request.url));
   } catch (err) {
-    console.error("Registration verification exception:", err);
-    const fallbackPath = nodeSlug ? `/${nodeSlug}/login` : "/login";
+    console.error("verify-registration:", err);
     return NextResponse.redirect(
-      new URL(`${fallbackPath}?error=Error+interno+al+verificar+cuenta`, request.url)
+      new URL(`/${redirectSlug}/login?error=Error+interno+al+verificar+cuenta`, request.url),
     );
   }
 }

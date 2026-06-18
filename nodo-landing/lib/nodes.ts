@@ -39,6 +39,8 @@ export interface NodeDef {
    * orbiting its parent rather than on the main Core orbit.
    */
   parentSlug?: string;
+  /** Selfie holding ID + AI/manual check during onboarding (professional plans only on Salud/Clínica). */
+  requiresIdentityVerification?: boolean;
 }
 
 export const NODES: NodeDef[] = [
@@ -114,6 +116,7 @@ export const NODES: NodeDef[] = [
     Icon: Scale,
     intro:
       "NODO Legal es el eje jurídico que atraviesa todo el ecosistema. Brindamos asesoramiento legal integral a todas nuestras unidades de negocio y a nuestros clientes, garantizando que cada operación, contrato e inversión esté respaldada con sólidos fundamentos legales. En una plataforma que mueve activos reales —propiedades, obras e inversiones— la solidez jurídica no es un detalle: es una condición indispensable.",
+    requiresIdentityVerification: true,
   },
   {
     code: "Salud",
@@ -142,6 +145,7 @@ export const NODES: NodeDef[] = [
           "Garantizamos control total sobre la privacidad y el acceso a la información médica bajo nuestra arquitectura NODO.",
       },
     ],
+    requiresIdentityVerification: true,
   },
   {
     code: "Agro",
@@ -162,6 +166,7 @@ export const NODES: NodeDef[] = [
     description:
       "Gestión contable e impositiva: balances, liquidaciones de impuestos y cumplimiento fiscal.",
     Icon: Calculator,
+    requiresIdentityVerification: true,
   },
   {
     code: "Clínica",
@@ -191,6 +196,7 @@ export const NODES: NodeDef[] = [
       },
     ],
     provisionable: true,
+    requiresIdentityVerification: true,
   },
   {
     code: "Finanzas",
@@ -255,4 +261,31 @@ export const NODES: NodeDef[] = [
 
 export function getNodeBySlug(slug: string): NodeDef | undefined {
   return NODES.find((n) => n.slug === slug);
+}
+
+/** Normalize URL slug param to canonical node slug (matches login page routing). */
+export function normalizeNodeSlug(nodeSlug: string): string {
+  const slug = nodeSlug.trim().toLowerCase();
+  if (slug === "nodo-clinica" || slug === "clinica-virtual") return "salud";
+  if (slug.startsWith("nodo-")) return slug.slice(5);
+  return slug;
+}
+
+/** Label shown in emails and UI for a login route slug. */
+export function getNodeMailLabel(nodeSlug: string): string {
+  const raw = nodeSlug.trim().toLowerCase();
+  if (raw === "clinica-virtual" || raw === "nodo-clinica" || raw === "clinica") {
+    return "NODO | Clínica Virtual";
+  }
+  const slug = normalizeNodeSlug(nodeSlug);
+  return getNodeBySlug(slug)?.label ?? "NODO Core";
+}
+
+export function getNodeLoginPath(nodeSlug: string): string {
+  const raw = nodeSlug.trim().toLowerCase();
+  if (raw === "nodo-clinica" || raw === "clinica-virtual") return "/clinica-virtual/login";
+  if (raw === "clinica") return "/clinica/login";
+  if (raw.startsWith("nodo-")) return `/${raw}/login`;
+  const slug = normalizeNodeSlug(nodeSlug);
+  return `/${slug}/login`;
 }

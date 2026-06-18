@@ -15,8 +15,18 @@ vi.mock("@/shared/lib/supabase", () => ({
 vi.mock("@/features/properties/hooks/use-properties", () => ({
   useProperties: () => ({
     data: [
-      { id: "prop-1", address: "Lavalle 100" },
-      { id: "prop-2", address: "Mitre 200" },
+      {
+        id: "prop-1",
+        address: "Lavalle 100",
+        commission_rate: null,
+        owner: { id: "owner-1", name: "Propietario A", commission_rate: 8 },
+      },
+      {
+        id: "prop-2",
+        address: "Mitre 200",
+        commission_rate: 12,
+        owner: { id: "owner-1", name: "Propietario A", commission_rate: 8 },
+      },
     ],
   }),
 }));
@@ -76,7 +86,7 @@ const contract: any = {
   adjustment_period_months: 3,
   status: "active",
   notes: null,
-  property: { address: "Lavalle 100" },
+  property: { address: "Lavalle 100", owner: { name: "Propietario A" } },
   tenant: { name: "Juan Pérez" },
   guarantors: [{ guarantor_id: "guar-1" }],
 };
@@ -98,6 +108,8 @@ describe("ContractFormDialog — edit mode", () => {
     );
     expect(screen.getByText(/editar contrato/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/alquiler/i)).toHaveValue("$ 250.000");
+    expect(screen.getByLabelText(/^propietario$/i)).toHaveValue("Propietario A");
+    expect(screen.getByLabelText(/administraci[oó]n inmobiliaria/i)).toHaveValue("8");
     expect(screen.getByLabelText(/ana garcía/i)).toBeChecked();
     expect(screen.getByLabelText(/luis díaz/i)).not.toBeChecked();
   });
@@ -150,5 +162,19 @@ describe("ContractFormDialog — edit mode", () => {
       contract_type: "habitacional",
     });
     expect(payload.guarantor_ids.sort()).toEqual(["guar-1", "guar-2"]);
+  });
+
+  it("updates commission when the property is changed", async () => {
+    render(
+      <ContractFormDialog open onOpenChange={vi.fn()} contract={contract} onSubmit={vi.fn()} />,
+      { wrapper },
+    );
+
+    const propertySelect = screen.getAllByRole("combobox")[0];
+    await userEvent.selectOptions(propertySelect, "prop-2");
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/administraci[oó]n inmobiliaria/i)).toHaveValue("12");
+    });
   });
 });

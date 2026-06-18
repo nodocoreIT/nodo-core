@@ -15,6 +15,7 @@ import {
   monthKey,
   remainingAmount,
   type CollectionStatus,
+  isOperationalPayment,
 } from "../lib/dashboard-payment-utils";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -239,9 +240,9 @@ export function useDashboardMetrics(today: Date = new Date()): DashboardMetrics 
   const error = payments.error ?? settlements.error ?? contracts.error ?? null;
 
   return useMemo<DashboardMetrics>(() => {
-    const paymentRows = payments.data ?? [];
+    const paymentRows = (payments.data ?? []).filter(isOperationalPayment);
     const settlementRows = settlements.data ?? [];
-    const contractRows = contracts.data ?? [];
+    const contractRows = (contracts.data ?? []).filter((c) => !c.archived_at);
 
     // Active contracts
     const activeContracts = contractRows.filter(
