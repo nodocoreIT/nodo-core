@@ -1,0 +1,423 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'nodo_theme.css' %}">
+<link rel="stylesheet" href="{% static 'dashboard_obras.css' %}">
+
+<div class="container-fluid-custom" style="padding-top: 0; margin-top: -15px;">
+    
+    <div class="row mb-3">
+        <div class="col-12">
+            <h2 style="color: #003000; font-weight: bold; margin-bottom: 0; text-transform: uppercase; font-size: 1.2rem; letter-spacing: 0.5px;">
+                Admin. de Obras
+            </h2>
+        </div>
+    </div>
+
+    <div class="action-bar">
+        <div class="btn-fast" onclick="location.href='{% url 'crear_obra_pantalla' %}'">
+            <i class="fa-solid fa-plus" style="color: var(--success);"></i>
+            <span>Crear Proyecto</span>
+        </div>
+        
+        <div class="btn-fast" onclick="abrirModalAlerta()">
+            <i class="fa-solid fa-triangle-exclamation" style="color: var(--danger);"></i>
+            <span>Alerta Obra</span>
+        </div>
+
+        <div class="btn-fast" onclick="location.href='{% url 'dashboard_obras' %}'">
+            <i class="fa-solid fa-house" style="color: #6366f1;"></i>
+            <span>Inicio Obras</span>
+        </div>
+    </div>
+
+    <div class="main-layout">
+        
+        <div>
+            <h2 style="color: #003000; font-weight: bold; margin-bottom: 0; text-transform: uppercase; font-size: 1.1rem; letter-spacing: 0.5px;">Tablero de Proyectos</h2>
+            <br>
+            <div class="obras-grid">
+                
+                {% for obra in obras %}
+                <div class="obra-card" style="border: 1px solid #e2e8f0; border-radius: 14px; background: #ffffff; padding: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                    <div class="obra-card-header" style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: #003000;">{{ obra.nombre }}</h3>
+                            
+                            <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: #64748b;">
+                                <i class="fa-solid fa-house-chimney" style="color: #198754; margin-right: 3px;"></i> {{ obra.propiedad_vinculada }}
+                            </p>
+                        </div>
+                        <span class="badge-status" style="background-color: #e6f4ea; color: #137333; font-weight: bold; text-transform: uppercase; font-size: 0.7rem; padding: 4px 8px; border-radius: 6px;">
+                            {{ obra.objeto.get_estado_display|default:obra.objeto.estado }}
+                        </span>
+                    </div>
+                    
+                    <div class="obra-card-body">
+                        <div class="info-row" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.85rem;">
+                            <span class="info-label" style="color: #64748b;">Presupuesto Inicial:</span>
+                            <span class="info-value" style="font-weight: 600; color: #334155;">${{ obra.presupuesto_estimado|floatformat:0 }}</span>
+                        </div>
+                        <div class="info-row" style="display: flex; justify-content: space-between; margin-bottom: 14px; font-size: 0.85rem;">
+                            <span class="info-label" style="color: #64748b;">Total Real Gastado:</span>
+                            <span class="info-value" {% if obra.alerta_desvio %}style="color: #dc3545; font-weight: bold;"{% else %}style="color: #198754; font-weight: bold;"{% endif %}>${{ obra.gasto_real|floatformat:0 }}</span>
+                        </div>
+                        
+                        <div style="display: flex; gap: 8px; margin-top: 10px;">
+                            <div style="flex: 1; padding: 10px; background-color: #f4f7fe; border-radius: 10px; border-left: 4px solid #0d6efd; text-align: center;">
+                                <span style="display: block; font-size: 0.65rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 2px;">Avance Obra</span>
+                                <span style="display: block; font-size: 1.2rem; font-weight: 800; color: #0d6efd; line-height: 1.2;">{{ obra.porcentaje_avance }}%</span>
+                                <span style="display: block; font-size: 0.6rem; color: #64748b; margin-top: 1px;">Progreso real</span>
+                            </div>
+                            
+                            <div style="flex: 1; padding: 10px; background-color: {% if obra.alerta_desvio %}#fdf2f2{% else %}#f3faf7{% endif %}; border-radius: 10px; border-left: 4px solid {% if obra.alerta_desvio %}#dc3545{% else %}#198754{% endif %}; text-align: center;">
+                                <span style="display: block; font-size: 0.65rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 2px;">Caja Gastada</span>
+                                <span style="display: block; font-size: 1.2rem; font-weight: 800; color: {% if obra.alerta_desvio %}#dc3545{% else %}#198754{% endif %}; line-height: 1.2;">{{ obra.porcentaje_gasto }}%</span>
+                                <span style="display: block; font-size: 0.6rem; color: #64748b; margin-top: 1px;">{% if obra.alerta_desvio %}Excedido{% else %}En margen{% endif %}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="obra-card-footer" style="display: flex; gap: 8px; margin-top: 15px;">
+                        <div class="btn-card btn-secondary" onclick="location.href='/obra/{{ obra.objeto.id }}/carga-rapida/'" style="flex: 1; text-align: center; cursor: pointer;">
+                            <i class="fa-solid fa-receipt me-1"></i> + Ticket
+                        </div>
+                        <div class="btn-card btn-primary" onclick="location.href='/dashboard/obras/ficha/{{ obra.objeto.id }}/'" style="flex: 1; text-align: center; cursor: pointer;">
+                            <i class="fa-solid fa-eye me-1"></i> Ver Ficha
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="w-100 text-center py-4 text-muted">
+                    No hay proyectos registrados actualmente.
+                </div>
+                {% endfor %}
+                
+            </div>
+        </div>
+
+        <div class="sidebar" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 10px; height: fit-content;">
+            
+            <div style="display: flex; gap: 4px; background: #e2e8f0; padding: 4px; border-radius: 10px; margin-bottom: 12px; overflow-x: auto;">
+                <button class="tab-toggle-btn active-tab" onclick="switchTab('tab-agenda', this)" style="flex: 1; padding: 6px 2px; border: none; border-radius: 8px; font-size: 0.7rem; font-weight: bold; background: #ffffff; color: #0f172a; white-space: nowrap; position: relative;">
+                    <i class="fa-solid fa-calendar d-block mb-1" style="color: var(--info); font-size: 0.85rem;"></i> Agenda
+                    {% if tareas_agenda|length > 0 %}
+                        <span style="position: absolute; top: -2px; right: -2px; background: var(--info); color: white; border-radius: 50%; padding: 1px 5px; font-size: 0.6rem; font-weight: 800;">{{ tareas_agenda|length }}</span>
+                    {% endif %}
+                </button>
+                <button class="tab-toggle-btn" onclick="switchTab('tab-logistica', this)" style="flex: 1; padding: 6px 2px; border: none; border-radius: 8px; font-size: 0.7rem; font-weight: bold; background: transparent; color: #64748b; white-space: nowrap; position: relative;">
+                    <i class="fa-solid fa-truck d-block mb-1" style="color: var(--accent); font-size: 0.85rem;"></i> Logística
+                    {% if tareas_logistica|length > 0 %}
+                        <span style="position: absolute; top: -2px; right: -2px; background: var(--danger); color: white; border-radius: 50%; padding: 1px 5px; font-size: 0.6rem; font-weight: 800;">{{ tareas_logistica|length }}</span>
+                    {% endif %}
+                </button>
+                <button class="tab-toggle-btn" onclick="switchTab('tab-caja', this)" style="flex: 1; padding: 6px 2px; border: none; border-radius: 8px; font-size: 0.7rem; font-weight: bold; background: transparent; color: #64748b; white-space: nowrap; position: relative;">
+                    <i class="fa-solid fa-wallet d-block mb-1" style="color: #6366f1; font-size: 0.85rem;"></i> Cajas
+                    {% if tareas_caja|length > 0 %}
+                        <span style="position: absolute; top: -2px; right: -2px; background: #6366f1; color: white; border-radius: 50%; padding: 1px 5px; font-size: 0.6rem; font-weight: 800;">{{ tareas_caja|length }}</span>
+                    {% endif %}
+                </button>
+            </div>
+
+            <div id="tab-agenda" class="widget-tab-content">
+                <div class="widget-header" style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="font-size: 0.85rem; font-weight: 700; color: #0f172a; margin: 0;">Pendientes de Hoy</h3>
+                    <button class="btn-widget-add" onclick="abrirModalAgenda()" style="width: 22px; height: 22px; font-size: 0.75rem; cursor: pointer;"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <ul class="list-stack" style="display: flex; flex-direction: column; gap: 4px; padding: 0; margin: 0; list-style: none;">
+                    {% for tarea in tareas_agenda %}
+                        {% if not tarea.completada %}
+                        <li class="list-row-fina" data-tipo="agenda" data-id="{{ tarea.id }}" style="display: flex; align-items: center; gap: 8px; background: #ffffff; padding: 6px 8px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            <input type="checkbox" onchange="toggleTarea(this)" style="cursor: pointer; min-width: 14px; min-height: 14px;">
+                            <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; white-space: nowrap;">{{ tarea.fecha_hora|date:"H:i"|default:"--" }}</span>
+                            <div style="font-size: 0.8rem; color: #1e293b; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">
+                                {{ tarea.titulo }} <span style="color: #0d6efd; font-size: 0.7rem; font-weight: bold;">({{ tarea.proyecto.nombre }})</span>
+                            </div>
+                        </li>
+                        {% endif %}
+                    {% empty %}
+                    <li class="text-muted small py-2 text-center" style="font-size: 0.75rem;">No hay reuniones hoy.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div id="tab-logistica" class="widget-tab-content" style="display: none;">
+                <div class="widget-header" style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="font-size: 0.85rem; font-weight: 700; color: #0f172a; margin: 0;">Materiales / Pedidos</h3>
+                    <button class="btn-widget-add" onclick="abrirModalLogistica()" style="width: 22px; height: 22px; font-size: 0.75rem; cursor: pointer;"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <ul class="list-stack" style="display: flex; flex-direction: column; gap: 4px; padding: 0; margin: 0; list-style: none;">
+                    {% for tarea in tareas_logistica %}
+                        {% if not tarea.completada %}
+                        <li class="list-row-fina" data-tipo="logistica" data-id="{{ tarea.id }}" style="display: flex; align-items: center; gap: 8px; background: #ffffff; padding: 6px 8px; border-radius: 8px; border: 1px solid #e2e8f0; {% if '🚨' in tarea.titulo %}border-left: 4px solid #dc3545; background-color: #fff5f5;{% endif %}">
+                            <input type="checkbox" onchange="toggleTarea(this)" style="cursor: pointer; min-width: 14px; min-height: 14px;">
+                            <div style="font-size: 0.8rem; color: #1e293b; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">
+                                {{ tarea.titulo }} 
+                                <span class="d-block" style="color: #64748b; font-size: 0.7rem; font-weight: bold; margin-top: 1px;">
+                                    <i class="fa-solid fa-house-chimney" style="font-size: 0.65rem;"></i> {{ tarea.proyecto.nombre }}
+                                </span>
+                            </div>
+                        </li>
+                        {% endif %}
+                    {% empty %}
+                    <li class="text-muted small py-2 text-center" style="font-size: 0.75rem;">Sin alertas de materiales.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div id="tab-caja" class="widget-tab-content" style="display: none;">
+                <div class="widget-header" style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="font-size: 0.85rem; font-weight: 700; color: #0f172a; margin: 0;">Rendiciones Caja Chica</h3>
+                    <button class="btn-widget-add" onclick="abrirModalCaja()" style="width: 22px; height: 22px; font-size: 0.75rem; cursor: pointer;"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <ul class="list-stack" style="display: flex; flex-direction: column; gap: 4px; padding: 0; margin: 0; list-style: none;">
+                    {% for tarea in tareas_caja %}
+                        {% if not tarea.completada %}
+                        <li class="list-row-fina" data-tipo="caja" data-id="{{ tarea.id }}" style="display: flex; align-items: center; gap: 8px; background: #ffffff; padding: 6px 8px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            <input type="checkbox" onchange="toggleTarea(this)" style="cursor: pointer; min-width: 14px; min-height: 14px;">
+                            <div style="font-size: 0.8rem; color: #1e293b; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">
+                                {{ tarea.titulo }} 
+                                <span class="d-block" style="color: #6366f1; font-size: 0.7rem; font-weight: bold; margin-top: 1px;">
+                                    <i class="fa-solid fa-house-chimney" style="font-size: 0.65rem;"></i> {{ tarea.proyecto.nombre }}
+                                </span>
+                            </div>
+                        </li>
+                        {% endif %}
+                    {% empty %}
+                    <li class="text-muted small py-2 text-center" style="font-size: 0.75rem;">Cajas rendidas.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+        </div>
+
+    </div>
+
+    <div id="modalAlertaObra" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 450px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <h3 style="color: var(--danger); font-size: 1.1rem; font-weight: bold; margin-bottom: 15px; text-transform: uppercase;">
+                <i class="fa-solid fa-triangle-exclamation"></i> Registrar Alerta Urgente
+            </h3>
+            <form method="POST" action="">
+                {% csrf_token %}
+                <input type="hidden" name="registrar_alerta_urgente" value="1">
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 4px; color: #475569;">Seleccionar Obra:</label>
+                    <select name="proyecto_id" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem;">
+                        <option value="" disabled selected>-- Elegir proyecto --</option>
+                        {% for obra in proyectos %}
+                            <option value="{{ obra.objeto.id }}">{{ obra.objeto.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 4px; color: #475569;">Detalle del Problema / Urgencia:</label>
+                    <textarea name="titulo_alerta" required placeholder="Ej: Pérdida de agua urgente, Correr flete por lluvia..." rows="3" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; resize: none;"></textarea>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" onclick="cerrarModalAlerta()" style="padding: 8px 12px; background: #e2e8f0; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: bold; color: #475569; cursor: pointer;">Cancelar</button>
+                    <button type="submit" style="padding: 8px 15px; background: var(--danger); border: none; border-radius: 6px; font-size: 0.8rem; font-weight: bold; color: white; cursor: pointer;">Lanzar Alerta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalLogistica" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 420px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <h3 style="color: var(--accent); font-size: 1.1rem; font-weight: bold; margin-bottom: 15px; text-transform: uppercase;">
+                <i class="fa-solid fa-truck"></i> Requerimiento Material
+            </h3>
+            <form method="POST" action="">
+                {% csrf_token %}
+                <input type="hidden" name="agregar_tarea_rapida" value="1">
+                <input type="hidden" name="tipo_tarea" value="logistica">
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 4px; color: #475569;">Obra destino:</label>
+                    <select name="proyecto_id" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem;">
+                        <option value="" disabled selected>-- Seleccionar obra --</option>
+                        {% for obra in proyectos %}
+                            <option value="{{ obra.objeto.id }}">{{ obra.objeto.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 4px; color: #475569;">¿Qué material se necesita pedir?</label>
+                    <input type="text" name="titulo" required placeholder="Ej: Pedir 40 barras del 8 a corralón" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem;">
+                </div>
+                <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 6px;">
+                    <input type="checkbox" name="critica" id="critica_log">
+                    <label for="critica_log" style="font-size: 0.8rem; font-weight: bold; color: #475569; margin: 0; cursor: pointer;">¿Es un faltante crítico / frena la obra?</label>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" onclick="cerrarModalLogistica()" style="padding: 8px 12px; background: #e2e8f0; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: bold; color: #475569; cursor: pointer;">Cancelar</button>
+                    <button type="submit" style="padding: 8px 15px; background: var(--accent); border: none; border-radius: 6px; font-size: 0.8rem; font-weight: bold; color: white; cursor: pointer;">Guardar Pedido</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalCaja" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 420px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <h3 style="color: #6366f1; font-size: 1.1rem; font-weight: bold; margin-bottom: 15px; text-transform: uppercase;">
+                <i class="fa-solid fa-wallet"></i> Recordatorio Rendición
+            </h3>
+            <form method="POST" action="">
+                {% csrf_token %}
+                <input type="hidden" name="agregar_tarea_rapida" value="1">
+                <input type="hidden" name="tipo_tarea" value="caja">
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 4px; color: #475569;">Obra correspondiente:</label>
+                    <select name="proyecto_id" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem;">
+                        <option value="" disabled selected>-- Seleccionar obra --</option>
+                        {% for obra in proyectos %}
+                            <option value="{{ obra.objeto.id }}">{{ obra.objeto.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 4px; color: #475569;">Detalle del gasto a rendir:</label>
+                    <input type="text" name="titulo" required placeholder="Ej: Rendir ticket ferretería (vuelto de tornillos)" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem;">
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" onclick="cerrarModalCaja()" style="padding: 8px 12px; background: #e2e8f0; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: bold; color: #475569; cursor: pointer;">Cancelar</button>
+                    <button type="submit" style="padding: 8px 15px; background: #6366f1; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: bold; color: white; cursor: pointer;">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalAgenda" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 420px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <h3 style="color: var(--info); font-size: 1.1rem; font-weight: bold; margin-bottom: 15px; text-transform: uppercase;">
+                <i class="fa-solid fa-calendar-days"></i> Agendar Evento / Reunión
+            </h3>
+            <form method="POST" action="">
+                {% csrf_token %}
+                <input type="hidden" name="agregar_tarea_rapida" value="1">
+                <input type="hidden" name="tipo_tarea" value="agenda">
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 4px; color: #475569;">Obra relacionada:</label>
+                    <select name="proyecto_id" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem;">
+                        <option value="" disabled selected>-- Seleccionar obra --</option>
+                        {% for obra in proyectos %}
+                            <option value="{{ obra.objeto.id }}">{{ obra.objeto.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 4px; color: #475569;">¿Qué hay que hacer / Reunión de qué?</label>
+                    <input type="text" name="titulo" required placeholder="Ej: Reunión con electricista en la obra" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 4px; color: #475569;">Fecha y Hora del compromiso:</label>
+                    <input type="datetime-local" name="fecha_hora" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem;">
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" onclick="cerrarModalAgenda()" style="padding: 8px 12px; background: #e2e8f0; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: bold; color: #475569; cursor: pointer;">Cancelar</button>
+                    <button type="submit" style="padding: 8px 15px; background: var(--info); border: none; border-radius: 6px; font-size: 0.8rem; font-weight: bold; color: white; cursor: pointer;">Agendar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // Controladores de los Modales
+    function abrirModalAlerta() { document.getElementById('modalAlertaObra').style.display = 'flex'; }
+    function cerrarModalAlerta() { document.getElementById('modalAlertaObra').style.display = 'none'; }
+    
+    function abrirModalAgenda() { document.getElementById('modalAgenda').style.display = 'flex'; }
+    function cerrarModalAgenda() { document.getElementById('modalAgenda').style.display = 'none'; }
+    
+    function abrirModalLogistica() { document.getElementById('modalLogistica').style.display = 'flex'; }
+    function cerrarModalLogistica() { document.getElementById('modalLogistica').style.display = 'none'; }
+    
+    function abrirModalCaja() { document.getElementById('modalCaja').style.display = 'flex'; }
+    function cerrarModalCaja() { document.getElementById('modalCaja').style.display = 'none'; }
+
+    // Switcheo de solapas del Sidebar
+    function switchTab(tabId, buttonElement) {
+        document.querySelectorAll('.widget-tab-content').forEach(function(content) {
+            content.style.display = 'none';
+        });
+        document.querySelectorAll('.tab-toggle-btn').forEach(function(btn) {
+            btn.style.background = 'transparent';
+            btn.style.color = '#64748b';
+        });
+        document.getElementById(tabId).style.display = 'block';
+        buttonElement.style.background = '#ffffff';
+        buttonElement.style.color = '#0f172a';
+    }
+
+    // Checkbox completado con AJAX (Eliminación suave de filas)
+    function toggleTarea(checkbox) {
+        const row = checkbox.closest('.list-row-fina');
+        const tareaId = row.getAttribute('data-id');
+        const tipoWidget = row.getAttribute('data-tipo');
+        const estadoCompletado = checkbox.checked;
+
+        if (estadoCompletado) {
+            row.style.textDecoration = 'line-through';
+            row.style.opacity = '0.4';
+        } else {
+            row.style.textDecoration = 'none';
+            row.style.opacity = '1';
+        }
+
+        const url = `/obra/toggle-tarea/`;
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                'id': tareaId,
+                'tipo': tipoWidget,
+                'completado': estadoCompletado
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                setTimeout(() => { row.remove(); }, 400);
+            } else {
+                alert('Error al guardar el estado: ' + data.message);
+                restoreRow(row, checkbox, estadoCompletado);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            restoreRow(row, checkbox, estadoCompletado);
+        });
+    }
+
+    function restoreRow(row, checkbox, originalState) {
+        checkbox.checked = !originalState;
+        row.style.textDecoration = 'none';
+        row.style.opacity = '1';
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}
