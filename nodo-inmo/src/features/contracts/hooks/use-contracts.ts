@@ -9,6 +9,7 @@ export type ContactParty = {
   name: string;
   dni: string | null;
   address: string | null;
+  phone?: string | null;
 };
 
 /** Contract row enriched with deeply embedded property (+ owner), tenant (+ dni), and guarantors (+ dni). */
@@ -50,7 +51,7 @@ export function useContracts() {
             "address, property_type, rooms, total_sqm, inventory_description, " +
             "owner:contacts!properties_owner_contact_id_fkey(name, dni, email, phone, address)" +
           "), " +
-          "tenant:contacts!contracts_tenant_id_fkey(name, dni, address), " +
+          "tenant:contacts!contracts_tenant_id_fkey(name, dni, address, phone), " +
           "guarantors:contract_guarantors(guarantor_id, guarantor:contacts!contract_guarantors_guarantor_id_fkey(name, dni, address))",
         )
         .order("created_at", { ascending: false });

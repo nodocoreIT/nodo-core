@@ -6,6 +6,7 @@ import { useAlertSettings } from "@/shared/hooks/use-alert-settings";
 export interface UpcomingAdjustment {
   contractId: string;
   tenantName: string;
+  tenantPhone: string | null;
   propertyAddress: string;
   nextAdjustmentDate: string;  // ISO date
   adjustmentIndex: string;     // "IPC" | "ICL" | "fixed" | "USD"
@@ -37,7 +38,7 @@ export function useUpcomingAdjustments() {
           adjustment_index,
           rent_amount,
           currency,
-          contacts:tenant_id ( name ),
+          contacts:tenant_id ( name, phone ),
           properties:property_id ( address )
         `)
         .eq("org_id", orgId!)
@@ -53,6 +54,7 @@ export function useUpcomingAdjustments() {
       return data.map((row: any) => ({
         contractId: row.id,
         tenantName: row.contacts?.name ?? "Inquilino",
+        tenantPhone: row.contacts?.phone ?? null,
         propertyAddress: row.properties?.address ?? "Propiedad",
         nextAdjustmentDate: row.next_adjustment_date,
         adjustmentIndex: row.adjustment_index,
