@@ -197,7 +197,9 @@ export default function EcosystemDiagram({
                 >
                   <animate attributeName="stroke-dashoffset"
                     from={lineLen} to={0}
-                    dur={`${legDur}s`} repeatCount="indefinite" />
+                    dur={`${legDur}s`}
+                    repeatCount="1"
+                    fill="freeze" />
                 </line>
               )}
             </g>
@@ -213,44 +215,23 @@ export default function EcosystemDiagram({
           />
         ))}
 
-        {/* Parent → sub-node lines: from parent center to child center */}
+        {/* Parent → sub-node lines */}
         {subPoints.map((p, i) => {
           const lx2 = p.x;
           const ly2 = p.y;
-          const totalLen  = dist({ x: p.parent.x, y: p.parent.y }, { x: lx2, y: ly2 });
-          const childDur  = travelDur({ x: p.parent.x, y: p.parent.y }, { x: lx2, y: ly2 });
           const visible   = shouldShowSub(p.node.parentSlug);
-          const isHovered = visible && hoveredParentSlug === p.node.parentSlug;
           const baseColor = dark ? "rgba(222,231,241,.3)" : "rgba(100,120,144,.4)";
           return (
-            <g key={`subline-${i}`}>
-              <line
-                x1={p.parent.x} y1={p.parent.y} x2={lx2} y2={ly2}
-                stroke={baseColor}
-                strokeWidth="1.5"
-                style={{
-                  opacity: visible ? (p.node.inDevelopment ? 0.4 : 1) : 0,
-                  transition: `opacity 0.3s ease ${p.siblingIndex * 80}ms`,
-                }}
-              />
-              {isHovered && (
-                <line
-                  x1={p.parent.x} y1={p.parent.y} x2={lx2} y2={ly2}
-                  stroke="#DA5A0E"
-                  strokeWidth="2"
-                  strokeDasharray={totalLen}
-                  strokeDashoffset={totalLen}
-                  opacity={p.node.inDevelopment ? 0.4 : 1}
-                  style={{ filter: "drop-shadow(0 0 3px rgba(218,90,14,0.5))" }}
-                >
-                  <animate attributeName="stroke-dashoffset"
-                    from={totalLen} to={0}
-                    dur={`${childDur}s`}
-                    begin={`${coreToParentDur}s`}
-                    repeatCount="indefinite" />
-                </line>
-              )}
-            </g>
+            <line
+              key={`subline-${i}`}
+              x1={p.parent.x} y1={p.parent.y} x2={lx2} y2={ly2}
+              stroke={baseColor}
+              strokeWidth="1.5"
+              style={{
+                opacity: visible ? (p.node.inDevelopment ? 0.4 : 1) : 0,
+                transition: `opacity 0.3s ease ${p.siblingIndex * 80}ms`,
+              }}
+            />
           );
         })}
 
