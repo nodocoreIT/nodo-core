@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** Returns true when email already has a non-paused registration on this node. */
 export async function isEmailRegisteredForNode(
-  admin: SupabaseClient,
+  admin: SupabaseClient<any, "public", any>,
   email: string,
   unitCode: string,
 ): Promise<boolean> {

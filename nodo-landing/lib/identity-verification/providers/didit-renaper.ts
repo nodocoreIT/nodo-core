@@ -90,13 +90,15 @@ export function createDiditRenaperProvider(apiKey: string): IdentityVerification
       const form = new FormData();
       form.append("issuing_state", "ARG");
       form.append("services", "arg_renaper");
-      form.append("document_number", normalizeDocumentNumber(input.documentNumber));
-      form.append("gender", input.gender);
+      form.append("document_number", normalizeDocumentNumber(input.documentNumber ?? ""));
+      form.append("gender", input.gender ?? "X");
       form.append("first_name", input.firstName);
       form.append("last_name", input.lastName);
       if (input.vendorData) form.append("vendor_data", input.vendorData);
 
-      const blob = new Blob([input.selfie], { type: input.selfieMimeType || "image/jpeg" });
+      const blob = new Blob([Uint8Array.from(input.holdingIdPhoto)], {
+        type: input.photoMimeType || "image/jpeg",
+      });
       form.append("selfie", blob, "selfie.jpg");
 
       const res = await fetch(DIDIT_URL, {
