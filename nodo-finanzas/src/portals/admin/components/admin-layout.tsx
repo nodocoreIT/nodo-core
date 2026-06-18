@@ -18,7 +18,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/shared/lib/utils";
 import { NotificationBell } from "@/components/ui/notification-bell";
+import { DolarCotizacionModal } from "@/components/ui/dolar-cotizacion-modal";
 import { useAuth } from "@/shared/hooks/use-auth";
+import { useDolar } from "@/hooks/use-dolar";
 
 interface NavItem {
   to: string;
@@ -53,7 +55,9 @@ const ROUTE_TITLES: Record<string, string> = {
 export function AdminLayout() {
   const { pathname } = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dolarModalOpen, setDolarModalOpen] = useState(false);
   const { signOut } = useAuth();
+  const dolar = useDolar();
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -163,13 +167,28 @@ export function AdminLayout() {
           </div>
 
           <div className="flex items-center gap-3">
-            <span
+            <button
+              type="button"
               id="dolar-badge"
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand"
+              onClick={() => setDolarModalOpen(true)}
+              title="Ver cotizaciones del dólar"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/20 transition-colors cursor-pointer"
             >
               <DollarSign className="h-3 w-3" />
-              USD —
-            </span>
+              {dolar.loading && !dolar.cotizacion
+                ? 'USD …'
+                : dolar.cotizacion
+                  ? `USD ${dolar.tipoDolarSeleccionado.toUpperCase()} · $${dolar.cotizacion.venta.toLocaleString('es-AR')}`
+                  : 'USD —'}
+            </button>
+
+            <DolarCotizacionModal
+              open={dolarModalOpen}
+              onClose={() => setDolarModalOpen(false)}
+              tipoSeleccionado={dolar.tipoDolarSeleccionado}
+              onSelectTipo={(tipo, cotizacion) => dolar.cambiarTipoDolar(tipo, cotizacion)}
+              onCotizacionesLoaded={(lista) => dolar.sincronizarCotizaciones(lista)}
+            />
 
             <NotificationBell />
 
