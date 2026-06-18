@@ -12,6 +12,7 @@ dist/
 nodo-landing/public/inmo/
 nodo-landing/public/autos/
 nodo-landing/public/clinica/
+nodo-landing/public/finanzas/
 
 # Environment variables — NEVER commit these
 .env
