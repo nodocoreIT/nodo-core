@@ -9,14 +9,9 @@ import {
   Wallet,
   Users,
   TrendingUp,
-  Bell,
-  Smartphone,
   Check,
-  X,
   ArrowRight,
   Bot,
-  Globe,
-  Zap,
 } from "lucide-react";
 
 const FEATURES = [
@@ -150,7 +145,7 @@ export default function NodoInmoPage() {
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
               <Link
-                href="/inmo"
+                href="/nodo-inmo/login"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 text-[16px] font-bold rounded-md text-white active:scale-[.98] transition-all duration-150 shadow-lg"
                 style={{
                   background: "linear-gradient(135deg, #ea580c, #c2410c)",
@@ -312,7 +307,7 @@ export default function NodoInmoPage() {
                 </ul>
 
                 <Link
-                  href="/inmo"
+                  href="/nodo-inmo/login"
                   className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 text-[15px] font-bold rounded-xl text-white transition-all duration-150 active:scale-[.98]"
                   style={{
                     background: "linear-gradient(135deg, #ea580c, #c2410c)",
@@ -394,7 +389,7 @@ export default function NodoInmoPage() {
                 </ul>
 
                 <Link
-                  href="/inmo"
+                  href="/nodo-inmo/login"
                   className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 text-[15px] font-bold rounded-xl text-white transition-all duration-150 active:scale-[.98]"
                   style={{
                     background: "linear-gradient(135deg, #ea580c, #c2410c)",

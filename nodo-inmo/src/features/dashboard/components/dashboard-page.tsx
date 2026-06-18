@@ -1,4 +1,5 @@
-import { History, Calendar, TrendingUp } from "lucide-react";
+import { History, Calendar, TrendingUp, MessageCircle, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@nodocore/shared-components";
 import { useDashboardMetrics } from "../hooks/use-dashboard-metrics";
@@ -8,6 +9,7 @@ import { MonthCollectionsSection } from "./month-collections-section";
 import { RecentReceiptsSection } from "./recent-receipts-section";
 import { formatMoney } from "@/features/contracts/lib/contract-labels";
 import { useUpcomingAdjustments } from "../hooks/use-upcoming-adjustments";
+import { useSendWhatsApp } from "@/features/contracts/hooks/use-send-whatsapp";
 
 function greetingName(user: ReturnType<typeof useAuth>["user"]): string {
   const fullName = (user?.user_metadata?.full_name as string | undefined) ?? "";
@@ -32,6 +34,8 @@ export function DashboardPage() {
   const { data: tasks = [] } = useTasks();
   const pendingTasks = tasks.filter((t) => t.status !== "completada");
   const { data: upcomingAdjustments = [] } = useUpcomingAdjustments();
+  const { sendFromAdjustment, loadingId: whatsappLoadingId } = useSendWhatsApp();
+  const [whatsappResult, setWhatsappResult] = useState<{ id: string; ok: boolean } | null>(null);
 
   if (metrics.loading) {
     return (
@@ -164,24 +168,51 @@ export function DashboardPage() {
               <h2 className="text-sm font-bold uppercase tracking-wide text-blue-900">
                 Próximos aumentos de alquiler
               </h2>
-              <ul className="mt-2 space-y-1">
+              <ul className="mt-2 space-y-2">
                 {upcomingAdjustments.map((adj) => (
-                  <li key={adj.contractId} className="text-sm text-blue-800">
-                    <span className="font-semibold">{adj.tenantName}</span>
-                    {" — "}
-                    {adj.propertyAddress}
-                    {" · Ajuste "}
-                    <span className="font-semibold">{adj.adjustmentIndex}</span>
-                    {" el "}
-                    <span className="font-semibold">
-                      {new Date(adj.nextAdjustmentDate + "T12:00:00").toLocaleDateString("es-AR", {
-                        day: "numeric",
-                        month: "long",
-                      })}
+                  <li key={adj.contractId} className="flex items-center justify-between gap-3 text-sm text-blue-800">
+                    <span>
+                      <span className="font-semibold">{adj.tenantName}</span>
+                      {" — "}
+                      {adj.propertyAddress}
+                      {" · Ajuste "}
+                      <span className="font-semibold">{adj.adjustmentIndex}</span>
+                      {" el "}
+                      <span className="font-semibold">
+                        {new Date(adj.nextAdjustmentDate + "T12:00:00").toLocaleDateString("es-AR", {
+                          day: "numeric",
+                          month: "long",
+                        })}
+                      </span>
+                      {" (alquiler actual: "}
+                      {formatMoney(adj.rentAmount, adj.currency)}
+                      {")"}
                     </span>
-                    {" (alquiler actual: "}
-                    {formatMoney(adj.rentAmount, adj.currency)}
-                    {")"}
+                    <button
+                      disabled={!adj.tenantPhone || whatsappLoadingId === adj.contractId}
+                      title={adj.tenantPhone ? "Avisar por WhatsApp" : "Sin teléfono registrado"}
+                      className={[
+                        "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors",
+                        whatsappResult?.id === adj.contractId
+                          ? whatsappResult.ok
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-600"
+                          : adj.tenantPhone
+                            ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                            : "cursor-not-allowed bg-gray-100 text-gray-400",
+                      ].join(" ")}
+                      onClick={async () => {
+                        const result = await sendFromAdjustment(adj);
+                        setWhatsappResult({ id: adj.contractId, ok: result.success });
+                        setTimeout(() => setWhatsappResult(null), 4000);
+                      }}
+                    >
+                      {whatsappLoadingId === adj.contractId
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <MessageCircle className="h-3.5 w-3.5" />
+                      }
+                      Avisar
+                    </button>
                   </li>
                 ))}
               </ul>
