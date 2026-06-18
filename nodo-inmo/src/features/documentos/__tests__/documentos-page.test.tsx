@@ -45,10 +45,14 @@ vi.mock("@/features/documentos/components/documents-section", () => ({
 
 // Stub the search store — we'll set the query via the mock
 let mockQuery = "";
-vi.mock("@/shared/search/use-search-store", () => ({
-  useSearchStore: (selector: (s: { query: string }) => string) =>
-    selector({ query: mockQuery }),
-}));
+vi.mock("@nodocore/shared-components", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
+  return {
+    ...actual,
+    useSearchStore: (selector: (s: { query: string }) => string) =>
+      selector({ query: mockQuery }),
+  };
+});
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 

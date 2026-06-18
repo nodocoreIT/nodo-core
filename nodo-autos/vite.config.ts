@@ -25,6 +25,10 @@ export default defineConfig({
       "@": resolve(__dirname, "./src"),
       react: resolve(__dirname, "node_modules/react"),
       "react-dom": resolve(__dirname, "node_modules/react-dom"),
+      "@nodocore/shared-components/styles": resolve(
+        monorepoRoot,
+        "packages/shared-components/src/styles",
+      ),
       // Compile from source so Vite shares one React instance (dist bundle breaks hooks).
       "@nodocore/shared-components": resolve(
         monorepoRoot,

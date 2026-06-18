@@ -1,0 +1,13 @@
+/*
+ * Shared interactive affordances for all Nodo apps.
+ * Import AFTER @import "tailwindcss" in your app's index.css:
+ *
+ *   @import "@nodocore/shared-components/styles/interactive.css";
+ */
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}

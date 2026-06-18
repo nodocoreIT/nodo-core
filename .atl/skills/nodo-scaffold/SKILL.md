@@ -215,3 +215,21 @@ In `nodo-landing/next.config.ts`, add the rewrite:
 - [ ] Landing entry point wired (`NodoPlaceholder.tsx` + `next.config.ts`)
 - [ ] `.env.local` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
 - [ ] Migration SQL run in the correct Supabase project
+
+---
+
+## 8. Interactive affordances (cursor pointer)
+
+Every nodo MUST show `cursor: pointer` (hand icon) on clickable controls — sidebar logout, nav items, icon buttons, etc.
+
+**Mandatory in `src/index.css`** (after `@import "tailwindcss"`):
+
+```css
+@import "@nodocore/shared-components/styles/interactive.css";
+```
+
+This shared stylesheet sets `cursor: pointer` on native `<button>` and `[role="button"]` elements.
+
+**Also use `@nodocore/shared-components` `Button`** for actions like "Cerrar sesión" — it includes `cursor-pointer` and `disabled:cursor-not-allowed` by default.
+
+Do NOT rely on per-layout `className="cursor-pointer"` overrides; the shared layer covers all nodos and future ones.

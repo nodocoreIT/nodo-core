@@ -8,7 +8,7 @@ import { useArchiveContract } from "@/features/contracts/hooks/use-archive-contr
 import { useSendWhatsApp } from "@/features/contracts/hooks/use-send-whatsapp";
 import { useUpdateContract } from "@/features/contracts/hooks/use-update-contract";
 import { ContractFormDialog } from "./contract-form-dialog";
-import { useSearchStore } from "@/shared/search/use-search-store";
+import { useSearchStore } from "@nodocore/shared-components";
 import { matchesQuery } from "@/shared/search/matches-query";
 import { CreateContractDialog } from "./create-contract-dialog";
 import { ContractPdfViewer } from "./contract-pdf-viewer";

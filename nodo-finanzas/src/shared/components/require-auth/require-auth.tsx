@@ -1,5 +1,5 @@
-import { Navigate } from "react-router-dom";
 import { useAuth } from "@/shared/hooks/use-auth";
+import { redirectToLandingLogin } from "@/shared/lib/auth-redirect";
 import { Spinner } from "@/components/ui/spinner";
 import type { ReactNode } from "react";
 
@@ -19,7 +19,8 @@ export function RequireAuth({ children }: RequireAuthProps) {
   }
 
   if (!session) {
-    return <Navigate to="/login" replace />;
+    redirectToLandingLogin();
+    return null;
   }
 
   return <>{children}</>;

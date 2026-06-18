@@ -16,6 +16,10 @@ import {
   LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  PortalHeaderActions,
+  PortalHeaderMobileActions,
+} from "@nodocore/shared-components";
 import { cn } from "@/shared/lib/utils";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { DolarCotizacionModal } from "@/components/ui/dolar-cotizacion-modal";
@@ -149,8 +153,8 @@ export function AdminLayout() {
       {/* Main */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Header */}
-        <header className="flex min-h-16 items-center justify-between gap-4 border-b border-border bg-[#e8faf0] px-4 sm:px-6 py-3 shadow-sm flex-shrink-0">
-          <div className="flex items-center gap-3">
+        <header className="flex min-h-16 items-center gap-3 sm:gap-4 border-b border-border bg-[#e8faf0] px-4 sm:px-6 py-3 shadow-sm flex-shrink-0">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <button
               type="button"
               className="block md:hidden text-navy hover:text-brand"
@@ -158,49 +162,67 @@ export function AdminLayout() {
             >
               <Menu className="h-6 w-6" />
             </button>
-            <div>
+            <div className="min-w-0">
               <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate2">
                 Nodo Finanzas · Panel Admin
               </p>
-              <h1 className="text-base sm:text-xl font-bold text-navy mt-1.5">{title}</h1>
+              <h1 className="truncate text-base sm:text-xl font-bold text-navy mt-1.5">{title}</h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              id="dolar-badge"
-              onClick={() => setDolarModalOpen(true)}
-              title="Ver cotizaciones del dólar"
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/20 transition-colors cursor-pointer"
-            >
-              <DollarSign className="h-3 w-3" />
-              {dolar.loading && !dolar.cotizacion
-                ? 'USD …'
-                : dolar.cotizacion
-                  ? `USD ${dolar.tipoDolarSeleccionado.toUpperCase()} · $${dolar.cotizacion.venta.toLocaleString('es-AR')}`
-                  : 'USD —'}
-            </button>
+          <PortalHeaderMobileActions
+            notifications={<NotificationBell />}
+            trailing={
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                title="Cerrar sesión"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate2 hover:bg-mist hover:text-navy transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            }
+          />
 
-            <DolarCotizacionModal
-              open={dolarModalOpen}
-              onClose={() => setDolarModalOpen(false)}
-              tipoSeleccionado={dolar.tipoDolarSeleccionado}
-              onSelectTipo={(tipo, cotizacion) => dolar.cambiarTipoDolar(tipo, cotizacion)}
-              onCotizacionesLoaded={(lista) => dolar.sincronizarCotizaciones(lista)}
-            />
+          <PortalHeaderActions
+            metrics={
+              <>
+                <button
+                  type="button"
+                  id="dolar-badge"
+                  onClick={() => setDolarModalOpen(true)}
+                  title="Ver cotizaciones del dólar"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/20 transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  <DollarSign className="h-3 w-3" />
+                  {dolar.loading && !dolar.cotizacion
+                    ? "USD …"
+                    : dolar.cotizacion
+                      ? `USD ${dolar.tipoDolarSeleccionado.toUpperCase()} · $${dolar.cotizacion.venta.toLocaleString("es-AR")}`
+                      : "USD —"}
+                </button>
 
-            <NotificationBell />
-
-            <button
-              type="button"
-              onClick={() => signOut()}
-              title="Cerrar sesión"
-              className="flex items-center justify-center rounded-lg p-2 text-slate2 hover:bg-mist hover:text-navy transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
+                <DolarCotizacionModal
+                  open={dolarModalOpen}
+                  onClose={() => setDolarModalOpen(false)}
+                  tipoSeleccionado={dolar.tipoDolarSeleccionado}
+                  onSelectTipo={(tipo, cotizacion) => dolar.cambiarTipoDolar(tipo, cotizacion)}
+                  onCotizacionesLoaded={(lista) => dolar.sincronizarCotizaciones(lista)}
+                />
+              </>
+            }
+            notifications={<NotificationBell />}
+            trailing={
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                title="Cerrar sesión"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate2 hover:bg-mist hover:text-navy transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            }
+          />
         </header>
 
         {/* Content */}

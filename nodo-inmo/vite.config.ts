@@ -24,6 +24,13 @@ export default defineConfig({
       "@": resolve(__dirname, "./src"),
       react: resolve(__dirname, "node_modules/react"),
       "react-dom": resolve(__dirname, "node_modules/react-dom"),
+      // Subpath must come before the package root alias (otherwise CSS imports
+      // resolve to index.ts/styles/... and Vite returns 500).
+      "@nodocore/shared-components/styles": resolve(
+        monorepoRoot,
+        "packages/shared-components/src/styles",
+      ),
+      // Compile from source so Vite shares one React instance (dist bundle breaks hooks).
       "@nodocore/shared-components": resolve(
         monorepoRoot,
         "packages/shared-components/src/index.ts",

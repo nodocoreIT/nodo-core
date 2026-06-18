@@ -11,7 +11,7 @@ import { ContractPdfActions } from "@/features/contracts/components/contract-pdf
 import { ContractStatusBadge } from "@/features/contracts/components/contract-status-badge";
 import { ContractLocacionButton } from "@/features/contracts/components/contract-locacion-button";
 import { DocumentsSection } from "@/features/documentos/components/documents-section";
-import { useSearchStore } from "@/shared/search/use-search-store";
+import { useSearchStore } from "@nodocore/shared-components";
 import { matchesQuery } from "@/shared/search/matches-query";
 import {
   Table,

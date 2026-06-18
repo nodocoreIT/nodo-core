@@ -27,7 +27,7 @@ import {
   AlertDialogTrigger,
 } from "@/shared/components/ui/alert-dialog";
 import { ContactFormDialog } from "./contact-form-dialog";
-import { useSearchStore } from "@/shared/search/use-search-store";
+import { useSearchStore } from "@nodocore/shared-components";
 import { matchesQuery } from "@/shared/search/matches-query";
 import type { ContactRow, ContactRole } from "@/features/contacts/hooks/use-contacts";
 import { useCreateContact } from "@/features/contacts/hooks/use-create-contact";
