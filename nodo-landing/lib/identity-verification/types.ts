@@ -12,6 +12,8 @@ export type IdentityVerificationInput = {
   holdingIdPhoto: Buffer;
   photoMimeType: string;
   documentNumber?: string;
+  /** Required for Didit/RENAPER when that provider is enabled. */
+  gender?: string;
   vendorData?: string;
 };
 
