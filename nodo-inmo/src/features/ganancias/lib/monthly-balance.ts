@@ -27,6 +27,7 @@ export interface MonthlyBalanceSummary {
   admAlquileres: CategoryTotals;
   contratos: CategoryTotals;
   ventas: CategoryTotals;
+  honorarios: CategoryTotals;
   netoArs: number;
   netoUsd: number;
   movements: MonthlyMovementRow[];
@@ -74,12 +75,27 @@ export function buildMonthlyBalance(
   const admAlquileres: CategoryTotals = { ars: 0, usd: 0 };
   const contratos: CategoryTotals = { ars: 0, usd: 0 };
   const ventas: CategoryTotals = { ars: 0, usd: 0 };
+  const honorarios: CategoryTotals = { ars: 0, usd: 0 };
 
   for (const m of inMonth) {
     if (m.type !== "income") continue;
     const signed = signedAmount(m);
-    if (m.source === "commission") addToCategory(admAlquileres, signed, m.currency);
-    if (m.source === "manual") addToCategory(contratos, signed, m.currency);
+    if (m.source === "commission") {
+      addToCategory(admAlquileres, signed, m.currency);
+    } else if (m.source === "manual") {
+      const upper = m.concept.toUpperCase();
+      if (upper.includes("VENTA")) {
+        addToCategory(ventas, signed, m.currency);
+      } else if (
+        upper.includes("HONORAR") ||
+        upper.includes("OBRA") ||
+        upper.includes("DIRECC")
+      ) {
+        addToCategory(honorarios, signed, m.currency);
+      } else {
+        addToCategory(contratos, signed, m.currency);
+      }
+    }
   }
 
   const netoArs = inMonth
@@ -131,6 +147,7 @@ export function buildMonthlyBalance(
     admAlquileres,
     contratos,
     ventas,
+    honorarios,
     netoArs,
     netoUsd,
     movements: inMonth.map((m) => ({

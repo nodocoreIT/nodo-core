@@ -9,61 +9,62 @@ export interface MonthlyReportData {
   periodYm: string;
   summary: MonthlyBalanceSummary;
   logoUrl?: string | null;
+  brandColor?: string;
 }
 
-const BRAND = "#1a4d3e";
-
-const styles = StyleSheet.create({
-  page: { fontFamily: "Helvetica", fontSize: 9, padding: 40, color: "#1a1a2e" },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: BRAND,
-  },
-  logo: { width: 72, height: 48, objectFit: "contain" },
-  brand: { fontSize: 14, fontFamily: "Helvetica-Bold", color: BRAND },
-  sub: { fontSize: 9, color: "#475569", marginTop: 2 },
-  title: {
-    fontSize: 11,
-    fontFamily: "Helvetica-Bold",
-    textAlign: "center",
-    marginBottom: 14,
-    color: BRAND,
-  },
-  row: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
-    paddingVertical: 5,
-  },
-  head: { fontFamily: "Helvetica-Bold", backgroundColor: "#f1f5f9" },
-  cDate: { width: "10%" },
-  cDetail: { width: "36%" },
-  cOrigin: { width: "12%" },
-  cAccount: { width: "16%" },
-  cArs: { width: "13%", textAlign: "right" },
-  cUsd: { width: "13%", textAlign: "right" },
-  total: {
-    marginTop: 10,
-    fontFamily: "Helvetica-Bold",
-    fontSize: 10,
-    textAlign: "right",
-    color: BRAND,
-  },
-  footer: {
-    position: "absolute",
-    bottom: 30,
-    left: 40,
-    right: 40,
-    fontSize: 8,
-    color: "#94a3b8",
-    textAlign: "center",
-  },
-});
+function createStyles(brand: string) {
+  return StyleSheet.create({
+    page: { fontFamily: "Helvetica", fontSize: 9, padding: 40, color: "#1a1a2e" },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+      paddingBottom: 12,
+      borderBottomWidth: 2,
+      borderBottomColor: brand,
+    },
+    logo: { width: 72, height: 48, objectFit: "contain" },
+    brand: { fontSize: 14, fontFamily: "Helvetica-Bold", color: brand },
+    sub: { fontSize: 9, color: "#475569", marginTop: 2 },
+    title: {
+      fontSize: 11,
+      fontFamily: "Helvetica-Bold",
+      textAlign: "center",
+      marginBottom: 14,
+      color: brand,
+    },
+    row: {
+      flexDirection: "row",
+      borderBottomWidth: 1,
+      borderBottomColor: "#e2e8f0",
+      paddingVertical: 5,
+    },
+    head: { fontFamily: "Helvetica-Bold", backgroundColor: "#f1f5f9" },
+    cDate: { width: "10%" },
+    cDetail: { width: "36%" },
+    cOrigin: { width: "12%" },
+    cAccount: { width: "16%" },
+    cArs: { width: "13%", textAlign: "right" },
+    cUsd: { width: "13%", textAlign: "right" },
+    total: {
+      marginTop: 10,
+      fontFamily: "Helvetica-Bold",
+      fontSize: 10,
+      textAlign: "right",
+      color: brand,
+    },
+    footer: {
+      position: "absolute",
+      bottom: 30,
+      left: 40,
+      right: 40,
+      fontSize: 8,
+      color: "#94a3b8",
+      textAlign: "center",
+    },
+  });
+}
 
 function amountStyle(value: number | null) {
   if (value != null && value < 0) return { color: "#dc2626" };
@@ -71,6 +72,8 @@ function amountStyle(value: number | null) {
 }
 
 export function MonthlyReportDocument(data: MonthlyReportData) {
+  const brand = data.brandColor ?? "#1a4d3e";
+  const styles = createStyles(brand);
   const { agencyName, address, summary, logoUrl } = data;
   const [mm, yyyy] = data.periodYm.split("-");
 

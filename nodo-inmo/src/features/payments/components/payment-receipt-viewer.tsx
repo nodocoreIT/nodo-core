@@ -3,6 +3,8 @@ import { Download, Share2, Loader2 } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import type { PaymentWithRelations } from "../hooks/use-payments";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
+import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";
+import { useThemeStore } from "@/shared/hooks/use-theme-settings";
 import { buildReceiptData } from "../lib/payment-receipt-pdf";
 
 function slugify(name: string): string {
@@ -15,6 +17,8 @@ interface PaymentReceiptViewerProps {
 
 export function PaymentReceiptViewer({ payment }: PaymentReceiptViewerProps) {
   const { data: agency, isLoading: agencyLoading } = useOrgProfile();
+  const { settings } = useThemeStore();
+  const { data: logoUrl } = useLogoUrl(agency?.logo_path);
 
   const [blob, setBlob] = useState<Blob | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -31,7 +35,7 @@ export function PaymentReceiptViewer({ payment }: PaymentReceiptViewerProps) {
 
     void (async () => {
       try {
-        const data = await buildReceiptData(payment, agency ?? null);
+        const data = await buildReceiptData(payment, agency ?? null, settings.primaryColor, logoUrl ?? null);
         const [{ pdf }, { PaymentReceiptDocument }] = await Promise.all([
           import("@react-pdf/renderer"),
           import("@/features/payments/components/payment-receipt-document"),
@@ -55,7 +59,7 @@ export function PaymentReceiptViewer({ payment }: PaymentReceiptViewerProps) {
     return () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [payment, agency, agencyLoading]);
+  }, [payment, agency, agencyLoading, logoUrl, settings]);
 
   useEffect(() => {
     if (

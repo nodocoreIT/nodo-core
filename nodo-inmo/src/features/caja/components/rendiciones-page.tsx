@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Check, FileText, HandCoins, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, Download, FileText, HandCoins, Loader2, Share2 } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import {
   Dialog,
@@ -23,7 +23,9 @@ import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";
 import { groupPendingByProperty } from "@/features/caja/lib/caja-math";
 import { buildPendingStatementData } from "@/features/caja/lib/pending-settlement-pdf";
 import { usePendingExpenses } from "@/features/caja/hooks/use-pending-expenses";
-import type { StatementData } from "@/features/caja/lib/settlement-statement-data";
+import { buildStatementData, type SealedBreakdown, type StatementData } from "@/features/caja/lib/settlement-statement-data";
+import { handleDownload, handleShare } from "@/features/caja/lib/settlement-pdf-actions";
+import { useThemeStore } from "@/shared/hooks/use-theme-settings";
 import { SettlementPdfViewer } from "./settlement-pdf-viewer";
 import { formatMoney } from "@/features/contracts/lib/contract-labels";
 
@@ -33,9 +35,14 @@ export function RendicionesPage() {
   const { data: agency } = useOrgProfile();
   const { data: logoUrl } = useLogoUrl(agency?.logo_path);
   const { data: expenses, isLoading: expensesLoading } = usePendingExpenses();
+  const { settings } = useThemeStore();
+  const primaryColor = settings.primaryColor;
   const [previewLoadingKey, setPreviewLoadingKey] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewStatement, setPreviewStatement] = useState<StatementData | null>(null);
+  const [finalizeLoading, setFinalizeLoading] = useState<string | null>(null);
+  const [finalizedStatement, setFinalizedStatement] = useState<StatementData | null>(null);
+  const [finalizeOpen, setFinalizeOpen] = useState(false);
 
   const allSettlements = data ?? [];
   const pendingGroups = groupPendingByProperty(allSettlements);
@@ -49,11 +56,42 @@ export function RendicionesPage() {
         allSettlements,
         agency ?? null,
         logoUrl ?? null,
+        primaryColor,
       );
       setPreviewStatement(statement);
       setPreviewOpen(true);
     } finally {
       setPreviewLoadingKey(null);
+    }
+  }
+
+  async function handleFinalize(group: (typeof pendingGroups)[number]) {
+    const key = `${group.owner_id}:${group.property_id}:${group.currency}`;
+    setFinalizeLoading(key);
+    try {
+      const sealedJson = await settleOwner.mutateAsync({
+        owner_id: group.owner_id,
+        owner_name: group.owner_name,
+        property_id: group.property_id,
+        settlement_ids: group.settlement_ids,
+        total: group.total,
+        currency: group.currency,
+      });
+      if (sealedJson) {
+        const sealed = sealedJson as unknown as SealedBreakdown;
+        const statement = buildStatementData({
+          breakdown: { ...sealed, currency: group.currency },
+          agency: agency ?? null,
+          logoUrl: logoUrl ?? null,
+          ownerName: group.owner_name,
+          settledDate: new Date().toISOString().slice(0, 10),
+          brandColor: primaryColor,
+        });
+        setFinalizedStatement(statement);
+        setFinalizeOpen(true);
+      }
+    } finally {
+      setFinalizeLoading(null);
     }
   }
 
@@ -186,20 +224,15 @@ export function RendicionesPage() {
                           variant="ghost"
                           size="sm"
                           aria-label={`Finalizar rendición de ${group.owner_name}`}
-                          disabled={settleOwner.isPending}
+                          disabled={finalizeLoading === rowKey || settleOwner.isPending}
                           className="gap-1 text-green-700 hover:bg-green-50 hover:text-green-800"
-                          onClick={() =>
-                            settleOwner.mutate({
-                              owner_id: group.owner_id,
-                              owner_name: group.owner_name,
-                              property_id: group.property_id,
-                              settlement_ids: group.settlement_ids,
-                              total: group.total,
-                              currency: group.currency,
-                            })
-                          }
+                          onClick={() => void handleFinalize(group)}
                         >
-                          <Check className="h-4 w-4" />
+                          {finalizeLoading === rowKey ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Check className="h-4 w-4" />
+                          )}
                           Finalizar
                         </Button>
                       </div>
@@ -224,6 +257,45 @@ export function RendicionesPage() {
           <div className="min-h-0 flex-1 p-4">
             {previewStatement ? (
               <SettlementPdfViewer data={previewStatement} />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={finalizeOpen} onOpenChange={setFinalizeOpen}>
+        <DialogContent className="flex h-[85vh] max-w-4xl flex-col gap-0 p-0">
+          <DialogHeader className="border-b border-border px-6 py-4">
+            <DialogTitle>
+              {finalizedStatement
+                ? `Liquidación finalizada — ${finalizedStatement.ownerName}`
+                : "Liquidación finalizada"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 p-4">
+            {finalizedStatement ? (
+              <div className="flex h-full flex-col gap-3">
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => void handleDownload(finalizedStatement)}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Descargar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => void handleShare(finalizedStatement)}
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    Compartir
+                  </Button>
+                </div>
+                <SettlementPdfViewer data={finalizedStatement} />
+              </div>
             ) : null}
           </div>
         </DialogContent>

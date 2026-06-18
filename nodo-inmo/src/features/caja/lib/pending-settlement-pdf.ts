@@ -20,6 +20,7 @@ export async function buildPendingStatementData(
   settlements: SettlementWithOwner[],
   agency: OrgProfileRow | null,
   logoUrl: string | null,
+  brandColor?: string,
 ): Promise<StatementData> {
   const batch = settlements.filter(
     (s) =>
@@ -60,17 +61,7 @@ export async function buildPendingStatementData(
 
   if (expensesError) throw expensesError;
 
-  const ownerExpenses = (expenses ?? []).filter((e) => {
-    const raw = e.property as unknown;
-    const property = Array.isArray(raw)
-      ? (raw[0] as { owner_id: string | null } | undefined)
-      : (raw as { owner_id: string | null } | null);
-    
-    // El query original no trae property_id en expenses. 
-    // Wait, let's fix the query above to also fetch property_id.
-    // e.property no tiene property_id. We need to fetch property_id.
-    return property?.owner_id === group.owner_id;
-  });
+  const ownerExpenses = expenses ?? [];
 
   const { data: ownerContact } = await supabase
     .schema("nodo_inmo")
@@ -113,5 +104,6 @@ export async function buildPendingStatementData(
     logoUrl,
     ownerName: group.owner_name,
     settledDate: new Date().toISOString().slice(0, 10),
+    brandColor,
   });
 }
