@@ -14,21 +14,36 @@ interface EcosystemDiagramProps {
 }
 
 // ─── Geometry ────────────────────────────────────────────────────────────────
-const W = 520;
-const H = 520;
+const W = 600;
+const H = 600;
 const CX = W / 2;
 const CY = H / 2;
 const R = 190;
-const SUB_ORBIT_R = 100;
+const SUB_ORBIT_R = 145;
 const CORE_R = 46;
 const HALO_R = CORE_R + 14;
 const SAT_DIAMETER_CQW = 15.5;
 const SUB_SAT_DIAMETER_CQW = 12.5;
 /** Angular spread (degrees) between siblings sharing the same parent. */
-const SIBLING_SPREAD_DEG = 40;
+const SIBLING_SPREAD_DEG = 75;
 /** Node radii in SVG units — used to trim lines to circle edges. */
 const SAT_R_SVG     = (SAT_DIAMETER_CQW     / 200) * W; // ~40
 const SUB_SAT_R_SVG = (SUB_SAT_DIAMETER_CQW / 200) * W; // ~32.5
+/** Travel speed for pulse dots (SVG units/s). Core→orbit ≈ 1s. */
+const TRAVEL_SPEED = 190;
+
+function dist(a: { x: number; y: number }, b: { x: number; y: number }) {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+function travelDur(from: { x: number; y: number }, to: { x: number; y: number }) {
+  return dist(from, to) / TRAVEL_SPEED;
+}
+
+/** Build keyTimes string for SMIL values aligned to a repeating cycle. */
+function kt(t: number, cycleDur: number) {
+  return (t / cycleDur).toFixed(4);
+}
 
 export default function EcosystemDiagram({
   dark = false,
@@ -122,6 +137,23 @@ export default function EcosystemDiagram({
   const shouldShowSub = (parentSlug: string | undefined) =>
     isLoginPage || !interactive || hoveredParentSlug === parentSlug;
 
+  const hoveredParentPoint = hoveredParentSlug
+    ? (mainPoints.find((p) => p.node.slug === hoveredParentSlug) ?? null)
+    : null;
+  const hoveredChildren = hoveredParentPoint
+    ? subPoints.filter((p) => p.node.parentSlug === hoveredParentSlug)
+    : [];
+  const showPulse = Boolean(hoveredParentPoint && (isLoginPage || interactive));
+  const coreFrom = { x: CX, y: CY };
+  const coreToParentDur = hoveredParentPoint
+    ? travelDur(coreFrom, { x: hoveredParentPoint.x, y: hoveredParentPoint.y })
+    : 0;
+  const childTravelDurs = hoveredChildren.map((c) =>
+    travelDur({ x: hoveredParentPoint!.x, y: hoveredParentPoint!.y }, { x: c.x, y: c.y }),
+  );
+  const maxChildDur = childTravelDurs.length ? Math.max(...childTravelDurs) : 0;
+  const pulseCycleDur = coreToParentDur + maxChildDur;
+
   return (
     <div className={`relative ${className}`} style={{ containerType: "inline-size" }}>
       {/* ── SVG backdrop ─────────────────────────────────────────────────── */}
@@ -143,14 +175,34 @@ export default function EcosystemDiagram({
         {/* Core → main-orbit lines */}
         {mainPoints.map((p, i) => {
           const isActiveLine = p.node.slug === activeNodeSlug || p.node.slug === activeParentSlug;
+          const isParentHovered = showPulse && hoveredParentSlug === p.node.slug;
+          const lineLen = dist(coreFrom, { x: p.x, y: p.y });
+          const legDur = travelDur(coreFrom, { x: p.x, y: p.y });
           return (
-            <line
-              key={`line-${i}`}
-              x1={CX} y1={CY} x2={p.x} y2={p.y}
-              stroke={isActiveLine ? "var(--color-brand)" : stroke}
-              strokeWidth={isActiveLine ? "2" : "1.5"}
-              opacity={p.node.inDevelopment ? 0.35 : 1}
-            />
+            <g key={`line-${i}`}>
+              <line
+                x1={CX} y1={CY} x2={p.x} y2={p.y}
+                stroke={isActiveLine ? "var(--color-brand)" : stroke}
+                strokeWidth={isActiveLine ? "2" : "1.5"}
+                opacity={p.node.inDevelopment ? 0.35 : 1}
+              />
+              {isParentHovered && (
+                <line
+                  x1={CX} y1={CY} x2={p.x} y2={p.y}
+                  stroke="#DA5A0E"
+                  strokeWidth="2"
+                  strokeDasharray={lineLen}
+                  strokeDashoffset={lineLen}
+                  style={{ filter: "drop-shadow(0 0 3px rgba(218,90,14,0.5))" }}
+                >
+                  <animate attributeName="stroke-dashoffset"
+                    from={lineLen} to={0}
+                    dur={`${legDur}s`}
+                    repeatCount="1"
+                    fill="freeze" />
+                </line>
+              )}
+            </g>
           );
         })}
 
@@ -158,78 +210,96 @@ export default function EcosystemDiagram({
         {mainPoints.filter((p) => parentSlugs.has(p.node.slug)).map((p) => (
           <circle
             key={`parent-ring-${p.node.code}`}
-            cx={p.x} cy={p.y} r={40}
+            cx={p.x} cy={p.y} r={SAT_R_SVG}
             fill="none" stroke={stroke} strokeWidth="1" strokeDasharray="2 5" opacity={0.5}
           />
         ))}
 
-        {/* Parent → sub-node lines: from parent center to child center */}
+        {/* Parent → sub-node lines */}
         {subPoints.map((p, i) => {
-          // Line goes center → center; the HTML node overlay sits on top in z-order.
           const lx2 = p.x;
           const ly2 = p.y;
-          const totalLen  = Math.sqrt((lx2 - p.parent.x) ** 2 + (ly2 - p.parent.y) ** 2);
-          const isHovered = shouldShowSub(p.node.parentSlug) && hoveredParentSlug === p.node.parentSlug;
+          const visible   = shouldShowSub(p.node.parentSlug);
           const baseColor = dark ? "rgba(222,231,241,.3)" : "rgba(100,120,144,.4)";
           return (
-            <g key={`subline-${i}`}>
-              {/* Gray base — draws in quickly when hovered */}
-              <line
-                x1={p.parent.x} y1={p.parent.y} x2={lx2} y2={ly2}
-                stroke={baseColor}
-                strokeWidth="1.5"
-                style={{
-                  strokeDasharray: totalLen,
-                  strokeDashoffset: isHovered ? 0 : totalLen,
-                  transition: `stroke-dashoffset 0.25s ease ${p.siblingIndex * 80}ms`,
-                  opacity: p.node.inDevelopment ? 0.4 : 1,
-                }}
-              />
-              {/* Orange overlay — grows progressively in sync with the dot */}
-              {isHovered && (
-                <line
-                  x1={p.parent.x} y1={p.parent.y} x2={lx2} y2={ly2}
-                  stroke="#DA5A0E"
-                  strokeWidth="2"
-                  strokeDasharray={totalLen}
-                  strokeDashoffset={totalLen}
-                  opacity={p.node.inDevelopment ? 0.4 : 1}
-                  style={{ filter: "drop-shadow(0 0 3px rgba(218,90,14,0.5))" }}
-                >
-                  <animate attributeName="stroke-dashoffset"
-                    from={totalLen} to={0}
-                    dur="1.1s" repeatCount="indefinite" />
-                </line>
-              )}
-              {/* Heartbeat ring at parent — fires when dot arrives (~0.72s into cycle) */}
-              {isHovered && (
-                <circle cx={p.parent.x} cy={p.parent.y}
-                  r={SAT_R_SVG} fill="none" stroke="#DA5A0E" strokeWidth="2" opacity="0"
-                >
-                  <animate attributeName="r"
-                    from={SAT_R_SVG} to={SAT_R_SVG + 22}
-                    dur="1.1s" begin="0.72s" repeatCount="indefinite" />
-                  <animate attributeName="opacity"
-                    values="0;0.75;0" keyTimes="0;0.15;1"
-                    dur="1.1s" begin="0.72s" repeatCount="indefinite" />
-                </circle>
-              )}
-            </g>
+            <line
+              key={`subline-${i}`}
+              x1={p.parent.x} y1={p.parent.y} x2={lx2} y2={ly2}
+              stroke={baseColor}
+              strokeWidth="1.5"
+              style={{
+                opacity: visible ? (p.node.inDevelopment ? 0.4 : 1) : 0,
+                transition: `opacity 0.3s ease ${p.siblingIndex * 80}ms`,
+              }}
+            />
           );
         })}
 
-        {/* Traveling orange dot: parent → each hovered sub-node */}
-        {subPoints
-          .filter((p) => hoveredParentSlug === p.node.parentSlug && (isLoginPage || interactive))
-          .map((p) => (
-            <circle key={`dot-${p.node.code}`} r="6" fill="#DA5A0E"
+        {/* Pulse: Core → parent, then parent → each child (distance-timed) */}
+        {showPulse && hoveredParentPoint && pulseCycleDur > 0 && (
+          <>
+            {hoveredChildren.length > 0 && (
+              <circle cx={hoveredParentPoint.x} cy={hoveredParentPoint.y}
+                r={SAT_R_SVG} fill="none" stroke="#DA5A0E" strokeWidth="2" opacity="0"
+              >
+                <animate attributeName="r"
+                  from={SAT_R_SVG} to={SAT_R_SVG + 22}
+                  dur="0.45s"
+                  begin={`${coreToParentDur}s`}
+                  repeatCount="indefinite" />
+                <animate attributeName="opacity"
+                  values="0;0.75;0" keyTimes="0;0.15;1"
+                  dur="0.45s"
+                  begin={`${coreToParentDur}s`}
+                  repeatCount="indefinite" />
+              </circle>
+            )}
+
+            <circle r="6" fill="#DA5A0E"
               style={{ filter: "drop-shadow(0 0 8px rgba(218,90,14,0.9))" }}
             >
-              <animate attributeName="cx" from={p.parent.x} to={p.x} dur="1.1s" repeatCount="indefinite" />
-              <animate attributeName="cy" from={p.parent.y} to={p.y} dur="1.1s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="1;0.9;0" keyTimes="0;0.65;1" dur="1.1s" repeatCount="indefinite" />
+              <animate attributeName="cx"
+                values={`${CX};${hoveredParentPoint.x};${hoveredParentPoint.x}`}
+                keyTimes={`0;${kt(coreToParentDur, pulseCycleDur)};1`}
+                dur={`${pulseCycleDur}s`} repeatCount="indefinite" />
+              <animate attributeName="cy"
+                values={`${CY};${hoveredParentPoint.y};${hoveredParentPoint.y}`}
+                keyTimes={`0;${kt(coreToParentDur, pulseCycleDur)};1`}
+                dur={`${pulseCycleDur}s`} repeatCount="indefinite" />
+              <animate attributeName="opacity"
+                values={`1;1;0;0`}
+                keyTimes={`0;${kt(coreToParentDur * 0.88, pulseCycleDur)};${kt(coreToParentDur, pulseCycleDur)};1`}
+                dur={`${pulseCycleDur}s`} repeatCount="indefinite" />
             </circle>
-          ))}
+
+            {hoveredChildren.map((child, idx) => {
+              const childDur = childTravelDurs[idx];
+              const arrive = coreToParentDur + childDur;
+              const tDepart = kt(coreToParentDur, pulseCycleDur);
+              const tArrive = kt(arrive, pulseCycleDur);
+              const tFade   = kt(arrive * 0.88, pulseCycleDur);
+              const tShow   = kt(coreToParentDur + 0.001, pulseCycleDur);
+              return (
+                <circle key={`pulse-${child.node.code}`} r="5" fill="#DA5A0E"
+                  style={{ filter: "drop-shadow(0 0 6px rgba(218,90,14,0.85))" }}
+                >
+                  <animate attributeName="cx"
+                    values={`${hoveredParentPoint.x};${hoveredParentPoint.x};${child.x};${child.x}`}
+                    keyTimes={`0;${tDepart};${tArrive};1`}
+                    dur={`${pulseCycleDur}s`} repeatCount="indefinite" />
+                  <animate attributeName="cy"
+                    values={`${hoveredParentPoint.y};${hoveredParentPoint.y};${child.y};${child.y}`}
+                    keyTimes={`0;${tDepart};${tArrive};1`}
+                    dur={`${pulseCycleDur}s`} repeatCount="indefinite" />
+                  <animate attributeName="opacity"
+                    values={`0;0;1;1;0;0`}
+                    keyTimes={`0;${tDepart};${tShow};${tFade};${tArrive};1`}
+                    dur={`${pulseCycleDur}s`} repeatCount="indefinite" />
+                </circle>
+              );
+            })}
+          </>
+        )}
 
         {/* Active node pulse + traveling dot (login page / activeNodeSlug) */}
         {activePoint && (
@@ -274,14 +344,18 @@ export default function EcosystemDiagram({
           isActive={p.node.slug === activeNodeSlug || p.node.slug === activeParentSlug}
           isLoginPage={isLoginPage}
           diameterCqw={SAT_DIAMETER_CQW}
-          isParentNode={interactive && !isLoginPage && parentSlugs.has(p.node.slug)}
-          onHoverChange={(hovered) => handleHoverChange(hovered, p.node.slug)}
+          onHoverChange={
+            interactive && !isLoginPage && parentSlugs.has(p.node.slug)
+              ? (hovered) => handleHoverChange(hovered, p.node.slug)
+              : undefined
+          }
         />
       ))}
 
       {/* Sub-nodes: hidden until parent hovered */}
       {subPoints.map((p) => {
         const visible = shouldShowSub(p.node.parentSlug);
+        const parentSlug = p.node.parentSlug;
         return (
           <Satellite
             key={p.node.code}
@@ -293,6 +367,11 @@ export default function EcosystemDiagram({
             diameterCqw={SUB_SAT_DIAMETER_CQW}
             isVisible={visible}
             subIndex={p.siblingIndex}
+            onHoverChange={
+              interactive && !isLoginPage && parentSlug
+                ? (hovered) => handleHoverChange(hovered, parentSlug)
+                : undefined
+            }
           />
         );
       })}
@@ -318,7 +397,6 @@ function Satellite({
   isActive,
   isLoginPage,
   diameterCqw = SAT_DIAMETER_CQW,
-  isParentNode = false,
   onHoverChange,
   isVisible,          // undefined = main node (always visible, no animation)
   subIndex = 0,
@@ -329,7 +407,6 @@ function Satellite({
   isActive: boolean;
   isLoginPage: boolean;
   diameterCqw?: number;
-  isParentNode?: boolean;
   onHoverChange?: (hovered: boolean) => void;
   isVisible?: boolean;  // only passed for sub-nodes
   subIndex?: number;
@@ -370,20 +447,18 @@ function Satellite({
     </span>
   );
 
-  // Visibility animation for sub-nodes.
+  // Visibility animation for sub-nodes (centering via Tailwind -translate-x/y-1/2 only).
   const visStyle: React.CSSProperties = {
     left, top,
     opacity: visible ? 1 : 0,
-    transform: visible
-      ? "translate(-50%, -50%) scale(1)"
-      : "translate(-50%, -50%) scale(0.4)",
+    transform: visible ? "scale(1)" : "scale(0.4)",
     transition: `opacity 0.3s ease ${subIndex * 70}ms, transform 0.35s cubic-bezier(0.34,1.56,0.64,1) ${subIndex * 70}ms`,
     pointerEvents: visible ? undefined : "none",
   };
 
   const baseStyle: React.CSSProperties = { left, top };
 
-  const hoverProps = isParentNode && onHoverChange
+  const hoverProps = onHoverChange
     ? { onMouseEnter: () => onHoverChange(true), onMouseLeave: () => onHoverChange(false) }
     : {};
 
