@@ -101,6 +101,10 @@ async function ensureAutosAccess(
     return { error: "Error al actualizar credenciales autos: " + authErr.message };
   }
 
+  if (!clienteId) {
+    return { error: "No se pudo resolver la concesionaria autos." };
+  }
+
   return { clienteId };
 }
 
