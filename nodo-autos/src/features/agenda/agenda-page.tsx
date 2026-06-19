@@ -56,7 +56,7 @@ function AutosAgendaInner() {
         },
       ],
       agendaBasePath: "/admin/agenda",
-      entityLabel: currentCliente?.nombre ?? "Agencia",
+      entityLabel: "la Agencia",
       tasks,
       isLoading: isLoading || !clienteId,
       createTask: (input: CreateTaskInput) => createMutation.mutateAsync(input),

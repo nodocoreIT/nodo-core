@@ -10,7 +10,7 @@ import type {
   Customer,
 } from '@/types';
 import type { SalesContractData } from '@/types/contract';
-import { supabase } from '@/shared/lib/supabase';
+import { autosDb } from '@/shared/lib/supabase';
 import { matchesVehicleSearch } from '@/shared/lib/utils';
 import { generateVehicleSlug } from '@/shared/lib/utils';
 import {
@@ -592,7 +592,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
 
         set({ loading: true, error: null });
         try {
-          let clienteQuery = supabase.from('clientes').select('*');
+          let clienteQuery = autosDb().from('clientes').select('*');
           if (configuredClienteId) {
             clienteQuery = clienteQuery.eq('id', configuredClienteId);
           }
@@ -610,8 +610,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
           let clienteUsers: User[] = [];
 
           if (currentCliente) {
-            const { data: userRows, error: userError } = await supabase
-              .from('users')
+            const { data: userRows, error: userError } = await autosDb().from('users')
               .select('*')
               .eq('cliente_id', currentCliente.id)
               .order('created_at', { ascending: true });
@@ -627,8 +626,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
 
           let vehicles: Vehicle[] = [];
           if (currentCliente) {
-            const { data: vehicleRows, error: vehicleError } = await supabase
-              .from('vehicles')
+            const { data: vehicleRows, error: vehicleError } = await autosDb().from('vehicles')
               .select('*')
               .eq('cliente_id', currentCliente.id)
               .order('created_at', { ascending: false });
@@ -640,8 +638,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
           let publications: Publication[] = [];
           if (vehicles.length > 0) {
             const vehicleIds = vehicles.map((v) => v.id);
-            const { data: pubRows, error: pubError } = await supabase
-              .from('publications')
+            const { data: pubRows, error: pubError } = await autosDb().from('publications')
               .select('*')
               .in('vehicle_id', vehicleIds);
 
@@ -651,8 +648,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
 
           let contracts: SalesContractData[] = [];
           if (currentCliente) {
-            const { data: contractRows, error: contractError } = await supabase
-              .from('contracts')
+            const { data: contractRows, error: contractError } = await autosDb().from('contracts')
               .select('*')
               .eq('cliente_id', currentCliente.id)
               .order('date', { ascending: false });
@@ -664,8 +660,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
 
           let customers: Customer[] = [];
           if (currentCliente) {
-            const { data: customerRows, error: customerError } = await supabase
-              .from('customers')
+            const { data: customerRows, error: customerError } = await autosDb().from('customers')
               .select('*')
               .eq('cliente_id', currentCliente.id)
               .order('last_name', { ascending: true });
@@ -697,8 +692,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
         try {
           set({ error: null });
           const payload = toClienteUpdate(updates);
-          const { data, error } = await supabase
-            .from('clientes')
+          const { data, error } = await autosDb().from('clientes')
             .update(payload)
             .eq('id', id)
             .select('*')
@@ -726,8 +720,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
           if (!vehicleData.clienteId) throw new Error('Cliente requerido para crear vehículo.');
 
           const payload = toVehicleInsert(vehicleData, get().currentUser?.id ?? null);
-          const { data, error } = await supabase
-            .from('vehicles')
+          const { data, error } = await autosDb().from('vehicles')
             .insert(payload)
             .select('*')
             .single();
@@ -758,8 +751,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
           set({ error: null });
           const previousVehicle = get().getVehicleById(id);
           const payload = toVehicleUpdate(updates, get().currentUser?.id ?? null);
-          const { data, error } = await supabase
-            .from('vehicles')
+          const { data, error } = await autosDb().from('vehicles')
             .update(payload)
             .eq('id', id)
             .select('*')
@@ -801,7 +793,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
         try {
           set({ error: null });
           const vehicle = get().getVehicleById(id);
-          const { error } = await supabase.from('vehicles').delete().eq('id', id);
+          const { error } = await autosDb().from('vehicles').delete().eq('id', id);
           if (error) throw error;
 
           set((state) => ({ vehicles: state.vehicles.filter((v) => v.id !== id) }));
@@ -878,8 +870,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
                 if (stored) {
                   existing = { id: stored.id, publicSlug: stored.publicSlug };
                 } else {
-                  const { data, error } = await supabase
-                    .from('vehicles')
+                  const { data, error } = await autosDb().from('vehicles')
                     .select('id, public_slug')
                     .eq('cliente_id', clienteId)
                     .eq('license_plate', licensePlate)
@@ -954,7 +945,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
         try {
           set({ error: null });
           const payload = toPublicationInsert(publicationData);
-          const { data, error } = await supabase.from('publications').insert(payload).select('*').single();
+          const { data, error } = await autosDb().from('publications').insert(payload).select('*').single();
           if (error) throw error;
           set((state) => ({ publications: [...state.publications, mapPublicationRow(data as PublicationRow)] }));
         } catch (error) {
@@ -967,7 +958,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
         try {
           set({ error: null });
           const payload = toPublicationUpdate(updates);
-          const { data, error } = await supabase.from('publications').update(payload).eq('id', id).select('*').single();
+          const { data, error } = await autosDb().from('publications').update(payload).eq('id', id).select('*').single();
           if (error) throw error;
           set((state) => ({
             publications: state.publications.map((p) => (p.id === id ? mapPublicationRow(data as PublicationRow) : p)),
@@ -984,8 +975,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
           const existing = get().publications.find((p) => p.vehicleId === vehicleId && p.channel === channel);
           if (existing) {
             const payload = toPublicationUpdate(updates);
-            const { data, error } = await supabase
-              .from('publications')
+            const { data, error } = await autosDb().from('publications')
               .update(payload)
               .eq('id', existing.id)
               .select('*')
@@ -1009,7 +999,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
             lastPublishedAt: updates.lastPublishedAt ?? undefined,
             errorMessage: updates.errorMessage ?? undefined,
           });
-          const { data, error } = await supabase.from('publications').insert(payload).select('*').single();
+          const { data, error } = await autosDb().from('publications').insert(payload).select('*').single();
           if (error) throw error;
           const mapped = mapPublicationRow(data as PublicationRow);
           set((state) => ({ publications: [...state.publications, mapped] }));
@@ -1027,8 +1017,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
 
       addAuditLog: async (logData) => {
         try {
-          const { data, error } = await supabase
-            .from('audit_logs')
+          const { data, error } = await autosDb().from('audit_logs')
             .insert({
               cliente_id: logData.clienteId,
               user_id: logData.userId ?? null,
@@ -1059,7 +1048,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
           if (!currentCliente) throw new Error('Cliente no identificado');
 
           const payload = toContractInsert(contractData, currentCliente.id);
-          const { data, error } = await supabase.from('contracts').insert(payload).select('*').single();
+          const { data, error } = await autosDb().from('contracts').insert(payload).select('*').single();
           if (error) throw error;
 
           set((state) => ({ contracts: [mapContractRow(data as ContractRow), ...state.contracts] }));
@@ -1079,7 +1068,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
           if (!currentCliente) throw new Error('Cliente no identificado');
 
           const payload = toCustomerInsert(customerData, currentCliente.id);
-          const { data, error } = await supabase.from('customers').insert(payload).select('*').single();
+          const { data, error } = await autosDb().from('customers').insert(payload).select('*').single();
           if (error) throw error;
 
           set((state) => ({
@@ -1099,7 +1088,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
         try {
           set({ loading: true, error: null });
           const payload = toCustomerUpdate(updates);
-          const { data, error } = await supabase.from('customers').update(payload).eq('id', id).select('*').single();
+          const { data, error } = await autosDb().from('customers').update(payload).eq('id', id).select('*').single();
           if (error) throw error;
 
           set((state) => ({
@@ -1118,7 +1107,7 @@ export const useVehicleStore = create<VehicleStoreState>()(
       deleteCustomer: async (id) => {
         try {
           set({ loading: true, error: null });
-          const { error } = await supabase.from('customers').delete().eq('id', id);
+          const { error } = await autosDb().from('customers').delete().eq('id', id);
           if (error) throw error;
           set((state) => ({ customers: state.customers.filter((c) => c.id !== id) }));
         } catch (error) {

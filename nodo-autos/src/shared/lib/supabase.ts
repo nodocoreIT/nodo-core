@@ -10,7 +10,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 /**
- * Supabase client singleton — uses default public schema.
- * Isolation between nodos is achieved via separate Supabase projects.
+ * Supabase client singleton.
+ *
+ * Auth / storage:  supabase.auth, supabase.storage
+ * nodo_autos:      autosDb().from("table_name")  — same pattern as nodo_inmo.schema("nodo_inmo")
  */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+/** App tables live in the nodo_autos schema (isolated like nodo_inmo on shared projects). */
+export const AUTOS_SCHEMA = "nodo_autos";
+
+export function autosDb() {
+  return supabase.schema(AUTOS_SCHEMA);
+}

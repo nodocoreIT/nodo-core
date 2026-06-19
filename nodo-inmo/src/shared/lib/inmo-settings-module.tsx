@@ -1,0 +1,159 @@
+import { useMemo } from "react";
+import {
+  SettingsModuleProvider,
+  type AlertSettings,
+  type SettingsModuleContextValue,
+  DEFAULT_ALERT_SETTINGS,
+} from "@nodocore/nodo-modules/settings";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useThemeSettings } from "@/shared/hooks/use-theme-settings";
+import { useAiSettings } from "@/shared/hooks/use-ai-settings";
+import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
+import {
+  useUpsertOrgProfile,
+  type UpsertOrgProfileInput,
+} from "@/features/agency-profile/hooks/use-upsert-org-profile";
+import { useUploadLogo } from "@/features/agency-profile/hooks/use-upload-logo";
+import { useLogoUrl } from "@/features/agency-profile/hooks/use-logo-url";
+import { useStaff } from "@/shared/hooks/use-staff";
+import { useUpdateProfile } from "@/features/profile/hooks/use-update-profile";
+import { useCashAccounts } from "@/shared/hooks/use-cash-accounts";
+import { supabase } from "@/shared/lib/supabase";
+
+const INMO_MANAGED_NAV = [
+  { to: "/admin/dashboard", label: "Inicio" },
+  { to: "/admin/properties", label: "Propiedades" },
+  { to: "/admin/owners", label: "Propietarios" },
+  { to: "/admin/tenants", label: "Inquilinos" },
+  { to: "/admin/contracts", label: "Contratos" },
+  { to: "/admin/payments", label: "Pagos" },
+  { to: "/admin/caja", label: "Caja" },
+  { to: "/admin/rendiciones", label: "Rendiciones" },
+  { to: "/admin/ganancias", label: "Ganancias" },
+  { to: "/admin/documentos", label: "Documentos" },
+  { to: "/admin/agenda", label: "Agenda y Tareas" },
+  { to: "/admin/reclamos", label: "Reclamos" },
+  { to: "/admin/portal", label: "Portales (Pro)" },
+  { to: "/admin/automatizaciones", label: "Automatizaciones (Pro)" },
+];
+
+export function InmoSettingsModuleProvider({ children }: { children: React.ReactNode }) {
+  const { settings, setSettings, resetSettings } = useThemeSettings();
+  const { aiSettings, setAiSettings } = useAiSettings();
+  const profileQuery = useOrgProfile();
+  const upsertMutation = useUpsertOrgProfile();
+  const uploadLogoMutation = useUploadLogo();
+  const logoUrlQuery = useLogoUrl(profileQuery.data?.logo_path);
+  const pdfLogoUrlQuery = useLogoUrl(profileQuery.data?.pdf_logo_path);
+  const staff = useStaff();
+  const updateProfileMutation = useUpdateProfile();
+  const cashAccounts = useCashAccounts();
+  const queryClient = useQueryClient();
+
+  const ipcMutation = useMutation({
+    mutationFn: async (val: number) => {
+      const now = new Date();
+      const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+      const { error } = await supabase.schema("shared").rpc("upsert_index_value", {
+        p_kind: "IPC",
+        p_period: period,
+        p_value: val,
+        p_source: "Manual",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ipc", "current"] });
+    },
+  });
+
+  const alertSettings: AlertSettings = profileQuery.data?.alert_settings
+    ? (profileQuery.data.alert_settings as unknown as AlertSettings)
+    : DEFAULT_ALERT_SETTINGS;
+
+  const value = useMemo((): SettingsModuleContextValue => {
+    return {
+      managedNav: INMO_MANAGED_NAV,
+      roleOptions: [
+        { value: "Vendedor", label: "Vendedor" },
+        { value: "Inquilino", label: "Inquilino" },
+        { value: "Propietario", label: "Propietario" },
+        { value: "Colega", label: "Colega" },
+      ],
+      inviteMessages: {
+        invited:
+          "Invitación enviada por correo. La persona recibirá un enlace para activar la cuenta y elegir su contraseña.",
+        existing:
+          "Usuario agregado a este nodo Inmo. Le enviamos un correo para avisarle que ya puede ingresar con su email y contraseña habituales.",
+      },
+      adminRole: "admin",
+      adminDisplayRole: "Administrador",
+      defaultInviteRole: "Colega",
+      themeSettings: settings,
+      setThemeSettings: setSettings,
+      resetThemeSettings: resetSettings,
+      aiSettings,
+      setAiSettings,
+      profile: profileQuery.data,
+      profileLoading: profileQuery.isLoading,
+      upsertProfile: async (input) => {
+        await upsertMutation.mutateAsync(input as UpsertOrgProfileInput);
+      },
+      isUpsertingProfile: upsertMutation.isPending,
+      uploadLogo: (input) => uploadLogoMutation.mutateAsync(input),
+      isUploadingLogo: uploadLogoMutation.isPending,
+      logoSignedUrl: logoUrlQuery.data ?? null,
+      pdfLogoSignedUrl: pdfLogoUrlQuery.data ?? null,
+      alertSettings,
+      alertSettingsLoading: profileQuery.isLoading,
+      staff: {
+        users: staff.users,
+        loading: staff.loading,
+        error: staff.error,
+        fetchMembers: staff.fetchMembers,
+        inviteUser: staff.inviteUser,
+        updateMemberRole: staff.updateMemberRole,
+        removeMember: staff.removeMember,
+      },
+      updateUserProfile: async (input) => {
+        await updateProfileMutation.mutateAsync(input);
+      },
+      isUpdatingUserProfile: updateProfileMutation.isPending,
+      bankAccounts: {
+        accounts: cashAccounts.accounts,
+        isLoading: cashAccounts.isLoading,
+        addAccount: async (input) => {
+          await cashAccounts.addAccount(input);
+        },
+        updateAccount: async (id, input) => {
+          await cashAccounts.updateAccount({ id, ...input });
+        },
+        removeAccount: cashAccounts.removeAccount,
+        isAdding: cashAccounts.isAdding,
+        isUpdating: cashAccounts.isUpdating,
+        isRemoving: cashAccounts.isRemoving,
+      },
+      saveManualIpc: ipcMutation.mutateAsync,
+      isSavingManualIpc: ipcMutation.isPending,
+    };
+  }, [
+    settings,
+    setSettings,
+    resetSettings,
+    aiSettings,
+    setAiSettings,
+    profileQuery.data,
+    profileQuery.isLoading,
+    upsertMutation.isPending,
+    uploadLogoMutation.isPending,
+    logoUrlQuery.data,
+    pdfLogoUrlQuery.data,
+    staff,
+    updateProfileMutation.isPending,
+    cashAccounts,
+    ipcMutation.isPending,
+    alertSettings,
+  ]);
+
+  return <SettingsModuleProvider value={value}>{children}</SettingsModuleProvider>;
+}

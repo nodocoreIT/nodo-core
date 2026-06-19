@@ -22,6 +22,8 @@ import {
 import { cn } from "@/shared/lib/utils";
 import { useDealershipBrand } from "@/shared/hooks/use-dealership-brand";
 import { NotificationsBell } from "@/features/notifications/notifications-bell";
+import { SettingsDialog } from "@nodocore/nodo-modules/settings";
+import { AutosSettingsModuleProvider } from "@/shared/lib/autos-settings-module";
 
 interface NavItem {
   to: string;
@@ -37,7 +39,6 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/caja", label: "Caja", icon: Wallet },
   { to: "/admin/agenda", label: "Agenda y Tareas", icon: Calendar },
   { to: "/admin/documentacion", label: "Documentación", icon: FileText },
-  { to: "/admin/configuracion", label: "Configuración", icon: Settings },
 ];
 
 const ROUTE_TITLES: Record<string, string> = {
@@ -50,7 +51,6 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/caja": "Caja",
   "/admin/agenda": "Agenda y Tareas",
   "/admin/documentacion": "Documentación",
-  "/admin/configuracion": "Configuración",
 };
 
 function initials(value: string): string {
@@ -66,6 +66,7 @@ export function AdminLayout() {
   const { pathname } = useLocation();
   const { name: dealershipName, logoUrl } = useDealershipBrand();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -111,6 +112,7 @@ export function AdminLayout() {
   void isMobile;
 
   return (
+    <AutosSettingsModuleProvider>
     <div className="flex h-screen overflow-hidden bg-paper">
       {/* Mobile overlay */}
       {mobileMenuOpen && (
@@ -191,6 +193,17 @@ export function AdminLayout() {
                 <p className="truncate text-xs text-white/50">{email}</p>
               )}
             </div>
+            <button
+              type="button"
+              aria-label="Configuración"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setSettingsOpen(true);
+              }}
+              className="flex-shrink-0 rounded-md p-1.5 text-white/60 transition-colors hover:text-brand"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
           </div>
 
           <Button
@@ -236,6 +249,9 @@ export function AdminLayout() {
           <Outlet />
         </main>
       </div>
+
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
+    </AutosSettingsModuleProvider>
   );
 }

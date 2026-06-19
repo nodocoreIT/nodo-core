@@ -47,6 +47,10 @@ export default defineConfig({
         monorepoRoot,
         "packages/nodo-modules/src/notifications/index.ts",
       ),
+      "@nodocore/nodo-modules/settings": resolve(
+        monorepoRoot,
+        "packages/nodo-modules/src/settings/index.ts",
+      ),
       "@nodocore/nodo-modules": resolve(monorepoRoot, "packages/nodo-modules/src/index.ts"),
       // Compile from source so Vite shares one React instance (dist bundle breaks hooks).
       "@nodocore/shared-components": resolve(
