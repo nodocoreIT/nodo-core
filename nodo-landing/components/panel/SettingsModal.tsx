@@ -442,7 +442,7 @@ export default function SettingsModal({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={inputStyle}
-              placeholder="Dejar vacío para no cambiarla"
+              placeholder="Ingresé contraseña…"
             />
           </div>
           {password && (
@@ -453,7 +453,7 @@ export default function SettingsModal({
                 value={passwordConfirm}
                 onChange={(e) => setPasswordConfirm(e.target.value)}
                 style={inputStyle}
-                placeholder="Repetir la nueva contraseña"
+                placeholder="Repetí la contraseña…"
               />
             </div>
           )}

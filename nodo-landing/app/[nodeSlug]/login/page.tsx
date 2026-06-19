@@ -9,6 +9,9 @@ import { Layers } from "lucide-react";
 import {
   PasswordResetPanel,
   usePasswordRecoveryBootstrap,
+  enforceNodeAccess,
+  INVALID_LOGIN_MESSAGE,
+  AUTH_ERROR_CREDENTIALS,
 } from "@nodocore/shared-components";
 import { createNodeBrowserClient } from "@/lib/supabase/nodo-browser";
 import { getNodeBySlug, getNodeMailLabel, getChildNodes, needsModulePicker } from "@/lib/nodes";
@@ -279,6 +282,18 @@ function LoginForm() {
     onError: (message) => setGeneralError(message),
   });
 
+  useEffect(() => {
+    if (recoveryBootstrapping) return;
+    if (modeParam === "register") setAuthMode("register");
+    else if (modeParam === "login") setAuthMode("login");
+    else if (modeParam === "forgot") setAuthMode("forgot");
+  }, [modeParam, recoveryBootstrapping, setAuthMode]);
+
+  useEffect(() => {
+    if (roleParam === "medico") setRegisterRole("medico");
+    else if (roleParam === "paciente") setRegisterRole("paciente");
+  }, [roleParam]);
+
   const [transitionTarget, setTransitionTarget] = useState<{
     label: string;
     code: string;
@@ -315,14 +330,22 @@ function LoginForm() {
       : "http://localhost:3000";
 
   const urlError = searchParams.get("error");
+  const authErrorCode = searchParams.get("auth_error");
   const showResend = searchParams.get("resend") === "1";
   const [resendLoading, setResendLoading] = useState(false);
 
   useEffect(() => {
+    if (authErrorCode === AUTH_ERROR_CREDENTIALS) {
+      setGeneralError(INVALID_LOGIN_MESSAGE);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("auth_error");
+      router.replace(url.pathname + url.search, { scroll: false });
+      return;
+    }
     if (urlError && authMode !== "reset-password") {
       setGeneralError(decodeURIComponent(urlError.replace(/\+/g, " ")));
     }
-  }, [urlError, authMode]);
+  }, [authErrorCode, urlError, authMode, router]);
 
   function unitCodeForResend(): string {
     if (isAutosNode) return "Autos";
@@ -432,12 +455,20 @@ function LoginForm() {
       });
 
       if (error) {
-        setGeneralError(
-          "Credenciales incorrectas. Verifique e intente nuevamente.",
-        );
+        setGeneralError(INVALID_LOGIN_MESSAGE);
         setLoading(false);
         return;
       }
+
+      if (matchedNode?.code) {
+        const access = await enforceNodeAccess(supabase, matchedNode.code);
+        if (!access.ok) {
+          setGeneralError(access.message);
+          setLoading(false);
+          return;
+        }
+      }
+
       // Determine which nodo we're entering and build the redirect
       let tLabel = "Core";
       let tCode = "Core";
@@ -1107,7 +1138,7 @@ function LoginForm() {
                       <input
                         id="login-pass"
                         type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
+                        placeholder="Ingresé contraseña…"
                         autoComplete="current-password"
                         value={password}
                         onChange={(e) => {
@@ -1308,6 +1339,7 @@ function LoginForm() {
                       setPasswordError("");
                     }}
                     className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
+                    placeholder="Ingresé contraseña…"
                   />
                 </div>
 
@@ -1323,6 +1355,7 @@ function LoginForm() {
                       setConfirmPassword(e.target.value);
                       setPasswordError("");
                     }}
+                    placeholder="Repetí la contraseña…"
                     className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
                   />
                   {passwordError && <p className="text-[12.5px] text-[#C0392B] mt-1.5">{passwordError}</p>}
@@ -1459,7 +1492,7 @@ function LoginForm() {
                             <input
                               id={`${simpleRegisterContent.idPrefix}-password`}
                               type="password"
-                              placeholder="Mínimo 6 caracteres"
+                              placeholder="Ingresé contraseña…"
                               value={password}
                               onChange={(e) => {
                                 setPassword(e.target.value);
@@ -1662,7 +1695,7 @@ function LoginForm() {
                             <input
                               id="reg-patient-pass"
                               type="password"
-                              placeholder="Crea una contraseña segura"
+                              placeholder="Ingresé contraseña…"
                               value={password}
                               onChange={(e) => {
                                 setPassword(e.target.value);

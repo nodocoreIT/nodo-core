@@ -126,7 +126,7 @@ export function ProfileDialog({
                       aria-label="Nueva contraseña"
                       type="password"
                       autoComplete="new-password"
-                      placeholder="Dejá en blanco para no cambiarla"
+                      placeholder="Ingresé contraseña…"
                       {...field}
                     />
                   </FormControl>
@@ -148,7 +148,7 @@ export function ProfileDialog({
                       aria-label="Confirmar contraseña"
                       type="password"
                       autoComplete="new-password"
-                      placeholder="Repetí la nueva contraseña"
+                      placeholder="Repetí la contraseña…"
                       {...field}
                     />
                   </FormControl>

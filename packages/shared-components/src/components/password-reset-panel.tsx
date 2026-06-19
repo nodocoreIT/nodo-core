@@ -72,7 +72,7 @@ export function PasswordResetPanel({
         <Input
           id="shared-reset-pass"
           type="password"
-          placeholder="Mínimo 6 caracteres"
+          placeholder="Ingresé contraseña…"
           value={password}
           onChange={(e) => {
             setPassword(e.target.value);
@@ -87,7 +87,7 @@ export function PasswordResetPanel({
         <Input
           id="shared-reset-pass-confirm"
           type="password"
-          placeholder="Repetí la contraseña"
+          placeholder="Repetí la contraseña…"
           value={confirmPassword}
           onChange={(e) => {
             setConfirmPassword(e.target.value);

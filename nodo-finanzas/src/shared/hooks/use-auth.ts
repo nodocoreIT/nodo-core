@@ -1,17 +1,50 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/shared/lib/supabase';
 import { redirectToLandingLogin } from '@/shared/lib/auth-redirect';
+import { userHasNodeAccess } from '@nodocore/shared-components';
 import type { Session } from '@supabase/supabase-js';
 
+const FINANZAS_UNIT_CODE = 'Finanzas';
+
 export function useAuth() {
-  const [session, setSession] = useState<Session | null | undefined>(undefined); // undefined = loading
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    let cancelled = false;
+
+    async function validate(s: Session | null) {
+      if (!s) {
+        if (!cancelled) setAccessDenied(false);
+        return;
+      }
+      const allowed = await userHasNodeAccess(supabase, FINANZAS_UNIT_CODE);
+      if (!allowed) {
+        await supabase.auth.signOut();
+        if (!cancelled) setAccessDenied(true);
+        return;
+      }
+      if (!cancelled) setAccessDenied(false);
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      setSession(data.session);
+      void validate(data.session);
+    });
+
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
-    return () => subscription.unsubscribe();
+    } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (cancelled) return;
+      setSession(s);
+      void validate(s);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
@@ -19,5 +52,11 @@ export function useAuth() {
     redirectToLandingLogin();
   };
 
-  return { session, loading: session === undefined, signOut };
+  return {
+    session: accessDenied ? null : session,
+    user: accessDenied ? null : session?.user ?? null,
+    loading: session === undefined,
+    accessDenied,
+    signOut,
+  };
 }

@@ -6,7 +6,7 @@
  */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@nodocore/shared-components";
+import { useAuth, useSupabase, enforceNodeAccess, INVALID_LOGIN_MESSAGE } from "@nodocore/shared-components";
 import { Button } from "@nodocore/shared-components";
 import { Input } from "@nodocore/shared-components";
 import { Label } from "@nodocore/shared-components";
@@ -15,6 +15,7 @@ import { BrandMark } from "@/shared/components/brand-mark";
 
 export function LoginPage() {
   const { signInWithPassword } = useAuth();
+  const supabase = useSupabase();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
@@ -40,8 +41,15 @@ export function LoginPage() {
       if (msg.includes("banned") || msg.includes("user is banned")) {
         setError("Tu acceso está pausado. Contactate con NODO para reactivarlo.");
       } else {
-        setError("Credenciales incorrectas.");
+        setError(INVALID_LOGIN_MESSAGE);
       }
+      setLoading(false);
+      return;
+    }
+
+    const access = await enforceNodeAccess(supabase, "Inmo");
+    if (!access.ok) {
+      setError(access.message);
       setLoading(false);
       return;
     }
@@ -78,7 +86,7 @@ export function LoginPage() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Ingrese su Contraseña"
+                placeholder="Ingresé contraseña…"
                 required
               />
             </div>

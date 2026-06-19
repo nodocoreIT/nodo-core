@@ -308,7 +308,7 @@ export default function PasswordsPage() {
                 type="password"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
-                placeholder="Contraseña"
+                placeholder="Ingresé contraseña…"
                 autoFocus
                 style={{
                   ...inputStyle,

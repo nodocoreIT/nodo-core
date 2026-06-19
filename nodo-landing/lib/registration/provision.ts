@@ -47,6 +47,14 @@ export async function provisionNodoAccess(params: {
       const found = list?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
       if (!found) return { ok: false, error: msg };
       userId = found.id;
+
+      if (code === "finanzas") {
+        await admin.auth.admin.updateUserById(userId, {
+          password,
+          app_metadata: { role: "user", plan: planToTier(plan) },
+        });
+      }
+
       return { ok: true, existing: true, user_id: userId };
     }
     return { ok: false, error: msg };

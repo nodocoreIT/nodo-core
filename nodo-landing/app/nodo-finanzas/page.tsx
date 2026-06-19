@@ -302,7 +302,7 @@ export default function NodoFinanzasPage() {
                 </ul>
 
                 <Link
-                  href="/nodo-finanzas/login"
+                  href="/nodo-finanzas/login?mode=register"
                   className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 text-[16px] font-bold rounded-xl text-white transition-all duration-150 active:scale-[.98]"
                   style={{
                     background: "linear-gradient(135deg, #059669, #047857)",

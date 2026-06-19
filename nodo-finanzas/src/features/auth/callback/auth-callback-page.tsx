@@ -4,6 +4,9 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/shared/lib/supabase";
+import { enforceNodeAccess, nodeLoginUrlWithAuthError } from "@nodocore/shared-components";
+import { LANDING_LOGIN_URL } from "@/shared/lib/auth-redirect";
+import { hideAppSplash } from "@/shared/lib/app-splash";
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -19,15 +22,20 @@ export function AuthCallbackPage() {
       } else {
         await supabase.auth.getSession();
       }
+
+      const access = await enforceNodeAccess(supabase, "Finanzas");
+      if (!access.ok) {
+        hideAppSplash();
+        window.location.replace(nodeLoginUrlWithAuthError(LANDING_LOGIN_URL));
+        return;
+      }
+
       navigate("/admin/dashboard", { replace: true });
     };
 
     settle();
   }, [navigate]);
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-paper">
-      <p className="text-slate2">Verificando sesión…</p>
-    </div>
-  );
+  // Splash from index.html stays visible until AppRouter hides it after navigation.
+  return null;
 }
