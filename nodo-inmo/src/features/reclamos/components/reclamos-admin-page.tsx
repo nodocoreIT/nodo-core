@@ -10,7 +10,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/shared/components/ui/dialog";
-import { Button } from "@nodocore/shared-components";
+import { Button, FormSelect } from "@nodocore/shared-components";
 import { cn } from "@/shared/lib/utils";
 
 // ── Label maps ────────────────────────────────────────────────────────────────
@@ -213,16 +213,16 @@ export function ReclamosAdminPage() {
                 <label className="text-xs font-semibold text-slate2 uppercase tracking-wide">
                   Estado
                 </label>
-                <select
+                <FormSelect
                   value={formStatus}
-                  onChange={(e) => setFormStatus(e.target.value)}
-                  className="w-full rounded border border-border p-2 text-sm bg-white"
-                >
-                  <option value="open">Abierto</option>
-                  <option value="in_progress">En curso</option>
-                  <option value="resolved">Resuelto</option>
-                  <option value="closed">Cerrado</option>
-                </select>
+                  onChange={setFormStatus}
+                  options={[
+                    { value: "open", label: "Abierto" },
+                    { value: "in_progress", label: "En curso" },
+                    { value: "resolved", label: "Resuelto" },
+                    { value: "closed", label: "Cerrado" },
+                  ]}
+                />
               </div>
 
               {/* Admin notes */}

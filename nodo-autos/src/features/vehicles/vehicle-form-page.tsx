@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, Controller, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Upload, X, Plus, ImageIcon, GripVertical } from "lucide-react";
+import { ArrowLeft, Save, X, Plus, Loader2 } from "lucide-react";
 import {
   Button,
   Input,
@@ -13,13 +13,25 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  FormSelect,
 } from "@nodocore/shared-components";
 import { VehicleTabBar, type VehicleTab } from "@/features/vehicles/components/vehicle-tab-bar";
 import { VehicleQrPanel } from "@/features/vehicles/components/vehicle-qr-panel";
 import { VehicleDocumentsPanel } from "@/features/vehicles/components/vehicle-documents-panel";
+import { VehiclePhotosPanel } from "@/features/vehicles/components/vehicle-photos-panel";
 import type { VehicleDocument } from "@/types";
 import { useVehicleStore } from "@/store/vehicle-store";
 import { supabase } from "@/shared/lib/supabase";
+import {
+  normalizeCurrency,
+  normalizeDoors,
+  normalizeFuelType,
+  normalizeOwnerType,
+  normalizeTransmission,
+  normalizeVehicleCondition,
+  normalizeVehicleStatus,
+  resolveFormSelectValue,
+} from "@/features/vehicles/lib/vehicle-field-normalizers";
 import { generateVehicleSlug } from "@/shared/lib/utils";
 import type { VehicleStatus, VehicleCondition, FuelType, Currency } from "@/types";
 
@@ -53,18 +65,42 @@ const vehicleSchema = z.object({
   version: z.string().optional(),
   year: z.coerce.number().min(1900).max(new Date().getFullYear() + 2),
   color: z.string().optional(),
-  fuelType: z.enum(["Diésel", "Eléctrico", "Nafta", "Nafta/GNC", "GNC", "Híbrido"]),
-  transmission: z.enum(["manual", "automatica"]).optional(),
-  doors: z.coerce.number().optional(),
+  fuelType: z.preprocess(
+    (value) => normalizeFuelType(typeof value === "string" ? value : ""),
+    z.enum(["Diésel", "Eléctrico", "Nafta", "Nafta/GNC", "GNC", "Híbrido"]),
+  ),
+  transmission: z.preprocess(
+    (value) =>
+      value === "" || value === undefined || value === null
+        ? undefined
+        : normalizeTransmission(String(value)),
+    z.enum(["manual", "automatica"]).optional(),
+  ),
+  doors: z.preprocess(
+    (value) => normalizeDoors(value as number | string | undefined | null),
+    z.union([z.literal(3), z.literal(4), z.literal(5)]).optional(),
+  ),
   kilometers: z.string().min(1, "Kilómetros requeridos"),
-  condition: z.enum(["nuevo", "usado"]),
-  status: z.enum(["disponible", "reservado", "vendido", "en_preparacion"]),
-  currency: z.enum(["ARS", "USD"]),
+  condition: z.preprocess(
+    (value) => normalizeVehicleCondition(typeof value === "string" ? value : ""),
+    z.enum(["nuevo", "usado"]),
+  ),
+  status: z.preprocess(
+    (value) => normalizeVehicleStatus(typeof value === "string" ? value : ""),
+    z.enum(["disponible", "reservado", "vendido", "en_preparacion"]),
+  ),
+  currency: z.preprocess(
+    (value) => normalizeCurrency(typeof value === "string" ? value : ""),
+    z.enum(["ARS", "USD"]),
+  ),
   listPrice: z.string().min(1, "Precio de lista requerido"),
   cashPrice: z.string().optional(),
   showPrice: z.boolean(),
   entryDate: z.string().min(1, "Fecha de ingreso requerida"),
-  ownerType: z.enum(["own", "consignment"]),
+  ownerType: z.preprocess(
+    (value) => normalizeOwnerType(typeof value === "string" ? value : ""),
+    z.enum(["own", "consignment"]),
+  ),
   margin: z.string().optional(),
   expenses: z.string().optional(),
   description: z.string(),
@@ -74,6 +110,48 @@ const vehicleSchema = z.object({
 });
 
 type VehicleFormValues = z.infer<typeof vehicleSchema>;
+
+const FUEL_TYPE_OPTIONS = [
+  { value: "Nafta", label: "Nafta" },
+  { value: "Diésel", label: "Diésel" },
+  { value: "Nafta/GNC", label: "Nafta/GNC" },
+  { value: "GNC", label: "GNC" },
+  { value: "Híbrido", label: "Híbrido" },
+  { value: "Eléctrico", label: "Eléctrico" },
+];
+
+const TRANSMISSION_OPTIONS = [
+  { value: "manual", label: "Manual" },
+  { value: "automatica", label: "Automática" },
+];
+
+const DOORS_OPTIONS = [
+  { value: "3", label: "3" },
+  { value: "4", label: "4" },
+  { value: "5", label: "5" },
+];
+
+const CONDITION_OPTIONS = [
+  { value: "usado", label: "Usado" },
+  { value: "nuevo", label: "Nuevo" },
+];
+
+const CURRENCY_OPTIONS = [
+  { value: "ARS", label: "ARS — Pesos" },
+  { value: "USD", label: "USD — Dólares" },
+];
+
+const OWNER_TYPE_OPTIONS = [
+  { value: "own", label: "Propio" },
+  { value: "consignment", label: "Consignación" },
+];
+
+const STATUS_OPTIONS = [
+  { value: "disponible", label: "Disponible" },
+  { value: "reservado", label: "Reservado" },
+  { value: "en_preparacion", label: "En preparación" },
+  { value: "vendido", label: "Vendido" },
+];
 
 export function VehicleFormPage() {
   const navigate = useNavigate();
@@ -88,6 +166,10 @@ export function VehicleFormPage() {
   // ── Photos state (outside RHF — managed manually) ──────────────────────────
   const [photos, setPhotos] = useState<string[]>(existing?.photos ?? []);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [photoUploadProgress, setPhotoUploadProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Features/equipment state ───────────────────────────────────────────────
@@ -98,6 +180,7 @@ export function VehicleFormPage() {
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     setValue,
@@ -105,6 +188,7 @@ export function VehicleFormPage() {
     formState: { errors, isSubmitting },
   } = useForm<VehicleFormValues>({
     resolver: zodResolver(vehicleSchema) as import("react-hook-form").Resolver<VehicleFormValues>,
+    shouldUnregister: false,
     defaultValues: {
       condition: "usado",
       status: "disponible",
@@ -135,18 +219,18 @@ export function VehicleFormPage() {
         version: existing.version ?? "",
         year: existing.year,
         color: existing.color ?? "",
-        fuelType: existing.fuelType,
-        transmission: existing.transmission,
-        doors: existing.doors,
+        fuelType: normalizeFuelType(existing.fuelType),
+        transmission: normalizeTransmission(existing.transmission),
+        doors: normalizeDoors(existing.doors),
         kilometers: formatNumericInput(existing.kilometers),
-        condition: existing.condition,
-        status: existing.status,
-        currency: existing.currency,
+        condition: normalizeVehicleCondition(existing.condition),
+        status: normalizeVehicleStatus(existing.status),
+        currency: normalizeCurrency(existing.currency),
         listPrice: formatCurrencyInput(existing.listPrice, existing.currency),
         cashPrice: existing.cashPrice !== undefined && existing.cashPrice !== null ? formatCurrencyInput(existing.cashPrice, existing.currency) : "",
         showPrice: existing.showPrice,
         entryDate: existing.entryDate,
-        ownerType: existing.ownerType,
+        ownerType: normalizeOwnerType(existing.ownerType),
         margin: existing.margin !== undefined && existing.margin !== null ? formatNumericInput(existing.margin) : "",
         expenses: existing.expenses !== undefined && existing.expenses !== null ? formatNumericInput(existing.expenses) : "",
         description: existing.description,
@@ -185,10 +269,12 @@ export function VehicleFormPage() {
     if (!files || files.length === 0) return;
 
     setUploadingPhotos(true);
+    setPhotoUploadProgress({ current: 0, total: files.length });
     const uploaded: string[] = [];
 
     try {
       for (let i = 0; i < files.length; i++) {
+        setPhotoUploadProgress({ current: i + 1, total: files.length });
         const file = files[i];
 
         if (!file.type.startsWith("image/")) {
@@ -225,20 +311,9 @@ export function VehicleFormPage() {
       toast.error("Error al subir fotos");
     } finally {
       setUploadingPhotos(false);
+      setPhotoUploadProgress(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  };
-
-  const removePhoto = (index: number) =>
-    setPhotos((prev) => prev.filter((_, i) => i !== index));
-
-  const movePhoto = (from: number, to: number) => {
-    setPhotos((prev) => {
-      const arr = [...prev];
-      const [item] = arr.splice(from, 1);
-      arr.splice(to, 0, item);
-      return arr;
-    });
   };
 
   // ── Features ──────────────────────────────────────────────────────────────
@@ -254,6 +329,15 @@ export function VehicleFormPage() {
     setFeatures((prev) => prev.filter((_, i) => i !== index));
 
   // ── Submit ─────────────────────────────────────────────────────────────────
+  function onInvalid(formErrors: FieldErrors<VehicleFormValues>) {
+    const firstMessage = Object.values(formErrors).find(
+      (error) => error?.message,
+    )?.message;
+
+    toast.error(firstMessage ?? "Revisá los datos en la pestaña Datos");
+    if (activeTab !== "datos") setActiveTab("datos");
+  }
+
   async function onSubmit(values: VehicleFormValues) {
     if (!currentCliente) {
       toast.error("No se pudo identificar la concesionaria");
@@ -301,22 +385,52 @@ export function VehicleFormPage() {
       tags: existing?.tags ?? [],
     };
 
+    const toastId = toast.loading(
+      isEdit ? "Guardando cambios…" : "Creando vehículo…",
+    );
+
     try {
       if (isEdit && id) {
         await updateVehicle(id, payload);
-        toast.success("Vehículo actualizado");
+        toast.success("Cambios guardados", {
+          id: toastId,
+          description: "El vehículo se actualizó correctamente",
+          duration: 4000,
+        });
       } else {
         await addVehicle(payload);
-        toast.success("Vehículo creado");
+        toast.success("Vehículo creado", {
+          id: toastId,
+          description: "Ya está en tu stock",
+          duration: 4000,
+        });
+        navigate("/admin/vehiculos");
       }
-      navigate("/admin/vehiculos");
-    } catch {
-      toast.error("Error al guardar el vehículo");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "No se pudo guardar el vehículo";
+      toast.error(message, { id: toastId });
     }
   }
 
   return (
     <div className="space-y-6 w-full max-w-6xl">
+      {isSubmitting && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px] px-4"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div className="flex flex-col items-center gap-3 rounded-xl bg-white px-8 py-6 shadow-xl text-center">
+            <Loader2 className="h-10 w-10 text-brand animate-spin" />
+            <p className="text-sm font-semibold text-navy">
+              {isEdit ? "Guardando cambios…" : "Creando vehículo…"}
+            </p>
+            <p className="text-xs text-slate2">Un momento</p>
+          </div>
+        </div>
+      )}
+
       <button
         type="button"
         onClick={() => navigate(-1)}
@@ -347,7 +461,7 @@ export function VehicleFormPage() {
         </Card>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-5">
         {activeTab === "datos" && (
           <>
         {/* Identificación */}
@@ -378,29 +492,55 @@ export function VehicleFormPage() {
               <Input {...register("vin")} placeholder="9BWZZZ377VT004251" />
             </FormField>
             <FormField label="Combustible">
-              <select {...register("fuelType")} className="w-full rounded-md border border-mist bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand">
-                <option>Nafta</option>
-                <option>Diésel</option>
-                <option>Nafta/GNC</option>
-                <option>GNC</option>
-                <option>Híbrido</option>
-                <option>Eléctrico</option>
-              </select>
+              <Controller
+                name="fuelType"
+                control={control}
+                render={({ field }) => (
+                  <FormSelect
+                    value={resolveFormSelectValue(field.value, FUEL_TYPE_OPTIONS)}
+                    onChange={(value) => field.onChange(normalizeFuelType(value))}
+                    options={FUEL_TYPE_OPTIONS}
+                  />
+                )}
+              />
             </FormField>
             <FormField label="Transmisión">
-              <select {...register("transmission")} className="w-full rounded-md border border-mist bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand">
-                <option value="">Sin especificar</option>
-                <option value="manual">Manual</option>
-                <option value="automatica">Automática</option>
-              </select>
+              <Controller
+                name="transmission"
+                control={control}
+                render={({ field }) => (
+                  <FormSelect
+                    value={resolveFormSelectValue(
+                      field.value ?? "",
+                      TRANSMISSION_OPTIONS,
+                      true,
+                    )}
+                    onChange={(value) => field.onChange(normalizeTransmission(value))}
+                    options={TRANSMISSION_OPTIONS}
+                    allowEmpty
+                    emptyLabel="Sin especificar"
+                  />
+                )}
+              />
             </FormField>
             <FormField label="Puertas">
-              <select {...register("doors")} className="w-full rounded-md border border-mist bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand">
-                <option value="">Sin especificar</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-              </select>
+              <Controller
+                name="doors"
+                control={control}
+                render={({ field }) => (
+                  <FormSelect
+                    value={resolveFormSelectValue(
+                      field.value ? String(field.value) : "",
+                      DOORS_OPTIONS,
+                      true,
+                    )}
+                    onChange={(value) => field.onChange(normalizeDoors(value))}
+                    options={DOORS_OPTIONS}
+                    allowEmpty
+                    emptyLabel="Sin especificar"
+                  />
+                )}
+              />
             </FormField>
             <FormField label="Kilómetros *" error={errors.kilometers?.message}>
               <Input
@@ -413,10 +553,19 @@ export function VehicleFormPage() {
               />
             </FormField>
             <FormField label="Condición">
-              <select {...register("condition")} className="w-full rounded-md border border-mist bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand">
-                <option value="usado">Usado</option>
-                <option value="nuevo">Nuevo</option>
-              </select>
+              <Controller
+                name="condition"
+                control={control}
+                render={({ field }) => (
+                  <FormSelect
+                    value={resolveFormSelectValue(field.value, CONDITION_OPTIONS)}
+                    onChange={(value) =>
+                      field.onChange(normalizeVehicleCondition(value))
+                    }
+                    options={CONDITION_OPTIONS}
+                  />
+                )}
+              />
             </FormField>
           </CardContent>
         </Card>
@@ -428,10 +577,17 @@ export function VehicleFormPage() {
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <FormField label="Moneda">
-              <select {...register("currency")} className="w-full rounded-md border border-mist bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand">
-                <option value="ARS">ARS — Pesos</option>
-                <option value="USD">USD — Dólares</option>
-              </select>
+              <Controller
+                name="currency"
+                control={control}
+                render={({ field }) => (
+                  <FormSelect
+                    value={resolveFormSelectValue(field.value, CURRENCY_OPTIONS)}
+                    onChange={(value) => field.onChange(normalizeCurrency(value))}
+                    options={CURRENCY_OPTIONS}
+                  />
+                )}
+              />
             </FormField>
             <FormField label="Precio lista *" error={errors.listPrice?.message}>
               <Input
@@ -472,18 +628,30 @@ export function VehicleFormPage() {
               <Input type="date" {...register("entryDate")} />
             </FormField>
             <FormField label="Tipo de tenencia">
-              <select {...register("ownerType")} className="w-full rounded-md border border-mist bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand">
-                <option value="own">Propio</option>
-                <option value="consignment">Consignación</option>
-              </select>
+              <Controller
+                name="ownerType"
+                control={control}
+                render={({ field }) => (
+                  <FormSelect
+                    value={resolveFormSelectValue(field.value, OWNER_TYPE_OPTIONS)}
+                    onChange={(value) => field.onChange(normalizeOwnerType(value))}
+                    options={OWNER_TYPE_OPTIONS}
+                  />
+                )}
+              />
             </FormField>
             <FormField label="Estado">
-              <select {...register("status")} className="w-full rounded-md border border-mist bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand">
-                <option value="disponible">Disponible</option>
-                <option value="reservado">Reservado</option>
-                <option value="en_preparacion">En preparación</option>
-                <option value="vendido">Vendido</option>
-              </select>
+              <Controller
+                name="status"
+                control={control}
+                render={({ field }) => (
+                  <FormSelect
+                    value={resolveFormSelectValue(field.value, STATUS_OPTIONS)}
+                    onChange={(value) => field.onChange(normalizeVehicleStatus(value))}
+                    options={STATUS_OPTIONS}
+                  />
+                )}
+              />
             </FormField>
             <FormField label="Margen ($)">
               <Input
@@ -578,72 +746,15 @@ export function VehicleFormPage() {
                 )}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={handleFileSelect}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingPhotos}
-                  className="flex items-center gap-2 rounded-lg border-2 border-dashed border-mist px-5 py-4 text-sm text-slate2 hover:border-brand hover:text-brand transition-colors disabled:opacity-50 w-full justify-center"
-                >
-                  <Upload size={18} />
-                  {uploadingPhotos ? "Subiendo fotos…" : "Seleccioná fotos (máx. 5MB c/u)"}
-                </button>
-              </div>
-
-              {photos.length > 0 && (
-                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">
-                  {photos.map((url, index) => (
-                    <div key={url} className="relative group aspect-square">
-                      <img
-                        src={url}
-                        alt={`Foto ${index + 1}`}
-                        className="w-full h-full object-cover rounded-lg border border-mist"
-                      />
-                      {index === 0 && (
-                        <span className="absolute top-1 left-1 rounded bg-brand px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                          Portada
-                        </span>
-                      )}
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
-                        {index > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => movePhoto(index, index - 1)}
-                            className="rounded bg-white/90 p-1 text-navy hover:bg-white"
-                            title="Mover a la izquierda"
-                          >
-                            <GripVertical size={14} />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => removePhoto(index)}
-                          className="rounded bg-white/90 p-1 text-red-600 hover:bg-white"
-                          title="Eliminar foto"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {photos.length === 0 && (
-                <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-slate2/60">
-                  <ImageIcon size={32} />
-                  <p className="text-xs">Sin fotos aún. La primera que subas será la portada.</p>
-                </div>
-              )}
+            <CardContent>
+              <VehiclePhotosPanel
+                photos={photos}
+                uploadingPhotos={uploadingPhotos}
+                uploadProgress={photoUploadProgress}
+                fileInputRef={fileInputRef}
+                onFileSelect={handleFileSelect}
+                onPhotosChange={setPhotos}
+              />
             </CardContent>
           </Card>
         )}

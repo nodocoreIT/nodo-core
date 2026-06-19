@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { PAGE_SIZE } from "@/shared/lib/constants";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Check, ChevronLeft, ChevronRight, Pencil, Trash2, Undo2, FileText } from "lucide-react";
-import { Button } from "@nodocore/shared-components";
+import { Button, FormSelect, SearchableSelect } from "@nodocore/shared-components";
 import {
   Table,
   TableBody,
@@ -242,35 +242,36 @@ export function PaymentsList() {
 
       {/* Advanced filters */}
       <div className="flex flex-wrap items-center gap-3">
-        <select
+        <SearchableSelect
           value={ownerFilter}
-          onChange={(e) => { setOwnerFilter(e.target.value); resetPage(); }}
-          className={cn(
-            "rounded-md border px-3 py-1.5 text-sm text-slate2 transition-colors focus:outline-none focus:ring-2 focus:ring-brand/30",
+          onChange={(value) => {
+            setOwnerFilter(value);
+            resetPage();
+          }}
+          options={owners.map((name) => ({ value: name, label: name }))}
+          allowEmpty
+          emptyLabel="Todos los propietarios"
+          searchPlaceholder="Buscar propietario..."
+          triggerClassName={cn(
             ownerFilter ? "border-brand bg-brand/5 font-medium" : "border-border bg-card",
           )}
           aria-label="Filtrar por propietario"
-        >
-          <option value="">Todos los propietarios</option>
-          {owners.map((name) => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
+        />
 
-        <select
+        <FormSelect
           value={monthFilter}
-          onChange={(e) => { setMonthFilter(e.target.value); resetPage(); }}
-          className={cn(
-            "rounded-md border px-3 py-1.5 text-sm text-slate2 transition-colors focus:outline-none focus:ring-2 focus:ring-brand/30",
+          onChange={(value) => {
+            setMonthFilter(value);
+            resetPage();
+          }}
+          options={months.map((ym) => ({ value: ym, label: formatMonthLabel(ym) }))}
+          allowEmpty
+          emptyLabel="Todos los meses"
+          triggerClassName={cn(
             monthFilter ? "border-brand bg-brand/5 font-medium" : "border-border bg-card",
           )}
           aria-label="Filtrar por mes de vencimiento"
-        >
-          <option value="">Todos los meses</option>
-          {months.map((ym) => (
-            <option key={ym} value={ym}>{formatMonthLabel(ym)}</option>
-          ))}
-        </select>
+        />
 
         {hasActiveAdvancedFilter && (
           <button

@@ -27,6 +27,21 @@ import {
   formatThousands,
 } from '@/utils/contract-calculations';
 import { matchesVehicleSearch } from '@/shared/lib/utils';
+import { FormSelect, SearchableSelect } from '@nodocore/shared-components';
+
+const DOCUMENT_TYPE_OPTIONS = [
+  { value: 'DNI', label: 'DNI' },
+  { value: 'CUIT', label: 'CUIT' },
+  { value: 'CUIL', label: 'CUIL' },
+  { value: 'Pasaporte', label: 'Pasaporte' },
+];
+
+const PAYMENT_TYPE_OPTIONS = [
+  { value: 'cash', label: 'Efectivo' },
+  { value: 'transfer', label: 'Transferencia' },
+  { value: 'check', label: 'Cheque' },
+  { value: 'promissory_note', label: 'Pagaré' },
+];
 
 function DocumentationHub({
   contracts,
@@ -313,9 +328,6 @@ function ContractViewer({
 const INPUT_CLASS =
   'w-full rounded-lg border border-mist bg-white px-3 py-2 text-sm text-navy placeholder:text-slate2/60 outline-none focus:border-brand focus:ring-1 focus:ring-brand transition';
 
-const SELECT_CLASS =
-  'w-full rounded-lg border border-mist bg-white px-3 py-2 text-sm text-navy outline-none focus:border-brand focus:ring-1 focus:ring-brand transition';
-
 const LABEL_CLASS = 'block text-xs font-medium text-slate2 mb-1';
 
 function ContractGenerator({
@@ -508,20 +520,19 @@ function ContractGenerator({
             <div className="space-y-3">
               <div>
                 <label className={LABEL_CLASS}>Seleccioná el vehículo</label>
-                <select
-                  className={SELECT_CLASS}
+                <SearchableSelect
                   value={selectedVehicleId}
-                  onChange={(e) => setSelectedVehicleId(e.target.value)}
-                >
-                  <option value="">— Seleccionar —</option>
-                  {vehicles
+                  onChange={setSelectedVehicleId}
+                  options={vehicles
                     .filter((v) => v.status === 'disponible')
-                    .map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.brand} {v.model} {v.year} {v.licensePlate ? `· ${v.licensePlate}` : ''}
-                      </option>
-                    ))}
-                </select>
+                    .map((v) => ({
+                      value: v.id,
+                      label: `${v.brand} ${v.model} ${v.year}${v.licensePlate ? ` · ${v.licensePlate}` : ''}`,
+                    }))}
+                  allowEmpty
+                  emptyLabel="— Seleccionar —"
+                  searchPlaceholder="Buscar vehículo..."
+                />
               </div>
               {selectedVehicle && (
                 <div>
@@ -546,18 +557,17 @@ function ContractGenerator({
             <div className="space-y-3">
               <div>
                 <label className={LABEL_CLASS}>Cargar desde clientes existentes</label>
-                <select
-                  className={SELECT_CLASS}
+                <SearchableSelect
                   value=""
-                  onChange={(e) => handleCustomerSelect(e.target.value)}
-                >
-                  <option value="">— Buscar en clientes —</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.firstName} {c.lastName} {c.documentNumber ? `(${c.documentNumber})` : ''}
-                    </option>
-                  ))}
-                </select>
+                  onChange={handleCustomerSelect}
+                  options={customers.map((c) => ({
+                    value: c.id,
+                    label: `${c.firstName} ${c.lastName}${c.documentNumber ? ` (${c.documentNumber})` : ''}`,
+                  }))}
+                  allowEmpty
+                  emptyLabel="— Buscar en clientes —"
+                  searchPlaceholder="Buscar cliente..."
+                />
               </div>
 
               <div>
@@ -574,15 +584,13 @@ function ContractGenerator({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={LABEL_CLASS}>Tipo de documento</label>
-                  <select
-                    className={SELECT_CLASS}
+                  <FormSelect
                     value={buyer.documentType}
-                    onChange={(e) => setBuyer({ ...buyer, documentType: e.target.value as DocumentType })}
-                  >
-                    {(['DNI', 'CUIT', 'CUIL', 'Pasaporte'] as DocumentType[]).map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+                    onChange={(value) =>
+                      setBuyer({ ...buyer, documentType: value as DocumentType })
+                    }
+                    options={DOCUMENT_TYPE_OPTIONS}
+                  />
                 </div>
                 <div>
                   <label className={LABEL_CLASS}>Número</label>
@@ -717,16 +725,11 @@ function ContractGenerator({
               {payments.map((p) => (
                 <div key={p.id} className="flex gap-2 items-start rounded-lg border border-mist bg-paper p-3">
                   <div className="grid grid-cols-2 gap-2 flex-1">
-                    <select
-                      className={SELECT_CLASS}
+                    <FormSelect
                       value={p.type}
-                      onChange={(e) => updatePayment(p.id, 'type', e.target.value as PaymentType)}
-                    >
-                      <option value="cash">Efectivo</option>
-                      <option value="transfer">Transferencia</option>
-                      <option value="check">Cheque</option>
-                      <option value="promissory_note">Pagaré</option>
-                    </select>
+                      onChange={(value) => updatePayment(p.id, 'type', value as PaymentType)}
+                      options={PAYMENT_TYPE_OPTIONS}
+                    />
                     <input
                       type="text"
                       inputMode="numeric"

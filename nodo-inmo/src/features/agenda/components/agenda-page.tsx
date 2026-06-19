@@ -27,6 +27,7 @@ import { useStaff } from "@/shared/hooks/use-staff";
 import { Button } from "@nodocore/shared-components";
 import { Input } from "@nodocore/shared-components";
 import { Label } from "@nodocore/shared-components";
+import { FormSelect, SearchableSelect } from "@nodocore/shared-components";
 import {
   Dialog,
   DialogContent,
@@ -367,67 +368,64 @@ export function AgendaPage() {
             {/* Status Filter */}
             <div className="space-y-1">
               <Label className="text-xs">Estado</Label>
-              <select
+              <FormSelect
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full text-xs rounded border border-border p-2 bg-white"
-              >
-                <option value="all">Todas</option>
-                <option value="pendiente">Pendientes</option>
-                <option value="completada">Completadas</option>
-                <option value="en_progreso">En Progreso</option>
-                <option value="cancelada">Canceladas</option>
-              </select>
+                onChange={setFilterStatus}
+                options={[
+                  { value: "all", label: "Todas" },
+                  { value: "pendiente", label: "Pendientes" },
+                  { value: "completada", label: "Completadas" },
+                  { value: "en_progreso", label: "En Progreso" },
+                  { value: "cancelada", label: "Canceladas" },
+                ]}
+                triggerClassName="text-xs h-9"
+              />
             </div>
 
             {/* Category Filter */}
             <div className="space-y-1">
               <Label className="text-xs">Categoría</Label>
-              <select
+              <FormSelect
                 value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="w-full text-xs rounded border border-border p-2 bg-white"
-              >
-                <option value="all">Todas las categorías</option>
-                {CATEGORIES.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </option>
-                ))}
-              </select>
+                onChange={setFilterCategory}
+                options={[
+                  { value: "all", label: "Todas las categorías" },
+                  ...CATEGORIES.map((cat) => ({ value: cat.value, label: cat.label })),
+                ]}
+                triggerClassName="text-xs h-9"
+              />
             </div>
 
             {/* Priority Filter */}
             <div className="space-y-1">
               <Label className="text-xs">Prioridad</Label>
-              <select
+              <FormSelect
                 value={filterPriority}
-                onChange={(e) => setFilterPriority(e.target.value)}
-                className="w-full text-xs rounded border border-border p-2 bg-white"
-              >
-                <option value="all">Todas las prioridades</option>
-                <option value="alta">Alta</option>
-                <option value="media">Media</option>
-                <option value="baja">Baja</option>
-              </select>
+                onChange={setFilterPriority}
+                options={[
+                  { value: "all", label: "Todas las prioridades" },
+                  { value: "alta", label: "Alta" },
+                  { value: "media", label: "Media" },
+                  { value: "baja", label: "Baja" },
+                ]}
+                triggerClassName="text-xs h-9"
+              />
             </div>
 
             {/* Assignee Filter */}
             <div className="space-y-1">
               <Label className="text-xs">Asignado a</Label>
-              <select
+              <SearchableSelect
                 value={filterAssignee}
-                onChange={(e) => setFilterAssignee(e.target.value)}
-                className="w-full text-xs rounded border border-border p-2 bg-white"
-              >
-                <option value="all">Cualquiera</option>
-                <option value="">Sin asignar / General</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.name}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setFilterAssignee}
+                options={[
+                  { value: "all", label: "Cualquiera" },
+                  { value: "", label: "Sin asignar / General" },
+                  ...users.map((user) => ({ value: user.name, label: user.name })),
+                ]}
+                searchPlaceholder="Buscar..."
+                triggerClassName="text-xs h-9"
+              />
             </div>
           </div>
         </div>
@@ -575,33 +573,29 @@ export function AgendaPage() {
               {/* Category */}
               <div className="space-y-1">
                 <Label htmlFor="task-cat">Categoría</Label>
-                <select
+                <FormSelect
                   id="task-cat"
                   value={formCategory}
-                  onChange={(e) => setFormCategory(e.target.value)}
-                  className="w-full text-xs rounded border border-border p-2 bg-white h-9"
-                >
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFormCategory}
+                  options={CATEGORIES.map((cat) => ({ value: cat.value, label: cat.label }))}
+                  triggerClassName="text-xs h-9"
+                />
               </div>
 
               {/* Priority */}
               <div className="space-y-1">
                 <Label htmlFor="task-prio">Prioridad</Label>
-                <select
+                <FormSelect
                   id="task-prio"
                   value={formPriority}
-                  onChange={(e) => setFormPriority(e.target.value)}
-                  className="w-full text-xs rounded border border-border p-2 bg-white h-9"
-                >
-                  <option value="alta">Alta</option>
-                  <option value="media">Media</option>
-                  <option value="baja">Baja</option>
-                </select>
+                  onChange={setFormPriority}
+                  options={[
+                    { value: "alta", label: "Alta" },
+                    { value: "media", label: "Media" },
+                    { value: "baja", label: "Baja" },
+                  ]}
+                  triggerClassName="text-xs h-9"
+                />
               </div>
             </div>
 
@@ -621,19 +615,16 @@ export function AgendaPage() {
               {/* Assigned To */}
               <div className="space-y-1">
                 <Label htmlFor="task-assign">Empleado Asignado</Label>
-                <select
+                <SearchableSelect
                   id="task-assign"
                   value={formAssignedTo}
-                  onChange={(e) => setFormAssignedTo(e.target.value)}
-                  className="w-full text-xs rounded border border-border p-2 bg-white h-9"
-                >
-                  <option value="">Sin asignar / General</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.name}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFormAssignedTo}
+                  options={users.map((user) => ({ value: user.name, label: user.name }))}
+                  allowEmpty
+                  emptyLabel="Sin asignar / General"
+                  searchPlaceholder="Buscar..."
+                  triggerClassName="text-xs h-9"
+                />
               </div>
             </div>
 
@@ -641,37 +632,37 @@ export function AgendaPage() {
               {/* Associated Property */}
               <div className="space-y-1">
                 <Label htmlFor="task-prop">Propiedad vinculada</Label>
-                <select
+                <SearchableSelect
                   id="task-prop"
                   value={formPropertyId}
-                  onChange={(e) => setFormPropertyId(e.target.value)}
-                  className="w-full text-xs rounded border border-border p-2 bg-white h-9"
-                >
-                  <option value="">Ninguna</option>
-                  {properties.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.address}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFormPropertyId}
+                  options={properties.map((property) => ({
+                    value: property.id,
+                    label: property.address,
+                  }))}
+                  allowEmpty
+                  emptyLabel="Ninguna"
+                  searchPlaceholder="Buscar propiedad..."
+                  triggerClassName="text-xs h-9"
+                />
               </div>
 
               {/* Associated Contact */}
               <div className="space-y-1">
                 <Label htmlFor="task-contact">Cliente vinculado</Label>
-                <select
+                <SearchableSelect
                   id="task-contact"
                   value={formContactId}
-                  onChange={(e) => setFormContactId(e.target.value)}
-                  className="w-full text-xs rounded border border-border p-2 bg-white h-9"
-                >
-                  <option value="">Ninguno</option>
-                  {contacts.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFormContactId}
+                  options={contacts.map((contact) => ({
+                    value: contact.id,
+                    label: contact.name,
+                  }))}
+                  allowEmpty
+                  emptyLabel="Ninguno"
+                  searchPlaceholder="Buscar contacto..."
+                  triggerClassName="text-xs h-9"
+                />
               </div>
             </div>
 

@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { FormSelect } from '@nodocore/shared-components';
 import { Spinner } from '@/components/ui/spinner';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { formatearMoneda, formatearFecha, getFechaHoy } from '@/utils/formatters';
@@ -504,14 +505,14 @@ export function PrestamosPage() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-ink">Moneda</label>
-                  <select
+                  <FormSelect
                     value={form.moneda}
-                    onChange={(e) => setForm((f) => ({ ...f, moneda: e.target.value as Moneda }))}
-                    className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-                  >
-                    <option value="ARS">Pesos (ARS)</option>
-                    <option value="USD">Dólares (USD)</option>
-                  </select>
+                    onChange={(value) => setForm((current) => ({ ...current, moneda: value as Moneda }))}
+                    options={[
+                      { value: 'ARS', label: 'Pesos (ARS)' },
+                      { value: 'USD', label: 'Dólares (USD)' },
+                    ]}
+                  />
                 </div>
 
                 <div className="flex flex-col gap-1">

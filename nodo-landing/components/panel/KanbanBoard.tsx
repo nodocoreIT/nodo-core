@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Bug, CheckSquare, Lightbulb } from "lucide-react";
+import { FormSelect, SearchableSelect } from "@nodocore/shared-components";
 import {
   DndContext,
   DragEndEvent,
@@ -333,41 +334,37 @@ function TaskEditModal({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
             <div>
               <label style={labelStyle}>Unidad</label>
-              <select
+              <FormSelect
                 value={unitCode}
-                onChange={(e) => setUnitCode(e.target.value)}
-                style={inputStyle}
-              >
-                {units.map((u) => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
+                onChange={setUnitCode}
+                options={units.map((unit) => ({ value: unit, label: unit }))}
+              />
             </div>
 
             <div>
               <label style={labelStyle}>Prioridad</label>
-              <select
+              <FormSelect
                 value={priority}
-                onChange={(e) => setPriority(e.target.value as Task["priority"])}
-                style={inputStyle}
-              >
-                <option value="alta">Alta</option>
-                <option value="media">Media</option>
-                <option value="baja">Baja</option>
-              </select>
+                onChange={(value) => setPriority(value as Task["priority"])}
+                options={[
+                  { value: "alta", label: "Alta" },
+                  { value: "media", label: "Media" },
+                  { value: "baja", label: "Baja" },
+                ]}
+              />
             </div>
 
             <div>
               <label style={labelStyle}>Tipo</label>
-              <select
+              <FormSelect
                 value={type}
-                onChange={(e) => setType(e.target.value as Task["type"])}
-                style={inputStyle}
-              >
-                <option value="task">Tarea</option>
-                <option value="bug">Bug</option>
-                <option value="idea">Idea</option>
-              </select>
+                onChange={(value) => setType(value as Task["type"])}
+                options={[
+                  { value: "task", label: "Tarea" },
+                  { value: "bug", label: "Bug" },
+                  { value: "idea", label: "Idea" },
+                ]}
+              />
             </div>
           </div>
 
@@ -383,16 +380,17 @@ function TaskEditModal({
 
           <div>
             <label style={labelStyle}>Responsable</label>
-            <select
+            <SearchableSelect
               value={assignee}
-              onChange={(e) => setAssignee(e.target.value)}
-              style={inputStyle}
-            >
-              <option value="">Sin asignar</option>
-              {profiles.map((p) => (
-                <option key={p.id} value={p.id}>{p.full_name}</option>
-              ))}
-            </select>
+              onChange={setAssignee}
+              options={profiles.map((profile) => ({
+                value: profile.id,
+                label: profile.full_name,
+              }))}
+              allowEmpty
+              emptyLabel="Sin asignar"
+              searchPlaceholder="Buscar..."
+            />
             {assignee && (() => {
               const profile = profiles.find((p) => p.id === assignee);
               if (!profile) return null;
@@ -722,31 +720,32 @@ function AddTaskForm({
         }}
       />
       <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-        <select
+        <FormSelect
           value={unit}
-          onChange={(e) => setUnit(e.target.value)}
-          style={{ flex: 1, border: "1px solid var(--color-mist)", borderRadius: 6, padding: "5px 8px", fontSize: 12.5, fontFamily: "var(--font-sans)", outline: "none" }}
-        >
-          {units.map((u) => <option key={u} value={u}>{u}</option>)}
-        </select>
-        <select
+          onChange={setUnit}
+          options={units.map((unitOption) => ({ value: unitOption, label: unitOption }))}
+          className="flex-1"
+        />
+        <FormSelect
           value={priority}
-          onChange={(e) => setPriority(e.target.value as Task["priority"])}
-          style={{ flex: 1, border: "1px solid var(--color-mist)", borderRadius: 6, padding: "5px 8px", fontSize: 12.5, fontFamily: "var(--font-sans)", outline: "none" }}
-        >
-          <option value="alta">Alta</option>
-          <option value="media">Media</option>
-          <option value="baja">Baja</option>
-        </select>
-        <select
+          onChange={(value) => setPriority(value as Task["priority"])}
+          options={[
+            { value: "alta", label: "Alta" },
+            { value: "media", label: "Media" },
+            { value: "baja", label: "Baja" },
+          ]}
+          className="flex-1"
+        />
+        <FormSelect
           value={type}
-          onChange={(e) => setType(e.target.value as Task["type"])}
-          style={{ flex: 1, border: "1px solid var(--color-mist)", borderRadius: 6, padding: "5px 8px", fontSize: 12.5, fontFamily: "var(--font-sans)", outline: "none" }}
-        >
-          <option value="task">Tarea</option>
-          <option value="bug">Bug</option>
-          <option value="idea">Idea</option>
-        </select>
+          onChange={(value) => setType(value as Task["type"])}
+          options={[
+            { value: "task", label: "Tarea" },
+            { value: "bug", label: "Bug" },
+            { value: "idea", label: "Idea" },
+          ]}
+          className="flex-1"
+        />
       </div>
       <div style={{ display: "flex", gap: 6 }}>
         <button

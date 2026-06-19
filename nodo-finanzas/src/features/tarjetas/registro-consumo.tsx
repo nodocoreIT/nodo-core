@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Receipt, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { FormSelect, SearchableSelect } from '@nodocore/shared-components';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { getFechaHoy } from '@/utils/formatters';
@@ -151,19 +152,17 @@ export function RegistroConsumo({
             {/* Tarjeta */}
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-ink">Tarjeta *</label>
-              <select
+              <SearchableSelect
                 value={tarjetaId}
-                onChange={(e) => setTarjetaId(e.target.value)}
-                className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-                required
-              >
-                <option value="">Seleccioná una tarjeta</option>
-                {tarjetasActivas.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nombre} — {t.banco} ({t.titular})
-                  </option>
-                ))}
-              </select>
+                onChange={setTarjetaId}
+                options={tarjetasActivas.map((tarjeta) => ({
+                  value: tarjeta.id,
+                  label: `${tarjeta.nombre} — ${tarjeta.banco} (${tarjeta.titular})`,
+                }))}
+                allowEmpty
+                emptyLabel="Seleccioná una tarjeta"
+                searchPlaceholder="Buscar tarjeta..."
+              />
             </div>
 
             {/* Fechas */}
@@ -245,29 +244,28 @@ export function RegistroConsumo({
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-ink">Moneda</label>
-                <select
+                <FormSelect
                   value={moneda}
-                  onChange={(e) => setMoneda(e.target.value as 'ARS' | 'USD')}
-                  className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-                >
-                  <option value="ARS">Pesos (ARS)</option>
-                  <option value="USD">Dólares (USD)</option>
-                </select>
+                  onChange={(value) => setMoneda(value as 'ARS' | 'USD')}
+                  options={[
+                    { value: 'ARS', label: 'Pesos (ARS)' },
+                    { value: 'USD', label: 'Dólares (USD)' },
+                  ]}
+                />
               </div>
             </div>
 
             {/* Cuotas */}
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-ink">Cuotas</label>
-              <select
-                value={cuotas}
-                onChange={(e) => setCuotas(parseInt(e.target.value))}
-                className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-              >
-                {opcionesCuotas.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+              <FormSelect
+                value={String(cuotas)}
+                onChange={(value) => setCuotas(parseInt(value, 10))}
+                options={opcionesCuotas.map((option) => ({
+                  value: String(option.value),
+                  label: option.label,
+                }))}
+              />
               {cuotas > 1 && parseFloat(monto) > 0 && (
                 <p className="text-xs text-slate2 mt-1">
                   Se registrarán {cuotas} cuotas de{' '}

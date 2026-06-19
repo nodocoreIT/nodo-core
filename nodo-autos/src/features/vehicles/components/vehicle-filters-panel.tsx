@@ -1,4 +1,4 @@
-import { Label, Input } from "@nodocore/shared-components";
+import { Label, Input, FormSelect } from "@nodocore/shared-components";
 import type { VehicleFilters } from "@/types";
 import {
   formatCurrencyInput,
@@ -215,18 +215,13 @@ function FilterSelect<T extends string>({
   return (
     <div>
       <Label className="mb-1 text-sm font-medium text-navy">{label}</Label>
-      <select
+      <FormSelect
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={fieldClass}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        onChange={(next) => onChange(next as T)}
+        options={options}
+        allowEmpty
+        emptyLabel={placeholder}
+      />
     </div>
   );
 }

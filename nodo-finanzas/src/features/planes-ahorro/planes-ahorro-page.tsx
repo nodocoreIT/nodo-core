@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { FormSelect } from '@nodocore/shared-components';
 import { Spinner } from '@/components/ui/spinner';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { formatearMoneda, formatearFecha, getFechaHoy } from '@/utils/formatters';
@@ -524,15 +525,16 @@ export function PlanesAhorroPage() {
                   <label className="block text-xs font-bold text-brand uppercase tracking-wider mb-1.5">
                     Modelo de Referencia
                   </label>
-                  <select
+                  <FormSelect
                     value={form.modeloReferencia}
-                    onChange={(e) => set('modeloReferencia', e.target.value)}
-                    className="w-full border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-                  >
-                    <option value="">Ninguno</option>
-                    <option value="maverick">Ford Maverick (XLT)</option>
-                    <option value="territory">Ford Territory (SEL)</option>
-                  </select>
+                    onChange={(value) => set('modeloReferencia', value)}
+                    options={[
+                      { value: 'maverick', label: 'Ford Maverick (XLT)' },
+                      { value: 'territory', label: 'Ford Territory (SEL)' },
+                    ]}
+                    allowEmpty
+                    emptyLabel="Ninguno"
+                  />
                 </div>
               </div>
 
@@ -658,14 +660,14 @@ export function PlanesAhorroPage() {
                   <label className="block text-xs font-bold text-slate2 uppercase tracking-wider mb-1.5">
                     Moneda
                   </label>
-                  <select
+                  <FormSelect
                     value={form.moneda}
-                    onChange={(e) => set('moneda', e.target.value as Moneda)}
-                    className="w-full border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-                  >
-                    <option value="ARS">Pesos (ARS)</option>
-                    <option value="USD">Dólares (USD)</option>
-                  </select>
+                    onChange={(value) => set('moneda', value as Moneda)}
+                    options={[
+                      { value: 'ARS', label: 'Pesos (ARS)' },
+                      { value: 'USD', label: 'Dólares (USD)' },
+                    ]}
+                  />
                 </div>
               </div>
 

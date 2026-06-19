@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
+import { FormSelect } from "@nodocore/shared-components";
 
 type Member = {
   id: string;
@@ -658,21 +659,25 @@ export default function CajaPage() {
 
                 <div>
                   <label style={labelStyle}>Cómo se abonó</label>
-                  <select value={formMethod} onChange={(e) => setFormMethod(e.target.value)} style={inputStyle}>
-                    {PAYMENT_METHODS.map((pm) => (
-                      <option key={pm} value={pm}>{pm}</option>
-                    ))}
-                  </select>
+                  <FormSelect
+                    value={formMethod}
+                    onChange={setFormMethod}
+                    options={PAYMENT_METHODS.map((method) => ({ value: method, label: method }))}
+                  />
                 </div>
 
                 <div>
                   <label style={labelStyle}>Pagado por</label>
-                  <select value={formPaidBy} onChange={(e) => setFormPaidBy(e.target.value)} style={inputStyle}>
-                    {members.length === 0 && <option value="">No hay miembros</option>}
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>{m.full_name}</option>
-                    ))}
-                  </select>
+                  <FormSelect
+                    value={formPaidBy}
+                    onChange={setFormPaidBy}
+                    options={members.map((member) => ({
+                      value: member.id,
+                      label: member.full_name,
+                    }))}
+                    allowEmpty={members.length === 0}
+                    emptyLabel="No hay miembros"
+                  />
                 </div>
 
                 <div>

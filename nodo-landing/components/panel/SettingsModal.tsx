@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { FormSelect } from "@nodocore/shared-components";
 
 type SettingsModalProps = {
   userId: string;
@@ -408,16 +409,16 @@ export default function SettingsModal({
           <div>
             <label style={labelStyle}>Tipo de acceso</label>
             {isAdmin ? (
-              <select
+              <FormSelect
                 value={role}
-                onChange={(e) => setRole(e.target.value)}
-                style={inputStyle}
-              >
-                <option value="admin">Administrador</option>
-                <option value="dev">Desarrollador</option>
-                <option value="designer">Diseñador</option>
-                <option value="manager">Gerente</option>
-              </select>
+                onChange={setRole}
+                options={[
+                  { value: "admin", label: "Administrador" },
+                  { value: "dev", label: "Desarrollador" },
+                  { value: "designer", label: "Diseñador" },
+                  { value: "manager", label: "Gerente" },
+                ]}
+              />
             ) : (
               <input
                 type="text"

@@ -10,6 +10,15 @@ export function buildPublicVehicleUrl(publicSlug: string, clienteIdentificador?:
   return `${base}/autos/x/${encodeURIComponent(publicSlug)}`;
 }
 
+export function generateWhatsAppMessage(
+  vehicle: { brand: string; model: string; year: number },
+  clienteName: string,
+): string {
+  return encodeURIComponent(
+    `Hola ${clienteName}! Estoy interesado/a en el ${vehicle.brand} ${vehicle.model} ${vehicle.year}. ¿Me podés pasar más información?`,
+  );
+}
+
 export async function generateQRCode(url: string): Promise<string> {
   return QRCode.toDataURL(url, {
     width: 300,
