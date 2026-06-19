@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import {
   FileText,
   Plus,
@@ -9,7 +10,12 @@ import {
   Printer,
   Save,
   Trash2,
+  Search,
+  Eye,
+  Download,
+  FileSearch,
 } from 'lucide-react';
+import { DocumentPreviewer } from '@/components/document-previewer';
 import { useVehicleStore } from '@/store/vehicle-store';
 import type { SalesContractData, Buyer, TradeInVehicle, PaymentMethod, DocumentType, PaymentType } from '@/types/contract';
 import { SalesContractTemplate } from '@/components/sales-contract-template';
@@ -20,89 +26,231 @@ import {
   parseDigitsToNumber,
   formatThousands,
 } from '@/utils/contract-calculations';
+import { matchesVehicleSearch } from '@/shared/lib/utils';
 
-// ─── Contract List ───────────────────────────────────────────────────────────
-
-function ContractsList({
+function DocumentationHub({
   contracts,
   vehicles,
   onNew,
   onView,
 }: {
   contracts: SalesContractData[];
-  vehicles: { id: string; brand: string; model: string; year: number; licensePlate?: string }[];
+  vehicles: { id: string; brand: string; model: string; year: number; licensePlate?: string; documents?: { name: string; label?: string; url: string }[] }[];
   onNew: () => void;
   onView: (contract: SalesContractData) => void;
 }) {
+  const [activeTab, setActiveTab] = useState<"boletos" | "vehiculos">("boletos");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [previewDoc, setPreviewDoc] = useState<{ name: string; label?: string; url: string; type: string; creadoEn: string } | null>(null);
+
+  const filteredContracts = contracts.filter(
+    (c) =>
+      c.buyer.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.vehicleId.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+
+  const vehiclesWithDocs = vehicles.filter(
+    (v) => (v.documents?.length ?? 0) > 0 && matchesVehicleSearch(v, searchTerm),
+  );
+
+  const getVehicleInfo = (id: string) => {
+    const v = vehicles.find((x) => x.id === id);
+    if (!v) return "Vehículo no encontrado";
+    return `${v.brand} ${v.model} (${v.year})`;
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-navy">Contratos de Compraventa</h1>
-          <p className="text-sm text-slate2 mt-0.5">Boletos generados y guardados</p>
+          <h1 className="text-xl font-semibold text-navy">Documentación</h1>
+          <p className="text-sm text-slate2 mt-0.5">
+            Gestioná boletos de compraventa y documentación de vehículos.
+          </p>
         </div>
         <button
           onClick={onNew}
           className="flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand/90 transition-colors"
         >
-          <Plus size={16} /> Nuevo Contrato
+          <Plus size={16} /> Nuevo Boleto
         </button>
       </div>
 
-      {contracts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-          <FileText size={40} className="text-mist" />
-          <p className="text-slate2 text-sm">Todavía no hay contratos guardados.</p>
-          <button
-            onClick={onNew}
-            className="flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand/90 transition-colors"
-          >
-            <Plus size={16} /> Generar primer contrato
-          </button>
+      <div className="overflow-hidden rounded-xl border border-mist bg-white shadow-sm">
+        <div className="border-b border-mist">
+          <nav className="flex px-2" aria-label="Documentación">
+            <button
+              type="button"
+              onClick={() => { setActiveTab("boletos"); setSearchTerm(""); }}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === "boletos"
+                  ? "border-brand text-brand"
+                  : "border-transparent text-slate2 hover:text-navy"
+              }`}
+            >
+              <FileText size={16} />
+              Boletos de Compraventa
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab("vehiculos"); setSearchTerm(""); }}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === "vehiculos"
+                  ? "border-brand text-brand"
+                  : "border-transparent text-slate2 hover:text-navy"
+              }`}
+            >
+              <Car size={16} />
+              Documentación de Vehículos
+            </button>
+          </nav>
         </div>
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-mist bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-paper text-xs uppercase text-slate2">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium">Fecha</th>
-                <th className="px-4 py-3 text-left font-medium">Vehículo</th>
-                <th className="px-4 py-3 text-left font-medium">Comprador</th>
-                <th className="px-4 py-3 text-right font-medium">Precio</th>
-                <th className="px-4 py-3 text-right font-medium"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-mist">
-              {contracts.map((c) => {
-                const v = vehicles.find((x) => x.id === c.vehicleId);
-                return (
-                  <tr key={c.id} className="hover:bg-paper/60 transition-colors">
-                    <td className="px-4 py-3 text-slate2">
-                      {new Date(c.date).toLocaleDateString('es-AR')}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-navy">
-                      {v
-                        ? `${v.brand} ${v.model} ${v.year}`
-                        : <span className="text-slate2">Vehículo eliminado</span>}
-                    </td>
-                    <td className="px-4 py-3 text-slate2">{c.buyer.fullName}</td>
-                    <td className="px-4 py-3 text-right font-medium text-navy">
-                      {formatCurrency(c.agreedSalePrice, c.currency)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => onView(c)}
-                        className="rounded px-3 py-1 text-xs font-medium text-brand hover:bg-brand/10 transition-colors"
-                      >
-                        Ver boleto
-                      </button>
-                    </td>
+
+        <div className="p-4 border-b border-mist bg-paper/60">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate2" />
+            <input
+              type="text"
+              placeholder={
+                activeTab === "boletos"
+                  ? "Buscar por comprador…"
+                  : "Buscar por marca, modelo o patente…"
+              }
+              className="w-full pl-9 pr-4 py-2 border border-mist rounded-lg text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand bg-white"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {activeTab === "boletos" ? (
+          filteredContracts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+              <FileText size={40} className="text-mist" />
+              <p className="text-slate2 text-sm">No se encontraron boletos.</p>
+              <button
+                onClick={onNew}
+                className="flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand/90 transition-colors"
+              >
+                <Plus size={16} /> Generar primer boleto
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-paper text-xs uppercase text-slate2">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium">Fecha</th>
+                    <th className="px-4 py-3 text-left font-medium">Comprador</th>
+                    <th className="px-4 py-3 text-left font-medium">Vehículo</th>
+                    <th className="px-4 py-3 text-right font-medium">Monto</th>
+                    <th className="px-4 py-3 text-right font-medium">Acciones</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-mist">
+                  {filteredContracts.map((c) => (
+                    <tr key={c.id} className="hover:bg-paper/60 transition-colors">
+                      <td className="px-4 py-3 text-slate2">
+                        {new Date(c.date).toLocaleDateString("es-AR")}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-navy">{c.buyer.fullName}</span>
+                          <span className="text-xs text-slate2">{c.buyer.documentNumber}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-slate2">{getVehicleInfo(c.vehicleId)}</td>
+                      <td className="px-4 py-3 text-right font-medium text-navy">
+                        {formatCurrency(c.agreedSalePrice, c.currency)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => onView(c)}
+                          className="rounded px-3 py-1 text-xs font-medium text-brand hover:bg-brand/10 transition-colors"
+                        >
+                          Ver boleto
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : vehiclesWithDocs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
+            <FileSearch size={40} className="text-mist" />
+            <p className="text-slate2 text-sm">No se encontraron vehículos con documentación.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-mist">
+            {vehiclesWithDocs.map((vehicle) => (
+              <div key={vehicle.id} className="p-4 hover:bg-paper/60 transition-colors">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-brand/10 text-brand rounded-lg">
+                      <Car size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-navy">
+                        {vehicle.brand} {vehicle.model} ({vehicle.year})
+                      </h3>
+                      <p className="text-xs text-slate2">
+                        Patente: {vehicle.licensePlate || "S/N"}
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    to={`/admin/vehiculos/${vehicle.id}`}
+                    className="text-xs font-medium text-brand hover:underline"
+                  >
+                    Ver vehículo
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 ml-11">
+                  {(vehicle.documents ?? []).map((doc, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-2 rounded-lg bg-white border border-mist"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText size={14} className="text-brand shrink-0" />
+                        <span className="text-xs font-medium text-navy truncate">
+                          {doc.label || doc.name}
+                        </span>
+                      </div>
+                      <div className="flex gap-1 shrink-0 ml-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPreviewDoc({
+                              name: doc.name,
+                              label: doc.label,
+                              url: doc.url,
+                              type: "application/pdf",
+                              creadoEn: new Date().toISOString(),
+                            })
+                          }
+                          className="p-1 text-slate2 hover:text-brand"
+                          title="Vista previa"
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <a href={doc.url} download={doc.name} className="p-1 text-slate2 hover:text-navy">
+                          <Download size={14} />
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {previewDoc && (
+        <DocumentPreviewer document={previewDoc} onClose={() => setPreviewDoc(null)} />
       )}
     </div>
   );
@@ -729,7 +877,7 @@ export function ContractsPage() {
   }
 
   return (
-    <ContractsList
+    <DocumentationHub
       contracts={contracts}
       vehicles={vehicles}
       onNew={() => setView('new')}

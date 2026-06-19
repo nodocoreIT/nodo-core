@@ -11,6 +11,7 @@ import type {
 } from '@/types';
 import type { SalesContractData } from '@/types/contract';
 import { supabase } from '@/shared/lib/supabase';
+import { matchesVehicleSearch } from '@/shared/lib/utils';
 
 // ─── Row types (DB shape) ─────────────────────────────────────────────────────
 
@@ -694,9 +695,14 @@ export const useVehicleStore = create<VehicleStoreState>()(
             .update(payload)
             .eq('id', id)
             .select('*')
-            .single();
+            .maybeSingle();
 
           if (error) throw error;
+          if (!data) {
+            throw new Error(
+              'No se pudo actualizar la concesionaria. Verificá permisos o contactá soporte.',
+            );
+          }
           set({ currentCliente: mapClienteRow(data as ClienteRow) });
         } catch (error) {
           set({ error: normalizeError(error, 'Error al actualizar la concesionaria') });
@@ -829,14 +835,16 @@ export const useVehicleStore = create<VehicleStoreState>()(
         if (filters.kilometersTo !== undefined) filtered = filtered.filter((v) => v.kilometers <= filters.kilometersTo!);
         if (filters.isPublished !== undefined) filtered = filtered.filter((v) => v.isPublished === filters.isPublished);
         if (filters.search) {
-          const search = filters.search.toLowerCase();
-          filtered = filtered.filter(
-            (v) =>
-              v.brand.toLowerCase().includes(search) ||
-              v.model.toLowerCase().includes(search) ||
-              v.description.toLowerCase().includes(search) ||
-              v.tags.some((tag) => tag.toLowerCase().includes(search)),
-          );
+          const search = filters.search.trim();
+          if (search) {
+            const lower = search.toLowerCase();
+            filtered = filtered.filter(
+              (v) =>
+                matchesVehicleSearch(v, search) ||
+                v.description.toLowerCase().includes(lower) ||
+                v.tags.some((tag) => tag.toLowerCase().includes(lower)),
+            );
+          }
         }
         return filtered;
       },
