@@ -8,12 +8,13 @@ import { Car, ArrowRight, ShoppingBag, Coins } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 import { getNodeBySlug } from "@/lib/nodes";
+import { AUTOS_ACCENT, CLINICA_ACCENT, getNodoLogoSrc } from "@/lib/node-accents";
 
 const PdfPricingModal = dynamic(() => import("@/components/PdfPricingModal"), {
   ssr: false,
 });
 
-function IntroWithLogo({ text }: { text: string }) {
+function IntroWithLogo({ text, logoSrc }: { text: string; logoSrc: string }) {
   const parts = text.split(/\bNODO\b/g);
   return (
     <>
@@ -22,7 +23,7 @@ function IntroWithLogo({ text }: { text: string }) {
           {i > 0 && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src="/logos/nodo%20nar.png"
+              src={logoSrc}
               alt="NODO"
               style={{
                 height: "0.82em",
@@ -48,6 +49,9 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
   const [devOpen, setDevOpen] = useState(false);
 
   const { Icon, code, description, intro, highlights, inDevelopment } = node;
+  const isAutos = slug === "autos";
+  const isClinica = slug === "clinica";
+  const nodoLogoSrc = getNodoLogoSrc(slug);
 
   return (
     <div style={{ backgroundColor: "var(--color-navy-900)" }}>
@@ -62,17 +66,36 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
             aria-hidden
             className="pointer-events-none absolute inset-0"
             style={{
-              background:
-                "radial-gradient(60% 55% at 50% 38%, rgba(218,90,14,.18), transparent 70%)",
+              background: isAutos
+                ? `radial-gradient(60% 55% at 50% 38%, rgba(${AUTOS_ACCENT.rgb},.18), transparent 70%)`
+                : isClinica
+                  ? `radial-gradient(60% 55% at 50% 38%, rgba(${CLINICA_ACCENT.rgb},.18), transparent 70%)`
+                  : "radial-gradient(60% 55% at 50% 38%, rgba(218,90,14,.18), transparent 70%)",
             }}
           />
 
           <div className="w-[min(1200px,92vw)] mx-auto relative z-10 flex flex-col items-center text-center">
-            <span className="mb-7 inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-brand/15 text-brand">
+            <span
+              className={
+                isAutos
+                  ? "mb-7 inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-rose-600/15 text-rose-500"
+                  : isClinica
+                    ? "mb-7 inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-teal-600/15 text-teal-400"
+                    : "mb-7 inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-brand/15 text-brand"
+              }
+            >
               <Icon className="h-9 w-9" strokeWidth={1.75} aria-hidden="true" />
             </span>
 
-            <p className="text-[13px] font-bold uppercase tracking-[.16em] text-brand mb-4">
+            <p
+              className={
+                isAutos
+                  ? "text-[13px] font-bold uppercase tracking-[.16em] text-rose-500 mb-4"
+                  : isClinica
+                    ? "text-[13px] font-bold uppercase tracking-[.16em] text-teal-400 mb-4"
+                    : "text-[13px] font-bold uppercase tracking-[.16em] text-brand mb-4"
+              }
+            >
               Unidad del ecosistema
             </p>
 
@@ -82,7 +105,7 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/logos/nodo%20nar.png"
+                src={nodoLogoSrc}
                 alt="Nodo"
                 style={{
                   height: "0.78em",
@@ -131,7 +154,11 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
                   <div className="flex flex-wrap items-center justify-center gap-4">
                     <Link
                       href="/nodo-autos/login"
-                      className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150 shadow-md shadow-brand/15"
+                      className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md text-white active:scale-[.98] transition-all duration-150 shadow-lg"
+                      style={{
+                        background: `linear-gradient(135deg, ${AUTOS_ACCENT.brand}, ${AUTOS_ACCENT.brand600})`,
+                        boxShadow: `0 8px 24px -8px rgba(${AUTOS_ACCENT.rgb},.45)`,
+                      }}
                     >
                       Entrar al Concesionario
                     </Link>
@@ -161,7 +188,11 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
                   <div className="flex flex-wrap items-center justify-center gap-4">
                     <Link
                       href="/nodo-clinica/login"
-                      className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150 shadow-md shadow-brand/15"
+                      className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md text-white active:scale-[.98] transition-all duration-150 shadow-lg"
+                      style={{
+                        background: `linear-gradient(135deg, ${CLINICA_ACCENT.brand}, ${CLINICA_ACCENT.brand600})`,
+                        boxShadow: `0 8px 24px -8px rgba(${CLINICA_ACCENT.rgb},.45)`,
+                      }}
                     >
                       Entrar a Clínica
                     </Link>
@@ -222,7 +253,7 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
                   color: "rgba(234,240,247,.78)",
                 }}
               >
-                <IntroWithLogo text={intro} />
+                <IntroWithLogo text={intro} logoSrc={nodoLogoSrc} />
               </p>
 
               {highlights && highlights.length > 0 && (
@@ -289,12 +320,12 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
                   style={{
                     background:
                       "linear-gradient(135deg, var(--color-navy-700), var(--color-navy))",
-                    border: "1px solid rgba(218, 90, 14, 0.25)",
-                    boxShadow: "0 10px 30px -15px rgba(218, 90, 14, 0.15)",
+                    border: `1px solid rgba(${AUTOS_ACCENT.rgb}, 0.25)`,
+                    boxShadow: `0 10px 30px -15px rgba(${AUTOS_ACCENT.rgb}, 0.15)`,
                   }}
                 >
                   <div>
-                    <div className="h-12 w-12 rounded-xl bg-brand/15 text-brand flex items-center justify-center mb-6">
+                    <div className="h-12 w-12 rounded-xl bg-rose-600/15 text-rose-500 flex items-center justify-center mb-6">
                       <Car className="h-6 w-6" />
                     </div>
                     <h3 className="font-display font-bold text-white text-[20px] mb-3">
@@ -309,7 +340,7 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
                   </div>
                   <Link
                     href="/nodo-autos/login"
-                    className="inline-flex items-center gap-2 text-brand font-semibold text-[15px] hover:text-brand-300 transition-colors"
+                    className="inline-flex items-center gap-2 text-rose-500 font-semibold text-[15px] hover:text-rose-400 transition-colors"
                   >
                     Acceder al módulo <ArrowRight className="h-4 w-4" />
                   </Link>

@@ -4,6 +4,9 @@ import Link from "next/link";
 import { Stethoscope } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
+import { CLINICA_ACCENT, getNodoLogoSrc } from "@/lib/node-accents";
+
+const clinicaLogoSrc = getNodoLogoSrc("clinica");
 
 export default function Page() {
   return (
@@ -19,17 +22,16 @@ export default function Page() {
             aria-hidden
             className="pointer-events-none absolute inset-0"
             style={{
-              background:
-                "radial-gradient(60% 55% at 50% 38%, rgba(218,90,14,.18), transparent 70%)",
+              background: `radial-gradient(60% 55% at 50% 38%, rgba(${CLINICA_ACCENT.rgb},.18), transparent 70%)`,
             }}
           />
 
           <div className="w-[min(1200px,92vw)] mx-auto relative z-10 flex flex-col items-center text-center">
-            <span className="mb-7 inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-brand/15 text-brand">
+            <span className="mb-7 inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-teal-600/15 text-teal-400">
               <Stethoscope className="h-9 w-9" strokeWidth={1.75} aria-hidden="true" />
             </span>
 
-            <p className="text-[13px] font-bold uppercase tracking-[.16em] text-brand mb-4">
+            <p className="text-[13px] font-bold uppercase tracking-[.16em] text-teal-400 mb-4">
               Unidad del ecosistema
             </p>
 
@@ -39,7 +41,7 @@ export default function Page() {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/logos/nodo%20nar.png"
+                src={clinicaLogoSrc}
                 alt="Nodo"
                 style={{ height: "0.78em", width: "auto", display: "inline-block" }}
               />
@@ -61,7 +63,11 @@ export default function Page() {
             <div className="mt-10">
               <Link
                 href="/nodo-clinica/login"
-                className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150 shadow-md shadow-brand/15"
+                className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md text-white active:scale-[.98] transition-all duration-150 shadow-lg"
+                style={{
+                  background: `linear-gradient(135deg, ${CLINICA_ACCENT.brand}, ${CLINICA_ACCENT.brand600})`,
+                  boxShadow: `0 8px 24px -8px rgba(${CLINICA_ACCENT.rgb},.45)`,
+                }}
               >
                 Entrar a Clínica
               </Link>
@@ -115,7 +121,7 @@ export default function Page() {
                   }}
                 >
                   <h3
-                    className="font-display font-bold text-brand-300"
+                    className="font-display font-bold text-teal-300"
                     style={{ fontSize: 17, marginBottom: 8 }}
                   >
                     {h.title}
@@ -141,7 +147,7 @@ export default function Page() {
           }}
         >
           <div className="w-[min(1200px,92vw)] mx-auto">
-            <p className="text-center text-[13px] font-bold uppercase tracking-[.16em] text-brand mb-3">
+            <p className="text-center text-[13px] font-bold uppercase tracking-[.16em] text-teal-400 mb-3">
               Módulos disponibles
             </p>
             <h2
@@ -154,20 +160,18 @@ export default function Page() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[800px] mx-auto">
               {/* Clínica Virtual — DISPONIBLE */}
               <div
-                className="rounded-2xl p-7 flex flex-col gap-4"
+                className="rounded-2xl p-7 flex flex-col gap-4 transition-all duration-300 hover:-translate-y-1"
                 style={{
-                  background: "var(--color-navy-700)",
-                  border: "1px solid rgba(255,255,255,.1)",
+                  background: "linear-gradient(135deg, var(--color-navy-700), var(--color-navy))",
+                  border: `1px solid rgba(${CLINICA_ACCENT.rgb}, 0.25)`,
+                  boxShadow: `0 10px 30px -15px rgba(${CLINICA_ACCENT.rgb}, 0.15)`,
                 }}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand/15 text-brand flex-shrink-0">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-teal-600/15 text-teal-400 flex-shrink-0">
                     <Stethoscope className="h-6 w-6" strokeWidth={1.75} />
                   </div>
-                  <span
-                    className="mt-0.5 inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide"
-                    style={{ background: "rgba(218,90,14,.18)", color: "var(--color-brand)" }}
-                  >
+                  <span className="mt-0.5 inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                     Disponible
                   </span>
                 </div>
@@ -185,7 +189,7 @@ export default function Page() {
                 </div>
                 <Link
                   href="/nodo-clinica/login"
-                  className="mt-auto text-[13px] font-semibold text-brand hover:text-brand-300 transition-colors"
+                  className="mt-auto text-[13px] font-semibold text-teal-400 hover:text-teal-300 transition-colors"
                 >
                   Acceder al módulo →
                 </Link>

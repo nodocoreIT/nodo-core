@@ -13,6 +13,9 @@ import {
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 import { getNodeBySlug } from "@/lib/nodes";
+import { CLINICA_ACCENT, getNodoLogoSrc } from "@/lib/node-accents";
+
+const saludLogoSrc = getNodoLogoSrc("salud");
 
 function IntroWithLogo({ text }: { text: string }) {
   const parts = text.split(/\bNODO\b/g);
@@ -23,7 +26,7 @@ function IntroWithLogo({ text }: { text: string }) {
           {i > 0 && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src="/logos/nodo%20nar.png"
+              src={saludLogoSrc}
               alt="NODO"
               style={{
                 height: "0.82em",
@@ -60,17 +63,16 @@ export default function Page() {
             aria-hidden
             className="pointer-events-none absolute inset-0"
             style={{
-              background:
-                "radial-gradient(60% 55% at 50% 38%, rgba(218,90,14,.18), transparent 70%)",
+              background: `radial-gradient(60% 55% at 50% 38%, rgba(${CLINICA_ACCENT.rgb},.18), transparent 70%)`,
             }}
           />
 
           <div className="w-[min(1200px,92vw)] mx-auto relative z-10 flex flex-col items-center text-center">
-            <span className="mb-7 inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-brand/15 text-brand">
+            <span className="mb-7 inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-teal-600/15 text-teal-400">
               <Icon className="h-9 w-9" strokeWidth={1.75} aria-hidden="true" />
             </span>
 
-            <p className="text-[13px] font-bold uppercase tracking-[.16em] text-brand mb-4">
+            <p className="text-[13px] font-bold uppercase tracking-[.16em] text-teal-400 mb-4">
               Unidad del ecosistema
             </p>
 
@@ -80,7 +82,7 @@ export default function Page() {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/logos/nodo%20nar.png"
+                src={saludLogoSrc}
                 alt="Nodo"
                 style={{
                   height: "0.78em",
@@ -105,7 +107,11 @@ export default function Page() {
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <Link
                 href="#submodulos"
-                className="inline-flex items-center justify-center px-7 py-3.5 text-[16px] font-semibold rounded-md bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150"
+                className="inline-flex items-center justify-center px-7 py-3.5 text-[16px] font-semibold rounded-md text-white active:scale-[.98] transition-all duration-150 shadow-lg"
+                style={{
+                  background: `linear-gradient(135deg, ${CLINICA_ACCENT.brand}, ${CLINICA_ACCENT.brand600})`,
+                  boxShadow: `0 8px 24px -8px rgba(${CLINICA_ACCENT.rgb},.45)`,
+                }}
               >
                 Ver Submódulos
               </Link>
@@ -172,12 +178,12 @@ export default function Page() {
                 style={{
                   background:
                     "linear-gradient(135deg, var(--color-navy-700), var(--color-navy))",
-                  border: "1px solid rgba(218, 90, 14, 0.25)",
-                  boxShadow: "0 10px 30px -15px rgba(218, 90, 14, 0.15)",
+                  border: `1px solid rgba(${CLINICA_ACCENT.rgb}, 0.25)`,
+                  boxShadow: `0 10px 30px -15px rgba(${CLINICA_ACCENT.rgb}, 0.15)`,
                 }}
               >
                 <div>
-                  <div className="h-12 w-12 rounded-xl bg-brand/15 text-brand flex items-center justify-center mb-6">
+                  <div className="h-12 w-12 rounded-xl bg-teal-600/15 text-teal-400 flex items-center justify-center mb-6">
                     <Sparkles className="h-6 w-6" />
                   </div>
                   <h3 className="font-display font-bold text-white text-[20px] mb-3">
@@ -194,7 +200,7 @@ export default function Page() {
                 </div>
                 <Link
                   href="/nodo-salud/clinica-virtual"
-                  className="inline-flex items-center gap-2 text-brand font-semibold text-[15px] hover:text-brand-300 transition-colors"
+                  className="inline-flex items-center gap-2 text-teal-400 font-semibold text-[15px] hover:text-teal-300 transition-colors"
                 >
                   Acceder al módulo <ArrowRight className="h-4 w-4" />
                 </Link>

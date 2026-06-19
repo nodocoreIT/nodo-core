@@ -14,7 +14,7 @@ export interface ThemeSettings {
 }
 
 export const DEFAULT_SETTINGS: ThemeSettings = {
-  primaryColor: "#da5a0e",
+  primaryColor: "#C41E3A",
   secondaryColor: "#121e2f",
   sidebarTextColor: "#9dacbe",
   fontColor: "#16202e",

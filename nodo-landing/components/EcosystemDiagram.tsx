@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { NODES, type NodeDef } from "@/lib/nodes";
+import { NODES, getLoginHrefForNode, type NodeDef } from "@/lib/nodes";
 
 interface EcosystemDiagramProps {
   dark?: boolean;
@@ -13,7 +13,6 @@ interface EcosystemDiagramProps {
   isLoginPage?: boolean;
 }
 
-// ─── Geometry ────────────────────────────────────────────────────────────────
 const W = 600;
 const H = 600;
 const CX = W / 2;
@@ -44,6 +43,9 @@ function travelDur(from: { x: number; y: number }, to: { x: number; y: number })
 function kt(t: number, cycleDur: number) {
   return (t / cycleDur).toFixed(4);
 }
+
+const ACTIVE_TWO_LEG_DUR = 2.4;
+const ACTIVE_ONE_LEG_DUR = 1.8;
 
 export default function EcosystemDiagram({
   dark = false,
@@ -176,33 +178,23 @@ export default function EcosystemDiagram({
         {mainPoints.map((p, i) => {
           const isActiveLine = p.node.slug === activeNodeSlug || p.node.slug === activeParentSlug;
           const isParentHovered = showPulse && hoveredParentSlug === p.node.slug;
-          const lineLen = dist(coreFrom, { x: p.x, y: p.y });
-          const legDur = travelDur(coreFrom, { x: p.x, y: p.y });
+          const isHighlighted = isActiveLine || isParentHovered;
           return (
-            <g key={`line-${i}`}>
-              <line
-                x1={CX} y1={CY} x2={p.x} y2={p.y}
-                stroke={isActiveLine ? "var(--color-brand)" : stroke}
-                strokeWidth={isActiveLine ? "2" : "1.5"}
-                opacity={p.node.inDevelopment ? 0.35 : 1}
-              />
-              {isParentHovered && (
-                <line
-                  x1={CX} y1={CY} x2={p.x} y2={p.y}
-                  stroke="#DA5A0E"
-                  strokeWidth="2"
-                  strokeDasharray={lineLen}
-                  strokeDashoffset={lineLen}
-                  style={{ filter: "drop-shadow(0 0 3px rgba(218,90,14,0.5))" }}
-                >
-                  <animate attributeName="stroke-dashoffset"
-                    from={lineLen} to={0}
-                    dur={`${legDur}s`}
-                    repeatCount="1"
-                    fill="freeze" />
-                </line>
-              )}
-            </g>
+            <line
+              key={`line-${i}`}
+              x1={CX}
+              y1={CY}
+              x2={p.x}
+              y2={p.y}
+              stroke={isHighlighted ? "var(--color-brand)" : stroke}
+              strokeWidth={isHighlighted ? "2" : "1.5"}
+              opacity={p.node.inDevelopment ? 0.35 : 1}
+              style={
+                isHighlighted
+                  ? { filter: "drop-shadow(0 0 3px var(--brand-glow-strong))" }
+                  : undefined
+              }
+            />
           );
         })}
 
@@ -217,19 +209,24 @@ export default function EcosystemDiagram({
 
         {/* Parent → sub-node lines */}
         {subPoints.map((p, i) => {
-          const lx2 = p.x;
-          const ly2 = p.y;
-          const visible   = shouldShowSub(p.node.parentSlug);
+          const visible = shouldShowSub(p.node.parentSlug);
+          const isActiveSubLine = p.node.slug === activeNodeSlug;
+          const isHoveredSubLine = showPulse && p.node.parentSlug === hoveredParentSlug;
+          const isHighlighted = isActiveSubLine || isHoveredSubLine;
           const baseColor = dark ? "rgba(222,231,241,.3)" : "rgba(100,120,144,.4)";
           return (
             <line
               key={`subline-${i}`}
-              x1={p.parent.x} y1={p.parent.y} x2={lx2} y2={ly2}
-              stroke={baseColor}
-              strokeWidth="1.5"
+              x1={p.parent.x}
+              y1={p.parent.y}
+              x2={p.x}
+              y2={p.y}
+              stroke={isHighlighted ? "var(--color-brand)" : baseColor}
+              strokeWidth={isHighlighted ? "2" : "1.5"}
               style={{
                 opacity: visible ? (p.node.inDevelopment ? 0.4 : 1) : 0,
                 transition: `opacity 0.3s ease ${p.siblingIndex * 80}ms`,
+                filter: isHighlighted ? "drop-shadow(0 0 3px var(--brand-glow-strong))" : undefined,
               }}
             />
           );
@@ -240,7 +237,7 @@ export default function EcosystemDiagram({
           <>
             {hoveredChildren.length > 0 && (
               <circle cx={hoveredParentPoint.x} cy={hoveredParentPoint.y}
-                r={SAT_R_SVG} fill="none" stroke="#DA5A0E" strokeWidth="2" opacity="0"
+                r={SAT_R_SVG} fill="none" stroke="var(--color-brand)" strokeWidth="2" opacity="0"
               >
                 <animate attributeName="r"
                   from={SAT_R_SVG} to={SAT_R_SVG + 22}
@@ -255,8 +252,8 @@ export default function EcosystemDiagram({
               </circle>
             )}
 
-            <circle r="6" fill="#DA5A0E"
-              style={{ filter: "drop-shadow(0 0 8px rgba(218,90,14,0.9))" }}
+            <circle r="6" fill="var(--color-brand)"
+              style={{ filter: "drop-shadow(0 0 8px var(--brand-glow-strong))" }}
             >
               <animate attributeName="cx"
                 values={`${CX};${hoveredParentPoint.x};${hoveredParentPoint.x}`}
@@ -280,8 +277,8 @@ export default function EcosystemDiagram({
               const tFade   = kt(arrive * 0.88, pulseCycleDur);
               const tShow   = kt(coreToParentDur + 0.001, pulseCycleDur);
               return (
-                <circle key={`pulse-${child.node.code}`} r="5" fill="#DA5A0E"
-                  style={{ filter: "drop-shadow(0 0 6px rgba(218,90,14,0.85))" }}
+                <circle key={`pulse-${child.node.code}`} r="5" fill="var(--color-brand)"
+                  style={{ filter: "drop-shadow(0 0 6px var(--brand-glow-strong))" }}
                 >
                   <animate attributeName="cx"
                     values={`${hoveredParentPoint.x};${hoveredParentPoint.x};${child.x};${child.x}`}
@@ -304,20 +301,20 @@ export default function EcosystemDiagram({
         {/* Active node pulse + traveling dot (login page / activeNodeSlug) */}
         {activePoint && (
           <>
-            <circle className="ecosystem-core-pulse" cx={activePoint.x} cy={activePoint.y} r={58} fill="#DA5A0E" />
+            <circle className="ecosystem-core-pulse" cx={activePoint.x} cy={activePoint.y} r={58} fill="var(--color-brand)" />
             {activeParentPoint && (
-              <circle className="ecosystem-core-pulse" cx={activeParentPoint.x} cy={activeParentPoint.y} r={58} fill="#DA5A0E" />
+              <circle className="ecosystem-core-pulse" cx={activeParentPoint.x} cy={activeParentPoint.y} r={58} fill="var(--color-brand)" />
             )}
-            <circle r="7" fill="var(--color-brand)" style={{ filter: "drop-shadow(0 2px 4px rgba(218,90,14,0.4))" }}>
+            <circle r="7" fill="var(--color-brand)" style={{ filter: "drop-shadow(0 2px 4px var(--brand-glow))" }}>
               {activeParentPoint ? (
                 <>
-                  <animate attributeName="cx" values={`${CX};${activeParentPoint.x};${activePoint.x}`} keyTimes="0;0.5;1" dur="2.4s" repeatCount="indefinite" />
-                  <animate attributeName="cy" values={`${CY};${activeParentPoint.y};${activePoint.y}`} keyTimes="0;0.5;1" dur="2.4s" repeatCount="indefinite" />
+                  <animate attributeName="cx" values={`${CX};${activeParentPoint.x};${activePoint.x}`} keyTimes="0;0.5;1" dur={`${ACTIVE_TWO_LEG_DUR}s`} repeatCount="indefinite" />
+                  <animate attributeName="cy" values={`${CY};${activeParentPoint.y};${activePoint.y}`} keyTimes="0;0.5;1" dur={`${ACTIVE_TWO_LEG_DUR}s`} repeatCount="indefinite" />
                 </>
               ) : (
                 <>
-                  <animate attributeName="cx" from={CX} to={activePoint.x} dur="1.8s" repeatCount="indefinite" />
-                  <animate attributeName="cy" from={CY} to={activePoint.y} dur="1.8s" repeatCount="indefinite" />
+                  <animate attributeName="cx" values={`${CX};${activePoint.x};${CX}`} keyTimes="0;0.95;1" dur={`${ACTIVE_ONE_LEG_DUR}s`} repeatCount="indefinite" />
+                  <animate attributeName="cy" values={`${CY};${activePoint.y};${CY}`} keyTimes="0;0.95;1" dur={`${ACTIVE_ONE_LEG_DUR}s`} repeatCount="indefinite" />
                 </>
               )}
             </circle>
@@ -325,8 +322,8 @@ export default function EcosystemDiagram({
         )}
 
         {/* Core */}
-        <circle className="ecosystem-core-pulse" cx={CX} cy={CY} r={HALO_R} fill="#DA5A0E" />
-        <circle cx={CX} cy={CY} r={CORE_R} fill="#DA5A0E" />
+        <circle className="ecosystem-core-pulse" cx={CX} cy={CY} r={HALO_R} fill="var(--color-brand)" />
+        <circle cx={CX} cy={CY} r={CORE_R} fill="var(--color-brand)" />
         <text x={CX} y={CY + 6} textAnchor="middle" fill="#fff" fontFamily="var(--font-display)" fontSize="19" fontWeight="700">
           Core
         </text>
@@ -411,7 +408,7 @@ function Satellite({
   isVisible?: boolean;  // only passed for sub-nodes
   subIndex?: number;
 }) {
-  const { node, sin, x, left, top } = point;
+  const { node, left, top } = point;
   const visible = isVisible ?? true; // main nodes are always visible
   const { Icon } = node;
 
@@ -419,7 +416,7 @@ function Satellite({
     "flex flex-col items-center justify-center gap-[1.2cqw] rounded-full text-center",
     "border transition-all duration-200 ease-out",
     isActive
-      ? "bg-navy-700 border-brand text-white shadow-[0_0_12px_rgba(218,90,14,0.4)]"
+      ? "bg-navy-700 border-brand text-white"
       : dark
         ? "bg-navy-700 border-[rgba(222,231,241,.55)] text-[#DEE7F1]"
         : "bg-white border-[#C6D3E2] text-navy",
@@ -433,7 +430,11 @@ function Satellite({
       style={{
         width: `${diameterCqw}cqw`,
         height: `${diameterCqw}cqw`,
-        boxShadow: dark ? "0 4px 12px rgba(0,0,0,.35)" : "0 4px 12px rgba(27,42,65,.14)",
+        boxShadow: isActive
+          ? "0 0 12px var(--brand-glow)"
+          : dark
+            ? "0 4px 12px rgba(0,0,0,.35)"
+            : "0 4px 12px rgba(27,42,65,.14)",
       }}
     >
       <Icon
@@ -473,30 +474,14 @@ function Satellite({
     );
   }
 
-  const tipGap = diameterCqw / 2 + 2.5;
-  const tipY = `calc(-50% + ${(sin * 9).toFixed(2)}cqw)`;
-  const tipOnRight = x >= CX;
-  const tipTransform = tipOnRight
-    ? `translate(${tipGap.toFixed(2)}cqw, ${tipY})`
-    : `translate(calc(-100% - ${tipGap.toFixed(2)}cqw), ${tipY})`;
-
   if (node.inDevelopment) {
-
     return (
       <div
-        className="group absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-not-allowed outline-none"
+        className="absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-not-allowed outline-none"
         style={isVisible !== undefined ? visStyle : baseStyle}
         {...hoverProps}
       >
         {circle}
-        <span
-          role="tooltip"
-          className="pointer-events-none absolute left-1/2 top-1/2 z-20 w-[140px] rounded-lg border border-white/10 bg-navy-900/95 px-3 py-2 text-center opacity-0 shadow-xl backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-100"
-          style={{ transform: tipTransform }}
-        >
-          <span className="block text-[12px] font-bold text-brand-300">{node.label}</span>
-          <span className="mt-0.5 block text-[11px] leading-snug text-white/60">En desarrollo</span>
-        </span>
       </div>
     );
   }
@@ -504,8 +489,7 @@ function Satellite({
   let href = `/nodo-${node.slug}`;
 
   if (isLoginPage) {
-    const loginSlug = node.slug === "salud" ? "nodo-clinica" : `nodo-${node.slug}`;
-    href = `/${loginSlug}/login`;
+    href = getLoginHrefForNode(node.slug);
   }
 
   return (

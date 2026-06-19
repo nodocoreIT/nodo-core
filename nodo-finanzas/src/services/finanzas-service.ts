@@ -1,4 +1,5 @@
 import { supabase, db } from '@/shared/lib/supabase';
+import { requireUserId } from '@/shared/lib/auth-user';
 import { DolarService } from '@/services/dolar-service';
 import type {
   Cuenta,
@@ -22,6 +23,21 @@ import type {
 
 export class FinanzasService {
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private static async withTenant<T extends Record<string, any>>(
+    row: T,
+  ): Promise<T & { user_id: string }> {
+    return { ...row, user_id: await requireUserId() };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private static async withTenantMany<T extends Record<string, any>>(
+    rows: T[],
+  ): Promise<Array<T & { user_id: string }>> {
+    const user_id = await requireUserId();
+    return rows.map((row) => ({ ...row, user_id }));
+  }
+
   // === CUENTAS ===
   static async obtenerCuentas(): Promise<Cuenta[]> {
     const { data, error } = await db
@@ -40,7 +56,7 @@ export class FinanzasService {
   static async crearCuenta(cuenta: Omit<Cuenta, 'id'>): Promise<Cuenta | null> {
     const { data, error } = await db
       .from('cuentas')
-      .insert([this.mapearCuentaParaDB(cuenta)])
+      .insert([await this.withTenant(this.mapearCuentaParaDB(cuenta))])
       .select()
       .single();
 
@@ -101,7 +117,7 @@ export class FinanzasService {
   ): Promise<MovimientoCuenta | null> {
     const { data, error } = await db
       .from('movimientos_cuenta')
-      .insert([{
+      .insert([await this.withTenant({
         cuenta_id:    movimiento.cuentaId,
         fecha:        movimiento.fecha,
         descripcion:  movimiento.descripcion,
@@ -110,7 +126,7 @@ export class FinanzasService {
         origen:       movimiento.origen,
         referencia_id: movimiento.referenciaId ?? null,
         detalle:      movimiento.detalle ?? null,
-      }])
+      })])
       .select()
       .single();
 
@@ -206,7 +222,7 @@ export class FinanzasService {
 
     const { data, error } = await db
       .from('gastos_fijos')
-      .insert([datosParaDB])
+      .insert([await this.withTenant(datosParaDB)])
       .select()
       .single();
 
@@ -273,7 +289,7 @@ export class FinanzasService {
   static async crearTarjeta(tarjeta: Omit<Tarjeta, 'id'>): Promise<Tarjeta | null> {
     const { data, error } = await db
       .from('tarjetas')
-      .insert([this.mapearTarjetaParaDB(tarjeta)])
+      .insert([await this.withTenant(this.mapearTarjetaParaDB(tarjeta))])
       .select()
       .single();
 
@@ -347,7 +363,7 @@ export class FinanzasService {
 
     const { data, error } = await db
       .from('tarjetas_consumos')
-      .insert([payload])
+      .insert([await this.withTenant(payload)])
       .select()
       .single();
 
@@ -420,7 +436,7 @@ export class FinanzasService {
   static async crearRubro(rubro: Omit<Rubro, 'id'>): Promise<Rubro | null> {
     const { data, error } = await db
       .from('rubros')
-      .insert([{
+      .insert([await this.withTenant({
         codigo: rubro.codigo,
         nombre: rubro.nombre,
         emoji: rubro.emoji,
@@ -429,7 +445,7 @@ export class FinanzasService {
         activo: rubro.activo,
         es_sistema: rubro.esSistema || false,
         orden: rubro.orden || 999
-      }])
+      })])
       .select(`
         id,
         nombre,
@@ -475,10 +491,22 @@ export class FinanzasService {
   }
 
   static async eliminarRubro(id: string): Promise<boolean> {
-    const { error } = await db
-      .from('rubros')
-      .update({ activo: false })
-      .eq('id', id);
+    const rubro = await FinanzasService.obtenerRubroPorId(id);
+    if (!rubro || rubro.esSistema) return false;
+
+    const tablas = ['gastos_diarios', 'gastos_fijos', 'tarjetas_consumos'] as const;
+    for (const tabla of tablas) {
+      const { error: refError } = await db
+        .from(tabla)
+        .update({ rubro_id: null })
+        .eq('rubro_id', id);
+      if (refError) {
+        console.error(`Error desvinculando rubro de ${tabla}:`, refError);
+        return false;
+      }
+    }
+
+    const { error } = await db.from('rubros').delete().eq('id', id);
 
     if (error) {
       console.error('Error eliminando rubro:', error);
@@ -486,6 +514,17 @@ export class FinanzasService {
     }
 
     return true;
+  }
+
+  static async eliminarRubrosInactivos(): Promise<number> {
+    const inactivos = (await FinanzasService.obtenerRubros()).filter(
+      r => !r.activo && !r.esSistema
+    );
+    let eliminados = 0;
+    for (const rubro of inactivos) {
+      if (await FinanzasService.eliminarRubro(rubro.id)) eliminados++;
+    }
+    return eliminados;
   }
 
   static async obtenerRubroPorId(id: string): Promise<Rubro | null> {
@@ -648,7 +687,7 @@ export class FinanzasService {
       console.log('ENVIANDO A DB (gastos_diarios):', JSON.stringify(datosParaDB, null, 2));
       const { data, error } = await db
         .from('gastos_diarios')
-        .insert([datosParaDB])
+        .insert([await this.withTenant(datosParaDB)])
         .select()
         .single();
 
@@ -661,7 +700,7 @@ export class FinanzasService {
 
           const { data: retryData, error: retryError } = await db
             .from('gastos_diarios')
-            .insert([datosSinCuenta])
+            .insert([await this.withTenant(datosSinCuenta)])
             .select()
             .single();
 
@@ -725,7 +764,7 @@ export class FinanzasService {
   static async crearPrestamo(prestamo: Omit<Prestamo, 'id'>): Promise<Prestamo | null> {
     const { data, error } = await db
       .from('prestamos')
-      .insert([this.mapearPrestamoParaDB(prestamo)])
+      .insert([await this.withTenant(this.mapearPrestamoParaDB(prestamo))])
       .select()
       .single();
 
@@ -803,7 +842,7 @@ export class FinanzasService {
   static async crearCuentaBancaria(cuenta: Omit<CuentaBancaria, 'id'>): Promise<CuentaBancaria | null> {
     const { data, error } = await db
       .from('cuentas_bancarias')
-      .insert([this.mapearCuentaBancariaParaDB(cuenta)])
+      .insert([await this.withTenant(this.mapearCuentaBancariaParaDB(cuenta))])
       .select()
       .single();
 
@@ -866,7 +905,7 @@ export class FinanzasService {
 
     const { data, error } = await db
       .from('categorias')
-      .insert([datosParaDB])
+      .insert([await this.withTenant(datosParaDB)])
       .select()
       .single();
 
@@ -925,7 +964,7 @@ export class FinanzasService {
   static async crearSueldo(sueldo: Omit<Sueldo, 'id'>): Promise<Sueldo | null> {
     const { data, error } = await db
       .from('sueldos')
-      .insert([this.mapearSueldoParaDB(sueldo)])
+      .insert([await this.withTenant(this.mapearSueldoParaDB(sueldo))])
       .select()
       .single();
 
@@ -1442,13 +1481,15 @@ export class FinanzasService {
   // === CONFIGURACIÓN USUARIO ===
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static async guardarConfiguracion(clave: string, valor: any): Promise<void> {
+    const user_id = await requireUserId();
     const { error } = await db
       .from('configuracion_usuario')
       .upsert({
         clave,
         valor: valor,
+        user_id,
       }, {
-        onConflict: 'clave'
+        onConflict: 'user_id,clave'
       });
 
     if (error) {
@@ -1490,7 +1531,7 @@ export class FinanzasService {
   static async crearCuotas(cuotas: Omit<CuotaProgramada, 'id'>[]): Promise<CuotaProgramada[]> {
     const { data, error } = await db
       .from('cuotas_programadas')
-      .insert(cuotas.map(this.mapearCuotaProgramadaParaDB))
+      .insert(await this.withTenantMany(cuotas.map(this.mapearCuotaProgramadaParaDB)))
       .select();
 
     if (error) {
@@ -1578,7 +1619,7 @@ export class FinanzasService {
   static async crearPlanAhorro(plan: Omit<PlanAhorro, 'id'>): Promise<PlanAhorro | null> {
     const { data, error } = await db
       .from('planes_ahorro')
-      .insert([this.mapearPlanAhorroParaDB(plan)])
+      .insert([await this.withTenant(this.mapearPlanAhorroParaDB(plan))])
       .select()
       .single();
     if (error) {
@@ -1656,7 +1697,7 @@ export class FinanzasService {
   }
 
   static async crearCuotasPlan(cuotas: Omit<CuotaPlanAhorro, 'id'>[]): Promise<CuotaPlanAhorro[]> {
-    const dbCuotas = cuotas.map(c => this.mapearCuotaPlanAhorroParaDB(c));
+    const dbCuotas = await this.withTenantMany(cuotas.map(c => this.mapearCuotaPlanAhorroParaDB(c)));
     const { data, error } = await db
       .from('cuotas_planes_ahorro')
       .insert(dbCuotas)
@@ -1831,7 +1872,6 @@ export class FinanzasService {
     await db.from('categorias').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await db.from('cuentas_bancarias').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await db.from('cuentas').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await db.from('cotizaciones_dolar').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   }
 
 }

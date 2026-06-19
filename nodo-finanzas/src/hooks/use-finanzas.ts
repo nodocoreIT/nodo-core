@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FinanzasService } from '@/services/finanzas-service';
+import { useAuth } from '@/shared/hooks/use-auth';
 import { calcularMesFacturacion } from '@/utils/tarjeta-fechas';
 import { getFechaHoy } from '@/utils/formatters';
 import type {
@@ -21,6 +22,8 @@ import type {
 import { TASA_INTERES_TARJETA } from '@/types';
 
 export const useFinanzas = () => {
+  const { session } = useAuth();
+  const userId = session?.user?.id;
   const [estado, setEstado] = useState<AppState>({
     cuentas: [],
     gastosFijos: [],
@@ -40,8 +43,13 @@ export const useFinanzas = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  // Cargar datos iniciales
+  // Cargar datos cuando hay sesión (multi-tenant por user_id)
   useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
     const cargarDatos = async () => {
       try {
         setLoading(true);
@@ -54,8 +62,8 @@ export const useFinanzas = () => {
       }
     };
 
-    cargarDatos();
-  }, []);
+    void cargarDatos();
+  }, [userId]);
 
   // Función para recargar solo los consumos de tarjetas
   const recargarConsumosTarjetas = useCallback(async () => {

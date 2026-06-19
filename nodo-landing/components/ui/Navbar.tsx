@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Search } from "lucide-react";
+import { useCommandPalette } from "@/components/CommandPaletteProvider";
 
 const navLinks = [
   { label: "Filosofía", id: "filosofia" },
@@ -16,6 +18,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const isHome = pathname === "/";
+  const { open: openCommandPalette } = useCommandPalette();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 8);
@@ -87,6 +90,22 @@ export default function Navbar() {
         </ul>
 
         {/* Right CTAs */}
+        <button
+          type="button"
+          onClick={openCommandPalette}
+          className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+          style={{ border: "1px solid rgba(255,255,255,.14)" }}
+          aria-label="Abrir buscador (Ctrl + K)"
+        >
+          <Search aria-hidden className="h-4 w-4" />
+          <span className="hidden sm:inline">Buscar</span>
+          <kbd
+            className="hidden rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/45 md:inline-block"
+            style={{ border: "1px solid rgba(255,255,255,.12)" }}
+          >
+            Ctrl K
+          </kbd>
+        </button>
       </div>
     </nav>
   );

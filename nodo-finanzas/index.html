@@ -85,8 +85,21 @@
         line-height: 1.06;
         color: #fff;
         text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35em;
+        flex-wrap: wrap;
       }
-      #nodo-splash-title span { color: #059669; }
+      #nodo-splash-title .nodo-logo {
+        height: 0.78em;
+        width: auto;
+        display: inline-block;
+      }
+      #nodo-splash-title .nodo-sep {
+        font-weight: 400;
+        color: #fff;
+      }
       .nodo-dots {
         margin-top: 32px;
         display: flex;
@@ -143,7 +156,11 @@
           </div>
         </div>
         <p id="nodo-splash-label">Entrando a</p>
-        <h2 id="nodo-splash-title">Nodo <span>Finanzas</span></h2>
+        <h2 id="nodo-splash-title">
+          <img class="nodo-logo" src="./logos/nodo-ver.png" alt="nodo" />
+          <span class="nodo-sep">|</span>
+          <span>Finanzas</span>
+        </h2>
         <div class="nodo-dots">
           <div class="nodo-dot"></div>
           <div class="nodo-dot"></div>

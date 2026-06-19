@@ -1,0 +1,1 @@
+INSERT INTO nodo_finanzas_personales.configuracion_usuario ("id", "clave", "valor", "created_at", user_id) VALUES ('37226459-11a9-4c42-ae19-75986e892fcf', 'tipo_dolar_seleccionado', '"blue"'::jsonb, '2025-11-20 20:04:16.995003+00', '6edaed45-1cd7-45d6-a731-66412b398724'::uuid) ON CONFLICT (id) DO NOTHING;

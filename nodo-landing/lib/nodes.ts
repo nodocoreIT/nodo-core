@@ -263,6 +263,26 @@ export function getNodeBySlug(slug: string): NodeDef | undefined {
   return NODES.find((n) => n.slug === slug);
 }
 
+export function getChildNodes(parentSlug: string): NodeDef[] {
+  return NODES.filter((n) => n.parentSlug === parentSlug && !n.inDevelopment);
+}
+
+/** Login route when clicking a node in the ecosystem diagram on the login page. */
+export function getLoginHrefForNode(slug: string): string {
+  const children = getChildNodes(slug);
+  if (children.length === 1) {
+    const child = children[0];
+    if (child.slug === "clinica") return "/nodo-clinica/login";
+    return `/nodo-${child.slug}/login`;
+  }
+  return `/nodo-${slug}/login`;
+}
+
+export function needsModulePicker(nodeParam: string): boolean {
+  const slug = normalizeNodeSlug(nodeParam);
+  return getChildNodes(slug).length > 1;
+}
+
 /** Normalize URL slug param to canonical node slug (matches login page routing). */
 export function normalizeNodeSlug(nodeSlug: string): string {
   const slug = nodeSlug.trim().toLowerCase();
