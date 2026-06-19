@@ -5,6 +5,10 @@ export function nodoAuthStorageKey(nodeSlug: string): string {
   return `nodo-auth-${nodeSlug.trim().toLowerCase()}`;
 }
 
+/**
+ * Panel (nodo-landing /panel) uses SSR cookies named `nodo-auth-panel` instead.
+ * Never use the landing panel client for nodo login — it would overwrite dashboard sessions.
+ */
 export function createNodoAuthClient(
   supabaseUrl: string,
   supabaseAnonKey: string,

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { panelSupabaseClientOptions } from "@/lib/supabase/panel-auth";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -8,8 +9,7 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      // All app tables now live in the nodo_core schema (see schema migration).
-      db: { schema: "nodo_core" },
+      ...panelSupabaseClientOptions,
       cookies: {
         getAll() {
           return cookieStore.getAll();

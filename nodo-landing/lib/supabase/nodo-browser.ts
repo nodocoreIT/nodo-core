@@ -1,25 +1,29 @@
-import { createBrowserClient } from "@supabase/ssr";
+import { createNodoAuthClient } from "@nodocore/shared-components/lib/create-nodo-auth-client";
+import { normalizeNodeSlug } from "@/lib/nodes";
 import { getNodoAuthCode, getNodoPublicAuthConfig } from "@/lib/supabase/nodo-auth-config";
-import { createClient } from "@/lib/supabase/client";
 
-const nodeClients = new Map<string, ReturnType<typeof createBrowserClient>>();
+const nodeClients = new Map<string, ReturnType<typeof createNodoAuthClient>>();
 
-/** Browser Supabase client for node login (auth only — no nodo_core schema). */
+/**
+ * Browser Supabase client for nodo login pages on the landing host.
+ * Always uses nodo-specific localStorage (never panel cookies).
+ */
 export function createNodeBrowserClient(nodeSlug: string) {
   const authCode = getNodoAuthCode(nodeSlug);
-  if (!authCode) return createClient();
+  const storageSlug = authCode?.toLowerCase() ?? normalizeNodeSlug(nodeSlug) ?? "unknown";
 
-  const cfg = getNodoPublicAuthConfig(authCode);
-  if (!cfg) return createClient();
+  const cfg = authCode ? getNodoPublicAuthConfig(authCode) : null;
+  const url = cfg?.url ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = cfg?.anonKey ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) {
+    throw new Error("Missing Supabase public env vars for nodo login.");
+  }
 
-  const landingUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (cfg.url === landingUrl) return createClient();
-
-  const cacheKey = `${cfg.url}:${cfg.anonKey}`;
+  const cacheKey = `${url}:${anonKey}:${storageSlug}`;
   const cached = nodeClients.get(cacheKey);
   if (cached) return cached;
 
-  const client = createBrowserClient(cfg.url, cfg.anonKey);
+  const client = createNodoAuthClient(url, anonKey, storageSlug);
   nodeClients.set(cacheKey, client);
   return client;
 }

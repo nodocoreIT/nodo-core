@@ -18,6 +18,12 @@
       "import": "./dist/lib/node-default-theme.js",
       "default": "./dist/lib/node-default-theme.js"
     },
+    "./lib/create-nodo-auth-client": {
+      "types": "./dist/lib/create-nodo-auth-client.d.ts",
+      "development": "./src/lib/create-nodo-auth-client.ts",
+      "import": "./dist/lib/create-nodo-auth-client.js",
+      "default": "./dist/lib/create-nodo-auth-client.js"
+    },
     "./styles/base.css": "./src/styles/base.css",
     "./styles/interactive.css": "./src/styles/interactive.css"
   },

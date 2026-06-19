@@ -20,19 +20,34 @@ async function resolveAdminOrgId(
     .eq("user_id", userId)
     .eq("role", "admin");
 
-  if (memberErr || !memberships?.length) return null;
+  if (!memberErr && memberships?.length) {
+    const orgIds = memberships.map((row) => row.org_id as string);
+    const { data: org, error: orgErr } = await admin
+      .schema("shared")
+      .from("organizations")
+      .select("id")
+      .in("id", orgIds)
+      .eq("product", product)
+      .maybeSingle();
 
-  const orgIds = memberships.map((row) => row.org_id as string);
-  const { data: org, error: orgErr } = await admin
-    .schema("shared")
-    .from("organizations")
-    .select("id")
-    .in("id", orgIds)
-    .eq("product", product)
-    .maybeSingle();
+    if (!orgErr && org?.id) return org.id as string;
+  }
 
-  if (orgErr || !org?.id) return null;
-  return org.id as string;
+  const { data: authUser } = await admin.auth.admin.getUserById(userId);
+  const orgIdFromClaims = authUser.user?.app_metadata?.org_id;
+  if (typeof orgIdFromClaims === "string" && orgIdFromClaims) {
+    const { data: org, error: orgErr } = await admin
+      .schema("shared")
+      .from("organizations")
+      .select("id")
+      .eq("id", orgIdFromClaims)
+      .eq("product", product)
+      .maybeSingle();
+
+    if (!orgErr && org?.id) return org.id as string;
+  }
+
+  return null;
 }
 
 async function purgeInmoStorage(admin: SupabaseClient, orgId: string): Promise<number> {
@@ -70,10 +85,13 @@ export async function purgeNodoOperationalData(
 ): Promise<PurgeResult> {
   const code = nodoCode.toLowerCase();
 
-  if (code === "inmo") {
-    const orgId = await resolveAdminOrgId(admin, provisionUserId, "inmo");
+  if (code === "inmo" || code === "clínica" || code === "clinica" || code === "salud") {
+    const product = code === "inmo" ? "inmo" : "clinica";
+    const orgId = await resolveAdminOrgId(admin, provisionUserId, product);
     if (!orgId) {
-      throw new Error("No se encontró la organización Inmo del usuario administrador.");
+      throw new Error(
+        `No se encontró la organización de ${nodoCode} del usuario administrador. Verificá que el acceso esté provisionado.`,
+      );
     }
 
     const { data: counts, error } = await admin.schema("nodo_inmo").rpc(
@@ -109,5 +127,7 @@ export async function purgeNodoOperationalData(
     };
   }
 
-  throw new Error(`El nodo "${nodoCode}" aún no soporta borrado de datos desde el panel.`);
+  throw new Error(
+    `El nodo "${nodoCode}" aún no soporta borrado de datos desde el panel.`,
+  );
 }
