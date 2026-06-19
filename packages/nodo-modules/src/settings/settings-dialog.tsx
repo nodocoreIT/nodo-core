@@ -104,7 +104,7 @@ function ProfileSettingsSection() {
               <FormItem>
                 <FormLabel>Nueva contraseña</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="Dejá en blanco para no cambiarla" {...field} />
+                  <Input type="password" placeholder="Ingresé contraseña…" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -118,7 +118,7 @@ function ProfileSettingsSection() {
               <FormItem>
                 <FormLabel>Confirmar contraseña</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="Repetí la nueva contraseña" {...field} />
+                  <Input type="password" placeholder="Repetí la contraseña…" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

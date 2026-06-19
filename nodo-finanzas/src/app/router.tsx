@@ -1,17 +1,10 @@
+import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AdminPortalPage } from "@/portals/admin/admin-portal-page";
 import { AuthCallbackPage } from "@/features/auth/callback/auth-callback-page";
 import { useAuth } from "@/shared/hooks/use-auth";
 import { redirectToLandingLogin } from "@/shared/lib/auth-redirect";
-import { Spinner } from "@/components/ui/spinner";
-
-function FullScreenSpinner() {
-  return (
-    <div className="min-h-screen bg-paper flex items-center justify-center">
-      <Spinner className="h-8 w-8" />
-    </div>
-  );
-}
+import { hideAppSplash } from "@/shared/lib/app-splash";
 
 function LoginRedirect() {
   redirectToLandingLogin();
@@ -26,7 +19,14 @@ function UnauthenticatedRedirect() {
 export function AppRouter() {
   const { session, loading } = useAuth();
 
-  if (loading) return <FullScreenSpinner />;
+  useEffect(() => {
+    if (loading) return;
+    const onCallback = window.location.pathname.includes("/auth/callback");
+    if (!onCallback) hideAppSplash();
+  }, [loading]);
+
+  // Keep index.html splash visible while auth resolves (avoids bg-paper flash).
+  if (loading) return null;
 
   return (
     <BrowserRouter basename="/finanzas">

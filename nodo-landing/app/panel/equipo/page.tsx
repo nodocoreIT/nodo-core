@@ -405,7 +405,7 @@ export default function EquipoPage() {
                         value={formPassword}
                         onChange={(e) => setFormPassword(e.target.value)}
                         style={inputStyle}
-                        placeholder="Mínimo 6 caracteres"
+                        placeholder="Ingresé contraseña…"
                         autoComplete="new-password"
                       />
                     </div>

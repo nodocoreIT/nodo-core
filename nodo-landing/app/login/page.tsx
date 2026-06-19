@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import EcosystemDiagram from "@/components/EcosystemDiagram";
 import { createClient } from "@/lib/supabase/client";
+import { INVALID_LOGIN_MESSAGE } from "@nodocore/shared-components";
 
 export default function LoginPage() {
   return (
@@ -68,7 +69,7 @@ function AdminLoginForm() {
     });
 
     if (error) {
-      setGeneralError("Credenciales incorrectas. Verificá e intentá nuevamente.");
+      setGeneralError(INVALID_LOGIN_MESSAGE);
       setLoading(false);
       return;
     }
@@ -219,7 +220,7 @@ function AdminLoginForm() {
                       <input
                         id="login-pass"
                         type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
+                        placeholder="Ingresé contraseña…"
                         autoComplete="current-password"
                         value={password}
                         onChange={(e) => {

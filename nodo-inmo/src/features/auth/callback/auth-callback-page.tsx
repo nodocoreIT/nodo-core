@@ -57,7 +57,7 @@ function SetPasswordForm() {
             <Input
               id="new-password"
               type="password"
-              placeholder="Mínimo 8 caracteres"
+              placeholder="Ingresé contraseña…"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -70,7 +70,7 @@ function SetPasswordForm() {
             <Input
               id="confirm-password"
               type="password"
-              placeholder="Repetí la contraseña"
+              placeholder="Repetí la contraseña…"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               required

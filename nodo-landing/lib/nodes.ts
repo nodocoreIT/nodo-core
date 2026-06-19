@@ -278,6 +278,24 @@ export function getLoginHrefForNode(slug: string): string {
   return `/nodo-${slug}/login`;
 }
 
+/** Same as login href but opens the register tab (e.g. pricing «Empezar ahora» CTAs). */
+export function withRegisterMode(loginHref: string): string {
+  const [path, query] = loginHref.split("?");
+  const params = new URLSearchParams(query ?? "");
+  params.set("mode", "register");
+  const qs = params.toString();
+  return `${path}?${qs}`;
+}
+
+export function getRegisterHrefForNode(slug: string): string {
+  return withRegisterMode(getLoginHrefForNode(slug));
+}
+
+export function getRegisterHrefForChildModule(childSlug: string): string {
+  if (childSlug === "clinica") return "/nodo-clinica/login?mode=register";
+  return `/nodo-${childSlug}/login?mode=register`;
+}
+
 export function needsModulePicker(nodeParam: string): boolean {
   const slug = normalizeNodeSlug(nodeParam);
   return getChildNodes(slug).length > 1;

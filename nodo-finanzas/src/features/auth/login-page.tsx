@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DollarSign } from 'lucide-react';
 import { supabase } from '@/shared/lib/supabase';
+import { enforceNodeAccess, INVALID_LOGIN_MESSAGE } from '@nodocore/shared-components';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -22,7 +23,12 @@ export function LoginPage() {
 
     if (mode === 'login') {
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError) setError('Credenciales incorrectas. Verificá tu email y contraseña.');
+      if (authError) {
+        setError(INVALID_LOGIN_MESSAGE);
+      } else {
+        const access = await enforceNodeAccess(supabase, 'Finanzas');
+        if (!access.ok) setError(access.message);
+      }
     } else {
       const { error: authError } = await supabase.auth.signUp({ email, password });
       if (authError) {
@@ -75,7 +81,7 @@ export function LoginPage() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
+            placeholder="Ingresé contraseña…"
             required
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
           />

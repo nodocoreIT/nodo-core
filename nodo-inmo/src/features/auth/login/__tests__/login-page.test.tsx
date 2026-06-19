@@ -11,12 +11,16 @@ import { MemoryRouter } from "react-router-dom";
 // Mock useAuth — LoginPage consumes it
 const mockSignIn = vi.fn();
 const mockUseAuth = vi.fn();
+const mockEnforceNodeAccess = vi.fn();
+const mockUseSupabase = vi.fn();
 
 vi.mock("@nodocore/shared-components", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@nodocore/shared-components")>();
   return {
     ...actual,
     useAuth: () => mockUseAuth(),
+    useSupabase: () => mockUseSupabase(),
+    enforceNodeAccess: (...args: unknown[]) => mockEnforceNodeAccess(...args),
     AuthProvider: ({ children }: { children: React.ReactNode }) => (
       <>{children}</>
     ),
@@ -44,6 +48,8 @@ describe("LoginPage", () => {
       signInWithPassword: mockSignIn,
       session: null,
     });
+    mockUseSupabase.mockReturnValue({});
+    mockEnforceNodeAccess.mockResolvedValue({ ok: true });
   });
 
   function renderLogin() {
@@ -121,6 +127,7 @@ describe("LoginPage", () => {
       data: { session: { user: {} } },
       error: null,
     });
+    mockEnforceNodeAccess.mockResolvedValue({ ok: true });
     renderLogin();
 
     await userEvent.type(screen.getByLabelText(/email/i), "admin@nodo.com");
@@ -133,6 +140,29 @@ describe("LoginPage", () => {
     );
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith("/"));
+  });
+
+  it("shows invalid-credentials message when user has no node access", async () => {
+    mockSignIn.mockResolvedValue({
+      data: { session: { user: {} } },
+      error: null,
+    });
+    mockEnforceNodeAccess.mockResolvedValue({
+      ok: false,
+      message: "Credenciales incorrectas. Verificá tu email y contraseña.",
+    });
+    renderLogin();
+
+    await userEvent.type(screen.getByLabelText(/email/i), "demo@nodocore.com.ar");
+    await userEvent.type(screen.getByLabelText(/contraseña|password/i), "secret123");
+    await userEvent.click(
+      screen.getByRole("button", { name: /iniciar sesión|sign in|ingresar/i }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(/credenciales incorrectas/i),
+    );
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it("disables the submit button while loading", async () => {

@@ -24,6 +24,8 @@ const AUTH_CONFIG = {
     owner: "/owner",
     tenant: "/tenant",
   },
+  unitCode: "Inmo",
+  allowedRoles: ["admin", "agent", "owner", "tenant"],
 };
 
 interface AppProvidersProps {

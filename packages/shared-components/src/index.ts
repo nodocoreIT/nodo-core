@@ -8,6 +8,14 @@ export {
   resolveDocumentFormat,
   type DocumentNumberFormat,
 } from "./lib/document-number";
+export {
+  userHasNodeAccess,
+  enforceNodeAccess,
+  INVALID_LOGIN_MESSAGE,
+  ACCESS_DENIED_MESSAGE,
+  AUTH_ERROR_CREDENTIALS,
+  nodeLoginUrlWithAuthError,
+} from "./lib/verify-node-access";
 
 // ─── Providers ───────────────────────────────────────────────────────────────
 export { SupabaseProvider, useSupabase } from "./providers/supabase-provider";

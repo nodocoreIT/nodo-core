@@ -56,11 +56,19 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/configuracion": "Configuración",
 };
 
+function initials(value: string): string {
+  const base = value.trim();
+  if (!base) return "?";
+  const parts = base.split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return base.slice(0, 2).toUpperCase();
+}
+
 export function AdminLayout() {
   const { pathname } = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dolarModalOpen, setDolarModalOpen] = useState(false);
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const dolar = useDolar();
 
   useEffect(() => {
@@ -78,6 +86,10 @@ export function AdminLayout() {
     Object.entries(ROUTE_TITLES)
       .sort((a, b) => b[0].length - a[0].length)
       .find(([key]) => pathname.startsWith(key))?.[1] ?? "Nodo Finanzas";
+
+  const fullName = (user?.user_metadata?.full_name as string | undefined) ?? "";
+  const email = user?.email ?? "";
+  const displayName = fullName || email;
 
   return (
     <div className="flex h-screen overflow-hidden bg-paper">
@@ -138,14 +150,27 @@ export function AdminLayout() {
           </div>
         </nav>
 
-        {/* Bottom padding */}
+        {/* Bottom: usuario + cerrar sesión */}
         <div className="flex-shrink-0 border-t border-navy-700 p-3">
+          <div className="flex items-center gap-3 px-1 py-1">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
+              {initials(displayName)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-white">{displayName}</p>
+              {fullName && (
+                <p className="truncate text-xs text-white/60">{email}</p>
+              )}
+            </div>
+          </div>
+
           <Button
             variant="outline"
-            className="w-full justify-center gap-2 border-navy-700 bg-transparent text-white/60 hover:bg-brand/10 hover:text-brand hover:border-brand"
-            onClick={() => window.location.replace("/nodo-landing")}
+            onClick={() => void signOut()}
+            className="mt-2 w-full cursor-pointer justify-center gap-2 border-navy-700 bg-transparent text-white/60 hover:bg-brand/10 hover:text-brand hover:border-brand"
           >
-            Nodo Finanzas
+            <LogOut className="h-4 w-4" />
+            Cerrar sesión
           </Button>
         </div>
       </aside>
@@ -170,19 +195,7 @@ export function AdminLayout() {
             </div>
           </div>
 
-          <PortalHeaderMobileActions
-            notifications={<NotificationBell />}
-            trailing={
-              <button
-                type="button"
-                onClick={() => void signOut()}
-                title="Cerrar sesión"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate2 hover:bg-mist hover:text-navy transition-colors"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            }
-          />
+          <PortalHeaderMobileActions notifications={<NotificationBell />} />
 
           <PortalHeaderActions
             metrics={
@@ -212,16 +225,6 @@ export function AdminLayout() {
               </>
             }
             notifications={<NotificationBell />}
-            trailing={
-              <button
-                type="button"
-                onClick={() => void signOut()}
-                title="Cerrar sesión"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate2 hover:bg-mist hover:text-navy transition-colors"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            }
           />
         </header>
 

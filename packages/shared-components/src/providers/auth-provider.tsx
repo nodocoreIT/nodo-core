@@ -12,12 +12,17 @@ import type {
   AuthTokenResponsePassword,
 } from "@supabase/supabase-js";
 import { useSupabase } from "./supabase-provider";
+import { userHasNodeAccess } from "../lib/verify-node-access";
 
 // ─── Public interfaces ──────────────────────────────────────────────────────
 
 export interface AuthConfig {
   /** Maps role strings to redirect paths on successful sign-in. */
   roleDestinations: Record<string, string>;
+  /** When set, session is rejected unless user_has_node_access RPC returns true. */
+  unitCode?: string;
+  /** When set, JWT role must be one of these values (blocks cross-nodo role bleed). */
+  allowedRoles?: string[];
 }
 
 export interface AuthContextValue {
@@ -98,23 +103,60 @@ export function AuthProvider({
 
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
+  async function validateSession(s: Session | null) {
+      if (!s) {
+        if (!cancelled) setAccessDenied(false);
+        return;
+      }
+
+      const claims = readClaims(s);
+
+      if (config.allowedRoles?.length) {
+        if (!claims.role || !config.allowedRoles.includes(claims.role)) {
+          await supabase.auth.signOut();
+          if (!cancelled) setAccessDenied(true);
+          return;
+        }
+      }
+
+      if (config.unitCode) {
+        const allowed = await userHasNodeAccess(supabase, config.unitCode);
+        if (!allowed) {
+          await supabase.auth.signOut();
+          if (!cancelled) setAccessDenied(true);
+          return;
+        }
+      }
+
+      if (!cancelled) setAccessDenied(false);
+    }
+
     // Seed session from cache
     supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
       setSession(data.session);
       setIsLoading(false);
+      void validateSession(data.session);
     });
 
-    // Subscribe to auth state changes — readClaims is derived from session so
-    // it updates automatically on token refresh without extra logic.
+    // Subscribe to auth state changes
     const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (cancelled) return;
       setSession(s);
       setIsLoading(false);
+      void validateSession(s);
     });
 
-    return () => listener.subscription.unsubscribe();
-  }, [supabase]);
+    return () => {
+      cancelled = true;
+      listener.subscription.unsubscribe();
+    };
+  }, [supabase, config.unitCode]);
 
   const signIn = useCallback(
     async (email: string, password: string): Promise<void> => {
@@ -142,13 +184,16 @@ export function AuthProvider({
   }, [supabase]);
 
   const { role, orgId, plan } = readClaims(session);
+  const roleAllowed =
+    !config.allowedRoles?.length ||
+    (role != null && config.allowedRoles.includes(role));
 
   const value: AuthContextValue = {
-    session,
-    user: session?.user ?? null,
-    role,
-    orgId,
-    plan,
+    session: accessDenied || !roleAllowed ? null : session,
+    user: accessDenied || !roleAllowed ? null : session?.user ?? null,
+    role: accessDenied || !roleAllowed ? null : role,
+    orgId: accessDenied || !roleAllowed ? null : orgId,
+    plan: accessDenied || !roleAllowed ? null : plan,
     isLoading,
     signIn,
     signInWithPassword,
