@@ -1,0 +1,323 @@
+{
+  "name": "StockAutos – Facebook Vehicle Automation",
+  "nodes": [
+    {
+      "id": "bbb00001-0000-4000-b000-000000000001",
+      "name": "Webhook: Recibir Acción",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 360],
+      "webhookId": "stockautos-facebook-webhook",
+      "parameters": {
+        "path": "facebook-vehicle",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "notes": "Recibe POST desde la app StockAutos (automation.ts).\nPayload esperado:\n- action: 'publish' | 'delete' | 'pause' | 'delete_republish'\n- platform: 'facebook'\n- vehicle: { id, brand, model, year, version, price, currency, showPrice, kilometers, photos[], description, features[] }\n- externalId: string (requerido para delete, pause, delete_republish)"
+    },
+    {
+      "id": "bbb00002-0000-4000-b000-000000000002",
+      "name": "Switch: Acción",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [500, 360],
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.body ? $json.body.action : $json.action }}",
+        "rules": {
+          "rules": [
+            { "value2": "publish", "operation": "equal" },
+            { "value2": "delete", "operation": "equal" },
+            { "value2": "pause", "operation": "equal" },
+            { "value2": "delete_republish", "operation": "equal" }
+          ]
+        },
+        "fallbackOutput": 3
+      }
+    },
+    {
+      "id": "bbb00003-0000-4000-b000-000000000003",
+      "name": "Code: Publicar en Facebook",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 80],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// PUBLICAR VEHÍCULO EN FACEBOOK PAGE\n// ─────────────────────────────────────────────────────────────────────────────\n// Variables requeridas (hardcodeadas o via $vars si tenés licencia):\n//   FB_PAGE_ID          : ID numérico de tu Facebook Page\n//   FB_PAGE_ACCESS_TOKEN: Page Access Token de larga duración\n// ─────────────────────────────────────────────────────────────────────────────\n\nconst FB_PAGE_ID = $vars.FB_PAGE_ID;\nconst FB_PAGE_ACCESS_TOKEN = $vars.FB_PAGE_ACCESS_TOKEN;\nconst BASE_URL = 'https://graph.facebook.com/v21.0';\n\nif (!FB_PAGE_ID || !FB_PAGE_ACCESS_TOKEN) {\n  throw new Error('Faltan variables del workflow. Configurá FB_PAGE_ID y FB_PAGE_ACCESS_TOKEN.');\n}\n\nconst items = $input.all();\nconst raw = items[0].json;\nconst data = raw.body || raw;\nconst vehicle = data.vehicle;\n\nif (!vehicle) {\n  throw new Error('Payload inválido: falta el objeto vehicle.');\n}\n\n// ── Construir mensaje ────────────────────────────────────────────────────────\nconst titulo = vehicle.brand + ' ' + vehicle.model + ' ' + vehicle.year + (vehicle.version ? ' ' + vehicle.version : '');\nconst km = vehicle.kilometers > 0\n  ? vehicle.kilometers.toLocaleString('es-AR') + ' km'\n  : '0 km';\nconst precio = (vehicle.showPrice !== false && vehicle.price && vehicle.price > 0)\n  ? vehicle.currency + ' ' + vehicle.price.toLocaleString('es-AR')\n  : '';\nconst featuresList = (vehicle.features && vehicle.features.length > 0)\n  ? vehicle.features.slice(0, 5).join(' • ')\n  : '';\n\nlet message = '🚗 ' + titulo + '\\n\\n' + (vehicle.description || '');\nif (featuresList) message += '\\n\\n✨ ' + featuresList;\nmessage += '\\n\\n📍 ' + km;\nif (precio) message += '\\n💰 ' + precio;\nmessage += '\\n\\n📲 Consultanos por DM o WhatsApp';\n\n// ── Validar fotos ───────────────────────────────────────────────────────────\nconst photos = (vehicle.photos || [])\n  .filter(function(p) { return typeof p === 'string' && p.startsWith('http'); })\n  .slice(0, 10);\n\nif (photos.length === 0) {\n  throw new Error('No hay fotos públicas (URLs http/https) disponibles para publicar en Facebook.');\n}\n\ntry {\n  let postId;\n\n  if (photos.length === 1) {\n    // ── Post con imagen única ──────────────────────────────────────────────\n    const res = await this.helpers.httpRequest({\n      method: 'POST',\n      url: BASE_URL + '/' + FB_PAGE_ID + '/photos',\n      qs: {\n        url: photos[0],\n        caption: message,\n        access_token: FB_PAGE_ACCESS_TOKEN\n      }\n    });\n\n    if (!res.id) {\n      throw new Error('Error al publicar foto: ' + JSON.stringify(res));\n    }\n    postId = res.post_id || res.id;\n\n  } else {\n    // ── Post con álbum (2–10 fotos) ────────────────────────────────────────\n    // Paso 1: subir cada foto sin publicar para obtener su media_fbid\n    const mediaIds = [];\n\n    for (var i = 0; i < photos.length; i++) {\n      const photoRes = await this.helpers.httpRequest({\n        method: 'POST',\n        url: BASE_URL + '/' + FB_PAGE_ID + '/photos',\n        qs: {\n          url: photos[i],\n          published: 'false',\n          access_token: FB_PAGE_ACCESS_TOKEN\n        }\n      });\n\n      if (!photoRes.id) {\n        throw new Error('Error al subir foto ' + (i + 1) + ': ' + JSON.stringify(photoRes));\n      }\n      mediaIds.push({ media_fbid: photoRes.id });\n    }\n\n    // Paso 2: crear el post con todas las fotos adjuntas\n    const postRes = await this.helpers.httpRequest({\n      method: 'POST',\n      url: BASE_URL + '/' + FB_PAGE_ID + '/feed',\n      qs: {\n        message: message,\n        attached_media: JSON.stringify(mediaIds),\n        access_token: FB_PAGE_ACCESS_TOKEN\n      }\n    });\n\n    if (!postRes.id) {\n      throw new Error('Error al crear post con álbum: ' + JSON.stringify(postRes));\n    }\n    postId = postRes.id;\n  }\n\n  return [{\n    json: {\n      success: true,\n      externalId: postId,\n      vehicleId: vehicle.id,\n      platform: 'facebook',\n      action: 'published',\n      message: 'Publicación creada exitosamente en Facebook',\n      publishedAt: new Date().toISOString(),\n      photoCount: photos.length,\n      postType: photos.length === 1 ? 'single' : 'album'\n    }\n  }];\n\n} catch (error) {\n  return [{\n    json: {\n      success: false,\n      error: error.message,\n      vehicleId: vehicle ? vehicle.id : null,\n      platform: 'facebook',\n      action: 'publish'\n    }\n  }];\n}"
+      },
+      "notes": "Publica en Facebook Page.\n- 1 foto → post de imagen única\n- 2–10 fotos → álbum (multi-foto)\nRequiere FB_PAGE_ID y FB_PAGE_ACCESS_TOKEN."
+    },
+    {
+      "id": "bbb00004-0000-4000-b000-000000000004",
+      "name": "Respond: Publicado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1020, 80],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": { "responseCode": 200 }
+      }
+    },
+    {
+      "id": "bbb00005-0000-4000-b000-000000000005",
+      "name": "HTTP: Eliminar Post FB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [760, 280],
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.body ? $json.body.externalId : $json.externalId }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "access_token", "value": "={{ $vars.FB_PAGE_ACCESS_TOKEN }}" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "neverError": true } }
+        }
+      },
+      "notes": "Elimina definitivamente el post de Facebook.\nRequiere externalId (ID del post en Graph API)."
+    },
+    {
+      "id": "bbb00006-0000-4000-b000-000000000006",
+      "name": "Set: Respuesta Eliminado",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [980, 280],
+      "parameters": {
+        "mode": "manual",
+        "fields": {
+          "values": [
+            { "name": "success", "type": "booleanValue", "booleanValue": "={{ $json.success === true }}" },
+            { "name": "platform", "type": "stringValue", "stringValue": "facebook" },
+            { "name": "action", "type": "stringValue", "stringValue": "deleted" },
+            { "name": "message", "type": "stringValue", "stringValue": "Publicación eliminada definitivamente de Facebook" },
+            { "name": "deletedAt", "type": "stringValue", "stringValue": "={{ new Date().toISOString() }}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "bbb00007-0000-4000-b000-000000000007",
+      "name": "Respond: Eliminado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1180, 280],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": { "responseCode": 200 }
+      }
+    },
+    {
+      "id": "bbb00008-0000-4000-b000-000000000008",
+      "name": "Code: Pausar Post FB",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 480],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// PAUSAR PUBLICACIÓN EN FACEBOOK\n// ─────────────────────────────────────────────────────────────────────────────\n// Facebook Graph API no soporta ocultar posts de página via API pública.\n// Esta acción devuelve success:true para que StockAutos guarde el estado\n// 'paused' localmente. El usuario puede ocultarlo manualmente desde Facebook.\n// ─────────────────────────────────────────────────────────────────────────────\n\nconst items = $input.all();\nconst raw = items[0].json;\nconst data = raw.body || raw;\nconst externalId = data.externalId;\n\nif (!externalId) {\n  throw new Error('externalId es requerido para pausar la publicación.');\n}\n\nreturn [{\n  json: {\n    success: true,\n    externalId: externalId,\n    platform: 'facebook',\n    action: 'paused',\n    message: 'Estado pausado guardado en StockAutos. Ocultá el post manualmente en Facebook si es necesario.',\n    pausedAt: new Date().toISOString(),\n    note: 'Facebook Graph API no permite ocultar posts de página de forma programática. Para reactivar usá delete_republish.'\n  }\n}];"
+      },
+      "notes": "Facebook no soporta ocultar posts via API.\nDevuelve success:true para guardar el estado 'paused' en StockAutos.\nEl usuario debe ocultarlo manualmente en Facebook si es necesario."
+    },
+    {
+      "id": "bbb00009-0000-4000-b000-000000000009",
+      "name": "Respond: Pausado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1020, 480],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": { "responseCode": 200 }
+      }
+    },
+    {
+      "id": "bbb00010-0000-4000-b000-000000000010",
+      "name": "HTTP: Eliminar Post FB (Republicar)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [760, 680],
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.body ? $json.body.externalId : $json.externalId }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "access_token", "value": "={{ $vars.FB_PAGE_ACCESS_TOKEN }}" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "neverError": true } }
+        }
+      },
+      "notes": "Primer paso de delete_republish: elimina el post anterior."
+    },
+    {
+      "id": "bbb00011-0000-4000-b000-000000000011",
+      "name": "Code: Merge Data Republicar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 680],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const webhookData = $('Webhook: Recibir Acción').first().json;\nreturn [{ json: webhookData.body || webhookData }];"
+      },
+      "notes": "Recupera los datos originales del vehículo para la republicación."
+    },
+    {
+      "id": "bbb00012-0000-4000-b000-000000000012",
+      "name": "Code: Republicar en Facebook",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1160, 680],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// REPUBLICAR VEHÍCULO EN FACEBOOK (eliminar + publicar nuevo)\n// ─────────────────────────────────────────────────────────────────────────────\n\nconst FB_PAGE_ID = $vars.FB_PAGE_ID;\nconst FB_PAGE_ACCESS_TOKEN = $vars.FB_PAGE_ACCESS_TOKEN;\nconst BASE_URL = 'https://graph.facebook.com/v21.0';\n\nif (!FB_PAGE_ID || !FB_PAGE_ACCESS_TOKEN) {\n  throw new Error('Faltan variables del workflow. Configurá FB_PAGE_ID y FB_PAGE_ACCESS_TOKEN.');\n}\n\nconst items = $input.all();\nconst raw = items[0].json;\nconst data = raw.body || raw;\nconst vehicle = data.vehicle;\n\nif (!vehicle) {\n  throw new Error('Payload inválido: falta el objeto vehicle.');\n}\n\nconst titulo = vehicle.brand + ' ' + vehicle.model + ' ' + vehicle.year + (vehicle.version ? ' ' + vehicle.version : '');\nconst km = vehicle.kilometers > 0\n  ? vehicle.kilometers.toLocaleString('es-AR') + ' km'\n  : '0 km';\nconst precio = (vehicle.showPrice !== false && vehicle.price && vehicle.price > 0)\n  ? vehicle.currency + ' ' + vehicle.price.toLocaleString('es-AR')\n  : '';\nconst featuresList = (vehicle.features && vehicle.features.length > 0)\n  ? vehicle.features.slice(0, 5).join(' • ')\n  : '';\n\nlet message = '🚗 ' + titulo + '\\n\\n' + (vehicle.description || '');\nif (featuresList) message += '\\n\\n✨ ' + featuresList;\nmessage += '\\n\\n📍 ' + km;\nif (precio) message += '\\n💰 ' + precio;\nmessage += '\\n\\n📲 Consultanos por DM o WhatsApp';\n\nconst photos = (vehicle.photos || [])\n  .filter(function(p) { return typeof p === 'string' && p.startsWith('http'); })\n  .slice(0, 10);\n\nif (photos.length === 0) {\n  throw new Error('No hay fotos públicas disponibles para republicar en Facebook.');\n}\n\ntry {\n  let postId;\n\n  if (photos.length === 1) {\n    const res = await this.helpers.httpRequest({\n      method: 'POST',\n      url: BASE_URL + '/' + FB_PAGE_ID + '/photos',\n      qs: {\n        url: photos[0],\n        caption: message,\n        access_token: FB_PAGE_ACCESS_TOKEN\n      }\n    });\n    if (!res.id) throw new Error('Error al publicar foto: ' + JSON.stringify(res));\n    postId = res.post_id || res.id;\n\n  } else {\n    const mediaIds = [];\n    for (var i = 0; i < photos.length; i++) {\n      const photoRes = await this.helpers.httpRequest({\n        method: 'POST',\n        url: BASE_URL + '/' + FB_PAGE_ID + '/photos',\n        qs: {\n          url: photos[i],\n          published: 'false',\n          access_token: FB_PAGE_ACCESS_TOKEN\n        }\n      });\n      if (!photoRes.id) throw new Error('Error al subir foto ' + (i + 1) + ': ' + JSON.stringify(photoRes));\n      mediaIds.push({ media_fbid: photoRes.id });\n    }\n\n    const postRes = await this.helpers.httpRequest({\n      method: 'POST',\n      url: BASE_URL + '/' + FB_PAGE_ID + '/feed',\n      qs: {\n        message: message,\n        attached_media: JSON.stringify(mediaIds),\n        access_token: FB_PAGE_ACCESS_TOKEN\n      }\n    });\n    if (!postRes.id) throw new Error('Error al crear post con álbum: ' + JSON.stringify(postRes));\n    postId = postRes.id;\n  }\n\n  return [{\n    json: {\n      success: true,\n      externalId: postId,\n      vehicleId: vehicle.id,\n      platform: 'facebook',\n      action: 'republished',\n      message: 'Publicación republicada exitosamente en Facebook con fecha actualizada',\n      republishedAt: new Date().toISOString(),\n      photoCount: photos.length,\n      postType: photos.length === 1 ? 'single' : 'album'\n    }\n  }];\n\n} catch (error) {\n  return [{\n    json: {\n      success: false,\n      error: error.message,\n      vehicleId: vehicle ? vehicle.id : null,\n      platform: 'facebook',\n      action: 'delete_republish'\n    }\n  }];\n}"
+      },
+      "notes": "Segundo paso de delete_republish: crea el post nuevo en Facebook.\nManeja imagen única y álbum (hasta 10 fotos)."
+    },
+    {
+      "id": "bbb00013-0000-4000-b000-000000000013",
+      "name": "Respond: Republicado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1360, 680],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": { "responseCode": 200 }
+      }
+    },
+    {
+      "id": "bbb00014-0000-4000-b000-000000000014",
+      "name": "Respond: Acción Desconocida",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [760, 880],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"success\": false, \"error\": \"Acción desconocida. Valores válidos: publish, delete, pause, delete_republish\", \"platform\": \"facebook\"}",
+        "options": { "responseCode": 400 }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook: Recibir Acción": {
+      "main": [[{ "node": "Switch: Acción", "type": "main", "index": 0 }]]
+    },
+    "Switch: Acción": {
+      "main": [
+        [{ "node": "Code: Publicar en Facebook", "type": "main", "index": 0 }],
+        [{ "node": "HTTP: Eliminar Post FB", "type": "main", "index": 0 }],
+        [{ "node": "Code: Pausar Post FB", "type": "main", "index": 0 }],
+        [{ "node": "HTTP: Eliminar Post FB (Republicar)", "type": "main", "index": 0 }],
+        [{ "node": "Respond: Acción Desconocida", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code: Publicar en Facebook": {
+      "main": [[{ "node": "Respond: Publicado", "type": "main", "index": 0 }]]
+    },
+    "HTTP: Eliminar Post FB": {
+      "main": [[{ "node": "Set: Respuesta Eliminado", "type": "main", "index": 0 }]]
+    },
+    "Set: Respuesta Eliminado": {
+      "main": [[{ "node": "Respond: Eliminado", "type": "main", "index": 0 }]]
+    },
+    "Code: Pausar Post FB": {
+      "main": [[{ "node": "Respond: Pausado", "type": "main", "index": 0 }]]
+    },
+    "HTTP: Eliminar Post FB (Republicar)": {
+      "main": [[{ "node": "Code: Merge Data Republicar", "type": "main", "index": 0 }]]
+    },
+    "Code: Merge Data Republicar": {
+      "main": [[{ "node": "Code: Republicar en Facebook", "type": "main", "index": 0 }]]
+    },
+    "Code: Republicar en Facebook": {
+      "main": [[{ "node": "Respond: Republicado", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "StockAutos" },
+    { "name": "Facebook" },
+    { "name": "Social Media" }
+  ],
+  "triggerCount": 0,
+  "versionId": "1",
+  "meta": { "templateCredsSetupCompleted": false },
+  "__readme": {
+    "configuracion": {
+      "paso_1_variables": "En n8n → hardcodear en cada Code node:\n  - FB_PAGE_ID: ID numérico de tu Facebook Page\n  - FB_PAGE_ACCESS_TOKEN: Page Access Token de larga duración (generado desde Graph API Explorer con permisos pages_manage_posts, pages_read_engagement)",
+      "paso_2_permisos": "El Page Access Token necesita los permisos:\n  - pages_manage_posts\n  - pages_read_engagement\n  - publish_video (opcional, para videos futuros)",
+      "paso_3_webhook": "En la app StockAutos, agregar en .env:\n  VITE_N8N_FACEBOOK_WEBHOOK_URL=https://TU-N8N.com/webhook/facebook-vehicle",
+      "paso_4_activar": "Activar el workflow en n8n (toggle en la esquina superior derecha)"
+    },
+    "diferencias_vs_instagram": {
+      "album": "Facebook usa /{page-id}/photos con published:false + /{page-id}/feed con attached_media en lugar del sistema de carrusel de Instagram.",
+      "pause": "Facebook no permite ocultar posts via API. La pausa es solo local en StockAutos.",
+      "token": "Requiere Page Access Token (no User Token). El mismo token que Instagram si usás Facebook Login en la misma app de Meta.",
+      "sin_wait": "Facebook no requiere el sleep de 15s que sí necesita Instagram para procesar el container."
+    },
+    "payloads": {
+      "publish": {
+        "action": "publish",
+        "platform": "facebook",
+        "vehicle": {
+          "id": "abc123",
+          "brand": "Toyota",
+          "model": "Corolla",
+          "year": 2022,
+          "version": "XEi CVT",
+          "price": 18500000,
+          "currency": "ARS",
+          "showPrice": true,
+          "kilometers": 45000,
+          "photos": ["https://ejemplo.com/foto1.jpg", "https://ejemplo.com/foto2.jpg"],
+          "description": "Excelente estado, full equipo, único dueño.",
+          "features": ["Techo solar", "Cámara de retroceso", "Apple CarPlay"]
+        }
+      },
+      "delete": {
+        "action": "delete",
+        "platform": "facebook",
+        "externalId": "123456789012345_987654321098765"
+      },
+      "pause": {
+        "action": "pause",
+        "platform": "facebook",
+        "externalId": "123456789012345_987654321098765"
+      },
+      "delete_republish": {
+        "action": "delete_republish",
+        "platform": "facebook",
+        "externalId": "123456789012345_987654321098765",
+        "vehicle": {
+          "id": "abc123",
+          "brand": "Toyota",
+          "model": "Corolla",
+          "year": 2022,
+          "price": 17900000,
+          "currency": "ARS",
+          "showPrice": true,
+          "kilometers": 45000,
+          "photos": ["https://ejemplo.com/foto1.jpg"],
+          "description": "Precio actualizado. Excelente estado.",
+          "features": ["Techo solar"]
+        }
+      }
+    }
+  }
+}

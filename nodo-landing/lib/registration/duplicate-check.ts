@@ -8,14 +8,18 @@ export async function isEmailRegisteredForNode(
 ): Promise<boolean> {
   const normalizedEmail = email.trim().toLowerCase();
 
-  const { data: access } = await admin
+  const { data: access, error: accessErr } = await admin
     .from("node_email_access")
     .select("status")
     .eq("email", normalizedEmail)
     .eq("unit_code", unitCode)
     .maybeSingle();
 
-  if (access && access.status !== "pausado") return true;
+  if (accessErr) {
+    console.error("isEmailRegisteredForNode node_email_access:", accessErr);
+  } else if (access && access.status !== "pausado") {
+    return true;
+  }
 
   const { data: client } = await admin
     .from("clients")

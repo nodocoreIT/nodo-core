@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Sora, Hanken_Grotesk } from "next/font/google";
+import { RecoveryHashRedirect } from "@/components/RecoveryHashRedirect";
 import "./globals.css";
 
 const sora = Sora({
@@ -30,7 +31,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${sora.variable} ${hanken.variable}`} suppressHydrationWarning>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        <RecoveryHashRedirect />
+        {children}
+      </body>
     </html>
   );
 }

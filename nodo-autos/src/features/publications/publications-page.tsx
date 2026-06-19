@@ -1,10 +1,22 @@
-import { useEffect } from "react";
-import { Car, Globe } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@nodocore/shared-components";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Car, Globe, Search, Share2 } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+} from "@nodocore/shared-components";
 import { useVehicleStore } from "@/store/vehicle-store";
 import type { PublicationChannel, PublicationStatus } from "@/types";
+import {
+  SOCIAL_PLATFORMS,
+  getPublicationForPlatform,
+  isPlatformPublished,
+} from "@/utils/publication-social";
 
-const CHANNELS: PublicationChannel[] = ["instagram", "facebook", "website", "mercadolibre"];
+const LIST_CHANNELS: PublicationChannel[] = ["instagram", "facebook", "website", "mercadolibre"];
 
 const CHANNEL_LABELS: Record<PublicationChannel, string> = {
   instagram: "Instagram",
@@ -27,34 +39,73 @@ const STATUS_LABEL: Record<PublicationStatus, string> = {
   fallido: "Fallido",
 };
 
+function matchesQuery(value: string, query: string) {
+  return value.toLowerCase().includes(query);
+}
+
 export function PublicationsPage() {
+  const navigate = useNavigate();
   const { vehicles, publications, loadInitialData, loading } = useVehicleStore();
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     void loadInitialData();
   }, [loadInitialData]);
 
-  const publishedVehicles = vehicles.filter((v) => v.isPublished || publications.some((p) => p.vehicleId === v.id));
+  const filteredVehicles = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return vehicles;
+    return vehicles.filter((vehicle) => {
+      const haystack = [
+        vehicle.licensePlate || "",
+        vehicle.brand,
+        vehicle.model,
+        vehicle.version || "",
+        String(vehicle.year),
+      ];
+      return haystack.some((field) => matchesQuery(field, query));
+    });
+  }, [vehicles, searchQuery]);
 
   return (
     <div className="space-y-5">
-      <h2 className="text-xl font-bold text-navy">Publicaciones</h2>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-navy">Publicaciones</h2>
+          <p className="text-sm text-slate2 mt-1">
+            Gestioná la publicación de vehículos en Instagram, Facebook y otros canales.
+          </p>
+        </div>
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate2" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar por patente, marca, modelo…"
+            className="pl-9"
+          />
+        </div>
+      </div>
 
       {loading && <p className="text-sm text-slate2">Cargando…</p>}
 
-      {!loading && publishedVehicles.length === 0 && (
+      {!loading && filteredVehicles.length === 0 && (
         <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
           <Globe className="h-10 w-10 text-slate2-300" />
-          <p className="text-slate2">No hay vehículos publicados aún.</p>
+          <p className="text-slate2">
+            {vehicles.length === 0
+              ? "No hay vehículos cargados aún."
+              : "No se encontraron vehículos con ese criterio."}
+          </p>
         </div>
       )}
 
-      {!loading && publishedVehicles.length > 0 && (
+      {!loading && filteredVehicles.length > 0 && (
         <Card className="border-slate-200 rounded-xl shadow-sm overflow-hidden">
           <CardHeader className="border-b border-mist">
             <div className="grid grid-cols-[1fr_repeat(4,_minmax(80px,_100px))] gap-4 items-center">
               <CardTitle className="text-xs text-slate2 uppercase tracking-wide">Vehículo</CardTitle>
-              {CHANNELS.map((ch) => (
+              {LIST_CHANNELS.map((ch) => (
                 <span key={ch} className="text-xs text-slate2 uppercase tracking-wide text-center">
                   {CHANNEL_LABELS[ch]}
                 </span>
@@ -63,15 +114,19 @@ export function PublicationsPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-mist">
-              {publishedVehicles.map((v) => {
+              {filteredVehicles.map((v) => {
                 const vehiclePublications = publications.filter((p) => p.vehicleId === v.id);
+                const socialPublishedCount = SOCIAL_PLATFORMS.filter((platform) =>
+                  isPlatformPublished(getPublicationForPlatform(publications, v.id, platform)),
+                ).length;
 
                 return (
-                  <div
+                  <button
                     key={v.id}
-                    className="grid grid-cols-[1fr_repeat(4,_minmax(80px,_100px))] gap-4 items-center px-5 py-3"
+                    type="button"
+                    onClick={() => navigate(`/admin/publicaciones/${v.id}`)}
+                    className="grid grid-cols-[1fr_repeat(4,_minmax(80px,_100px))] gap-4 items-center px-5 py-3 w-full text-left hover:bg-paper transition-colors group"
                   >
-                    {/* Vehicle info */}
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="h-9 w-12 flex-shrink-0 overflow-hidden rounded-md bg-mist">
                         {v.photos[0] ? (
@@ -87,23 +142,46 @@ export function PublicationsPage() {
                         )}
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-navy">
+                        <p className="truncate text-sm font-semibold text-navy group-hover:text-brand transition-colors">
                           {v.brand} {v.model}
                         </p>
-                        <p className="text-xs text-slate2">{v.year}</p>
+                        <p className="text-xs text-slate2 flex items-center gap-2">
+                          <span>{v.year}</span>
+                          {socialPublishedCount > 0 && (
+                            <span className="inline-flex items-center gap-1 text-emerald-600">
+                              <Share2 className="h-3 w-3" />
+                              {socialPublishedCount} red{socialPublishedCount > 1 ? "es" : ""}
+                            </span>
+                          )}
+                        </p>
                       </div>
                     </div>
 
-                    {/* Channel badges */}
-                    {CHANNELS.map((ch) => {
+                    {LIST_CHANNELS.map((ch) => {
                       const pub = vehiclePublications.find((p) => p.channel === ch);
+                      const socialPublished =
+                        (ch === "instagram" || ch === "facebook") &&
+                        isPlatformPublished(
+                          getPublicationForPlatform(publications, v.id, ch),
+                        );
+
                       return (
                         <div key={ch} className="flex justify-center">
-                          {pub ? (
+                          {socialPublished || pub ? (
                             <span
-                              className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[pub.status]}`}
+                              className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                socialPublished || pub?.status === "publicado"
+                                  ? STATUS_BADGE.publicado
+                                  : pub
+                                    ? STATUS_BADGE[pub.status]
+                                    : STATUS_BADGE.borrador
+                              }`}
                             >
-                              {STATUS_LABEL[pub.status]}
+                              {socialPublished || pub?.status === "publicado"
+                                ? STATUS_LABEL.publicado
+                                : pub
+                                  ? STATUS_LABEL[pub.status]
+                                  : "—"}
                             </span>
                           ) : (
                             <span className="text-xs text-slate2-300">—</span>
@@ -111,7 +189,7 @@ export function PublicationsPage() {
                         </div>
                       );
                     })}
-                  </div>
+                  </button>
                 );
               })}
             </div>

@@ -27,7 +27,12 @@ export const NODE_REGISTRATION_CONFIG: Record<string, NodeRegistrationConfig> =
         label: n.label,
         provisionable: n.provisionable ?? false,
         requiresIdentityVerification: n.requiresIdentityVerification ?? false,
-        selfServicePlans: n.code === "Salud" || n.code === "Clínica" ? ["paciente"] : [],
+        selfServicePlans:
+          n.code === "Salud" || n.code === "Clínica"
+            ? ["paciente"]
+            : n.code === "Finanzas"
+              ? ["finanzas"]
+              : [],
         productKey: n.slug,
         accessUrl: `/${n.slug}`,
       },

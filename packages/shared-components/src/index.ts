@@ -23,6 +23,11 @@ export {
   NotificationBellButton,
   type NotificationBellButtonProps,
 } from "./components/notification-bell-button";
+export {
+  PasswordResetPanel,
+  type PasswordResetPanelProps,
+} from "./components/password-reset-panel";
+export { usePasswordRecoveryBootstrap, isRecoveryHash } from "./hooks/use-password-recovery-bootstrap";
 export { PlanGate, type PlanTier } from "./components/plan-gate";
 export { RequireAuth } from "./components/require-auth";
 

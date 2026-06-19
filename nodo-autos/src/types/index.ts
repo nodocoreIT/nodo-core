@@ -103,6 +103,8 @@ export interface Vehicle {
   // Publication
   isPublished: boolean;
   publicSlug: string;
+  socialTitle?: string;
+  socialDescription?: string;
 
   // Internal
   internalNotes?: string;
@@ -121,6 +123,7 @@ export interface Publication {
   vehicleId: string;
   channel: PublicationChannel;
   status: PublicationStatus;
+  externalId?: string;
   postLink?: string;
   postText?: string;
   hashtags?: string[];
@@ -128,6 +131,8 @@ export interface Publication {
   errorMessage?: string;
   createdAt: string;
 }
+
+export type SocialPlatformKey = 'instagram' | 'facebook';
 
 export interface AuditLog {
   id: string;

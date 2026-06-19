@@ -1,4 +1,5 @@
 import "server-only";
+import fs from "fs";
 import nodemailer from "nodemailer";
 import path from "path";
 
@@ -12,6 +13,12 @@ const CONTACT_TO = process.env.CONTACT_TO ?? "contacto@nodocore.com.ar";
 
 export function isMailConfigured(): boolean {
   return Boolean(USER && PASS);
+}
+
+function registrationLogoAttachments(): nodemailer.SendMailOptions["attachments"] {
+  const logoPath = path.join(process.cwd(), "public/logos/logo compuestoa.png");
+  if (!fs.existsSync(logoPath)) return [];
+  return [{ filename: "logo_compuesto.png", path: logoPath, cid: "nodologo" }];
 }
 
 type ContactPayload = {
@@ -90,13 +97,7 @@ export async function sendRegistrationVerificationEmail({
     to: email,
     subject: `Verificá tu registro en NODO | Clínica Virtual`,
     text: `Hola ${nombre},\n\nGracias por registrarte en NODO | Clínica Virtual (${plan.toUpperCase()}). Para completar tu registro, por favor verifica tu cuenta haciendo clic en el siguiente enlace:\n\n${verificationUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO Core`,
-    attachments: [
-      {
-        filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
-        cid: "nodologo",
-      },
-    ],
+    attachments: registrationLogoAttachments(),
     html: `
       <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;background-color:#F5F8FC;">
         <div style="text-align:center;margin-bottom:20px;">
@@ -114,6 +115,64 @@ export async function sendRegistrationVerificationEmail({
         </div>
         <p style="color:#9DACBE;font-size:12px;line-height:1.4;">
           Si el botón no funciona, podés copiar y pegar este enlace en tu navegador:<br/>
+          <a href="${verificationUrl}" style="color:#DA5A0E;">${verificationUrl}</a>
+        </p>
+      </div>
+    `,
+  });
+}
+
+export async function sendFinanzasVerificationEmail({
+  nombre,
+  email,
+  token,
+  origin,
+}: {
+  nombre: string;
+  email: string;
+  token: string;
+  origin: string;
+}): Promise<void> {
+  if (!isMailConfigured()) {
+    throw new Error(
+      "SMTP no configurado: faltan ZOHO_SMTP_USER y/o ZOHO_SMTP_PASSWORD.",
+    );
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: HOST,
+    port: PORT,
+    secure: PORT === 465,
+    auth: { user: USER, pass: PASS },
+  });
+
+  const verificationUrl = `${origin}/api/verify-registration?token=${token}`;
+  const attachments = registrationLogoAttachments();
+  const logoHtml = attachments?.length
+    ? `<div style="text-align:center;margin-bottom:20px;"><img src="cid:nodologo" alt="NODO Finanzas" style="height:32px;display:inline-block;"/></div>`
+    : "";
+
+  await transporter.sendMail({
+    from: `"NODO Finanzas Personales" <${USER}>`,
+    to: email,
+    subject: "Verificá tu cuenta en NODO Finanzas Personales",
+    text: `Hola ${nombre},\n\nGracias por registrarte en NODO Finanzas Personales. Para activar tu cuenta, verificá tu correo con este enlace:\n\n${verificationUrl}\n\nEl enlace vence en 24 horas.\n\nSaludos,\nEl equipo de NODO Core`,
+    attachments,
+    html: `
+      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;background-color:#F5F8FC;">
+        ${logoHtml}
+        <h2 style="color:#1B2A41;margin-top:0;font-size:20px;text-align:center;">Verificá tu cuenta</h2>
+        <p style="color:#647890;font-size:15px;line-height:1.5;">
+          Hola <strong>${nombre}</strong>,<br/><br/>
+          Confirmá tu correo para empezar a usar <strong>NODO Finanzas Personales</strong>:
+        </p>
+        <div style="margin:24px 0;text-align:center;">
+          <a href="${verificationUrl}" style="background-color:#DA5A0E;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;font-size:15px;">
+            Verificar mi cuenta
+          </a>
+        </div>
+        <p style="color:#9DACBE;font-size:12px;line-height:1.4;">
+          Si el botón no funciona, copiá este enlace en tu navegador:<br/>
           <a href="${verificationUrl}" style="color:#DA5A0E;">${verificationUrl}</a>
         </p>
       </div>

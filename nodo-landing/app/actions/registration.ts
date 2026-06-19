@@ -12,6 +12,7 @@ import {
   sendRegistrationVerificationEmail,
   sendPatientVerificationEmail,
   sendInmoVerificationEmail,
+  sendFinanzasVerificationEmail,
   sendAdminNewRegistrationEmail,
 } from "@/lib/mail";
 import { resolveRegistrationOrigin } from "@/lib/registration/origin";
@@ -34,6 +35,10 @@ async function sendVerificationEmail(
   }
   if (planLower === "inmo" || unitCode === "Inmo") {
     await sendInmoVerificationEmail(payload);
+    return;
+  }
+  if (planLower === "finanzas" || unitCode === "Finanzas") {
+    await sendFinanzasVerificationEmail(payload);
     return;
   }
   await sendRegistrationVerificationEmail({
@@ -113,32 +118,49 @@ export async function submitNodeRegistration(
 
     if (insertErr || !pending) {
       console.error("pending_registrations insert:", insertErr);
-      return { status: "error", message: "Error al registrar la solicitud." };
+      const detail = insertErr?.message?.trim();
+      return {
+        status: "error",
+        message: detail
+          ? `Error al registrar la solicitud: ${detail}`
+          : "Error al registrar la solicitud.",
+      };
     }
 
     const emailOrigin = resolveRegistrationOrigin(origin);
+    let mailSent = false;
 
     if (isMailConfigured()) {
-      await sendVerificationEmail(unitCode, plan, {
-        nombre: fullName,
-        email,
-        token: pending.verification_token,
-        origin: emailOrigin,
-      });
+      try {
+        await sendVerificationEmail(unitCode, plan, {
+          nombre: fullName,
+          email,
+          token: pending.verification_token,
+          origin: emailOrigin,
+        });
+        mailSent = true;
+      } catch (mailErr) {
+        console.error("submitNodeRegistration mail:", mailErr);
+      }
     } else {
       console.warn("Mail not configured. Token:", pending.verification_token);
     }
 
     return {
       status: "success",
-      message:
-        "Te enviamos un correo de verificación. Revisá tu casilla para continuar con el registro.",
+      message: mailSent
+        ? "Te enviamos un correo de verificación. Revisá tu casilla para continuar con el registro."
+        : "Registro guardado. Si no recibís el correo de verificación en unos minutos, usá «Reenviar correo» o contactá soporte.",
     };
   } catch (err) {
     console.error("submitNodeRegistration:", err);
+    const detail = err instanceof Error ? err.message : String(err);
     return {
       status: "error",
-      message: "Hubo un problema al procesar el registro. Intente nuevamente.",
+      message:
+        process.env.NODE_ENV === "development"
+          ? `Hubo un problema al procesar el registro: ${detail}`
+          : "Hubo un problema al procesar el registro. Intente nuevamente.",
     };
   }
 }

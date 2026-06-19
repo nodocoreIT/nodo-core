@@ -1,0 +1,487 @@
+{
+  "name": "StockAutos – Instagram Vehicle Automation",
+  "nodes": [
+    {
+      "id": "aaa00001-0000-4000-a000-000000000001",
+      "name": "Webhook: Recibir Acción",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 360],
+      "webhookId": "stockautos-instagram-webhook",
+      "parameters": {
+        "path": "instagram-vehicle",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "notes": "Recibe POST desde la app StockAutos (automation.ts).\nPayload esperado:\n- action: 'publish' | 'delete' | 'pause' | 'delete_republish'\n- platform: 'instagram'\n- vehicle: { id, brand, model, year, version, price, currency, showPrice, kilometers, photos[], description, features[] }\n- externalId: string (requerido para delete, pause, delete_republish)"
+    },
+    {
+      "id": "aaa00002-0000-4000-a000-000000000002",
+      "name": "Switch: Acción",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [500, 360],
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.body ? $json.body.action : $json.action }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "publish",
+              "operation": "equal"
+            },
+            {
+              "value2": "delete",
+              "operation": "equal"
+            },
+            {
+              "value2": "pause",
+              "operation": "equal"
+            },
+            {
+              "value2": "delete_republish",
+              "operation": "equal"
+            }
+          ]
+        },
+        "fallbackOutput": 3
+      }
+    },
+    {
+      "id": "aaa00003-0000-4000-a000-000000000003",
+      "name": "Code: Publicar en Instagram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 80],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// PUBLICAR VEHÍCULO EN INSTAGRAM\n// ─────────────────────────────────────────────────────────────────────────────\n// Variables requeridas en n8n → Workflow Settings → Variables:\n//   IG_USER_ID     : ID del perfil de Instagram Business (ej: 17841234567890)\n//   IG_ACCESS_TOKEN: Token de larga duración de Meta Graph API\n// ─────────────────────────────────────────────────────────────────────────────\n\nconst IG_USER_ID = $vars.IG_USER_ID;\nconst IG_ACCESS_TOKEN = $vars.IG_ACCESS_TOKEN;\nconst BASE_URL = 'https://graph.facebook.com/v21.0';\n\nif (!IG_USER_ID || !IG_ACCESS_TOKEN) {\n  throw new Error('Faltan variables del workflow. Configurá IG_USER_ID e IG_ACCESS_TOKEN en Workflow Settings → Variables.');\n}\n\nconst items = $input.all();\nconst raw = items[0].json;\nconst data = raw.body || raw;\nconst vehicle = data.vehicle;\n\nif (!vehicle) {\n  throw new Error('Payload inválido: falta el objeto vehicle.');\n}\n\n// ── Construir caption ────────────────────────────────────────────────────────\nconst titulo = vehicle.brand + ' ' + vehicle.model + ' ' + vehicle.year + (vehicle.version ? ' ' + vehicle.version : '');\nconst km = vehicle.kilometers > 0\n  ? vehicle.kilometers.toLocaleString('es-AR') + ' km'\n  : '0 km';\nconst precio = (vehicle.showPrice !== false && vehicle.price && vehicle.price > 0)\n  ? vehicle.currency + ' ' + vehicle.price.toLocaleString('es-AR')\n  : '';\nconst featuresList = (vehicle.features && vehicle.features.length > 0)\n  ? vehicle.features.slice(0, 5).join(' • ')\n  : '';\n\nlet caption = '🚗 ' + titulo + '\\n\\n' + (vehicle.description || '');\nif (featuresList) caption += '\\n\\n✨ ' + featuresList;\ncaption += '\\n\\n📍 ' + km;\nif (precio) caption += '\\n💰 ' + precio;\ncaption += '\\n\\n📲 Consultanos por DM o WhatsApp';\n\n// ── Validar fotos ───────────────────────────────────────────────────────────\n// Instagram requiere URLs públicas. Para fotos en Firebase Storage\n// asegurate que sean URLs de descarga públicas (no firmadas con expiración corta).\nconst photos = (vehicle.photos || [])\n  .filter(function(p) { return typeof p === 'string' && p.startsWith('http'); })\n  .slice(0, 10); // Instagram soporta máximo 10 imágenes en carrusel\n\nif (photos.length === 0) {\n  throw new Error('No hay fotos públicas (URLs http/https) disponibles para publicar en Instagram.');\n}\n\ntry {\n  let creation_id;\n\n  if (photos.length === 1) {\n    // ── Post imagen única ──────────────────────────────────────────────────\n    const containerRes = await this.helpers.httpRequest({\n      method: 'POST',\n      url: BASE_URL + '/' + IG_USER_ID + '/media',\n      qs: {\n        image_url: photos[0],\n        caption: caption,\n        access_token: IG_ACCESS_TOKEN\n      }\n    });\n\n    if (!containerRes.id) {\n      throw new Error('Error al crear contenedor de media: ' + JSON.stringify(containerRes));\n    }\n    creation_id = containerRes.id;\n\n  } else {\n    // ── Post carrusel (2–10 fotos) ─────────────────────────────────────────\n    const childIds = [];\n\n    for (var i = 0; i < photos.length; i++) {\n      const childRes = await this.helpers.httpRequest({\n        method: 'POST',\n        url: BASE_URL + '/' + IG_USER_ID + '/media',\n        qs: {\n          image_url: photos[i],\n          is_carousel_item: 'true',\n          access_token: IG_ACCESS_TOKEN\n        }\n      });\n\n      if (!childRes.id) {\n        throw new Error('Error al crear item del carrusel (foto ' + (i + 1) + '): ' + JSON.stringify(childRes));\n      }\n      childIds.push(childRes.id);\n    }\n\n    const carouselRes = await this.helpers.httpRequest({\n      method: 'POST',\n      url: BASE_URL + '/' + IG_USER_ID + '/media',\n      qs: {\n        media_type: 'CAROUSEL',\n        children: childIds.join(','),\n        caption: caption,\n        access_token: IG_ACCESS_TOKEN\n      }\n    });\n\n    if (!carouselRes.id) {\n      throw new Error('Error al crear contenedor del carrusel: ' + JSON.stringify(carouselRes));\n    }\n    creation_id = carouselRes.id;\n  }\n\n  // ── Esperar que Instagram procese el container (recomendado por Meta) ────\n  await new Promise(function(resolve) { setTimeout(resolve, 15000); });\n\n  // ── Publicar el contenedor ───────────────────────────────────────────────\n  const publishRes = await this.helpers.httpRequest({\n    method: 'POST',\n    url: BASE_URL + '/' + IG_USER_ID + '/media_publish',\n    qs: {\n      creation_id: creation_id,\n      access_token: IG_ACCESS_TOKEN\n    }\n  });\n\n  if (!publishRes.id) {\n    throw new Error('Error al publicar el contenedor: ' + JSON.stringify(publishRes));\n  }\n\n  return [{\n    json: {\n      success: true,\n      externalId: publishRes.id,\n      vehicleId: vehicle.id,\n      platform: 'instagram',\n      action: 'published',\n      message: 'Publicación creada exitosamente en Instagram',\n      publishedAt: new Date().toISOString(),\n      photoCount: photos.length,\n      postType: photos.length === 1 ? 'single' : 'carousel'\n    }\n  }];\n\n} catch (error) {\n  return [{\n    json: {\n      success: false,\n      error: error.message,\n      vehicleId: vehicle ? vehicle.id : null,\n      platform: 'instagram',\n      action: 'publish'\n    }\n  }];\n}"
+      },
+      "notes": "Crea un post en Instagram Business.\n- 1 foto → post de imagen única\n- 2–10 fotos → carrusel automático\nRequiere IG_USER_ID e IG_ACCESS_TOKEN en Variables del workflow."
+    },
+    {
+      "id": "aaa00004-0000-4000-a000-000000000004",
+      "name": "Respond: Publicado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1020, 80],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "aaa00005-0000-4000-a000-000000000005",
+      "name": "HTTP: Eliminar Post IG",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [760, 280],
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.externalId }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "={{ $vars.IG_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "notes": "Elimina definitivamente el post de Instagram.\nRequiere externalId (ID del media en Meta Graph API)."
+    },
+    {
+      "id": "aaa00006-0000-4000-a000-000000000006",
+      "name": "Set: Respuesta Eliminado",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [980, 280],
+      "parameters": {
+        "mode": "manual",
+        "fields": {
+          "values": [
+            {
+              "name": "success",
+              "type": "booleanValue",
+              "booleanValue": "={{ $json.success === true }}"
+            },
+            {
+              "name": "externalId",
+              "type": "stringValue",
+              "stringValue": "={{ $('HTTP: Eliminar Post IG').item.json.externalId || '' }}"
+            },
+            {
+              "name": "platform",
+              "type": "stringValue",
+              "stringValue": "instagram"
+            },
+            {
+              "name": "action",
+              "type": "stringValue",
+              "stringValue": "deleted"
+            },
+            {
+              "name": "message",
+              "type": "stringValue",
+              "stringValue": "Publicación eliminada definitivamente de Instagram"
+            },
+            {
+              "name": "deletedAt",
+              "type": "stringValue",
+              "stringValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "aaa00007-0000-4000-a000-000000000007",
+      "name": "Respond: Eliminado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1180, 280],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "aaa00008-0000-4000-a000-000000000008",
+      "name": "Code: Pausar Post IG",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 480],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// PAUSAR / ARCHIVAR PUBLICACIÓN EN INSTAGRAM\n// ─────────────────────────────────────────────────────────────────────────────\n// NOTA: Instagram Graph API no soporta una pausa nativa para posts de feed.\n// Esta acción intenta archivar el post usando is_hidden=true.\n// Si falla (cuentas que no soportan esta operación), el sistema devuelve\n// success: true con una nota de que debe pausarse manualmente desde la app.\n// El estado 'paused' se sigue guardando en el sistema local de StockAutos.\n// ─────────────────────────────────────────────────────────────────────────────\n\nconst IG_ACCESS_TOKEN = $vars.IG_ACCESS_TOKEN;\nconst BASE_URL = 'https://graph.facebook.com/v21.0';\n\nconst items = $input.all();\nconst raw = items[0].json;\nconst data = raw.body || raw;\nconst externalId = data.externalId;\n\nif (!externalId) {\n  throw new Error('externalId es requerido para pausar la publicación.');\n}\n\nif (!IG_ACCESS_TOKEN) {\n  throw new Error('Falta la variable IG_ACCESS_TOKEN en Variables del workflow.');\n}\n\ntry {\n  const response = await this.helpers.httpRequest({\n    method: 'POST',\n    url: BASE_URL + '/' + externalId,\n    headers: { 'Content-Type': 'application/json' },\n    body: {\n      access_token: IG_ACCESS_TOKEN,\n      is_hidden: true\n    }\n  });\n\n  const apiSuccess = response && (response.success === true || response.id);\n\n  return [{\n    json: {\n      success: true,\n      externalId: externalId,\n      platform: 'instagram',\n      action: 'paused',\n      apiHidden: apiSuccess,\n      message: apiSuccess\n        ? 'Publicación archivada/pausada en Instagram.'\n        : 'El estado fue guardado como pausado en StockAutos. Pausar manualmente en Instagram si es necesario.',\n      pausedAt: new Date().toISOString(),\n      note: 'Para volver a publicar usa la acción delete_republish.'\n    }\n  }];\n\n} catch (error) {\n  // La pausa falla silenciosamente: StockAutos guarda el estado 'paused' igual.\n  return [{\n    json: {\n      success: true,\n      externalId: externalId,\n      platform: 'instagram',\n      action: 'paused',\n      apiHidden: false,\n      message: 'Estado pausado guardado en StockAutos. No se pudo archivar vía API (' + error.message + ').',\n      pausedAt: new Date().toISOString(),\n      note: 'Instagram Business puede no soportar is_hidden para este tipo de contenido. Pausar manualmente si es necesario.'\n    }\n  }];\n}"
+      },
+      "notes": "Pausa temporalmente el post.\nInstagram no tiene pause nativo → intenta archivar con is_hidden=true.\nSiempre devuelve success:true para que StockAutos guarde el estado 'paused'."
+    },
+    {
+      "id": "aaa00009-0000-4000-a000-000000000009",
+      "name": "Respond: Pausado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1020, 480],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "aaa00010-0000-4000-a000-000000000010",
+      "name": "HTTP: Eliminar Post IG (Republicar)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [760, 680],
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.externalId }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "={{ $vars.IG_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "notes": "Primer paso de delete_republish: elimina el post anterior.\nSi falla, el flujo continúa igual y publica el nuevo post."
+    },
+    {
+      "id": "aaa00011-0000-4000-a000-000000000011",
+      "name": "Code: Merge Data Republicar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 680],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Recupera el payload original del webhook para usarlo en la republicación.\n// El nodo HTTP de eliminación reemplaza el item, así que recuperamos los datos\n// del webhook via $('Webhook: Recibir Acción').\nconst webhookData = $('Webhook: Recibir Acción').first().json;\nreturn [{ json: webhookData.body || webhookData }];"
+      },
+      "notes": "Recupera los datos originales del vehículo para la republicación,\nya que el nodo HTTP de borrado sobreescribe el item actual."
+    },
+    {
+      "id": "aaa00012-0000-4000-a000-000000000012",
+      "name": "Code: Republicar en Instagram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1160, 680],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ─────────────────────────────────────────────────────────────────────────────\n// REPUBLICAR VEHÍCULO EN INSTAGRAM (eliminar + publicar nuevo)\n// ─────────────────────────────────────────────────────────────────────────────\n// Mismo lógica que 'Publicar' pero la fecha del post se actualiza\n// automáticamente al ser un post nuevo en Instagram.\n// ─────────────────────────────────────────────────────────────────────────────\n\nconst IG_USER_ID = $vars.IG_USER_ID;\nconst IG_ACCESS_TOKEN = $vars.IG_ACCESS_TOKEN;\nconst BASE_URL = 'https://graph.facebook.com/v21.0';\n\nif (!IG_USER_ID || !IG_ACCESS_TOKEN) {\n  throw new Error('Faltan variables del workflow. Configurá IG_USER_ID e IG_ACCESS_TOKEN en Workflow Settings → Variables.');\n}\n\nconst items = $input.all();\nconst raw = items[0].json;\nconst data = raw.body || raw;\nconst vehicle = data.vehicle;\n\nif (!vehicle) {\n  throw new Error('Payload inválido: falta el objeto vehicle.');\n}\n\n// ── Construir caption ────────────────────────────────────────────────────────\nconst titulo = vehicle.brand + ' ' + vehicle.model + ' ' + vehicle.year + (vehicle.version ? ' ' + vehicle.version : '');\nconst km = vehicle.kilometers > 0\n  ? vehicle.kilometers.toLocaleString('es-AR') + ' km'\n  : '0 km';\nconst precio = (vehicle.showPrice !== false && vehicle.price && vehicle.price > 0)\n  ? vehicle.currency + ' ' + vehicle.price.toLocaleString('es-AR')\n  : '';\nconst featuresList = (vehicle.features && vehicle.features.length > 0)\n  ? vehicle.features.slice(0, 5).join(' • ')\n  : '';\n\nlet caption = '🚗 ' + titulo + '\\n\\n' + (vehicle.description || '');\nif (featuresList) caption += '\\n\\n✨ ' + featuresList;\ncaption += '\\n\\n📍 ' + km;\nif (precio) caption += '\\n💰 ' + precio;\ncaption += '\\n\\n📲 Consultanos por DM o WhatsApp';\n\n// ── Validar fotos ───────────────────────────────────────────────────────────\nconst photos = (vehicle.photos || [])\n  .filter(function(p) { return typeof p === 'string' && p.startsWith('http'); })\n  .slice(0, 10);\n\nif (photos.length === 0) {\n  throw new Error('No hay fotos públicas (URLs http/https) disponibles para republicar en Instagram.');\n}\n\ntry {\n  let creation_id;\n\n  if (photos.length === 1) {\n    const containerRes = await this.helpers.httpRequest({\n      method: 'POST',\n      url: BASE_URL + '/' + IG_USER_ID + '/media',\n      qs: {\n        image_url: photos[0],\n        caption: caption,\n        access_token: IG_ACCESS_TOKEN\n      }\n    });\n\n    if (!containerRes.id) {\n      throw new Error('Error al crear contenedor de media: ' + JSON.stringify(containerRes));\n    }\n    creation_id = containerRes.id;\n\n  } else {\n    const childIds = [];\n\n    for (var i = 0; i < photos.length; i++) {\n      const childRes = await this.helpers.httpRequest({\n        method: 'POST',\n        url: BASE_URL + '/' + IG_USER_ID + '/media',\n        qs: {\n          image_url: photos[i],\n          is_carousel_item: 'true',\n          access_token: IG_ACCESS_TOKEN\n        }\n      });\n\n      if (!childRes.id) {\n        throw new Error('Error al crear item del carrusel (foto ' + (i + 1) + '): ' + JSON.stringify(childRes));\n      }\n      childIds.push(childRes.id);\n    }\n\n    const carouselRes = await this.helpers.httpRequest({\n      method: 'POST',\n      url: BASE_URL + '/' + IG_USER_ID + '/media',\n      qs: {\n        media_type: 'CAROUSEL',\n        children: childIds.join(','),\n        caption: caption,\n        access_token: IG_ACCESS_TOKEN\n      }\n    });\n\n    if (!carouselRes.id) {\n      throw new Error('Error al crear contenedor del carrusel: ' + JSON.stringify(carouselRes));\n    }\n    creation_id = carouselRes.id;\n  }\n\n  const publishRes = await this.helpers.httpRequest({\n    method: 'POST',\n    url: BASE_URL + '/' + IG_USER_ID + '/media_publish',\n    qs: {\n      creation_id: creation_id,\n      access_token: IG_ACCESS_TOKEN\n    }\n  });\n\n  if (!publishRes.id) {\n    throw new Error('Error al publicar el contenedor: ' + JSON.stringify(publishRes));\n  }\n\n  return [{\n    json: {\n      success: true,\n      externalId: publishRes.id,\n      vehicleId: vehicle.id,\n      platform: 'instagram',\n      action: 'republished',\n      message: 'Publicación republicada exitosamente en Instagram con fecha actualizada',\n      republishedAt: new Date().toISOString(),\n      photoCount: photos.length,\n      postType: photos.length === 1 ? 'single' : 'carousel'\n    }\n  }];\n\n} catch (error) {\n  return [{\n    json: {\n      success: false,\n      error: error.message,\n      vehicleId: vehicle ? vehicle.id : null,\n      platform: 'instagram',\n      action: 'delete_republish'\n    }\n  }];\n}"
+      },
+      "notes": "Segundo paso de delete_republish: crea el post nuevo.\nLa fecha se actualiza automáticamente al ser un post nuevo en Instagram.\nManeja tanto imagen única como carrusel (hasta 10 fotos)."
+    },
+    {
+      "id": "aaa00013-0000-4000-a000-000000000013",
+      "name": "Respond: Republicado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1360, 680],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "aaa00014-0000-4000-a000-000000000014",
+      "name": "Respond: Acción Desconocida",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [760, 880],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"success\": false, \"error\": \"Acción desconocida. Valores válidos: publish, delete, pause, delete_republish\", \"platform\": \"instagram\"}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook: Recibir Acción": {
+      "main": [
+        [
+          {
+            "node": "Switch: Acción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Acción": {
+      "main": [
+        [
+          {
+            "node": "Code: Publicar en Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP: Eliminar Post IG",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: Pausar Post IG",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP: Eliminar Post IG (Republicar)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Acción Desconocida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Publicar en Instagram": {
+      "main": [
+        [
+          {
+            "node": "Respond: Publicado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Eliminar Post IG": {
+      "main": [
+        [
+          {
+            "node": "Set: Respuesta Eliminado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Respuesta Eliminado": {
+      "main": [
+        [
+          {
+            "node": "Respond: Eliminado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Pausar Post IG": {
+      "main": [
+        [
+          {
+            "node": "Respond: Pausado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Eliminar Post IG (Republicar)": {
+      "main": [
+        [
+          {
+            "node": "Code: Merge Data Republicar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Merge Data Republicar": {
+      "main": [
+        [
+          {
+            "node": "Code: Republicar en Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Republicar en Instagram": {
+      "main": [
+        [
+          {
+            "node": "Respond: Republicado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "StockAutos" },
+    { "name": "Instagram" },
+    { "name": "Social Media" }
+  ],
+  "triggerCount": 0,
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "__readme": {
+    "configuracion": {
+      "paso_1_variables": "En n8n → Workflow Settings → Variables, crear:\n  - IG_USER_ID: ID numérico del perfil Instagram Business\n  - IG_ACCESS_TOKEN: Token de larga duración de Meta Graph API (no expira en 60 días si es page token)",
+      "paso_2_webhook": "En la app StockAutos, configurar en .env:\n  VITE_N8N_WEBHOOK_URL=https://TU-N8N.com/webhook/instagram-vehicle",
+      "paso_3_activar": "Activar el workflow en n8n (toggle en la esquina superior derecha)"
+    },
+    "payloads": {
+      "publish": {
+        "action": "publish",
+        "platform": "instagram",
+        "vehicle": {
+          "id": "abc123",
+          "brand": "Toyota",
+          "model": "Corolla",
+          "year": 2022,
+          "version": "XEi CVT",
+          "price": 18500000,
+          "currency": "ARS",
+          "showPrice": true,
+          "kilometers": 45000,
+          "photos": ["https://ejemplo.com/foto1.jpg", "https://ejemplo.com/foto2.jpg"],
+          "description": "Excelente estado, full equipo, único dueño.",
+          "features": ["Techo solar", "Cámara de retroceso", "Apple CarPlay"]
+        }
+      },
+      "delete": {
+        "action": "delete",
+        "platform": "instagram",
+        "externalId": "17841234567890123"
+      },
+      "pause": {
+        "action": "pause",
+        "platform": "instagram",
+        "externalId": "17841234567890123"
+      },
+      "delete_republish": {
+        "action": "delete_republish",
+        "platform": "instagram",
+        "externalId": "17841234567890123",
+        "vehicle": {
+          "id": "abc123",
+          "brand": "Toyota",
+          "model": "Corolla",
+          "year": 2022,
+          "version": "XEi CVT",
+          "price": 17900000,
+          "currency": "ARS",
+          "showPrice": true,
+          "kilometers": 45000,
+          "photos": ["https://ejemplo.com/foto1.jpg"],
+          "description": "Precio actualizado. Excelente estado, full equipo.",
+          "features": ["Techo solar", "Cámara de retroceso"]
+        }
+      }
+    },
+    "respuestas": {
+      "publish_ok": { "success": true, "externalId": "17841234567890123", "vehicleId": "abc123", "platform": "instagram", "action": "published", "message": "Publicación creada exitosamente en Instagram", "publishedAt": "2026-04-01T12:00:00.000Z", "photoCount": 2, "postType": "carousel" },
+      "delete_ok": { "success": true, "externalId": "17841234567890123", "platform": "instagram", "action": "deleted", "message": "Publicación eliminada definitivamente de Instagram", "deletedAt": "2026-04-01T12:00:00.000Z" },
+      "pause_ok": { "success": true, "externalId": "17841234567890123", "platform": "instagram", "action": "paused", "message": "Publicación archivada/pausada en Instagram.", "pausedAt": "2026-04-01T12:00:00.000Z" },
+      "republish_ok": { "success": true, "externalId": "17841234567890999", "vehicleId": "abc123", "platform": "instagram", "action": "republished", "message": "Publicación republicada exitosamente en Instagram con fecha actualizada", "republishedAt": "2026-04-01T12:00:00.000Z" }
+    },
+    "notas_importantes": [
+      "Las fotos del vehículo deben ser URLs públicas (https://). Firebase Storage URLs con token de acceso funcionan solo si el objeto es público.",
+      "Instagram soporta máximo 10 fotos en carrusel. El workflow toma las primeras 10 automáticamente.",
+      "La acción 'pause' intenta archivar el post via is_hidden=true. Si la API no lo soporta, devuelve success:true igual para que StockAutos guarde el estado localmente.",
+      "El access_token debe ser un Page Access Token de larga duración (no el User Access Token de 60 días).",
+      "Para delete_republish, el externalId del post anterior es el que guardó StockAutos en la primera publicación (campo externalIds.instagram en publicationsStatus)."
+    ]
+  }
+}
