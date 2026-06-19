@@ -47,8 +47,6 @@ export interface FormSelectProps {
   emptyLabel?: string;
   /** Raise above modals/dialogs (e.g. z-[200]). */
   contentClassName?: string;
-  /** Set false when the select lives inside a modal to avoid focus-trap conflicts. */
-  modal?: boolean;
   "aria-label"?: string;
 }
 
@@ -64,7 +62,6 @@ export function FormSelect({
   allowEmpty = false,
   emptyLabel = "—",
   contentClassName,
-  modal = true,
   "aria-label": ariaLabel,
 }: FormSelectProps) {
   const emptyOption = options.find((option) => option.value === "");
@@ -91,7 +88,6 @@ export function FormSelect({
         value={radixValue}
         onValueChange={(next) => onChange(next === EMPTY_SELECT_VALUE ? "" : next)}
         disabled={disabled}
-        modal={modal}
       >
         <SelectTrigger
           id={id}
