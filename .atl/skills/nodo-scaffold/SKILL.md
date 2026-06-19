@@ -233,3 +233,30 @@ This shared stylesheet sets `cursor: pointer` on native `<button>` and `[role="b
 **Also use `@nodocore/shared-components` `Button`** for actions like "Cerrar sesión" — it includes `cursor-pointer` and `disabled:cursor-not-allowed` by default.
 
 Do NOT rely on per-layout `className="cursor-pointer"` overrides; the shared layer covers all nodos and future ones.
+
+---
+
+## 9. Shared nodo modules (`@nodocore/nodo-modules`)
+
+Optional modules shared across nodos. Install only what the product needs.
+
+| Module | Export | DB tables | UI |
+|--------|--------|-----------|-----|
+| **Agenda y Tareas** | `@nodocore/nodo-modules/agenda` | `tasks` | `AgendaPage` + `createTasksHooks` |
+| **Caja** | `@nodocore/nodo-modules/caja` | `cash_movements` (+ optional `conceptos`, `cash_accounts`) | `CajaPage` + `createCajaHooks` |
+| **Notificaciones** | `@nodocore/nodo-modules/notifications` | (derived from tasks + nodo hooks) | `NotificationsDropdown` + `buildTaskNotifications` |
+
+### Install checklist
+
+- [ ] `"@nodocore/nodo-modules": "workspace:*"` in `package.json`
+- [ ] Vite aliases for `/agenda`, `/caja`, `/notifications` subpaths (source, not dist)
+- [ ] Migration with tenant column + RLS (see `nodo-autos/supabase/migrations/006_tasks_and_caja.sql`)
+- [ ] `createTasksHooks` / `createCajaHooks` wired to tenant id from store or auth
+- [ ] Feature wrappers: `AgendaModuleProvider`, `CajaModuleProvider`
+- [ ] `PortalHeaderActions` + `NotificationsBell` in admin layout
+- [ ] Routes `/admin/agenda`, `/admin/caja` + `ROUTE_TITLES`
+
+Detailed steps: repo root **`AGENTS.md`** → *Installing shared modules in a nodo*.
+
+Reference: **`nodo-autos`** (minimal caja). **`nodo-inmo`** still uses local agenda/caja for rendiciones/ganancias — new nodos should prefer the shared package.
+

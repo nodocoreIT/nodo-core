@@ -57,13 +57,7 @@ export function PublicationsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-navy">Redes Sociales</h2>
-          <p className="text-sm text-slate2 mt-1">
-            Gestioná la publicación de vehículos en Instagram, Facebook y otros canales.
-          </p>
-        </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate2" />
           <Input

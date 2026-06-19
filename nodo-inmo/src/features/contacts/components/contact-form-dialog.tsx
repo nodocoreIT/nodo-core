@@ -3,8 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
-import { Button } from "@nodocore/shared-components";
-import { Input } from "@nodocore/shared-components";
+import { Button, Input, DocumentNumberInput } from "@nodocore/shared-components";
 import {
   Dialog,
   DialogContent,
@@ -239,11 +238,13 @@ export function ContactFormDialog({
                   <FormItem>
                     <FormLabel htmlFor="contact-dni-input">DNI</FormLabel>
                     <FormControl>
-                      <Input
+                      <DocumentNumberInput
                         id="contact-dni-input"
                         aria-label="DNI"
-                        placeholder="20-12345678-9"
+                        documentType="DNI"
+                        placeholder="12.345.678"
                         {...field}
+                        value={field.value ?? ""}
                       />
                     </FormControl>
                     <FormMessage />

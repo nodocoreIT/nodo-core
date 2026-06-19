@@ -125,9 +125,9 @@ function AdminLoginForm() {
             <Image
               src="/logos/logo compuesto estrella az letra blancazzz.png"
               alt="Nodo Core"
-              height={30}
               width={140}
-              className="h-[30px] w-auto"
+              height={30}
+              style={{ height: "30px", width: "auto" }}
             />
           </div>
 

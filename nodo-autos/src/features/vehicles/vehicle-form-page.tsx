@@ -440,10 +440,6 @@ export function VehicleFormPage() {
         Volver
       </button>
 
-      <h2 className="text-xl font-bold text-navy">
-        {isEdit ? "Editar vehículo" : "Nuevo vehículo"}
-      </h2>
-
       <VehicleTabBar
         activeTab={activeTab}
         onChange={setActiveTab}

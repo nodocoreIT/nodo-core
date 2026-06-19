@@ -80,7 +80,6 @@ export function ConfigPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <h2 className="text-xl font-bold text-navy">Configuración</h2>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-mist">

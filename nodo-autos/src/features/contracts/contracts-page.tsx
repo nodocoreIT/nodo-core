@@ -27,7 +27,7 @@ import {
   formatThousands,
 } from '@/utils/contract-calculations';
 import { matchesVehicleSearch } from '@/shared/lib/utils';
-import { FormSelect, SearchableSelect } from '@nodocore/shared-components';
+import { FormSelect, SearchableSelect, DocumentNumberInput } from '@nodocore/shared-components';
 
 const DOCUMENT_TYPE_OPTIONS = [
   { value: 'DNI', label: 'DNI' },
@@ -76,13 +76,10 @@ function DocumentationHub({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-navy">Documentación</h1>
-          <p className="text-sm text-slate2 mt-0.5">
-            Gestioná boletos de compraventa y documentación de vehículos.
-          </p>
-        </div>
+      <div className="flex items-center justify-end gap-4">
+        <p className="text-sm text-slate2 hidden sm:block">
+          Gestioná boletos de compraventa y documentación de vehículos.
+        </p>
         <button
           onClick={onNew}
           className="flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand/90 transition-colors"
@@ -474,8 +471,7 @@ function ContractGenerator({
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 className="text-xl font-semibold text-navy">Nuevo Boleto de Compraventa</h1>
-            <p className="text-sm text-slate2 mt-0.5">Completá los datos para generar el contrato.</p>
+            <p className="text-sm text-slate2">Completá los datos para generar el contrato.</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -594,20 +590,13 @@ function ContractGenerator({
                 </div>
                 <div>
                   <label className={LABEL_CLASS}>Número</label>
-                  <input
-                    type="text"
-                    inputMode={buyer.documentType === 'DNI' ? 'numeric' : 'text'}
+                  <DocumentNumberInput
                     className={INPUT_CLASS}
-                    placeholder="00.000.000"
+                    documentType={buyer.documentType}
                     value={buyer.documentNumber}
-                    onChange={(e) => {
-                      let val = e.target.value;
-                      if (buyer.documentType === 'DNI') {
-                        const digits = val.replace(/\D/g, '');
-                        val = digits ? formatThousands(Number(digits)) : '';
-                      }
-                      setBuyer({ ...buyer, documentNumber: val });
-                    }}
+                    onChange={(e) =>
+                      setBuyer({ ...buyer, documentNumber: e.target.value })
+                    }
                   />
                 </div>
               </div>

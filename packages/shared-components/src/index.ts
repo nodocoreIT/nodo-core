@@ -1,5 +1,13 @@
 // ─── Lib ─────────────────────────────────────────────────────────────────────
 export { cn } from "./lib/utils";
+export {
+  normalizeDocumentDigits,
+  formatDocumentThousands,
+  formatCuitInput,
+  formatDocumentNumberInput,
+  resolveDocumentFormat,
+  type DocumentNumberFormat,
+} from "./lib/document-number";
 
 // ─── Providers ───────────────────────────────────────────────────────────────
 export { SupabaseProvider, useSupabase } from "./providers/supabase-provider";
@@ -34,6 +42,10 @@ export { RequireAuth } from "./components/require-auth";
 // ─── UI primitives ───────────────────────────────────────────────────────────
 export { Button, buttonVariants, type ButtonProps } from "./components/ui/button";
 export { Input, type InputProps } from "./components/ui/input";
+export {
+  DocumentNumberInput,
+  type DocumentNumberInputProps,
+} from "./components/document-number-input";
 export { Label } from "./components/ui/label";
 export {
   Card,
