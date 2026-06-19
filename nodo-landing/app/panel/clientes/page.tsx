@@ -654,6 +654,8 @@ export default function ClientesPage() {
     display: "block",
   };
 
+  const modalSelectProps = { modal: false, contentClassName: "z-[200]" } as const;
+
   const allSelected = filtered.length > 0 && selected.size === filtered.length;
   const activeFormUnit = formUnits.find((u) => u.key === activeUnitKey) ?? formUnits[0];
   const assignableNodes = getAssignableNodes(formUnits.map((u) => u.unit_code));
@@ -1240,6 +1242,7 @@ export default function ClientesPage() {
                           <div>
                             <label style={labelStyle}>Módulo</label>
                             <FormSelect
+                              {...modalSelectProps}
                               value={activeFormUnit.unit_code}
                               onChange={(newCode) => {
                                 updateFormUnit(activeFormUnit.key, {
@@ -1263,6 +1266,7 @@ export default function ClientesPage() {
                               if (planOptions.length > 0) {
                                 return (
                                   <FormSelect
+                                    {...modalSelectProps}
                                     value={activeFormUnit.plan}
                                     onChange={(value) => updateFormUnit(activeFormUnit.key, { plan: value })}
                                     options={planOptions}
@@ -1277,6 +1281,7 @@ export default function ClientesPage() {
                           <div>
                             <label style={labelStyle}>Estado</label>
                             <FormSelect
+                              {...modalSelectProps}
                               value={activeFormUnit.status}
                               onChange={(value) => updateFormUnit(activeFormUnit.key, { status: value as ClientStatus })}
                               options={[

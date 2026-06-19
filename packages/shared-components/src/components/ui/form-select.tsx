@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   Select,
   SelectContent,
@@ -45,6 +45,10 @@ export interface FormSelectProps {
   triggerClassName?: string;
   allowEmpty?: boolean;
   emptyLabel?: string;
+  /** Raise above modals/dialogs (e.g. z-[200]). */
+  contentClassName?: string;
+  /** Set false when the select lives inside a modal to avoid focus-trap conflicts. */
+  modal?: boolean;
   "aria-label"?: string;
 }
 
@@ -59,6 +63,8 @@ export function FormSelect({
   triggerClassName,
   allowEmpty = false,
   emptyLabel = "—",
+  contentClassName,
+  modal = true,
   "aria-label": ariaLabel,
 }: FormSelectProps) {
   const emptyOption = options.find((option) => option.value === "");
@@ -67,6 +73,8 @@ export function FormSelect({
   const resolvedEmptyLabel = emptyLabel ?? emptyOption?.label ?? "—";
 
   const radixValue = resolveRadixValue(value, safeOptions, resolvedAllowEmpty);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   useEffect(() => {
     const safe = value ?? "";
@@ -74,8 +82,8 @@ export function FormSelect({
       safe !== "" && safeOptions.some((option) => option.value === safe);
     if (isValidOption || safe === "") return;
 
-    onChange(resolvedAllowEmpty ? "" : safeOptions[0]?.value ?? "");
-  }, [value, safeOptions, resolvedAllowEmpty, onChange]);
+    onChangeRef.current(resolvedAllowEmpty ? "" : safeOptions[0]?.value ?? "");
+  }, [value, safeOptions, resolvedAllowEmpty]);
 
   return (
     <div className={cn("relative", className)}>
@@ -83,6 +91,7 @@ export function FormSelect({
         value={radixValue}
         onValueChange={(next) => onChange(next === EMPTY_SELECT_VALUE ? "" : next)}
         disabled={disabled}
+        modal={modal}
       >
         <SelectTrigger
           id={id}
@@ -91,7 +100,7 @@ export function FormSelect({
         >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className={cn("z-[200]", contentClassName)}>
           {resolvedAllowEmpty && (
             <SelectItem value={EMPTY_SELECT_VALUE}>{resolvedEmptyLabel}</SelectItem>
           )}
