@@ -12,7 +12,7 @@ const NODO_FINANZAS_URL = process.env.NODO_FINANZAS_URL ?? "http://localhost:517
 const isDev = process.env.NODE_ENV !== "production";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@nodocore/shared-components"],
+  transpilePackages: ["@nodocore/shared-components", "@nodocore/nodo-modules"],
   allowedDevOrigins: ["127.0.0.1", "192.168.1.37"],
   // Bundle the SPA index.html files into the Lambda so Route Handlers
   // can serve them via readFileSync. On Vercel, public/ is on the CDN
@@ -33,6 +33,7 @@ const nextConfig: NextConfig = {
       // Route Handlers (app/inmo/[[...slug]]/route.ts etc.) are evaluated.
       return {
         beforeFiles: [
+          { source: "/favicon.ico", destination: "/favicon.png" },
           // ── nodo-inmo ─────────────────────────────────────────────────────
           { source: "/inmo", destination: `${NODO_INMO_URL}/inmo` },
           { source: "/inmo/:path*", destination: `${NODO_INMO_URL}/inmo/:path*` },
@@ -55,7 +56,11 @@ const nextConfig: NextConfig = {
     // (app/inmo/[[...slug]]/route.ts, app/autos/[[...slug]]/route.ts).
     // Static assets in public/inmo/ and public/autos/ are served directly
     // by Next.js before the Route Handlers are ever reached.
-    return {};
+    return {
+      beforeFiles: [
+        { source: "/favicon.ico", destination: "/favicon.png" },
+      ],
+    };
   },
 };
 

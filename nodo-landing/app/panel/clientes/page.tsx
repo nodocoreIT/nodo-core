@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Fragment } from "react";
-import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, RotateCcw } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
 import { NODES } from "@/lib/nodes";
@@ -113,6 +113,8 @@ export default function ClientesPage() {
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
   const [statusMenuUnitId, setStatusMenuUnitId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ ids: string[]; label: string } | null>(null);
+  const [activeUnitKey, setActiveUnitKey] = useState<string>("");
+  const [resettingUnitKey, setResettingUnitKey] = useState<string | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
   const [formName, setFormName] = useState("");
@@ -179,7 +181,9 @@ export default function ClientesPage() {
     setFormEmail("");
     setFormPhone("");
     setFormSince(today);
-    setFormUnits([newFormUnit()]);
+    const firstUnit = newFormUnit();
+    setFormUnits([firstUnit]);
+    setActiveUnitKey(firstUnit.key);
     setError("");
     setShowForm(true);
   }
@@ -191,7 +195,7 @@ export default function ClientesPage() {
     setFormPhone(c.phone ?? "");
     setFormSince(c.since ?? today);
     const cu = unitsByClient.get(c.id) ?? [];
-    setFormUnits(
+    const mappedUnits =
       cu.length > 0
         ? cu.map((u) => ({
             key: u.id,
@@ -205,8 +209,9 @@ export default function ClientesPage() {
             provisioned_at: u.provisioned_at ?? null,
             provision_user_id: u.provision_user_id ?? null,
           }))
-        : [newFormUnit()]
-    );
+        : [newFormUnit()];
+    setFormUnits(mappedUnits);
+    setActiveUnitKey(mappedUnits[0]?.key ?? "");
     setError("");
     setShowForm(true);
   }
@@ -216,11 +221,17 @@ export default function ClientesPage() {
   }
 
   function addFormUnit() {
-    setFormUnits((prev) => [...prev, newFormUnit()]);
+    const unit = newFormUnit();
+    setFormUnits((prev) => [...prev, unit]);
+    setActiveUnitKey(unit.key);
   }
 
   function removeFormUnit(key: string) {
-    setFormUnits((prev) => prev.filter((u) => u.key !== key));
+    const next = formUnits.filter((u) => u.key !== key);
+    setFormUnits(next);
+    if (activeUnitKey === key) {
+      setActiveUnitKey(next[0]?.key ?? "");
+    }
   }
 
   async function handleSave() {
@@ -447,6 +458,40 @@ export default function ClientesPage() {
     navigator.clipboard?.writeText(text);
   }
 
+  async function resetUnitPassword(unit: FormUnit) {
+    const savedUnitIds = new Set((editingClient ? unitsByClient.get(editingClient.id) : [])?.map((u) => u.id) ?? []);
+    if (!editingClient || !savedUnitIds.has(unit.key)) {
+      setError("Primero guardá el cliente para poder blanquear el acceso.");
+      return;
+    }
+    if (!unit.access_user.trim()) {
+      setError("El nodo necesita un email de acceso para blanquear la contraseña.");
+      return;
+    }
+
+    setResettingUnitKey(unit.key);
+    setError("");
+    const res = await fetch("/api/admin/client-unit-password-reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ client_unit_id: unit.key }),
+    });
+    const json = await res.json();
+    setResettingUnitKey(null);
+
+    if (!res.ok || !json.ok) {
+      setError(json.error ?? "No se pudo blanquear la contraseña.");
+      return;
+    }
+
+    updateFormUnit(unit.key, {
+      access_password: json.password,
+      provision_user_id: json.user_id ?? unit.provision_user_id,
+    });
+    copy(json.password);
+    setError("Contraseña blanqueada. La temporal quedó copiada al portapapeles.");
+  }
+
   async function handleStatusChange(unitId: string, newStatus: ClientStatus) {
     setStatusUpdating(unitId);
     setStatusMenuUnitId(null);
@@ -486,6 +531,7 @@ export default function ClientesPage() {
   };
 
   const allSelected = filtered.length > 0 && selected.size === filtered.length;
+  const activeFormUnit = formUnits.find((u) => u.key === activeUnitKey) ?? formUnits[0];
 
   return (
     <>
@@ -738,7 +784,6 @@ export default function ClientesPage() {
 
                                     {/* Credentials */}
                                     <div style={{ borderTop: "1px solid var(--color-mist)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-                                      <CredRow label="URL" value={u.access_url} onCopy={copy} />
                                       <CredRow label="Usuario" value={u.access_user} onCopy={copy} />
                                       <CredRow
                                         label="Contraseña"
@@ -782,7 +827,7 @@ export default function ClientesPage() {
         {/* Form modal */}
         {showForm && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(18,30,47,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
-            <div style={{ background: "white", borderRadius: 12, width: "min(560px, 96vw)", maxHeight: "92vh", overflowY: "auto", boxShadow: "0 12px 40px rgba(18,30,47,.18)" }}>
+            <div style={{ background: "white", borderRadius: 12, width: "min(760px, 96vw)", maxHeight: "92vh", overflowY: "auto", boxShadow: "0 12px 40px rgba(18,30,47,.18)" }}>
               <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-mist)", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: "white", zIndex: 1 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-navy)", fontFamily: "var(--font-display)" }}>
                   {editingClient ? "Editar cliente" : "Nuevo cliente"}
@@ -813,48 +858,97 @@ export default function ClientesPage() {
                 </div>
 
                 {/* Nodos */}
-                <div style={{ borderTop: "1px solid var(--color-mist)", paddingTop: 14 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-navy)" }}>Nodos comprados</span>
-                    <button onClick={addFormUnit} style={{ display: "flex", alignItems: "center", gap: 5, background: "transparent", color: "var(--color-brand)", border: "1px solid var(--color-brand)", borderRadius: 6, padding: "5px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}>
+                <div style={{ borderTop: "1px solid var(--color-mist)", paddingTop: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 12 }}>
+                    <div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-navy)" }}>Nodos comprados</span>
+                      <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--color-slate2)" }}>
+                        Cada pestaña representa un módulo contratado por el cliente.
+                      </p>
+                    </div>
+                    <button onClick={addFormUnit} style={{ display: "flex", alignItems: "center", gap: 5, background: "transparent", color: "var(--color-brand)", border: "1px solid var(--color-brand)", borderRadius: 8, padding: "7px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)", flexShrink: 0 }}>
                       <Plus size={14} strokeWidth={2.5} /> Agregar nodo
                     </button>
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    {formUnits.map((u, idx) => (
-                      <div key={u.key} style={{ border: "1px solid var(--color-mist)", borderRadius: 10, padding: 14, background: "var(--color-paper)" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                          <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--color-slate2)" }}>Nodo {idx + 1}</span>
-                          {formUnits.length > 1 && (
-                            <button onClick={() => removeFormUnit(u.key)} aria-label="Quitar nodo" title="Quitar" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, background: "transparent", color: "#C0392B", border: "1px solid #F5C6C2", borderRadius: 6, cursor: "pointer" }}>
-                              <Trash2 size={13} strokeWidth={2} />
-                            </button>
-                          )}
-                        </div>
+                  <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 12 }}>
+                    {formUnits.map((u, idx) => {
+                      const active = activeFormUnit?.key === u.key;
+                      const st = statusStyle(u.status);
+                      const nodeLabel = NODES.find((n) => n.code === u.unit_code)?.label ?? `Nodo ${idx + 1}`;
+                      return (
+                        <button
+                          key={u.key}
+                          type="button"
+                          onClick={() => setActiveUnitKey(u.key)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            border: active ? "1px solid var(--color-brand)" : "1px solid var(--color-mist)",
+                            background: active ? "rgba(218,90,14,.08)" : "white",
+                            color: active ? "var(--color-brand)" : "var(--color-ink)",
+                            borderRadius: 999,
+                            padding: "8px 12px",
+                            fontSize: 12.5,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
+                            fontFamily: "var(--font-sans)",
+                          }}
+                        >
+                          <span>{nodeLabel}</span>
+                          <span style={{ width: 7, height: 7, borderRadius: "50%", background: st.color }} />
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-                          <div style={{ flex: 1 }}>
+                  {activeFormUnit && (
+                    <div style={{ border: "1px solid var(--color-mist)", borderRadius: 14, padding: 16, background: "var(--color-paper)" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+                        <div>
+                          <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "var(--color-navy)", fontFamily: "var(--font-display)" }}>
+                            {NODES.find((n) => n.code === activeFormUnit.unit_code)?.label ?? "Nodo"}
+                          </p>
+                          <p style={{ margin: "3px 0 0", fontSize: 12.5, color: "var(--color-slate2)" }}>
+                            Configuración comercial, estado operativo y acceso del cliente.
+                          </p>
+                        </div>
+                        {formUnits.length > 1 && (
+                          <button onClick={() => removeFormUnit(activeFormUnit.key)} aria-label="Quitar nodo" title="Quitar nodo" style={{ display: "flex", alignItems: "center", gap: 6, background: "white", color: "#C0392B", border: "1px solid #F5C6C2", borderRadius: 8, padding: "7px 10px", cursor: "pointer", fontSize: 12.5, fontWeight: 700, fontFamily: "var(--font-sans)" }}>
+                            <Trash2 size={13} strokeWidth={2} />
+                            Quitar
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={{ background: "white", border: "1px solid var(--color-mist)", borderRadius: 12, padding: 14, marginBottom: 12 }}>
+                        <p style={{ margin: "0 0 12px", fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-slate2)" }}>
+                          Contratación
+                        </p>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                          <div>
                             <label style={labelStyle}>Módulo</label>
                             <FormSelect
-                              value={u.unit_code}
+                              value={activeFormUnit.unit_code}
                               onChange={(newCode) => {
                                 const nodePlans = NODO_PLANS.find((n) => n.slug === newCode.toLowerCase());
                                 const firstPlan = nodePlans?.plans ? Object.keys(nodePlans.plans)[0] : "";
-                                updateFormUnit(u.key, { unit_code: newCode, plan: firstPlan });
+                                updateFormUnit(activeFormUnit.key, { unit_code: newCode, plan: firstPlan });
                               }}
                               options={NODES.map((node) => ({ value: node.code, label: node.label }))}
                             />
                           </div>
-                          <div style={{ flex: 1 }}>
+                          <div>
                             <label style={labelStyle}>Plan</label>
                             {(() => {
-                              const nodePlans = NODO_PLANS.find((n) => n.slug === u.unit_code.toLowerCase());
+                              const nodePlans = NODO_PLANS.find((n) => n.slug === activeFormUnit.unit_code.toLowerCase());
                               if (nodePlans?.plans) {
                                 return (
                                   <FormSelect
-                                    value={u.plan}
-                                    onChange={(value) => updateFormUnit(u.key, { plan: value })}
+                                    value={activeFormUnit.plan}
+                                    onChange={(value) => updateFormUnit(activeFormUnit.key, { plan: value })}
                                     options={Object.entries(nodePlans.plans).map(([tier, pricing]) => ({
                                       value: tier,
                                       label: `${tier.charAt(0).toUpperCase() + tier.slice(1)} — ${pricing.currency} ${pricing.monthly}/mes`,
@@ -863,18 +957,15 @@ export default function ClientesPage() {
                                 );
                               }
                               return (
-                                <input type="text" value={u.plan} onChange={(e) => updateFormUnit(u.key, { plan: e.target.value })} style={inputStyle} placeholder="Plan..." />
+                                <input type="text" value={activeFormUnit.plan} onChange={(e) => updateFormUnit(activeFormUnit.key, { plan: e.target.value })} style={inputStyle} placeholder="Plan..." />
                               );
                             })()}
                           </div>
-                        </div>
-
-                        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-                          <div style={{ flex: 1 }}>
+                          <div>
                             <label style={labelStyle}>Estado</label>
                             <FormSelect
-                              value={u.status}
-                              onChange={(value) => updateFormUnit(u.key, { status: value as ClientStatus })}
+                              value={activeFormUnit.status}
+                              onChange={(value) => updateFormUnit(activeFormUnit.key, { status: value as ClientStatus })}
                               options={[
                                 { value: "activo", label: "Activo" },
                                 { value: "pausado", label: "Pausado" },
@@ -884,50 +975,71 @@ export default function ClientesPage() {
                               ]}
                             />
                           </div>
-                          <div style={{ flex: 1 }}>
+                          <div>
                             <label style={labelStyle}>Avance (%)</label>
-                            <input type="number" value={u.progress} onChange={(e) => updateFormUnit(u.key, { progress: e.target.value })} style={inputStyle} min="0" max="100" />
+                            <input type="number" value={activeFormUnit.progress} onChange={(e) => updateFormUnit(activeFormUnit.key, { progress: e.target.value })} style={inputStyle} min="0" max="100" />
                           </div>
                         </div>
-
-                        <p style={{ margin: "4px 0 8px", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-slate2)" }}>
-                          Accesos a la plataforma
-                        </p>
-                        <div style={{ marginBottom: 10 }}>
-                          <label style={labelStyle}>URL</label>
-                          <input type="text" value={u.access_url} onChange={(e) => updateFormUnit(u.key, { access_url: e.target.value })} style={inputStyle} placeholder="https://inmo.nodocore.com.ar" autoComplete="off" />
-                        </div>
-                        <div style={{ display: "flex", gap: 10 }}>
-                          <div style={{ flex: 1 }}>
-                            <label style={labelStyle}>Usuario (email)</label>
-                            <input type="text" value={u.access_user} onChange={(e) => updateFormUnit(u.key, { access_user: e.target.value })} style={inputStyle} autoComplete="off" />
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <label style={labelStyle}>Contraseña</label>
-                            <input type="text" value={u.access_password} onChange={(e) => updateFormUnit(u.key, { access_password: e.target.value })} style={inputStyle} autoComplete="off" />
-                          </div>
-                        </div>
-                        {(() => {
-                          const nodeDef = NODES.find((n) => n.code === u.unit_code);
-                          if (!nodeDef?.provisionable) return null;
-                          if (!u.access_user.trim() || !u.access_password.trim()) return null;
-                          if (u.status !== "activo") return null;
-                          if (u.provisioned_at) {
-                            return (
-                              <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "#1F8A5B", fontWeight: 600 }}>
-                                ✓ Acceso ya creado en {nodeDef.label}
-                              </p>
-                            );
-                          }
-                          return (
-                            <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "#2A6FDB", fontWeight: 500 }}>
-                              Al guardar se creará el acceso de administrador en {nodeDef.label}.
-                            </p>
-                          );
-                        })()}
                       </div>
-                    ))}
-                  </div>
+
+                      <div style={{ background: "white", border: "1px solid var(--color-mist)", borderRadius: 12, padding: 14 }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+                          <div>
+                            <p style={{ margin: 0, fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-slate2)" }}>
+                              Acceso del cliente
+                            </p>
+                            <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--color-slate2)", lineHeight: 1.45 }}>
+                              La contraseña real definida por el usuario no se puede consultar. Desde acá podés definir una temporal o blanquear el acceso.
+                            </p>
+                          </div>
+                          {activeFormUnit.provisioned_at && (
+                            <span style={{ fontSize: 11.5, fontWeight: 800, background: "#E1F0E8", color: "#1F8A5B", borderRadius: 999, padding: "4px 9px", whiteSpace: "nowrap" }}>
+                              Acceso activo
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                          <div>
+                            <label style={labelStyle}>Usuario (email)</label>
+                            <input type="text" value={activeFormUnit.access_user} onChange={(e) => updateFormUnit(activeFormUnit.key, { access_user: e.target.value })} style={inputStyle} autoComplete="off" />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Contraseña temporal / inicial</label>
+                            <input type="text" value={activeFormUnit.access_password} onChange={(e) => updateFormUnit(activeFormUnit.key, { access_password: e.target.value })} style={inputStyle} autoComplete="off" />
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 12 }}>
+                          {(() => {
+                            const nodeDef = NODES.find((n) => n.code === activeFormUnit.unit_code);
+                            if (!nodeDef?.provisionable) {
+                              return <p style={{ margin: 0, fontSize: 11.5, color: "var(--color-slate2)" }}>Este módulo no tiene provisionamiento automático configurado.</p>;
+                            }
+                            if (!activeFormUnit.access_user.trim() || !activeFormUnit.access_password.trim()) {
+                              return <p style={{ margin: 0, fontSize: 11.5, color: "#B5630C", fontWeight: 600 }}>Completá usuario y contraseña inicial para crear o actualizar el acceso.</p>;
+                            }
+                            if (activeFormUnit.status !== "activo") {
+                              return <p style={{ margin: 0, fontSize: 11.5, color: "var(--color-slate2)" }}>El acceso se sincroniza cuando el estado está activo.</p>;
+                            }
+                            if (activeFormUnit.provisioned_at) {
+                              return <p style={{ margin: 0, fontSize: 11.5, color: "#1F8A5B", fontWeight: 600 }}>✓ Acceso ya creado en {nodeDef.label}</p>;
+                            }
+                            return <p style={{ margin: 0, fontSize: 11.5, color: "#2A6FDB", fontWeight: 500 }}>Al guardar se creará el acceso de administrador en {nodeDef.label}.</p>;
+                          })()}
+                          {editingClient && (
+                            <button
+                              type="button"
+                              onClick={() => resetUnitPassword(activeFormUnit)}
+                              disabled={resettingUnitKey === activeFormUnit.key}
+                              style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--color-navy)", color: "white", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, fontWeight: 700, cursor: resettingUnitKey === activeFormUnit.key ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", opacity: resettingUnitKey === activeFormUnit.key ? 0.65 : 1, flexShrink: 0 }}
+                            >
+                              <RotateCcw size={13} />
+                              {resettingUnitKey === activeFormUnit.key ? "Blanqueando..." : "Blanquear contraseña"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {error && <p style={{ margin: 0, fontSize: 12.5, color: "#C0392B" }}>{error}</p>}

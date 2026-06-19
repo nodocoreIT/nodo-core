@@ -19,8 +19,14 @@ export function SearchInput({
   className,
 }: SearchInputProps) {
   return (
-    <div className={cn("relative w-full max-w-full sm:max-w-[14rem] md:max-w-[16rem]", className)}>
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate2" />
+    <div
+      className={cn(
+        "flex h-10 w-full max-w-full items-center gap-2.5 rounded-pill border border-border bg-paper px-3 sm:max-w-[14rem] md:max-w-[16rem]",
+        "focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20",
+        className,
+      )}
+    >
+      <Search className="h-4 w-4 shrink-0 text-slate2" aria-hidden />
       <input
         type="search"
         role="searchbox"
@@ -28,7 +34,7 @@ export function SearchInput({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 w-full rounded-pill border border-border bg-paper pl-9 pr-4 text-sm text-foreground placeholder:text-slate2 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+        className="min-w-0 flex-1 border-0 bg-transparent py-0 text-sm text-foreground placeholder:text-slate2 focus:outline-none focus:ring-0"
       />
     </div>
   );

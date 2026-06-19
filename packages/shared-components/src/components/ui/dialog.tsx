@@ -39,7 +39,7 @@ const DialogContent = React.forwardRef<
       ref={ref}
       className={cn(
         // Base
-        "fixed z-50 grid w-full gap-4 border border-[var(--color-border)] bg-[var(--color-card)] p-6 shadow-[var(--shadow-lg)] duration-200 rounded-md",
+        "fixed z-50 grid w-full gap-4 border border-[var(--color-border)] bg-white p-6 shadow-[var(--shadow-lg)] duration-200 rounded-md",
         // Animations
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         // Mobile: top-pinned with safe margins, scrollable so content is always reachable

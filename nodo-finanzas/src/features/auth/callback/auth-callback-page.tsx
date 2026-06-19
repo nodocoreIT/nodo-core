@@ -31,11 +31,14 @@ export function AuthCallbackPage() {
       }
 
       navigate("/admin/dashboard", { replace: true });
+      hideAppSplash();
     };
 
-    settle();
+    void settle().catch(() => {
+      hideAppSplash();
+      window.location.replace(nodeLoginUrlWithAuthError(LANDING_LOGIN_URL));
+    });
   }, [navigate]);
 
-  // Splash from index.html stays visible until AppRouter hides it after navigation.
   return null;
 }

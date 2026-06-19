@@ -20,7 +20,9 @@
     "noUncheckedSideEffectImports": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@nodocore/nodo-modules": ["../packages/nodo-modules/src/index.ts"],
+      "@nodocore/nodo-modules/notifications": ["../packages/nodo-modules/src/notifications/index.ts"]
     }
   },
   "include": ["src"],

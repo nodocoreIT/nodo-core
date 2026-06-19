@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MoneyInput } from '@/components/ui/money-input';
 import { FormSelect } from '@nodocore/shared-components';
 import { Spinner } from '@/components/ui/spinner';
 import { useFinanzas } from '@/hooks/use-finanzas';
@@ -282,8 +283,8 @@ export function PlanesAhorroPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base font-black text-ink truncate">{plan.detalle}</h3>
-                    <p className="text-xs text-slate2 flex items-center gap-1 mt-0.5">
-                      <Calendar className="w-3 h-3" />
+                    <p className="text-xs text-slate2 flex items-center gap-1.5 mt-0.5">
+                      <Calendar className="w-4 h-4 shrink-0" strokeWidth={2.25} />
                       Inicio: {formatearFecha(plan.fechaInicio)}
                     </p>
                   </div>
@@ -374,8 +375,11 @@ export function PlanesAhorroPage() {
                     proximo ? 'bg-red-50 border-red-100' : 'bg-brand/5 border-brand/20'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <Calendar className={`w-4 h-4 ${proximo ? 'text-red-600' : 'text-brand'}`} />
+                  <div className="flex items-center gap-2.5">
+                    <Calendar
+                      className={`w-5 h-5 shrink-0 ${proximo ? 'text-red-600' : 'text-brand'}`}
+                      strokeWidth={2.25}
+                    />
                     <div>
                       <p
                         className={`text-[10px] uppercase font-bold tracking-wider ${
@@ -407,13 +411,13 @@ export function PlanesAhorroPage() {
                     </div>
                   </div>
                   {plan.cuotasPagas === plan.cuotasTotales ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    <CheckCircle2 className="w-7 h-7 text-green-500 shrink-0" strokeWidth={2.25} />
                   ) : (
                     <a
                       href={plan.linkPago || 'https://www.mercadopago.com.ar/servicios'}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-black transition-all ${
                         proximo
                           ? 'bg-red-600 text-white hover:bg-red-700'
                           : 'bg-brand text-white hover:bg-brand/90'
@@ -421,46 +425,44 @@ export function PlanesAhorroPage() {
                       onClick={(e) => e.stopPropagation()}
                     >
                       PAGAR
-                      <ExternalLink className="w-3 h-3" />
+                      <ExternalLink className="w-4 h-4 shrink-0" strokeWidth={2.25} />
                     </a>
                   )}
                 </div>
 
                 {/* Actions */}
-                <div className="flex justify-end gap-2 pt-2 border-t border-mist">
+                <div className="flex justify-end gap-3 pt-3 border-t border-mist">
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={() => setPlanParaMarcarPagado(plan)}
-                    className="h-8 w-8 p-0 border-mist hover:border-green-200 hover:bg-green-50"
+                    className="h-14 w-14 min-w-14 p-0 shrink-0 rounded-xl border-2 border-mist hover:border-green-200 hover:bg-green-50 [&_svg]:!size-8"
                     title="Marcar cuota pagada"
                   >
-                    <Check className="w-3.5 h-3.5 text-green-600" />
+                    <Check className="text-green-600" strokeWidth={2.5} />
                   </Button>
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={() => setPlanParaCuotas(plan)}
-                    className="h-8 w-8 p-0 border-mist hover:border-brand/30 hover:bg-brand/5"
+                    className="h-14 w-14 min-w-14 p-0 shrink-0 rounded-xl border-2 border-mist hover:border-brand/30 hover:bg-brand/5 [&_svg]:!size-8"
                     title="Ver historial de cuotas"
                   >
-                    <Calendar className="w-3.5 h-3.5 text-brand" />
+                    <Calendar className="text-brand" strokeWidth={2.5} />
                   </Button>
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={() => abrirFormulario(plan)}
-                    className="h-8 w-8 p-0 border-mist hover:border-brand/30 hover:bg-brand/5"
+                    className="h-14 w-14 min-w-14 p-0 shrink-0 rounded-xl border-2 border-mist hover:border-brand/30 hover:bg-brand/5 [&_svg]:!size-8"
+                    title="Editar plan"
                   >
-                    <Edit className="w-3.5 h-3.5 text-brand" />
+                    <Edit className="text-brand" strokeWidth={2.5} />
                   </Button>
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={() => handleEliminar(plan.id)}
-                    className="h-8 w-8 p-0 border-mist hover:border-red-200 hover:bg-red-50"
+                    className="h-14 w-14 min-w-14 p-0 shrink-0 rounded-xl border-2 border-mist hover:border-red-200 hover:bg-red-50 [&_svg]:!size-8"
+                    title="Eliminar plan"
                   >
-                    <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                    <Trash2 className="text-red-500" strokeWidth={2.5} />
                   </Button>
                 </div>
               </div>
@@ -540,36 +542,18 @@ export function PlanesAhorroPage() {
 
               {/* Valor Movil / Saldo Cancelacion */}
               <div className="bg-paper rounded-xl border border-mist p-4 grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-brand uppercase tracking-wider mb-1.5">
-                    Valor Móvil Hoy
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate2 font-medium">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={form.valorMovil}
-                      onChange={(e) => set('valorMovil', parseFloat(e.target.value) || 0)}
-                      className="w-full pl-7 pr-3 py-2 border border-mist rounded-lg text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-red-600 uppercase tracking-wider mb-1.5">
-                    Saldo Liquidación
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate2 font-medium">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={form.saldoCancelacion}
-                      onChange={(e) => set('saldoCancelacion', parseFloat(e.target.value) || 0)}
-                      className="w-full pl-7 pr-3 py-2 border border-red-100 rounded-lg text-sm text-ink focus:outline-none focus:ring-2 focus:ring-red-300"
-                    />
-                  </div>
-                </div>
+                <MoneyInput
+                  label="Valor Móvil Hoy"
+                  value={form.valorMovil}
+                  onChange={(v) => set('valorMovil', v)}
+                  moneda={form.moneda}
+                />
+                <MoneyInput
+                  label="Saldo Liquidación"
+                  value={form.saldoCancelacion}
+                  onChange={(v) => set('saldoCancelacion', v)}
+                  moneda={form.moneda}
+                />
               </div>
 
               {/* Fechas y cuotas */}
@@ -641,21 +625,12 @@ export function PlanesAhorroPage() {
 
               {/* Importe y moneda */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate2 uppercase tracking-wider mb-1.5">
-                    Importe de Cuota
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate2 font-medium">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={form.importeCuota}
-                      onChange={(e) => set('importeCuota', parseFloat(e.target.value) || 0)}
-                      className="w-full pl-7 pr-3 py-2 border border-mist rounded-lg text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand font-bold"
-                    />
-                  </div>
-                </div>
+                <MoneyInput
+                  label="Importe de Cuota"
+                  value={form.importeCuota}
+                  onChange={(v) => set('importeCuota', v)}
+                  moneda={form.moneda}
+                />
                 <div>
                   <label className="block text-xs font-bold text-slate2 uppercase tracking-wider mb-1.5">
                     Moneda

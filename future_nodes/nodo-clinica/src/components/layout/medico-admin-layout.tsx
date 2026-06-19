@@ -94,6 +94,10 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const title = ROUTE_TITLES[pathname] ?? "Gestión";
   const displayName = doctor?.fullName ?? "Médico";
 
+  useEffect(() => {
+    document.title = "Nodo | Clinicas";
+  }, []);
+
   const handleLogout = async () => {
     await clinicApi.logout();
     router.push("/");
@@ -126,7 +130,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-16 flex-shrink-0 items-center justify-between px-5">
+        <div className="mt-2.5 flex h-16 flex-shrink-0 items-center justify-between px-5">
           <BrandMark onDark iconClassName="h-6 w-6" />
           <button
             type="button"

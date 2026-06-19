@@ -38,15 +38,17 @@ interface AgencyProfileFormProps {
 }
 
 export function AgencyProfileForm({ onSuccess }: AgencyProfileFormProps) {
-  const { role } = useAuth();
+  const { role: authRole } = useAuth();
   const {
     adminRole,
+    sessionRole,
     profile,
     upsertProfile,
     isUpsertingProfile,
     uploadLogo,
     isUploadingLogo,
   } = useSettingsModule();
+  const role = sessionRole ?? authRole;
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm<AgencyProfileFormValues>({

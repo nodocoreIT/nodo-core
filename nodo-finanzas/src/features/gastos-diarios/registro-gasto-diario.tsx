@@ -14,8 +14,10 @@ import { useRubros } from '@/hooks/use-rubros';
 import { getFechaHoy, formatearMoneda } from '@/utils/formatters';
 import { capitalizarDescripcion } from '@/utils/capitalizar-descripcion';
 import { VoiceGastoButton } from '@/features/gastos-diarios/components/voice-gasto-button';
+import { useExtractGastoFromVoice } from '@/features/gastos-diarios/hooks/use-extract-gasto-from-voice';
 import {
   parseGastoDictado,
+  parsedTieneDatosUtiles,
   type ParsedGastoDictado,
 } from '@/features/gastos-diarios/lib/parse-gasto-dictado';
 import type { FormaDePago, GastoDiario } from '@/types';
@@ -57,6 +59,7 @@ const FORMAS_PAGO: Array<{ value: FormaDePago; label: string }> = [
 export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando, datosIniciales }: Props) {
   const finanzas = useFinanzas();
   const { rubrosActivos } = useRubros();
+  const { extract: extractGastoFromVoice } = useExtractGastoFromVoice();
   const [procesando, setProcesando] = useState(false);
   const [dictadoPreview, setDictadoPreview] = useState<ParsedGastoDictado | null>(null);
   const [ultimoDictado, setUltimoDictado] = useState('');
@@ -131,36 +134,47 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
 
   const applyParsedGasto = useCallback(
     (parsed: ParsedGastoDictado) => {
-      if (parsed.fecha) setValue('fecha', parsed.fecha);
-      if (parsed.monto) setValue('monto', parsed.monto);
-      if (parsed.descripcion) setValue('descripcion', parsed.descripcion);
-      if (parsed.formaPago) setValue('formaPago', parsed.formaPago);
+      const opts = { shouldDirty: true, shouldTouch: true };
+      if (parsed.fecha) setValue('fecha', parsed.fecha, opts);
+      if (parsed.monto) setValue('monto', parsed.monto, opts);
+      if (parsed.descripcion) setValue('descripcion', parsed.descripcion, opts);
+      if (parsed.formaPago) setValue('formaPago', parsed.formaPago, opts);
       if (parsed.rubroId) {
-        setValue('rubroId', parsed.rubroId);
-        if (parsed.rubroCodigo) setValue('rubro', parsed.rubroCodigo);
+        setValue('rubroId', parsed.rubroId, opts);
+        if (parsed.rubroCodigo) setValue('rubro', parsed.rubroCodigo, opts);
       }
-      if (parsed.tarjetaId) setValue('tarjetaId', parsed.tarjetaId);
-      if (parsed.cuotas) setValue('cuotas', parsed.cuotas);
-      if (parsed.cuentaId) setValue('cuentaId', parsed.cuentaId);
+      if (parsed.tarjetaId) setValue('tarjetaId', parsed.tarjetaId, opts);
+      if (parsed.cuotas) setValue('cuotas', parsed.cuotas, opts);
+      if (parsed.cuentaId) setValue('cuentaId', parsed.cuentaId, opts);
     },
     [setValue],
   );
 
   const handleDictado = useCallback(
     async (transcript: string) => {
-      const parsed = parseGastoDictado({
+      const context = {
         texto: transcript,
         rubros: rubrosActivos,
         tarjetas: tarjetasActivas,
         cuentas: cuentasActivas,
         fechaReferencia: getFechaHoy(),
-      });
+      };
+
+      let parsed = parseGastoDictado(context);
+
+      if (!parsed.monto) {
+        try {
+          parsed = await extractGastoFromVoice(context);
+        } catch (err) {
+          if (!parsedTieneDatosUtiles(parsed)) throw err;
+        }
+      }
 
       setUltimoDictado(transcript);
       setDictadoPreview(parsed);
       applyParsedGasto(parsed);
 
-      if (!parsed.monto && !parsed.descripcion && !parsed.rubroId) {
+      if (!parsedTieneDatosUtiles(parsed)) {
         throw new Error('EMPTY_PARSE');
       }
 
@@ -172,13 +186,15 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
         .filter(Boolean)
         .join(' · ');
 
-      if (parsed.advertencias.length > 0) {
+      if (!parsed.monto) {
+        toast('Detectamos parte del gasto pero no el monto. Completalo manualmente.', { icon: '⚠️' });
+      } else if (parsed.advertencias.length > 0) {
         toast(resumen || 'Dictado interpretado con advertencias', { icon: '⚠️' });
       } else {
         toast.success(resumen ? `Dictado aplicado: ${resumen}` : 'Dictado aplicado al formulario');
       }
     },
-    [applyParsedGasto, cuentasActivas, formaPagoLabels, rubrosActivos, tarjetasActivas],
+    [applyParsedGasto, cuentasActivas, extractGastoFromVoice, formaPagoLabels, rubrosActivos, tarjetasActivas],
   );
 
   async function onSubmit(data: FormData) {
@@ -240,7 +256,7 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
       <Card>
         {!gastoEditando && (
           <div className="mb-5 rounded-xl border border-brand/20 bg-brand/5 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4">
               <div>
                 <p className="text-sm font-semibold text-ink">Cargá el gasto hablando</p>
                 <p className="text-xs text-slate2 mt-1">

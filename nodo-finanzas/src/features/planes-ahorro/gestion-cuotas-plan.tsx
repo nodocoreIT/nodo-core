@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Spinner } from '@/components/ui/spinner';
 import { Calendar, Check, X, Plus, Trash2 } from 'lucide-react';
 import { formatearMoneda, formatearFecha } from '@/utils/formatters';
@@ -258,17 +259,12 @@ export function GestionCuotasPlan({ plan, onClose }: Props) {
                       onChange={(e) => actualizarCuota(index, 'fechaVencimiento', e.target.value)}
                       className="flex-1 border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
                     />
-                    <div className="relative w-40">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate2 font-medium">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={cuota.importe}
-                        onChange={(e) => actualizarCuota(index, 'importe', parseFloat(e.target.value) || 0)}
-                        className="w-full pl-7 pr-3 py-2 text-sm border border-mist rounded-lg focus:ring-1 focus:ring-brand outline-none"
-                        placeholder="Importe"
-                      />
-                    </div>
+                    <MoneyInput
+                      value={cuota.importe}
+                      onChange={(v) => actualizarCuota(index, 'importe', v)}
+                      moneda={plan.moneda}
+                      className="w-40 shrink-0"
+                    />
                     <Button
                       variant="outline"
                       size="sm"

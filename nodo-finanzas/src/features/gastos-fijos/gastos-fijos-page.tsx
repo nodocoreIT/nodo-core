@@ -283,7 +283,94 @@ export function GastosFijosPage() {
 
       {/* List */}
       <Card title="Gastos Fijos Registrados">
-        <div className="overflow-x-auto">
+        {gastosOrdenados.length === 0 ? (
+          <div className="py-16 text-center text-slate2">
+            <div className="flex flex-col items-center gap-2">
+              <Calculator className="h-10 w-10 opacity-20" />
+              <p className="font-semibold text-ink">Sin gastos fijos</p>
+              <p className="text-xs">Agregá tu primer gasto fijo mensual.</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Mobile: card list */}
+            <div className="md:hidden divide-y divide-mist/60">
+              {gastosOrdenados.map((gasto) => {
+                const isPagado = estaPagadoEsteMes(gasto.id);
+                const rubro = rubrosMap.get(gasto.rubroId);
+                return (
+                  <div
+                    key={gasto.id}
+                    className={`py-3 ${!gasto.activo ? 'opacity-50' : ''}`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <RubroDisplay rubro={rubro} />
+                      <button
+                        onClick={() => finanzas.actualizarGastoFijo(gasto.id, { activo: !gasto.activo })}
+                        className={`inline-flex px-2 py-0.5 text-[10px] font-bold uppercase rounded-md border tracking-wider transition-all shrink-0 ${
+                          gasto.activo
+                            ? 'bg-mist text-brand border-brand/30 hover:bg-brand/10'
+                            : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                        }`}
+                      >
+                        {gasto.activo ? 'Activo' : 'Inactivo'}
+                      </button>
+                    </div>
+
+                    <p className={`font-semibold text-sm leading-snug ${isPagado ? 'text-brand' : 'text-ink'}`}>
+                      {gasto.descripcion}
+                    </p>
+                    {gasto.etiqueta && (
+                      <p className="text-xs text-slate2 mt-0.5">{gasto.etiqueta}</p>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-2 mt-2 mb-3">
+                      <p className={`text-base font-bold leading-tight ${isPagado ? 'text-brand' : 'text-ink'}`}>
+                        {formatearMoneda(gasto.monto, gasto.moneda)}
+                      </p>
+                      {gasto.moneda === 'USD' && dolar.cotizacion && (
+                        <p className="text-[11px] text-slate2">
+                          ≈ {formatearMoneda(dolar.convertirUSDaARS(gasto.monto))}
+                        </p>
+                      )}
+                      <span className="text-[9px] font-bold uppercase bg-mist text-slate2 px-2 py-1 rounded-md">
+                        {gasto.formaDePago}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant={isPagado ? 'primary' : 'danger'}
+                        onClick={() => abrirModalPago(gasto)}
+                        disabled={!gasto.activo || cargandoPago}
+                        className="text-[10px] px-2 h-7"
+                      >
+                        {isPagado ? 'Pagado' : 'Pagar'}
+                      </Button>
+                      <button
+                        onClick={() => abrirFormulario(gasto)}
+                        className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"
+                        title="Editar"
+                        disabled={!gasto.activo}
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setGastoAEliminar(gasto)}
+                        className="p-1.5 text-slate2 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-mist">
@@ -373,20 +460,11 @@ export function GastosFijosPage() {
                   </tr>
                 );
               })}
-              {gastosOrdenados.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="py-16 text-center text-slate2">
-                    <div className="flex flex-col items-center gap-2">
-                      <Calculator className="h-10 w-10 opacity-20" />
-                      <p className="font-semibold text-ink">Sin gastos fijos</p>
-                      <p className="text-xs">Agregá tu primer gasto fijo mensual.</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
-        </div>
+            </div>
+          </>
+        )}
       </Card>
 
       {/* Delete modal */}

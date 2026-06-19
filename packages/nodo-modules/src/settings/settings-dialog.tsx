@@ -467,6 +467,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     setTimeout(() => setAiKeySaved(false), 2500);
   };
   const { role: authRole, user: authUser } = useAuth();
+  const effectiveRole = module.sessionRole ?? authRole;
   const profile = module.profile;
   const { settings, setSettings, resetSettings } = { settings: module.themeSettings, setSettings: module.setThemeSettings, resetSettings: module.resetThemeSettings };
   const upsertProfile = module.upsertProfile;
@@ -580,6 +581,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     email: "",
     role: module.defaultInviteRole,
   });
+  const [invitePassword, setInvitePassword] = useState("");
   const [isInviting, setIsInviting] = useState(false);
   const [inviteSuccessMessage, setInviteSuccessMessage] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -588,10 +590,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [deletingUser, setDeletingUser] = useState(false);
 
   useEffect(() => {
-    if (open && activeTab === "users" && authRole === module.adminRole) {
+    if (open && activeTab === "users" && effectiveRole === module.adminRole) {
       void fetchMembers();
     }
-  }, [open, activeTab, authRole, fetchMembers]);
+  }, [open, activeTab, effectiveRole, fetchMembers]);
 
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
@@ -618,14 +620,24 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMember.name || !newMember.email) return;
+    if (module.inviteRequiresPassword && !invitePassword.trim()) {
+      setInviteError("La contraseña inicial es obligatoria.");
+      return;
+    }
     setIsInviting(true);
     setInviteError(null);
     setInviteSuccessMessage(null);
     try {
-      const { id: userId, invited } = await inviteUser(newMember.name, newMember.email, newMember.role);
+      const { id: userId, invited } = await inviteUser(
+        newMember.name,
+        newMember.email,
+        newMember.role,
+        module.inviteRequiresPassword ? invitePassword.trim() : undefined,
+      );
       const next = { ...userPermissions, [userId]: draftSections };
       await persistUserPermissions(next);
       handleNewUser();
+      setInvitePassword("");
       setInviteSuccessMessage(
         invited ? module.inviteMessages.invited : module.inviteMessages.existing,
       );
@@ -639,10 +651,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[800px] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden">
+      <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[800px] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden bg-white data-[state=open]:animate-none data-[state=closed]:animate-none">
           <nav
             aria-label="Secciones de configuración"
-            className="hidden sm:flex sm:w-52 md:w-56 flex-shrink-0 flex-col border-r border-border bg-paper overflow-y-auto"
+            className="hidden sm:flex sm:w-52 md:w-56 flex-shrink-0 flex-col border-r border-border bg-slate-50 overflow-y-auto"
           >
             {settingsTabs.map((tab) => (
               <button
@@ -660,8 +672,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             ))}
           </nav>
 
-        <div className="flex flex-1 min-h-0 flex-col min-w-0">
-          <div className="bg-paper p-6 pb-4 flex-shrink-0">
+        <div className="flex flex-1 min-h-0 flex-col min-w-0 bg-white">
+          <div className="bg-white p-6 pb-4 flex-shrink-0 border-b border-border">
             <DialogHeader>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mr-6">
                 <DialogTitle className="text-xl">
@@ -704,7 +716,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             />
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-6 bg-white">
           {/* TAB 0: Mi Perfil */}
           {activeTab === "profile" && <ProfileSettingsSection />}
 
@@ -1303,6 +1315,20 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     required={!selectedUserId}
                   />
                 </div>
+                {module.inviteRequiresPassword && !selectedUserId && (
+                  <div className="space-y-1 md:col-span-3">
+                    <Label htmlFor="memberPassword">Contraseña inicial</Label>
+                    <Input
+                      id="memberPassword"
+                      type="password"
+                      placeholder="Mínimo 6 caracteres"
+                      value={invitePassword}
+                      onChange={(e) => setInvitePassword(e.target.value)}
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                )}
                 <div className="space-y-1">
                   <Label htmlFor="memberRole">Rol del Usuario</Label>
                   <FormSelect
@@ -1325,7 +1351,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   />
                 </div>
 
-                {authRole === module.adminRole && (
+                {effectiveRole === module.adminRole && (
                   <div className="md:col-span-3 space-y-2 border-t border-border pt-4">
                     <div>
                       <h4 className="text-sm font-bold text-navy">Secciones visibles</h4>
@@ -1430,7 +1456,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       <th className="p-3">Nombre</th>
                       <th className="p-3">Rol asignado</th>
                       <th className="p-3">Estado</th>
-                      {authRole === module.adminRole && (
+                      {effectiveRole === module.adminRole && (
                         <th className="p-3 text-right">Acciones</th>
                       )}
                     </tr>
@@ -1438,7 +1464,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   <tbody className="divide-y divide-border text-slate2">
                     {usersLoading && (
                       <tr>
-                        <td colSpan={authRole === module.adminRole ? 4 : 3} className="p-6 text-center text-slate2">
+                        <td colSpan={effectiveRole === module.adminRole ? 4 : 3} className="p-6 text-center text-slate2">
                           <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                         </td>
                       </tr>
@@ -1471,7 +1497,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                 {user.status}
                               </span>
                             </td>
-                            {authRole === module.adminRole && (
+                            {effectiveRole === module.adminRole && (
                               <td className="p-3">
                                 <div className="flex justify-end gap-1">
                                   <Button
@@ -1505,7 +1531,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       })}
                   </tbody>
                 </table>
-                {authRole === module.adminRole && (
+                {effectiveRole === module.adminRole && (
                   <p className="text-[11px] text-slate2 px-3 py-2 border-t border-border">
                     Usá <strong>Editar</strong> para cambiar el rol y las secciones visibles.{" "}
                     <strong>Eliminar</strong> quita el acceso al panel (no borra administradores ni tu propia cuenta).

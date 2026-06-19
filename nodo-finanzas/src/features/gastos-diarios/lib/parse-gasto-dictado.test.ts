@@ -51,6 +51,18 @@ describe('parseGastoDictado', () => {
     expect(result.confianza).toBeGreaterThan(0.7);
   });
 
+  it('interpreta el ejemplo del formulario de dictado', () => {
+    const result = parseGastoDictado({
+      texto: 'Hoy gasté 250 pesos en el médico con Mercado Pago',
+      rubros,
+      fechaReferencia: '2026-06-19',
+    });
+
+    expect(result.monto).toBe(250);
+    expect(result.formaPago).toBe('MERCADO_PAGO');
+    expect(result.rubroId).toBe('rubro-salud');
+  });
+
   it('interpreta monto en lucas y rubro de supermercado', () => {
     const result = parseGastoDictado({
       texto: 'ayer gasté 15 lucas en el super con débito',
@@ -74,6 +86,92 @@ describe('parseGastoDictado', () => {
     expect(result.monto).toBe(8500);
     expect(result.formaPago).toBe('EFECTIVO');
     expect(result.rubroId).toBe('rubro-transporte');
+  });
+
+  it('interpreta montos dictados en palabras', () => {
+    const result = parseGastoDictado({
+      texto: 'hoy gaste doscientos cincuenta pesos en el medico con mercado pago',
+      rubros,
+      fechaReferencia: '2026-06-19',
+    });
+
+    expect(result.monto).toBe(250);
+    expect(result.formaPago).toBe('MERCADO_PAGO');
+    expect(result.rubroId).toBe('rubro-salud');
+  });
+
+  it('interpreta gasto con simbolo pesos y supermercado', () => {
+    const result = parseGastoDictado({
+      texto: 'pago ayer gasté $250 en el supermercado y pagué con mercado pago',
+      rubros,
+      fechaReferencia: '2026-06-19',
+    });
+
+    expect(result.monto).toBe(250);
+    expect(result.fecha).toBe('2026-06-18');
+    expect(result.formaPago).toBe('MERCADO_PAGO');
+    expect(result.rubroId).toBe('rubro-alimentacion');
+  });
+
+  it('interpreta gasto medico con tarjeta santander', () => {
+    const result = parseGastoDictado({
+      texto:
+        'tarjeta de crédito hoy gasté $250 en el médico y pagué con Santander río tarjeta de crédito',
+      rubros,
+      tarjetas: [
+        {
+          id: 'tarjeta-santander',
+          nombre: 'Visa',
+          banco: 'Santander Rio',
+          tipo: 'visa',
+          activa: true,
+          diaCierre: 20,
+          diaVencimiento: 2,
+        },
+      ],
+      fechaReferencia: '2026-06-19',
+    });
+
+    expect(result.monto).toBe(250);
+    expect(result.fecha).toBe('2026-06-19');
+    expect(result.formaPago).toBe('TARJETA');
+    expect(result.rubroId).toBe('rubro-salud');
+    expect(result.tarjetaId).toBe('tarjeta-santander');
+  });
+
+  it('no falla cuando los rubros vienen sin codigo (como desde la API)', () => {
+    const rubrosSinCodigo: Rubro[] = [
+      {
+        id: 'rubro-salud',
+        codigo: undefined as unknown as string,
+        nombre: 'Salud',
+        emoji: '💊',
+        color: '#10b981',
+        activo: true,
+        esSistema: true,
+        orden: 1,
+      },
+    ];
+
+    expect(() =>
+      parseGastoDictado({
+        texto:
+          'tarjeta de crédito hoy gasté $250 en el médico y pagué con Santander río tarjeta de crédito',
+        rubros: rubrosSinCodigo,
+        fechaReferencia: '2026-06-19',
+      }),
+    ).not.toThrow();
+
+    const result = parseGastoDictado({
+      texto:
+        'tarjeta de crédito hoy gasté $250 en el médico y pagué con Santander río tarjeta de crédito',
+      rubros: rubrosSinCodigo,
+      fechaReferencia: '2026-06-19',
+    });
+
+    expect(result.monto).toBe(250);
+    expect(result.formaPago).toBe('TARJETA');
+    expect(result.rubroId).toBe('rubro-salud');
   });
 
   it('detecta cuotas en tarjeta', () => {

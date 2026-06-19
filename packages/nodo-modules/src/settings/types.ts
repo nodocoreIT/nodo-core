@@ -97,13 +97,17 @@ export interface StaffApi {
   loading: boolean;
   error: string | null;
   fetchMembers: () => Promise<void>;
-  inviteUser: (name: string, email: string, role: string) => Promise<{ id: string; invited: boolean }>;
+  inviteUser: (name: string, email: string, role: string, password?: string) => Promise<{ id: string; invited: boolean }>;
   updateMemberRole: (userId: string, role: string) => Promise<void>;
   removeMember: (userId: string) => Promise<void>;
 }
 
 export interface SettingsModuleContextValue {
   hiddenTabs?: SettingsTabId[];
+  /** When JWT role is unavailable (panel), use for admin permission checks. */
+  sessionRole?: string | null;
+  /** Panel team invites need an initial password (inmo uses email invite). */
+  inviteRequiresPassword?: boolean;
   managedNav: NavSection[];
   roleOptions: { value: string; label: string }[];
   inviteMessages: { invited: string; existing: string };

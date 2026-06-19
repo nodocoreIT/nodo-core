@@ -5,14 +5,13 @@ import {
   Plus,
   Trash2,
   Edit,
-  ChevronLeft,
-  ChevronRight,
   Search,
   X,
   CreditCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { MonthPicker } from '@/components/ui/month-picker';
 import { RubroDisplay } from '@/components/rubros/rubro-display';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { formatearFecha, getFechaHoy } from '@/utils/formatters';
@@ -32,14 +31,6 @@ export function DetalleTarjetaPage() {
   const [vistaRegistro, setVistaRegistro] = useState(false);
 
   const tarjeta = finanzas.tarjetas.find((t) => t.id === id);
-
-  const cambiarMes = (incremento: number) => {
-    const [anio, mes] = filtroMes.split('-').map(Number);
-    const nueva = new Date(anio, mes - 1 + incremento, 1);
-    setFiltroMes(
-      `${nueva.getFullYear()}-${String(nueva.getMonth() + 1).padStart(2, '0')}`
-    );
-  };
 
   const consumosDelMes = useMemo(() => {
     if (!id) return [];
@@ -179,15 +170,15 @@ export function DetalleTarjetaPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-mist p-4 flex flex-col sm:flex-row gap-3 items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate2" />
+      <div className="bg-white rounded-xl border border-mist px-3 py-2.5 flex flex-col sm:flex-row gap-2 sm:items-center">
+        <div className="relative w-full sm:max-w-xs sm:flex-shrink-0">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate2" />
           <input
             type="text"
             placeholder="Buscar por lugar o detalle..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 border border-mist rounded-lg text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
+            className="h-9 w-full rounded-lg border border-mist bg-white pl-8 pr-8 text-sm text-ink focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand"
           />
           {busqueda && (
             <button
@@ -198,29 +189,16 @@ export function DetalleTarjetaPage() {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => cambiarMes(-1)}
-            className="p-1.5 rounded hover:bg-mist text-slate2 transition-colors"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <input
-            type="month"
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <MonthPicker
             value={filtroMes}
-            onChange={(e) => setFiltroMes(e.target.value)}
-            className="px-3 py-1.5 border border-mist rounded-lg text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand bg-paper cursor-pointer"
+            onChange={setFiltroMes}
+            className="border-0 shadow-none bg-transparent py-0 px-0"
           />
-          <button
-            onClick={() => cambiarMes(1)}
-            className="p-1.5 rounded hover:bg-mist text-slate2 transition-colors"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          <span className="text-xs text-slate2 font-medium whitespace-nowrap">
+            {consumosFiltrados.length} resultado{consumosFiltrados.length !== 1 ? 's' : ''}
+          </span>
         </div>
-        <span className="text-xs text-slate2 font-medium whitespace-nowrap">
-          {consumosFiltrados.length} resultado{consumosFiltrados.length !== 1 ? 's' : ''}
-        </span>
       </div>
 
       {/* Consumption list */}

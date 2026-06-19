@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Check, Lock } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
-import { getNodoPlanBySlug, STATUS_LABEL, STATUS_COLOR, type PlanTier } from "@/lib/nodo-plans";
+import { getNodoPlanBySlug, STATUS_LABEL, STATUS_COLOR, isNodoPlanAccessible, type PlanTier } from "@/lib/nodo-plans";
 
 const PLAN_ORDER: PlanTier[] = ["starter", "pro"];
 
@@ -56,7 +56,7 @@ export default function NodoDetailPage({ params }: { params: Promise<{ slug: str
   const { slug } = use(params);
   const nodo = getNodoPlanBySlug(slug);
 
-  if (!nodo || nodo.status !== "development") notFound();
+  if (!nodo || !isNodoPlanAccessible(nodo.status)) notFound();
 
   const statusStyle = STATUS_COLOR[nodo.status];
 

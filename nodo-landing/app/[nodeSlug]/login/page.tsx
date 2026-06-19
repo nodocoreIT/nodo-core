@@ -30,6 +30,15 @@ import {
   type NodeAccent,
 } from "@/lib/node-accents";
 
+function redirectToFinanzasAuth(accessToken: string, refreshToken: string) {
+  try {
+    sessionStorage.setItem("nodo-finanzas-skip-splash", "1");
+  } catch {
+    // ignore
+  }
+  window.location.href = `/finanzas/auth/callback#access_token=${accessToken}&refresh_token=${refreshToken}`;
+}
+
 function NodeTransitionOverlay({
   label,
   code,
@@ -132,7 +141,7 @@ function NodeTransitionOverlay({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={logoSrc}
-            alt="Nodo"
+            alt=""
             style={{
               height: "0.78em",
               width: "auto",
@@ -518,7 +527,7 @@ function LoginForm() {
         } else if (isAutosNode) {
           window.location.href = `/autos/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
         } else if (isFinanzasNode) {
-          window.location.href = `/finanzas/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+          redirectToFinanzasAuth(access_token, refresh_token);
         } else {
           router.push("/panel");
         }
@@ -746,7 +755,7 @@ function LoginForm() {
     } else if (isAutosNode) {
       window.location.href = `/autos/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
     } else if (isFinanzasNode) {
-      window.location.href = `/finanzas/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+      redirectToFinanzasAuth(access_token, refresh_token);
     } else {
       router.push("/panel");
     }

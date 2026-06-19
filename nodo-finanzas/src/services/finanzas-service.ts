@@ -407,21 +407,24 @@ export class FinanzasService {
   // RUBROS
   // ====================================
 
+  private static readonly RUBRO_SELECT = `
+    id,
+    codigo,
+    nombre,
+    emoji,
+    color,
+    descripcion,
+    activo,
+    es_sistema,
+    orden,
+    created_at,
+    updated_at
+  `;
+
   static async obtenerRubros(): Promise<Rubro[]> {
     const { data, error } = await db
       .from('rubros')
-      .select(`
-        id,
-        nombre,
-        emoji,
-        color,
-        descripcion,
-        activo,
-        es_sistema,
-        orden,
-        created_at,
-        updated_at
-      `)
+      .select(FinanzasService.RUBRO_SELECT)
       .order('orden', { ascending: true })
       .order('nombre', { ascending: true });
 
@@ -446,18 +449,7 @@ export class FinanzasService {
         es_sistema: rubro.esSistema || false,
         orden: rubro.orden || 999
       })])
-      .select(`
-        id,
-        nombre,
-        emoji,
-        color,
-        descripcion,
-        activo,
-        es_sistema,
-        orden,
-        created_at,
-        updated_at
-      `)
+      .select(FinanzasService.RUBRO_SELECT)
       .single();
 
     if (error) {
@@ -530,18 +522,7 @@ export class FinanzasService {
   static async obtenerRubroPorId(id: string): Promise<Rubro | null> {
     const { data, error } = await db
       .from('rubros')
-      .select(`
-        id,
-        nombre,
-        emoji,
-        color,
-        descripcion,
-        activo,
-        es_sistema,
-        orden,
-        created_at,
-        updated_at
-      `)
+      .select(FinanzasService.RUBRO_SELECT)
       .eq('id', id)
       .single();
 

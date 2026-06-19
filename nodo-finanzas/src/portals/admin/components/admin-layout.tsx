@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import {
   PortalHeaderActions,
   PortalHeaderMobileActions,
+  useFixedDocumentTitle,
 } from "@nodocore/shared-components";
 import { cn } from "@/shared/lib/utils";
 import { NotificationBell } from "@/components/ui/notification-bell";
@@ -85,7 +86,9 @@ export function AdminLayout() {
   const title =
     Object.entries(ROUTE_TITLES)
       .sort((a, b) => b[0].length - a[0].length)
-      .find(([key]) => pathname.startsWith(key))?.[1] ?? "Nodo Finanzas";
+      .find(([key]) => pathname.startsWith(key))?.[1] ?? "Dashboard";
+
+  useFixedDocumentTitle("Nodo | Finanzas");
 
   const fullName = (user?.user_metadata?.full_name as string | undefined) ?? "";
   const email = user?.email ?? "";
@@ -109,7 +112,7 @@ export function AdminLayout() {
         )}
       >
         {/* Brand */}
-        <div className="flex h-16 flex-shrink-0 items-center justify-between px-5 border-b border-navy-700">
+        <div className="mt-2.5 flex h-16 flex-shrink-0 items-center justify-between border-b border-navy-700 px-5">
           <div className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-brand" />
             <span className="font-display font-bold text-white text-sm">

@@ -1,6 +1,13 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Menu } from "lucide-react";
+import {
+  PortalHeaderActions,
+  PortalHeaderMobileActions,
+  SearchInput,
+} from "@nodocore/shared-components";
+import { usePanelShell } from "./PanelChrome";
+import { NotificationsBell } from "./NotificationsBell";
 
 type TopbarProps = {
   breadcrumb: string;
@@ -15,100 +22,51 @@ export default function Topbar({
   title,
   searchValue = "",
   onSearchChange,
-  searchPlaceholder = "Buscar...",
+  searchPlaceholder = "Buscar…",
 }: TopbarProps) {
+  const shell = usePanelShell();
+  const hasSearch = onSearchChange !== undefined;
+
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "20px 30px",
-        borderBottom: "1px solid var(--color-mist)",
-        background: "rgba(245,248,252,.9)",
-        backdropFilter: "blur(8px)",
-        flexShrink: 0,
-      }}
+    <header
+      className="flex min-h-20 shrink-0 flex-col items-center gap-3 border-b border-border bg-[#EEF3F8] px-4 py-3 shadow-sm sm:flex-row sm:gap-4 sm:px-6"
     >
-      <div>
-        <p
-          style={{
-            margin: 0,
-            fontSize: 12.5,
-            fontWeight: 600,
-            color: "var(--color-slate2)",
-            marginBottom: 2,
-          }}
-        >
-          {breadcrumb}
-        </p>
-        <h1
-          style={{
-            margin: 0,
-            fontSize: 22,
-            fontWeight: 700,
-            color: "var(--color-ink)",
-            fontFamily: "var(--font-display)",
-          }}
-        >
-          {title}
-        </h1>
-      </div>
-      {onSearchChange !== undefined && (
-      <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
-        <input
-          type="text"
-          placeholder={searchPlaceholder}
-          value={searchValue}
-          onChange={(e) => onSearchChange(e.target.value)}
-          style={{
-            background: "white",
-            border: "1px solid var(--color-mist)",
-            borderRadius: 999,
-            padding: "9px 38px 9px 16px",
-            minWidth: 240,
-            fontSize: 13.5,
-            color: "var(--color-ink)",
-            outline: "none",
-            fontFamily: "var(--font-sans)",
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.borderColor = "var(--color-brand)";
-            e.currentTarget.style.boxShadow =
-              "0 0 0 3px rgba(218,90,14,.12)";
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.borderColor = "var(--color-mist)";
-            e.currentTarget.style.boxShadow = "none";
-          }}
-        />
-        {searchValue && (
+      <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:min-w-0 sm:flex-1 sm:justify-start">
+        <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
-            onClick={() => onSearchChange!("")}
-            aria-label="Limpiar búsqueda"
-            title="Limpiar"
-            style={{
-              position: "absolute",
-              right: 8,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 22,
-              height: 22,
-              borderRadius: "50%",
-              border: "none",
-              background: "var(--color-mist)",
-              color: "var(--color-slate2)",
-              cursor: "pointer",
-              padding: 0,
-            }}
+            className="block text-navy hover:text-brand md:hidden"
+            onClick={() => shell?.openMobileMenu()}
+            aria-label="Abrir menú"
           >
-            <X size={14} strokeWidth={2.5} />
+            <Menu className="h-6 w-6" />
           </button>
-        )}
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate2 sm:text-xs">
+              {breadcrumb}
+            </p>
+            <h1 className="truncate text-base font-bold text-navy sm:text-xl">
+              {title}
+            </h1>
+          </div>
+        </div>
+
+        <PortalHeaderMobileActions notifications={<NotificationsBell />} />
       </div>
-      )}
-    </div>
+
+      <PortalHeaderActions
+        search={
+          hasSearch ? (
+            <SearchInput
+              value={searchValue}
+              onChange={onSearchChange!}
+              placeholder={searchPlaceholder}
+              className="w-full sm:max-w-none md:max-w-none"
+            />
+          ) : undefined
+        }
+        notifications={<NotificationsBell />}
+      />
+    </header>
   );
 }

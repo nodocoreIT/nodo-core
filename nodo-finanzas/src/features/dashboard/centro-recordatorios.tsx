@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Bell,
   X,
@@ -10,7 +10,9 @@ import {
   Edit2,
   Check,
 } from 'lucide-react';
+import { useNotificationDismissals } from '@nodocore/nodo-modules/notifications';
 import { Card } from '@/components/ui/card';
+import { MoneyInput } from '@/components/ui/money-input';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { calcularFechasTarjeta } from '@/utils/tarjeta-fechas';
 import { formatearMoneda, formatearFecha } from '@/utils/formatters';
@@ -39,27 +41,34 @@ interface Props {
 
 export function CentroRecordatorios({ onNavigate }: Props) {
   const finanzas = useFinanzas();
-  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  const { dismissed, dismiss } = useNotificationDismissals('finanzas');
+  const dismissedIds = dismissed.map((d) => d.id);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState<string>('');
+  const [editValue, setEditValue] = useState(0);
+  const [editMoneda, setEditMoneda] = useState<'ARS' | 'USD'>('ARS');
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('dismissed_reminders');
-      if (saved) setDismissedIds(JSON.parse(saved));
-    } catch (_) {
-      // ignore
-    }
-  }, []);
-
-  function saveDismissed(ids: string[]) {
-    setDismissedIds(ids);
-    localStorage.setItem('dismissed_reminders', JSON.stringify(ids));
-  }
-
-  function handleDismiss(id: string, e: React.MouseEvent) {
+  function handleDismiss(reminder: ReminderItem, e: React.MouseEvent) {
     e.stopPropagation();
-    saveDismissed([...dismissedIds, id]);
+    const href =
+      reminder.type === 'TARJETA'
+        ? '/admin/tarjetas'
+        : reminder.type === 'PRESTAMO'
+          ? '/admin/prestamos'
+          : '/admin/planes-ahorro';
+    const kind =
+      reminder.type === 'PLAN_AHORRO'
+        ? 'plan'
+        : reminder.type === 'PRESTAMO'
+          ? 'prestamo'
+          : 'tarjeta';
+    dismiss({
+      id: reminder.id,
+      kind,
+      title: reminder.title,
+      description: `Vence ${reminder.dueDate}`,
+      href,
+      priority: 0,
+    });
   }
 
   const reminders = useMemo<ReminderItem[]>(() => {
@@ -181,7 +190,8 @@ export function CentroRecordatorios({ onNavigate }: Props) {
   function startEditing(e: React.MouseEvent, reminder: ReminderItem) {
     e.stopPropagation();
     setEditingId(reminder.id);
-    setEditValue(String(reminder.amount));
+    setEditValue(reminder.amount);
+    setEditMoneda(reminder.moneda);
   }
 
   function cancelEditing(e: React.MouseEvent) {
@@ -191,8 +201,8 @@ export function CentroRecordatorios({ onNavigate }: Props) {
 
   async function saveEdit(e: React.MouseEvent, reminder: ReminderItem) {
     e.stopPropagation();
-    const newValue = parseFloat(editValue);
-    if (isNaN(newValue)) return;
+    const newValue = editValue;
+    if (newValue <= 0) return;
     try {
       if (reminder.type === 'PLAN_AHORRO') {
         await finanzas.actualizarPlanAhorro(reminder.entityId, { importeCuota: newValue });
@@ -241,7 +251,7 @@ export function CentroRecordatorios({ onNavigate }: Props) {
             >
             <Card className="border-0 shadow-none rounded-none bg-transparent p-4">
               <button
-                onClick={(e) => handleDismiss(reminder.id, e)}
+                onClick={(e) => handleDismiss(reminder, e)}
                 className="absolute top-2 right-2 p-1 text-slate2/40 hover:text-slate2 hover:bg-mist rounded-full opacity-0 group-hover:opacity-100 transition-all"
                 title="Ocultar recordatorio"
               >
@@ -283,12 +293,11 @@ export function CentroRecordatorios({ onNavigate }: Props) {
                         className="flex items-center gap-1"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <input
-                          type="number"
-                          autoFocus
+                        <MoneyInput
                           value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          className="w-24 px-2 py-1 text-sm font-bold border border-brand rounded outline-none focus:ring-1 focus:ring-brand"
+                          onChange={setEditValue}
+                          moneda={editMoneda}
+                          className="w-36"
                         />
                         <button
                           onClick={(e) => saveEdit(e, reminder)}

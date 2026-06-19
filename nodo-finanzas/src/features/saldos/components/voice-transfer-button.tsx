@@ -136,6 +136,9 @@ export function VoiceTransferButton({
   const isProcessing = state === "extracting";
   const isListening = state === "listening";
 
+  const recordingButtonClass =
+    "!bg-red-600 !text-white !border-red-600 hover:!bg-red-700 hover:!text-white focus:!bg-red-600 focus:!text-white [&_svg]:!text-white animate-pulse";
+
   const tooltip =
     state === "listening"
       ? "Escuchando… clic para detener"
@@ -149,17 +152,13 @@ export function VoiceTransferButton({
     <div className="relative">
       <Button
         type="button"
-        variant={state === "error" ? "danger" : "outline"}
+        variant={state === "error" || isListening ? "danger" : "outline"}
         size="sm"
         onClick={handleClick}
         disabled={disabled || isProcessing}
         title={tooltip}
         aria-label={tooltip}
-        className={
-          isListening
-            ? "bg-red-500 hover:bg-red-600 text-white border-red-500 animate-pulse"
-            : undefined
-        }
+        className={isListening ? recordingButtonClass : undefined}
       >
         {isProcessing ? (
           <>

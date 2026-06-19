@@ -1,4 +1,5 @@
 import { useAiStore } from "@/hooks/use-ai-settings";
+import { geminiGenerateJson } from "@/lib/gemini-client";
 import type { Cuenta } from "@/types";
 
 export interface ExtractedTransfer {
@@ -6,13 +7,6 @@ export interface ExtractedTransfer {
   cuentaDestinoId: string;
   monto: number;
   descripcion?: string;
-}
-
-interface GeminiResponse {
-  candidates?: Array<{
-    content?: { parts?: Array<{ text?: string }> };
-  }>;
-  error?: { message: string };
 }
 
 function buildSystemPrompt(cuentas: Cuenta[]): string {
@@ -46,44 +40,11 @@ async function callGemini(
   transcript: string,
   cuentas: Cuenta[],
 ): Promise<ExtractedTransfer> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
-
-  const body = {
-    contents: [
-      {
-        parts: [
-          { text: buildSystemPrompt(cuentas) },
-          { text: `Texto dictado: "${transcript}"` },
-        ],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.1,
-      maxOutputTokens: 256,
-    },
-  };
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  const data: GeminiResponse = await res.json();
-
-  if (!res.ok) {
-    const msg = data.error?.message ?? `HTTP ${res.status}`;
-    throw new Error(`Gemini API error: ${msg}`);
-  }
-
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-  const cleaned = raw
-    .trim()
-    .replace(/^```(?:json)?/i, "")
-    .replace(/```$/, "")
-    .trim();
-
-  const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+  const parsed = await geminiGenerateJson(
+    apiKey,
+    buildSystemPrompt(cuentas),
+    `Texto dictado: "${transcript}"`,
+  );
 
   if (parsed.error === "no_match") {
     throw new Error("NO_MATCH");
