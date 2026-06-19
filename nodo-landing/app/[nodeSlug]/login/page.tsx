@@ -496,10 +496,15 @@ function LoginForm() {
     }
 
     setLoading(true);
+    const { data: sessionData } = await authSupabase!.auth.getSession();
     const res = await fetch("/api/auth/complete-forced-password", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(sessionData.session?.access_token
+          ? { Authorization: `Bearer ${sessionData.session.access_token}` }
+          : {}),
+      },
       body: JSON.stringify({
         password: password.trim(),
         confirmPassword: confirmPassword.trim(),
@@ -561,6 +566,11 @@ function LoginForm() {
     setLoading(true);
 
     if (authMode === "login") {
+      if (!authSupabase) {
+        setGeneralError("No se pudo inicializar la autenticación de este nodo.");
+        setLoading(false);
+        return;
+      }
       const supabase = authSupabase;
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -829,7 +839,7 @@ function LoginForm() {
 
     if (error) return error.message;
 
-    await authSupabase.auth.signOut();
+    await authSupabase.auth.signOut({ scope: "local" });
     setSuccessModal({
       open: true,
       type: "reset_success",

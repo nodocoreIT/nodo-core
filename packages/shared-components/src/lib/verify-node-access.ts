@@ -42,7 +42,7 @@ export async function enforceNodeAccess(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const allowed = await userHasNodeAccess(supabase, unitCode);
   if (allowed) return { ok: true };
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" });
   return { ok: false, message: INVALID_LOGIN_MESSAGE };
 }
 

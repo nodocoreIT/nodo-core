@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Fragment } from "react";
-import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, RotateCcw, Database, AlertTriangle } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, RotateCcw, Database, AlertTriangle, Loader2 } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
 import { NODES, unitHasClientAccessCredentials, type NodeDef } from "@/lib/nodes";
@@ -611,6 +611,7 @@ export default function ClientesPage() {
   }
 
   function closePurgeModal() {
+    if (purgingUnitKey) return;
     setPurgeConfirmUnit(null);
     setPurgeConfirmText("");
     setPurgeConfirmPassword("");
@@ -642,36 +643,57 @@ export default function ClientesPage() {
     setPurgingUnitKey(unit.key);
     setPurgeModalError("");
     setError("");
-    const res = await fetch("/api/admin/purge-nodo-data", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_unit_id: unit.key,
-        confirm: purgeConfirmText,
-        password: purgeConfirmPassword,
-      }),
-    });
-    const json = await res.json();
-    setPurgingUnitKey(null);
 
-    if (!res.ok || !json.ok) {
-      setPurgeModalError(json.error ?? "No se pudieron borrar los datos del nodo.");
-      return;
+    try {
+      const res = await fetch("/api/admin/purge-nodo-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_unit_id: unit.key,
+          confirm: purgeConfirmText,
+          password: purgeConfirmPassword,
+        }),
+      });
+
+      let json: { ok?: boolean; error?: string; counts?: Record<string, number>; storage_files_removed?: number };
+      const raw = await res.text();
+      try {
+        json = raw ? (JSON.parse(raw) as typeof json) : {};
+      } catch {
+        json = {
+          ok: false,
+          error: `Error del servidor (${res.status}). Intentá de nuevo en unos segundos.`,
+        };
+      }
+
+      if (!res.ok || json.ok === false) {
+        const message = json.error ?? "No se pudieron borrar los datos del nodo.";
+        setPurgeModalError(message);
+        alert(message);
+        return;
+      }
+
+      closePurgeModal();
+
+      const totalRows = Object.values(json.counts ?? {}).reduce(
+        (acc: number, n) => acc + (typeof n === "number" ? n : 0),
+        0,
+      );
+      const storageNote =
+        typeof json.storage_files_removed === "number" && json.storage_files_removed > 0
+          ? ` Se eliminaron ${json.storage_files_removed} archivo(s) en Storage.`
+          : "";
+      setNoticeMessage(
+        `Datos operativos borrados (${totalRows} filas en total). El acceso del administrador se mantiene.${storageNote}`,
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "No se pudo conectar con el servidor. Verificá tu conexión.";
+      setPurgeModalError(message);
+      alert(message);
+    } finally {
+      setPurgingUnitKey(null);
     }
-
-    closePurgeModal();
-
-    const totalRows = Object.values(json.counts ?? {}).reduce(
-      (acc: number, n) => acc + (typeof n === "number" ? n : 0),
-      0,
-    );
-    const storageNote =
-      typeof json.storage_files_removed === "number" && json.storage_files_removed > 0
-        ? ` Se eliminaron ${json.storage_files_removed} archivo(s) en Storage.`
-        : "";
-    setNoticeMessage(
-      `Datos operativos borrados (${totalRows} filas en total). El acceso del administrador se mantiene.${storageNote}`,
-    );
   }
 
   async function handleStatusChange(unitId: string, newStatus: ClientStatus) {
@@ -1009,9 +1031,18 @@ export default function ClientesPage() {
           </div>
         )}
 
-        {purgeConfirmUnit && (
+        {purgeConfirmUnit && (() => {
+          const isPurging = purgingUnitKey === purgeConfirmUnit.key;
+          return (
           <div style={{ position: "fixed", inset: 0, background: "rgba(18,30,47,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 120, padding: 16 }}>
-            <div style={{ background: "white", borderRadius: 14, width: "min(480px, 96vw)", boxShadow: "0 16px 48px rgba(18,30,47,.22)", overflow: "hidden" }}>
+            <div style={{ background: "white", borderRadius: 14, width: "min(480px, 96vw)", boxShadow: "0 16px 48px rgba(18,30,47,.22)", overflow: "hidden", position: "relative" }}>
+              {isPurging && (
+                <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,.72)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, zIndex: 2 }}>
+                  <Loader2 size={28} color="#DC2626" style={{ animation: "spin 1s linear infinite" }} />
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#991B1B" }}>Borrando datos del nodo...</p>
+                  <p style={{ margin: 0, fontSize: 12.5, color: "var(--color-slate2)" }}>No cierres esta ventana.</p>
+                </div>
+              )}
               <div style={{ background: "#FEF2F2", borderBottom: "1px solid #FECACA", padding: "20px 24px" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 999, background: "#FEE2E2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -1053,7 +1084,8 @@ export default function ClientesPage() {
                     setPurgeConfirmPassword(e.target.value);
                     setPurgeModalError("");
                   }}
-                  style={{ ...inputStyle, marginBottom: 12 }}
+                  disabled={isPurging}
+                  style={{ ...inputStyle, marginBottom: 12, opacity: isPurging ? 0.6 : 1 }}
                   autoComplete="current-password"
                   placeholder="Contraseña con la que entrás al panel"
                 />
@@ -1068,28 +1100,39 @@ export default function ClientesPage() {
                     setPurgeConfirmText(e.target.value);
                     setPurgeModalError("");
                   }}
-                  style={inputStyle}
+                  disabled={isPurging}
+                  style={{ ...inputStyle, opacity: isPurging ? 0.6 : 1 }}
                   autoComplete="off"
                   placeholder="BORRAR"
                 />
 
                 {purgeModalError && (
-                  <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "#C0392B", fontWeight: 600 }}>{purgeModalError}</p>
+                  <div style={{ margin: "12px 0 0", padding: "10px 12px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8 }}>
+                    <p style={{ margin: 0, fontSize: 12.5, color: "#C0392B", fontWeight: 600, lineHeight: 1.45 }}>{purgeModalError}</p>
+                  </div>
                 )}
 
                 <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
                   <button
                     type="button"
                     onClick={() => purgeUnitData(purgeConfirmUnit)}
-                    disabled={purgingUnitKey === purgeConfirmUnit.key || !canConfirmPurge()}
-                    style={{ flex: 1, background: "#DC2626", color: "white", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-sans)", opacity: !canConfirmPurge() ? 0.5 : 1 }}
+                    disabled={isPurging || !canConfirmPurge()}
+                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "#DC2626", color: "white", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 700, cursor: isPurging || !canConfirmPurge() ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", opacity: isPurging || !canConfirmPurge() ? 0.55 : 1 }}
                   >
-                    {purgingUnitKey === purgeConfirmUnit.key ? "Borrando..." : "Sí, borrar permanentemente"}
+                    {isPurging ? (
+                      <>
+                        <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} />
+                        Borrando...
+                      </>
+                    ) : (
+                      "Sí, borrar permanentemente"
+                    )}
                   </button>
                   <button
                     type="button"
                     onClick={closePurgeModal}
-                    style={{ flex: 1, background: "transparent", color: "var(--color-slate2)", border: "1px solid var(--color-mist)", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}
+                    disabled={isPurging}
+                    style={{ flex: 1, background: "transparent", color: "var(--color-slate2)", border: "1px solid var(--color-mist)", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 600, cursor: isPurging ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", opacity: isPurging ? 0.55 : 1 }}
                   >
                     Cancelar
                   </button>
@@ -1097,7 +1140,8 @@ export default function ClientesPage() {
               </div>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {showAddNodoPicker && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(18,30,47,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 110, padding: 16 }}>
@@ -1488,8 +1532,17 @@ export default function ClientesPage() {
                                 flexShrink: 0,
                               }}
                             >
-                              <Database size={13} />
-                              {purgingUnitKey === activeFormUnit.key ? "Borrando..." : "Borrar datos del nodo"}
+                              {purgingUnitKey === activeFormUnit.key ? (
+                                <>
+                                  <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />
+                                  Borrando...
+                                </>
+                              ) : (
+                                <>
+                                  <Database size={13} />
+                                  Borrar datos del nodo
+                                </>
+                              )}
                             </button>
                           </div>
                         </div>

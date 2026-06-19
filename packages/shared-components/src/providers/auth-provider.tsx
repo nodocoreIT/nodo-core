@@ -128,7 +128,7 @@ export function AuthProvider({
         if (!allowed) {
           if (!cancelled) {
             setAccessDenied(true);
-            await supabase.auth.signOut();
+            await supabase.auth.signOut({ scope: "local" });
           }
           return;
         }
@@ -181,7 +181,7 @@ export function AuthProvider({
   );
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
   }, [supabase]);
 
   const { role, orgId, plan } = readClaims(session);
