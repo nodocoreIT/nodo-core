@@ -20,6 +20,14 @@ export {
   createNodoAuthClient,
   nodoAuthStorageKey,
 } from "./lib/create-nodo-auth-client";
+export { mustSetPassword, readJwtAppMetadata, fetchMustSetPassword, completeForcedPassword, landingApiBase } from "./lib/jwt-claims";
+export {
+  getNodeDefaultTheme,
+  isEmptyThemeSettings,
+  mergeThemeSettings,
+  NODE_DEFAULT_THEMES,
+} from "./lib/node-default-theme";
+export { RequiredPasswordForm, type RequiredPasswordFormProps } from "./components/required-password-form";
 
 // ─── Providers ───────────────────────────────────────────────────────────────
 export { SupabaseProvider, useSupabase } from "./providers/supabase-provider";

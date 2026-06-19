@@ -12,6 +12,12 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./lib/node-default-theme": {
+      "types": "./dist/lib/node-default-theme.d.ts",
+      "development": "./src/lib/node-default-theme.ts",
+      "import": "./dist/lib/node-default-theme.js",
+      "default": "./dist/lib/node-default-theme.js"
+    },
     "./styles/base.css": "./src/styles/base.css",
     "./styles/interactive.css": "./src/styles/interactive.css"
   },

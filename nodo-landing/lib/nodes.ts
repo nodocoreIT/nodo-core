@@ -226,7 +226,7 @@ export const NODES: NodeDef[] = [
           "Visualización gráfica de tu situación financiera: gastos por categoría, evolución diaria y balance del mes.",
       },
     ],
-    provisionable: false,
+    provisionable: true,
   },
   {
     code: "Autos",
@@ -261,6 +261,11 @@ export const NODES: NodeDef[] = [
 
 export function getNodeBySlug(slug: string): NodeDef | undefined {
   return NODES.find((n) => n.slug === slug);
+}
+
+/** True when the dashboard unit row has an email used for client login. */
+export function unitHasClientAccessCredentials(accessUser: string | null | undefined): boolean {
+  return !!accessUser?.trim();
 }
 
 export function getChildNodes(parentSlug: string): NodeDef[] {

@@ -18,17 +18,22 @@ export async function userHasNodeAccess(
   const code = unitCode.trim();
   if (!code) return false;
 
-  // RPC is defined in public; landing browser client defaults to nodo_core schema.
-  const { data, error } = await supabase.schema("public").rpc("user_has_node_access", {
-    p_unit_code: code,
-  });
+  const candidates = [code, code.toLowerCase(), code.charAt(0).toUpperCase() + code.slice(1).toLowerCase()];
 
-  if (error) {
-    console.error("user_has_node_access RPC failed:", error.message);
-    return false;
+  for (const candidate of [...new Set(candidates)]) {
+    const { data, error } = await supabase.schema("public").rpc("user_has_node_access", {
+      p_unit_code: candidate,
+    });
+
+    if (error) {
+      console.error("user_has_node_access RPC failed:", error.message);
+      return false;
+    }
+
+    if (data === true) return true;
   }
 
-  return data === true;
+  return false;
 }
 
 export async function enforceNodeAccess(

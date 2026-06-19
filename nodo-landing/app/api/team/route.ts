@@ -1,5 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requirePanelAdmin } from "@/lib/panel/panel-api-auth";
 
 function getInitials(name: string): string {
   return name
@@ -19,31 +19,10 @@ function getColor(name: string): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
-// Create a team member. Uses the admin API so the user is created already
-// confirmed and the caller's own session is never touched (unlike client-side
-// auth.signUp). Restricted to admins.
+// Create a team member.
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return Response.json({ error: "No autorizado." }, { status: 401 });
-  }
-
-  const { data: caller } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (caller?.role !== "admin") {
-    return Response.json(
-      { error: "Solo los administradores pueden crear miembros." },
-      { status: 403 }
-    );
-  }
+  const auth = await requirePanelAdmin();
+  if (!auth.ok) return auth.response;
 
   const body = await request.json().catch(() => ({}));
   const fullName = String(body.fullName ?? "").trim();

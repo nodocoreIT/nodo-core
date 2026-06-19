@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { unitCodeFromSlug, normalizeUnitCode } from "@/lib/registration/node-config";
+import { authAdminForUnitCode, resolveAuthUserForUnit } from "@/lib/registration/client-unit-auth";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
@@ -13,6 +14,7 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient();
+
   const { data: access } = await admin
     .from("node_email_access")
     .select("client_unit_id")
@@ -20,18 +22,45 @@ export async function POST(request: NextRequest) {
     .eq("unit_code", unitCode)
     .maybeSingle();
 
-  if (!access) {
+  let unit = null as {
+    status: string;
+    password_set_at: string | null;
+    access_user: string | null;
+    unit_code: string;
+    provision_user_id: string | null;
+  } | null;
+
+  if (access?.client_unit_id) {
+    const { data } = await admin
+      .from("client_units")
+      .select("status, password_set_at, access_user, unit_code, provision_user_id")
+      .eq("id", access.client_unit_id)
+      .maybeSingle();
+    unit = data;
+  }
+
+  if (!unit) {
+    const { data } = await admin
+      .from("client_units")
+      .select("status, password_set_at, access_user, unit_code, provision_user_id")
+      .eq("unit_code", unitCode)
+      .ilike("access_user", email)
+      .maybeSingle();
+    unit = data;
+  }
+
+  if (!unit) {
     return NextResponse.json({ needsPassword: false });
   }
 
-  const { data: unit } = await admin
-    .from("client_units")
-    .select("status, password_set_at, access_user")
-    .eq("id", access.client_unit_id)
-    .maybeSingle();
+  const authAdmin = authAdminForUnitCode(unit.unit_code) ?? admin;
+  const authUser = await resolveAuthUserForUnit(authAdmin, unit);
+  const mustReset = authUser?.appMetadata?.must_set_password === true;
 
   const needsPassword =
-    unit?.status === "activo" && !unit.password_set_at && !!unit.access_user;
+    (unit.status === "activo" || unit.status === "onboarding") &&
+    !!unit.access_user &&
+    (!unit.password_set_at || mustReset);
 
-  return NextResponse.json({ needsPassword });
+  return NextResponse.json({ needsPassword, mustResetPassword: mustReset });
 }

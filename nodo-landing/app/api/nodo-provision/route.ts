@@ -1,28 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
 import { provisionNodoAccess } from "@/lib/registration/provision";
+import { requirePanelTeamMember } from "@/lib/panel/panel-api-auth";
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return Response.json({ error: "No autorizado." }, { status: 401 });
-  }
-
-  const { data: caller } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (caller?.role !== "admin") {
-    return Response.json(
-      { error: "Solo los administradores pueden provisionar accesos." },
-      { status: 403 },
-    );
-  }
+  const auth = await requirePanelTeamMember();
+  if (!auth.ok) return auth.response;
 
   const body = await request.json().catch(() => ({}));
   const nodoCode = String(body.nodo_code ?? "").trim();
@@ -34,6 +15,13 @@ export async function POST(request: Request) {
   if (!nodoCode || !email || !password) {
     return Response.json(
       { error: "nodo_code, email y password son obligatorios." },
+      { status: 400 },
+    );
+  }
+
+  if (password.length < 8) {
+    return Response.json(
+      { error: "La contraseña debe tener al menos 8 caracteres." },
       { status: 400 },
     );
   }

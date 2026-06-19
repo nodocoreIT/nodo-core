@@ -116,8 +116,8 @@ export function AuthProvider({
 
       const claims = readClaims(s);
 
-      if (config.allowedRoles?.length) {
-        if (!claims.role || !config.allowedRoles.includes(claims.role)) {
+      if (config.allowedRoles?.length && claims.role) {
+        if (!config.allowedRoles.includes(claims.role)) {
           if (!cancelled) setAccessDenied(true);
           return;
         }
@@ -126,7 +126,10 @@ export function AuthProvider({
       if (config.unitCode) {
         const allowed = await userHasNodeAccess(supabase, config.unitCode);
         if (!allowed) {
-          if (!cancelled) setAccessDenied(true);
+          if (!cancelled) {
+            setAccessDenied(true);
+            await supabase.auth.signOut();
+          }
           return;
         }
       }
@@ -182,16 +185,17 @@ export function AuthProvider({
   }, [supabase]);
 
   const { role, orgId, plan } = readClaims(session);
-  const roleAllowed =
-    !config.allowedRoles?.length ||
-    (role != null && config.allowedRoles.includes(role));
+  const roleBlocked =
+    role != null &&
+    !!config.allowedRoles?.length &&
+    !config.allowedRoles.includes(role);
 
   const value: AuthContextValue = {
-    session: accessDenied || !roleAllowed ? null : session,
-    user: accessDenied || !roleAllowed ? null : session?.user ?? null,
-    role: accessDenied || !roleAllowed ? null : role,
-    orgId: accessDenied || !roleAllowed ? null : orgId,
-    plan: accessDenied || !roleAllowed ? null : plan,
+    session: accessDenied || roleBlocked ? null : session,
+    user: accessDenied || roleBlocked ? null : session?.user ?? null,
+    role: accessDenied || roleBlocked ? null : role,
+    orgId: accessDenied || roleBlocked ? null : orgId,
+    plan: accessDenied || roleBlocked ? null : plan,
     isLoading,
     signIn,
     signInWithPassword,

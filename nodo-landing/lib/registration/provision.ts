@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getNodeDefaultTheme, isEmptyThemeSettings } from "@nodocore/shared-components/lib/node-default-theme";
 import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
+import {
+  finanzasThemeAppMetadata,
+  seedAutosClienteTheme,
+  seedInmoOrgProfileTheme,
+} from "@/lib/registration/seed-node-theme";
 
 const AUTOS_SCHEMA = "nodo_autos";
 
@@ -61,6 +67,7 @@ async function ensureAutosAccess(
           telefono: "pendiente",
           whatsapp_numero: "pendiente",
           email_contacto: email,
+          theme_settings: getNodeDefaultTheme("Autos"),
         })
         .select("id")
         .single();
@@ -105,7 +112,124 @@ async function ensureAutosAccess(
     return { error: "No se pudo resolver la concesionaria autos." };
   }
 
+  await seedAutosClienteTheme(admin, clienteId);
+
   return { clienteId };
+}
+
+async function ensureInmoMembership(
+  admin: SupabaseClient,
+  params: {
+    userId: string;
+    email: string;
+    clientName: string;
+    plan: string;
+    product: "inmo" | "clinica";
+  },
+): Promise<{ orgId: string } | { error: string }> {
+  const { userId, email, clientName, plan, product } = params;
+
+  const { data: orgId, error: rpcErr } = await admin.rpc("admin_ensure_inmo_membership", {
+    p_user_id: userId,
+    p_client_name: clientName,
+    p_email: email,
+    p_plan: plan,
+    p_product: product,
+  });
+
+  if (rpcErr) {
+    return { error: "Error al asegurar membresía: " + rpcErr.message };
+  }
+
+  if (!orgId) {
+    return { error: "No se pudo resolver la organización." };
+  }
+
+  return { orgId: orgId as string };
+}
+
+async function ensureInmoAccess(
+  admin: SupabaseClient,
+  params: {
+    userId: string;
+    email: string;
+    clientName: string;
+    password: string;
+    plan: string;
+    product: "inmo" | "clinica";
+  },
+): Promise<{ orgId: string } | { error: string }> {
+  const { userId, password, plan, product } = params;
+  const tier = planToTier(plan);
+
+  const membership = await ensureInmoMembership(admin, params);
+  if ("error" in membership) return membership;
+
+  const { data: userData } = await admin.auth.admin.getUserById(userId);
+  const currentAppMetadata = userData.user?.app_metadata ?? {};
+
+  const updatePayload: {
+    password?: string;
+    app_metadata: Record<string, unknown>;
+  } = {
+    app_metadata: {
+      ...currentAppMetadata,
+      org_id: membership.orgId,
+      role: "admin",
+      plan: tier,
+      must_set_password: false,
+    },
+  };
+
+  if (password) {
+    updatePayload.password = password;
+  }
+
+  const { error: authErr } = await admin.auth.admin.updateUserById(userId, updatePayload);
+
+  if (authErr) {
+    return { error: "Error al actualizar credenciales: " + authErr.message };
+  }
+
+  await seedInmoOrgProfileTheme(admin, membership.orgId, params.clientName, product);
+
+  return { orgId: membership.orgId };
+}
+
+/** Re-sync org membership + JWT claims for dashboard-managed Inmo users. */
+export async function syncInmoUserClaims(params: {
+  nodoCode: string;
+  userId: string;
+  email: string;
+  clientName: string;
+  password?: string;
+  plan: string;
+}): Promise<{ ok: true; org_id: string } | { ok: false; error: string }> {
+  const code = params.nodoCode.toLowerCase();
+  if (!["inmo", "clínica", "clinica", "salud"].includes(code)) {
+    return { ok: false, error: `El nodo "${params.nodoCode}" no usa claims de Inmo.` };
+  }
+
+  const admin = createNodoAdminClient(params.nodoCode);
+  if (!admin) {
+    return { ok: false, error: `Nodo "${params.nodoCode}" no configurado.` };
+  }
+
+  const product = code === "inmo" ? "inmo" : "clinica";
+  const result = await ensureInmoAccess(admin, {
+    userId: params.userId,
+    email: params.email,
+    clientName: params.clientName,
+    password: params.password ?? "",
+    plan: params.plan,
+    product,
+  });
+
+  if ("error" in result) {
+    return { ok: false, error: result.error };
+  }
+
+  return { ok: true, org_id: result.orgId };
 }
 
 export type ProvisionResult = {
@@ -152,9 +276,18 @@ export async function provisionNodoAccess(params: {
       userId = found.id;
 
       if (code === "finanzas") {
+        const currentMeta = found.app_metadata ?? {};
+        const themePatch = isEmptyThemeSettings(currentMeta.theme_settings)
+          ? finanzasThemeAppMetadata()
+          : {};
         await admin.auth.admin.updateUserById(userId, {
           password,
-          app_metadata: { role: "user", plan: planToTier(plan) },
+          app_metadata: {
+            ...currentMeta,
+            role: "user",
+            plan: planToTier(plan),
+            ...themePatch,
+          },
         });
         return { ok: true, existing: true, user_id: userId };
       }
@@ -178,6 +311,28 @@ export async function provisionNodoAccess(params: {
         };
       }
 
+      if (code === "inmo" || code === "clínica" || code === "clinica" || code === "salud") {
+        const product = code === "inmo" ? "inmo" : "clinica";
+        const inmoResult = await ensureInmoAccess(admin, {
+          userId,
+          email,
+          clientName,
+          password,
+          plan,
+          product,
+        });
+        if ("error" in inmoResult) {
+          return { ok: false, error: inmoResult.error };
+        }
+        return {
+          ok: true,
+          existing: true,
+          user_id: userId,
+          org_id: inmoResult.orgId,
+        };
+      }
+
+      await admin.auth.admin.updateUserById(userId, { password });
       return { ok: true, existing: true, user_id: userId };
     }
     return { ok: false, error: msg };
@@ -186,42 +341,23 @@ export async function provisionNodoAccess(params: {
   userId = created.user!.id;
 
   if (code === "inmo" || code === "clínica" || code === "clinica" || code === "salud") {
-    const product =
-      code === "inmo" ? "inmo" : "clinica";
+    const product = code === "inmo" ? "inmo" : "clinica";
 
-    const { data: org, error: orgErr } = await admin
-      .schema("shared")
-      .from("organizations")
-      .insert({
-        name: clientName || email,
-        tier: planToTier(plan),
-        product,
-      })
-      .select("id")
-      .single();
+    const claims = await ensureInmoAccess(admin, {
+      userId,
+      email,
+      clientName,
+      password,
+      plan,
+      product,
+    });
 
-    if (orgErr || !org) {
+    if ("error" in claims) {
       await admin.auth.admin.deleteUser(userId);
-      return { ok: false, error: "Error al crear organización: " + (orgErr?.message ?? "") };
+      return { ok: false, error: claims.error };
     }
 
-    await admin
-      .schema("shared")
-      .from("user_profiles")
-      .insert({ id: userId, full_name: clientName || email });
-
-    const { error: memberErr } = await admin
-      .schema("shared")
-      .from("org_members")
-      .insert({ org_id: org.id, user_id: userId, role: "admin" });
-
-    if (memberErr) {
-      await admin.schema("shared").from("organizations").delete().eq("id", org.id);
-      await admin.auth.admin.deleteUser(userId);
-      return { ok: false, error: "Error al crear membresía: " + memberErr.message };
-    }
-
-    return { ok: true, user_id: userId, org_id: org.id };
+    return { ok: true, user_id: userId, org_id: claims.orgId };
   }
 
   if (code === "autos") {
@@ -243,7 +379,11 @@ export async function provisionNodoAccess(params: {
 
   if (code === "finanzas") {
     await admin.auth.admin.updateUserById(userId, {
-      app_metadata: { role: "user", plan: planToTier(plan) },
+      app_metadata: {
+        role: "user",
+        plan: planToTier(plan),
+        ...finanzasThemeAppMetadata(),
+      },
     });
     return { ok: true, user_id: userId };
   }
@@ -286,9 +426,13 @@ export async function updateNodoUserPassword(
 ): Promise<boolean> {
   const admin = createNodoAdminClient(nodoCode);
   if (!admin) return false;
+
+  const { data } = await admin.auth.admin.getUserById(userId);
+  const currentAppMetadata = data.user?.app_metadata ?? {};
+
   const { error } = await admin.auth.admin.updateUserById(userId, {
     password,
-    app_metadata: { must_set_password: false },
+    app_metadata: { ...currentAppMetadata, must_set_password: false },
   });
   return !error;
 }

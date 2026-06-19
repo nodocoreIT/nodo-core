@@ -16,6 +16,7 @@ export const PANEL_DEFAULT_THEME: ThemeSettings = {
 const STORAGE_KEY = "nodo-panel-theme-settings";
 
 export function readPanelThemeFromStorage(): ThemeSettings {
+  if (typeof window === "undefined") return PANEL_DEFAULT_THEME;
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return { ...PANEL_DEFAULT_THEME, ...JSON.parse(stored) };
