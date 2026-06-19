@@ -28,7 +28,12 @@ export const DEFAULT_ACCENT = {
   rgb: "218, 90, 14",
 } as const;
 
-export type NodeAccent = typeof DEFAULT_ACCENT;
+export interface NodeAccent {
+  brand: string;
+  brand600: string;
+  brand300: string;
+  rgb: string;
+}
 
 export function isClinicaLoginNode(nodeParam: string): boolean {
   return (
