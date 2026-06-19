@@ -9,7 +9,7 @@ export function useAutosThemeSync() {
     autosDb()
       .from("clientes")
       .select("theme_settings")
-      .single()
+      .maybeSingle()
       .then(({ data }) => {
         if (data?.theme_settings && typeof data.theme_settings === "object") {
           setSettings(data.theme_settings as Partial<ThemeSettings>);

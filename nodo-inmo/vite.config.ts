@@ -19,11 +19,15 @@ export default defineConfig({
     origin: "http://localhost:3000",
   },
   resolve: {
-    dedupe: ["react", "react-dom", "react/jsx-runtime"],
+    dedupe: ["react", "react-dom", "react/jsx-runtime", "@tanstack/react-query"],
     alias: {
       "@": resolve(__dirname, "./src"),
       react: resolve(__dirname, "node_modules/react"),
       "react-dom": resolve(__dirname, "node_modules/react-dom"),
+      "@tanstack/react-query": resolve(
+        __dirname,
+        "node_modules/@tanstack/react-query",
+      ),
       // Subpath must come before the package root alias (otherwise CSS imports
       // resolve to index.ts/styles/... and Vite returns 500).
       "@nodocore/shared-components/styles": resolve(
@@ -55,7 +59,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ["react", "react-dom", "react/jsx-runtime"],
+    include: ["react", "react-dom", "react/jsx-runtime", "@tanstack/react-query"],
     exclude: ["@nodocore/shared-components", "@nodocore/nodo-modules"],
   },
   test: {

@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, useEffect, Fragment } from "react";
-import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, RotateCcw } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, RotateCcw, Database, AlertTriangle } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
-import { NODES } from "@/lib/nodes";
-import { NODO_PLANS } from "@/lib/nodo-plans";
+import { NODES, type NodeDef } from "@/lib/nodes";
+import {
+  defaultPlanCodeForUnit,
+  getPlanSelectOptions,
+  normalizePlanCode,
+  type NodePlan,
+} from "@/lib/panel/planes";
 import { FormSelect } from "@nodocore/shared-components";
 
 type ClientStatus =
@@ -82,11 +87,16 @@ function formatDate(dateStr: string): string {
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-function newFormUnit(): FormUnit {
+function getAssignableNodes(usedCodes: string[]): NodeDef[] {
+  const used = new Set(usedCodes);
+  return NODES.filter((node) => !used.has(node.code));
+}
+
+function createFormUnit(unitCode: string, planes: NodePlan[]): FormUnit {
   return {
     key: crypto.randomUUID(),
-    unit_code: NODES[0]?.code ?? "",
-    plan: "",
+    unit_code: unitCode,
+    plan: defaultPlanCodeForUnit(planes, unitCode),
     status: "activo",
     progress: "0",
     access_url: "",
@@ -100,6 +110,7 @@ function newFormUnit(): FormUnit {
 export default function ClientesPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [units, setUnits] = useState<ClientUnit[]>([]);
+  const [planes, setPlanes] = useState<NodePlan[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -115,6 +126,14 @@ export default function ClientesPage() {
   const [confirmDelete, setConfirmDelete] = useState<{ ids: string[]; label: string } | null>(null);
   const [activeUnitKey, setActiveUnitKey] = useState<string>("");
   const [resettingUnitKey, setResettingUnitKey] = useState<string | null>(null);
+  const [purgingUnitKey, setPurgingUnitKey] = useState<string | null>(null);
+  const [purgeConfirmUnit, setPurgeConfirmUnit] = useState<FormUnit | null>(null);
+  const [purgeConfirmText, setPurgeConfirmText] = useState("");
+  const [purgeConfirmPassword, setPurgeConfirmPassword] = useState("");
+  const [purgeModalError, setPurgeModalError] = useState("");
+  const [dashboardUserEmail, setDashboardUserEmail] = useState("");
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+  const [showAddNodoPicker, setShowAddNodoPicker] = useState(false);
 
   const today = new Date().toISOString().slice(0, 10);
   const [formName, setFormName] = useState("");
@@ -128,6 +147,17 @@ export default function ClientesPage() {
   }, []);
 
   useEffect(() => {
+    async function loadDashboardEmail() {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user?.email) setDashboardUserEmail(user.email);
+    }
+    void loadDashboardEmail();
+  }, []);
+
+  useEffect(() => {
     if (!statusMenuUnitId) return;
     function onDocClick() {
       setStatusMenuUnitId(null);
@@ -138,12 +168,18 @@ export default function ClientesPage() {
 
   async function loadAll() {
     const supabase = createClient();
-    const [{ data: cs }, { data: us }] = await Promise.all([
+    const [{ data: cs }, { data: us }, { data: ps }] = await Promise.all([
       supabase.from("clients").select("id, name, email, phone, since, created_at").order("created_at", { ascending: false }),
       supabase.from("client_units").select("*").order("created_at"),
+      supabase
+        .from("planes")
+        .select("id, unit_code, code, label, price_monthly, price_annual_monthly, currency, sort_order, is_active")
+        .eq("is_active", true)
+        .order("sort_order"),
     ]);
     setClients((cs ?? []) as Client[]);
     setUnits((us ?? []) as ClientUnit[]);
+    setPlanes((ps ?? []) as NodePlan[]);
     setLoading(false);
   }
 
@@ -181,7 +217,7 @@ export default function ClientesPage() {
     setFormEmail("");
     setFormPhone("");
     setFormSince(today);
-    const firstUnit = newFormUnit();
+    const firstUnit = createFormUnit(NODES[0]?.code ?? "", planes);
     setFormUnits([firstUnit]);
     setActiveUnitKey(firstUnit.key);
     setError("");
@@ -200,7 +236,7 @@ export default function ClientesPage() {
         ? cu.map((u) => ({
             key: u.id,
             unit_code: u.unit_code,
-            plan: u.plan ?? "",
+            plan: normalizePlanCode(planes, u.unit_code, u.plan),
             status: u.status,
             progress: String(u.progress ?? 0),
             access_url: u.access_url ?? "",
@@ -209,7 +245,7 @@ export default function ClientesPage() {
             provisioned_at: u.provisioned_at ?? null,
             provision_user_id: u.provision_user_id ?? null,
           }))
-        : [newFormUnit()];
+        : [createFormUnit(NODES[0]?.code ?? "", planes)];
     setFormUnits(mappedUnits);
     setActiveUnitKey(mappedUnits[0]?.key ?? "");
     setError("");
@@ -220,10 +256,25 @@ export default function ClientesPage() {
     setFormUnits((prev) => prev.map((u) => (u.key === key ? { ...u, ...patch } : u)));
   }
 
-  function addFormUnit() {
-    const unit = newFormUnit();
+  function addFormUnitWithCode(unitCode: string) {
+    const unit = createFormUnit(unitCode, planes);
     setFormUnits((prev) => [...prev, unit]);
     setActiveUnitKey(unit.key);
+    setShowAddNodoPicker(false);
+    setError("");
+  }
+
+  function openAddNodoPicker() {
+    const available = getAssignableNodes(formUnits.map((u) => u.unit_code));
+    if (available.length === 0) {
+      setError("Este cliente ya tiene todos los nodos del ecosistema asignados.");
+      return;
+    }
+    if (available.length === 1) {
+      addFormUnitWithCode(available[0].code);
+      return;
+    }
+    setShowAddNodoPicker(true);
   }
 
   function removeFormUnit(key: string) {
@@ -241,6 +292,7 @@ export default function ClientesPage() {
     }
     setSaving(true);
     setError("");
+    setNoticeMessage(null);
     const supabase = createClient();
 
     const clientPayload = {
@@ -282,7 +334,7 @@ export default function ClientesPage() {
       return {
         client_id: clientId,
         unit_code: u.unit_code,
-        plan: u.plan.trim() || null,
+        plan: normalizePlanCode(planes, u.unit_code, u.plan.trim()) || null,
         status: u.status,
         progress: Math.max(0, Math.min(100, Number(u.progress) || 0)),
         access_url: u.access_url.trim() || null,
@@ -368,19 +420,27 @@ export default function ClientesPage() {
       });
     }
 
-    // Sync plan tier in nodo app_metadata when plan field has a value.
+    // Sync plan tier in nodo app_metadata when the plan changed or was set.
     for (const u of formUnits) {
       const nodeDef = NODES.find((n) => n.code === u.unit_code);
       if (!nodeDef?.provisionable) continue;
-      const userId = provisionedUserIds.get(u.unit_code);
-      if (!userId || !u.plan) continue;
+
+      const userId = provisionedUserIds.get(u.unit_code) ?? u.provision_user_id;
+      const nextPlan = u.plan.trim();
+      if (!userId || !nextPlan) continue;
+
+      const prev = prevUnits.find((p) => p.unit_code === u.unit_code);
+      const prevPlan = normalizePlanCode(planes, u.unit_code, prev?.plan ?? "");
+      const normalizedNextPlan = normalizePlanCode(planes, u.unit_code, nextPlan);
+      if (prevPlan === normalizedNextPlan && prev?.provision_user_id) continue;
+
       await fetch("/api/nodo-plan-update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nodo_code: u.unit_code,
           user_id: userId,
-          plan: u.plan,
+          plan: normalizedNextPlan,
         }),
       });
     }
@@ -492,6 +552,70 @@ export default function ClientesPage() {
     setError("Contraseña blanqueada. La temporal quedó copiada al portapapeles.");
   }
 
+  function closePurgeModal() {
+    setPurgeConfirmUnit(null);
+    setPurgeConfirmText("");
+    setPurgeConfirmPassword("");
+    setPurgeModalError("");
+  }
+
+  function canConfirmPurge() {
+    return (
+      purgeConfirmText.trim().toUpperCase() === "BORRAR" &&
+      purgeConfirmPassword.trim().length >= 6
+    );
+  }
+
+  async function purgeUnitData(unit: FormUnit) {
+    const savedUnitIds = new Set((editingClient ? unitsByClient.get(editingClient.id) : [])?.map((u) => u.id) ?? []);
+    if (!editingClient || !savedUnitIds.has(unit.key)) {
+      setError("Primero guardá el cliente para poder borrar datos del nodo.");
+      return;
+    }
+    if (!unit.provisioned_at || !unit.provision_user_id) {
+      setError("Este nodo no tiene acceso provisionado todavía.");
+      return;
+    }
+    if (!canConfirmPurge()) {
+      setPurgeModalError("Escribí BORRAR y tu contraseña del dashboard para continuar.");
+      return;
+    }
+
+    setPurgingUnitKey(unit.key);
+    setPurgeModalError("");
+    setError("");
+    const res = await fetch("/api/admin/purge-nodo-data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_unit_id: unit.key,
+        confirm: purgeConfirmText,
+        password: purgeConfirmPassword,
+      }),
+    });
+    const json = await res.json();
+    setPurgingUnitKey(null);
+
+    if (!res.ok || !json.ok) {
+      setPurgeModalError(json.error ?? "No se pudieron borrar los datos del nodo.");
+      return;
+    }
+
+    closePurgeModal();
+
+    const totalRows = Object.values(json.counts ?? {}).reduce(
+      (acc: number, n) => acc + (typeof n === "number" ? n : 0),
+      0,
+    );
+    const storageNote =
+      typeof json.storage_files_removed === "number" && json.storage_files_removed > 0
+        ? ` Se eliminaron ${json.storage_files_removed} archivo(s) en Storage.`
+        : "";
+    setNoticeMessage(
+      `Datos operativos borrados (${totalRows} filas en total). El acceso del administrador se mantiene.${storageNote}`,
+    );
+  }
+
   async function handleStatusChange(unitId: string, newStatus: ClientStatus) {
     setStatusUpdating(unitId);
     setStatusMenuUnitId(null);
@@ -532,6 +656,7 @@ export default function ClientesPage() {
 
   const allSelected = filtered.length > 0 && selected.size === filtered.length;
   const activeFormUnit = formUnits.find((u) => u.key === activeUnitKey) ?? formUnits[0];
+  const assignableNodes = getAssignableNodes(formUnits.map((u) => u.unit_code));
 
   return (
     <>
@@ -824,6 +949,170 @@ export default function ClientesPage() {
           </div>
         )}
 
+        {purgeConfirmUnit && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(18,30,47,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 120, padding: 16 }}>
+            <div style={{ background: "white", borderRadius: 14, width: "min(480px, 96vw)", boxShadow: "0 16px 48px rgba(18,30,47,.22)", overflow: "hidden" }}>
+              <div style={{ background: "#FEF2F2", borderBottom: "1px solid #FECACA", padding: "20px 24px" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 999, background: "#FEE2E2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <AlertTriangle size={20} color="#DC2626" />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#991B1B", fontFamily: "var(--font-display)" }}>
+                      Borrar datos del nodo
+                    </h3>
+                    <p style={{ margin: "6px 0 0", fontSize: 13.5, color: "#7F1D1D", lineHeight: 1.5, fontWeight: 600 }}>
+                      Esta acción es permanente y no se puede revertir.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ padding: "20px 24px 24px" }}>
+                <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--color-ink)", lineHeight: 1.55 }}>
+                  Vas a eliminar <strong>todos los datos operativos</strong> de{" "}
+                  <strong>{NODES.find((n) => n.code === purgeConfirmUnit.unit_code)?.label ?? purgeConfirmUnit.unit_code}</strong>{" "}
+                  para este cliente.
+                </p>
+                <ul style={{ margin: "0 0 16px", paddingLeft: 18, fontSize: 13, color: "var(--color-slate2)", lineHeight: 1.6 }}>
+                  <li>Propiedades, contratos, contactos, pagos y caja</li>
+                  <li>Documentos, reclamos, tareas y movimientos</li>
+                  <li>Usuarios del equipo (excepto el administrador)</li>
+                </ul>
+                <p style={{ margin: "0 0 18px", fontSize: 13, color: "#7F1D1D", lineHeight: 1.5 }}>
+                  No hay forma de recuperar esta información después. El acceso del administrador al panel se mantiene.
+                </p>
+
+                <label style={{ ...labelStyle, display: "block" }}>
+                  Tu contraseña del dashboard{dashboardUserEmail ? ` (${dashboardUserEmail})` : ""}
+                </label>
+                <input
+                  type="password"
+                  value={purgeConfirmPassword}
+                  onChange={(e) => {
+                    setPurgeConfirmPassword(e.target.value);
+                    setPurgeModalError("");
+                  }}
+                  style={{ ...inputStyle, marginBottom: 12 }}
+                  autoComplete="current-password"
+                  placeholder="Contraseña con la que entrás al panel"
+                />
+
+                <label style={{ ...labelStyle, display: "block" }}>
+                  Escribí <strong>BORRAR</strong> para confirmar
+                </label>
+                <input
+                  type="text"
+                  value={purgeConfirmText}
+                  onChange={(e) => {
+                    setPurgeConfirmText(e.target.value);
+                    setPurgeModalError("");
+                  }}
+                  style={inputStyle}
+                  autoComplete="off"
+                  placeholder="BORRAR"
+                />
+
+                {purgeModalError && (
+                  <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "#C0392B", fontWeight: 600 }}>{purgeModalError}</p>
+                )}
+
+                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                  <button
+                    type="button"
+                    onClick={() => purgeUnitData(purgeConfirmUnit)}
+                    disabled={purgingUnitKey === purgeConfirmUnit.key || !canConfirmPurge()}
+                    style={{ flex: 1, background: "#DC2626", color: "white", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-sans)", opacity: !canConfirmPurge() ? 0.5 : 1 }}
+                  >
+                    {purgingUnitKey === purgeConfirmUnit.key ? "Borrando..." : "Sí, borrar permanentemente"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closePurgeModal}
+                    style={{ flex: 1, background: "transparent", color: "var(--color-slate2)", border: "1px solid var(--color-mist)", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showAddNodoPicker && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(18,30,47,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 110, padding: 16 }}>
+            <div style={{ background: "white", borderRadius: 12, width: "min(640px, 96vw)", maxHeight: "82vh", overflowY: "auto", boxShadow: "0 12px 40px rgba(18,30,47,.18)", padding: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-navy)", fontFamily: "var(--font-display)" }}>
+                  Elegí el nodo a agregar
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAddNodoPicker(false)}
+                  style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--color-slate2)", fontSize: 20, lineHeight: 1, padding: "2px 4px" }}
+                >
+                  ×
+                </button>
+              </div>
+              <p style={{ margin: "0 0 16px", fontSize: 13.5, color: "var(--color-slate2)", lineHeight: 1.5 }}>
+                Seleccioná qué módulo del ecosistema querés contratar para este cliente.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+                {assignableNodes.map((node) => {
+                  const Icon = node.Icon;
+                  return (
+                    <button
+                      key={node.code}
+                      type="button"
+                      onClick={() => addFormUnitWithCode(node.code)}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-start",
+                        gap: 10,
+                        textAlign: "left",
+                        background: "var(--color-paper)",
+                        border: "1px solid var(--color-mist)",
+                        borderRadius: 12,
+                        padding: "14px 16px",
+                        cursor: "pointer",
+                        fontFamily: "var(--font-sans)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            background: "white",
+                            color: "var(--color-navy)",
+                            border: "1px solid var(--color-mist)",
+                          }}
+                        >
+                          <Icon size={18} strokeWidth={2.2} />
+                        </span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-navy)" }}>{node.label}</span>
+                      </div>
+                      <span style={{ fontSize: 12.5, color: "var(--color-slate2)", lineHeight: 1.45 }}>
+                        {node.description}
+                      </span>
+                      {node.inDevelopment && (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#B5630C", background: "#FCE9D8", borderRadius: 999, padding: "3px 8px" }}>
+                          En desarrollo
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Form modal */}
         {showForm && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(18,30,47,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
@@ -866,7 +1155,27 @@ export default function ClientesPage() {
                         Cada pestaña representa un módulo contratado por el cliente.
                       </p>
                     </div>
-                    <button onClick={addFormUnit} style={{ display: "flex", alignItems: "center", gap: 5, background: "transparent", color: "var(--color-brand)", border: "1px solid var(--color-brand)", borderRadius: 8, padding: "7px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)", flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      onClick={openAddNodoPicker}
+                      disabled={assignableNodes.length === 0}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        background: "transparent",
+                        color: "var(--color-brand)",
+                        border: "1px solid var(--color-brand)",
+                        borderRadius: 8,
+                        padding: "7px 12px",
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        cursor: assignableNodes.length === 0 ? "not-allowed" : "pointer",
+                        fontFamily: "var(--font-sans)",
+                        flexShrink: 0,
+                        opacity: assignableNodes.length === 0 ? 0.5 : 1,
+                      }}
+                    >
                       <Plus size={14} strokeWidth={2.5} /> Agregar nodo
                     </button>
                   </div>
@@ -933,26 +1242,30 @@ export default function ClientesPage() {
                             <FormSelect
                               value={activeFormUnit.unit_code}
                               onChange={(newCode) => {
-                                const nodePlans = NODO_PLANS.find((n) => n.slug === newCode.toLowerCase());
-                                const firstPlan = nodePlans?.plans ? Object.keys(nodePlans.plans)[0] : "";
-                                updateFormUnit(activeFormUnit.key, { unit_code: newCode, plan: firstPlan });
+                                updateFormUnit(activeFormUnit.key, {
+                                  unit_code: newCode,
+                                  plan: defaultPlanCodeForUnit(planes, newCode),
+                                });
                               }}
-                              options={NODES.map((node) => ({ value: node.code, label: node.label }))}
+                              options={NODES.map((node) => ({
+                                value: node.code,
+                                label: node.inDevelopment ? `${node.label} (en desarrollo)` : node.label,
+                                disabled: formUnits.some(
+                                  (unit) => unit.key !== activeFormUnit.key && unit.unit_code === node.code,
+                                ),
+                              }))}
                             />
                           </div>
                           <div>
                             <label style={labelStyle}>Plan</label>
                             {(() => {
-                              const nodePlans = NODO_PLANS.find((n) => n.slug === activeFormUnit.unit_code.toLowerCase());
-                              if (nodePlans?.plans) {
+                              const planOptions = getPlanSelectOptions(planes, activeFormUnit.unit_code);
+                              if (planOptions.length > 0) {
                                 return (
                                   <FormSelect
                                     value={activeFormUnit.plan}
                                     onChange={(value) => updateFormUnit(activeFormUnit.key, { plan: value })}
-                                    options={Object.entries(nodePlans.plans).map(([tier, pricing]) => ({
-                                      value: tier,
-                                      label: `${tier.charAt(0).toUpperCase() + tier.slice(1)} — ${pricing.currency} ${pricing.monthly}/mes`,
-                                    }))}
+                                    options={planOptions}
                                   />
                                 );
                               }
@@ -1038,10 +1351,66 @@ export default function ClientesPage() {
                           )}
                         </div>
                       </div>
+
+                      {editingClient && activeFormUnit.provisioned_at && (
+                        <div
+                          style={{
+                            background: "#FEF2F2",
+                            border: "1px solid #FECACA",
+                            borderRadius: 12,
+                            padding: 14,
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                            <div>
+                              <p style={{ margin: 0, fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: "#991B1B" }}>
+                                Zona peligrosa
+                              </p>
+                              <p style={{ margin: "6px 0 0", fontSize: 12, color: "#7F1D1D", lineHeight: 1.45 }}>
+                                Borra propiedades, contratos, contactos, pagos, caja y el resto de datos operativos de{" "}
+                                {NODES.find((n) => n.code === activeFormUnit.unit_code)?.label ?? activeFormUnit.unit_code}.
+                                No elimina la organización ni el usuario administrador.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPurgeConfirmUnit(activeFormUnit);
+                                setPurgeConfirmText("");
+                                setPurgeConfirmPassword("");
+                                setPurgeModalError("");
+                              }}
+                              disabled={purgingUnitKey === activeFormUnit.key}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                background: "#DC2626",
+                                color: "white",
+                                border: "none",
+                                borderRadius: 8,
+                                padding: "8px 12px",
+                                fontSize: 12.5,
+                                fontWeight: 700,
+                                cursor: purgingUnitKey === activeFormUnit.key ? "not-allowed" : "pointer",
+                                fontFamily: "var(--font-sans)",
+                                opacity: purgingUnitKey === activeFormUnit.key ? 0.65 : 1,
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Database size={13} />
+                              {purgingUnitKey === activeFormUnit.key ? "Borrando..." : "Borrar datos del nodo"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
 
+                {noticeMessage && (
+                  <p style={{ margin: 0, fontSize: 12.5, color: "#1F8A5B", fontWeight: 600 }}>{noticeMessage}</p>
+                )}
                 {error && <p style={{ margin: 0, fontSize: 12.5, color: "#C0392B" }}>{error}</p>}
 
                 <div style={{ display: "flex", gap: 10, marginTop: 4 }}>

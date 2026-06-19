@@ -1,8 +1,107 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
 
+const AUTOS_SCHEMA = "nodo_autos";
+
 function planToTier(plan: string): "starter" | "pro" {
   return plan.toLowerCase().includes("pro") ? "pro" : "starter";
+}
+
+function autosIdentificador(email: string, userId: string): string {
+  const base = email.split("@")[0].replace(/\W/g, "_").slice(0, 32);
+  const suffix = userId.replace(/-/g, "").slice(0, 8);
+  return `${base}_${suffix}`.slice(0, 40);
+}
+
+async function ensureAutosAccess(
+  admin: SupabaseClient,
+  params: {
+    userId: string;
+    email: string;
+    clientName: string;
+    password: string;
+    plan: string;
+  },
+): Promise<{ clienteId: string } | { error: string }> {
+  const { userId, email, clientName, password, plan } = params;
+  const autos = admin.schema(AUTOS_SCHEMA);
+  const tier = planToTier(plan);
+
+  const { data: existingUser, error: existingUserErr } = await autos
+    .from("users")
+    .select("cliente_id, role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (existingUserErr) {
+    return { error: "Error al leer usuario autos: " + existingUserErr.message };
+  }
+
+  let clienteId = existingUser?.cliente_id as string | undefined;
+
+  if (!clienteId) {
+    const { data: existingCliente, error: existingClienteErr } = await autos
+      .from("clientes")
+      .select("id")
+      .eq("email_contacto", email)
+      .maybeSingle();
+
+    if (existingClienteErr) {
+      return { error: "Error al leer concesionaria autos: " + existingClienteErr.message };
+    }
+
+    clienteId = existingCliente?.id;
+
+    if (!clienteId) {
+      const { data: cliente, error: clienteErr } = await autos
+        .from("clientes")
+        .insert({
+          nombre: clientName || email,
+          identificador: autosIdentificador(email, userId),
+          telefono: "pendiente",
+          whatsapp_numero: "pendiente",
+          email_contacto: email,
+        })
+        .select("id")
+        .single();
+
+      if (clienteErr || !cliente) {
+        return {
+          error: "Error al crear concesionaria autos: " + (clienteErr?.message ?? ""),
+        };
+      }
+
+      clienteId = cliente.id;
+    }
+
+    const { error: userErr } = await autos.from("users").upsert(
+      {
+        id: userId,
+        cliente_id: clienteId,
+        email,
+        name: clientName || email,
+        role: "administrador",
+      },
+      { onConflict: "id" },
+    );
+
+    if (userErr) {
+      return { error: "Error al crear usuario autos: " + userErr.message };
+    }
+  }
+
+  const role = (existingUser?.role as string | undefined) ?? "administrador";
+
+  const { error: authErr } = await admin.auth.admin.updateUserById(userId, {
+    password,
+    app_metadata: { role, cliente_id: clienteId, plan: tier },
+  });
+
+  if (authErr) {
+    return { error: "Error al actualizar credenciales autos: " + authErr.message };
+  }
+
+  return { clienteId };
 }
 
 export type ProvisionResult = {
@@ -53,6 +152,26 @@ export async function provisionNodoAccess(params: {
           password,
           app_metadata: { role: "user", plan: planToTier(plan) },
         });
+        return { ok: true, existing: true, user_id: userId };
+      }
+
+      if (code === "autos") {
+        const autosResult = await ensureAutosAccess(admin, {
+          userId,
+          email,
+          clientName,
+          password,
+          plan,
+        });
+        if ("error" in autosResult) {
+          return { ok: false, error: autosResult.error };
+        }
+        return {
+          ok: true,
+          existing: true,
+          user_id: userId,
+          cliente_id: autosResult.clienteId,
+        };
       }
 
       return { ok: true, existing: true, user_id: userId };
@@ -102,43 +221,20 @@ export async function provisionNodoAccess(params: {
   }
 
   if (code === "autos") {
-    const identificador = email.split("@")[0].replace(/\W/g, "_").slice(0, 40);
-    const { data: cliente, error: clienteErr } = await admin
-      .from("clientes")
-      .insert({
-        nombre: clientName || email,
-        identificador,
-        telefono: "pendiente",
-        whatsapp_numero: "pendiente",
-        email_contacto: email,
-      })
-      .select("id")
-      .single();
-
-    if (clienteErr || !cliente) {
-      await admin.auth.admin.deleteUser(userId);
-      return { ok: false, error: "Error al crear cliente autos: " + (clienteErr?.message ?? "") };
-    }
-
-    const { error: userErr } = await admin.from("users").insert({
-      id: userId,
-      cliente_id: cliente.id,
+    const autosResult = await ensureAutosAccess(admin, {
+      userId,
       email,
-      name: clientName || email,
-      role: "administrador",
+      clientName,
+      password,
+      plan,
     });
 
-    if (userErr) {
-      await admin.from("clientes").delete().eq("id", cliente.id);
+    if ("error" in autosResult) {
       await admin.auth.admin.deleteUser(userId);
-      return { ok: false, error: "Error al crear usuario autos: " + userErr.message };
+      return { ok: false, error: autosResult.error };
     }
 
-    await admin.auth.admin.updateUserById(userId, {
-      app_metadata: { role: "administrador", cliente_id: cliente.id },
-    });
-
-    return { ok: true, user_id: userId, cliente_id: cliente.id };
+    return { ok: true, user_id: userId, cliente_id: autosResult.clienteId };
   }
 
   if (code === "finanzas") {
