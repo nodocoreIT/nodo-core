@@ -1,6 +1,7 @@
 import { useEffect } from "react";
+import { isEmptyThemeSettings, mergeThemeSettings } from "@nodocore/shared-components";
 import { autosDb } from "@/shared/lib/supabase";
-import { useThemeStore, type ThemeSettings } from "./use-theme-settings";
+import { useThemeStore, DEFAULT_SETTINGS, type ThemeSettings } from "./use-theme-settings";
 
 export function useAutosThemeSync() {
   const { setSettings } = useThemeStore();
@@ -10,9 +11,12 @@ export function useAutosThemeSync() {
       .from("clientes")
       .select("theme_settings")
       .maybeSingle()
-      .then(({ data }) => {
-        if (data?.theme_settings && typeof data.theme_settings === "object") {
-          setSettings(data.theme_settings as Partial<ThemeSettings>);
+      .then(async ({ data }) => {
+        const theme = mergeThemeSettings(data?.theme_settings, DEFAULT_SETTINGS);
+        setSettings(theme);
+
+        if (!data?.theme_settings || isEmptyThemeSettings(data.theme_settings)) {
+          await saveAutosThemeSettings(theme);
         }
       });
   }, [setSettings]);

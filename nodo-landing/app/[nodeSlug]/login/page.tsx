@@ -12,6 +12,8 @@ import {
   enforceNodeAccess,
   INVALID_LOGIN_MESSAGE,
   AUTH_ERROR_CREDENTIALS,
+  mustSetPassword,
+  fetchMustSetPassword,
 } from "@nodocore/shared-components";
 import { createNodeBrowserClient } from "@/lib/supabase/nodo-browser";
 import { getNodeBySlug, getNodeMailLabel, getChildNodes, needsModulePicker } from "@/lib/nodes";
@@ -278,6 +280,7 @@ function LoginForm() {
   const [nameError, setNameError] = useState("");
   const [generalError, setGeneralError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [needsNewPassword, setNeedsNewPassword] = useState(false);
 
   const {
     authMode,
@@ -422,6 +425,107 @@ function LoginForm() {
 
   const validEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
+  function redirectAfterSession(session: { access_token: string; refresh_token: string }) {
+    let tLabel = "Core";
+    let tCode = "Core";
+    let TIcon: React.ElementType = Layers;
+
+    if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
+      tLabel = matchedNode?.label ?? "Nodo Inmo";
+      tCode = matchedNode?.code ?? "Inmo";
+      TIcon = matchedNode?.Icon ?? Layers;
+    } else if (
+      nodeParam === "nodo-clinica" ||
+      nodeParam === "clinica-virtual" ||
+      nodeParam === "clinica"
+    ) {
+      tLabel = "Clínica Virtualaaaaa";
+      tCode = "Clínica";
+      TIcon = matchedNode?.Icon ?? Layers;
+    } else if (isAutosNode) {
+      tLabel = matchedNode?.label ?? "Nodo Automotores";
+      tCode = matchedNode?.code ?? "Autos";
+      TIcon = matchedNode?.Icon ?? Layers;
+    } else if (isFinanzasNode) {
+      tLabel = matchedNode?.label ?? "Nodo Finanzas Personales";
+      tCode = matchedNode?.code ?? "Finanzas";
+      TIcon = matchedNode?.Icon ?? Layers;
+    }
+
+    setTransitionTarget({
+      label: tLabel,
+      code: tCode,
+      Icon: TIcon,
+      ...(isFinanzasNode || isAutosNode || isClinicaNode
+        ? { logoSrc: loginNodoLogoSrc }
+        : {}),
+    });
+
+    const { access_token, refresh_token } = session;
+    setTimeout(() => {
+      if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
+        window.location.href = `/inmo/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+      } else if (
+        nodeParam === "nodo-clinica" ||
+        nodeParam === "clinica-virtual" ||
+        nodeParam === "clinica"
+      ) {
+        window.location.href = `/clinica/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+      } else if (isAutosNode) {
+        window.location.href = `/autos/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+      } else if (isFinanzasNode) {
+        redirectToFinanzasAuth(access_token, refresh_token);
+      } else {
+        router.push("/panel");
+      }
+    }, 1550);
+  }
+
+  async function handleForcedPasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setPasswordError("");
+    setGeneralError("");
+
+    if (password.trim().length < 8) {
+      setPasswordError("La contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setPasswordError("Las contraseñas no coinciden.");
+      return;
+    }
+
+    setLoading(true);
+    const res = await fetch("/api/auth/complete-forced-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        password: password.trim(),
+        confirmPassword: confirmPassword.trim(),
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      setGeneralError(json.error ?? "No se pudo actualizar la contraseña.");
+      setLoading(false);
+      return;
+    }
+
+    const { data: refreshed, error: refreshErr } = await authSupabase.auth.refreshSession();
+    if (refreshErr || !refreshed.session) {
+      setGeneralError("Contraseña actualizada. Volvé a iniciar sesión.");
+      setNeedsNewPassword(false);
+      setAuthMode("login");
+      setLoading(false);
+      return;
+    }
+
+    setNeedsNewPassword(false);
+    redirectAfterSession(refreshed.session);
+    setLoading(false);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setEmailError("");
@@ -478,60 +582,17 @@ function LoginForm() {
         }
       }
 
-      // Determine which nodo we're entering and build the redirect
-      let tLabel = "Core";
-      let tCode = "Core";
-      let TIcon: React.ElementType = Layers;
-
-      if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
-        tLabel = matchedNode?.label ?? "Nodo Inmo";
-        tCode = matchedNode?.code ?? "Inmo";
-        TIcon = matchedNode?.Icon ?? Layers;
-      } else if (
-        nodeParam === "nodo-clinica" ||
-        nodeParam === "clinica-virtual" ||
-        nodeParam === "clinica"
-      ) {
-        tLabel = "Clínica Virtualaaaaa";
-        tCode = "Clínica";
-        TIcon = matchedNode?.Icon ?? Layers;
-      } else if (isAutosNode) {
-        tLabel = matchedNode?.label ?? "Nodo Automotores";
-        tCode = matchedNode?.code ?? "Autos";
-        TIcon = matchedNode?.Icon ?? Layers;
-      } else if (isFinanzasNode) {
-        tLabel = matchedNode?.label ?? "Nodo Finanzas Personales";
-        tCode = matchedNode?.code ?? "Finanzas";
-        TIcon = matchedNode?.Icon ?? Layers;
+      if (await fetchMustSetPassword(supabase)) {
+        setNeedsNewPassword(true);
+        setPassword("");
+        setConfirmPassword("");
+        setLoading(false);
+        return;
       }
 
-      setTransitionTarget({
-        label: tLabel,
-        code: tCode,
-        Icon: TIcon,
-        ...(isFinanzasNode || isAutosNode || isClinicaNode
-          ? { logoSrc: loginNodoLogoSrc }
-          : {}),
-      });
-
-      const { access_token, refresh_token } = data.session!;
-      setTimeout(() => {
-        if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
-          window.location.href = `/inmo/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
-        } else if (
-          nodeParam === "nodo-clinica" ||
-          nodeParam === "clinica-virtual" ||
-          nodeParam === "clinica"
-        ) {
-          window.location.href = `/clinica/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
-        } else if (isAutosNode) {
-          window.location.href = `/autos/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
-        } else if (isFinanzasNode) {
-          redirectToFinanzasAuth(access_token, refresh_token);
-        } else {
-          router.push("/panel");
-        }
-      }, 1550);
+      redirectAfterSession(data.session!);
+      setLoading(false);
+      return;
     } else {
       const originUrl = registrationOrigin;
 
@@ -1026,6 +1087,64 @@ function LoginForm() {
                   })}
                 </div>
               </div>
+            ) : needsNewPassword ? (
+              <form onSubmit={handleForcedPasswordSubmit} noValidate>
+                <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
+                  ◎ Nueva contraseña
+                </span>
+                <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
+                  Definí tu nueva contraseña
+                </h1>
+                <p className="text-slate2 text-[14.5px] mb-6">
+                  Tu acceso fue blanqueado o requiere una clave nueva. Elegí una contraseña y repetila para continuar.
+                </p>
+
+                <div className="mb-4">
+                  <label htmlFor="forced-pass" className="block text-[13px] font-semibold text-navy mb-1.5">
+                    Contraseña
+                  </label>
+                  <input
+                    id="forced-pass"
+                    type="password"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setPasswordError("");
+                    }}
+                    className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
+                    placeholder="Mínimo 8 caracteres"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label htmlFor="forced-pass-confirm" className="block text-[13px] font-semibold text-navy mb-1.5">
+                    Repetir contraseña
+                  </label>
+                  <input
+                    id="forced-pass-confirm"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      setPasswordError("");
+                    }}
+                    className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
+                  />
+                  {passwordError && <p className="text-[12.5px] text-[#C0392B] mt-1.5">{passwordError}</p>}
+                </div>
+
+                {generalError && (
+                  <p className="text-[13px] text-[#C0392B] mb-3 text-center">{generalError}</p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {loading ? "Guardando…" : "Continuar"}
+                </button>
+              </form>
             ) : authMode === "login" ? (
               <div>
                 {/* Kicker */}

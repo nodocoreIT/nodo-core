@@ -1,101 +1,21 @@
 /**
- * AuthCallbackPage — handles magic-link, OAuth, and staff invitation redirects.
- *
- * When type=invite in the URL hash: set the session then prompt the user to
- * choose a permanent password before entering the app.
+ * AuthCallbackPage — handles magic-link, OAuth, landing-login redirects, and forced password reset.
  */
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/shared/lib/supabase";
-import { Button } from "@nodocore/shared-components";
-import { Input } from "@nodocore/shared-components";
-import { Label } from "@nodocore/shared-components";
-
-// ── Set-password form shown after accepting an invite ─────────────────────────
-
-function SetPasswordForm() {
-  const navigate = useNavigate();
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password.length < 8) {
-      setError("La contraseña debe tener al menos 8 caracteres");
-      return;
-    }
-    if (password !== confirm) {
-      setError("Las contraseñas no coinciden");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      const { error: updateError } = await supabase.auth.updateUser({ password });
-      if (updateError) throw updateError;
-      navigate("/");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar la contraseña");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-paper px-4">
-      <div className="w-full max-w-sm space-y-6 rounded-xl border border-border bg-white p-8 shadow-sm">
-        <div className="space-y-1 text-center">
-          <h1 className="text-xl font-bold text-navy">Activá tu cuenta</h1>
-          <p className="text-sm text-slate2">Elegí una contraseña para ingresar al sistema</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <Label htmlFor="new-password">Nueva contraseña</Label>
-            <Input
-              id="new-password"
-              type="password"
-              placeholder="Ingresé contraseña…"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoFocus
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="confirm-password">Confirmá la contraseña</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              placeholder="Repetí la contraseña…"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-            />
-          </div>
-
-          {error && (
-            <p className="text-xs text-destructive font-medium">{error}</p>
-          )}
-
-          <Button type="submit" disabled={saving} className="w-full">
-            {saving ? "Guardando..." : "Activar cuenta"}
-          </Button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// ── Main callback handler ─────────────────────────────────────────────────────
+import {
+  enforceNodeAccess,
+  fetchMustSetPassword,
+  INVALID_LOGIN_MESSAGE,
+  RequiredPasswordForm,
+} from "@nodocore/shared-components";
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
-  const [isInvite, setIsInvite] = useState(false);
+  const [needsPassword, setNeedsPassword] = useState(false);
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const hash = window.location.hash.substring(1);
@@ -106,24 +26,70 @@ export function AuthCallbackPage() {
 
     const settle = async () => {
       if (access_token && refresh_token) {
-        await supabase.auth.setSession({ access_token, refresh_token });
+        const { error: sessionErr } = await supabase.auth.setSession({
+          access_token,
+          refresh_token,
+        });
+        if (sessionErr) {
+          setError(INVALID_LOGIN_MESSAGE);
+          setReady(true);
+          return;
+        }
+        await supabase.auth.refreshSession();
       } else {
         await supabase.auth.getSession();
       }
 
-      if (type === "invite" || type === "recovery") {
-        // Stay on this page and show the set-password form
-        setIsInvite(true);
+      const mustReset =
+        type === "invite" ||
+        type === "recovery" ||
+        (await fetchMustSetPassword(supabase));
+
+      if (mustReset) {
+        setNeedsPassword(true);
         setReady(true);
-      } else {
-        navigate("/");
+        return;
       }
+
+      const access = await enforceNodeAccess(supabase, "Inmo");
+      if (!access.ok) {
+        setError(access.message);
+        setReady(true);
+        return;
+      }
+
+      navigate("/", { replace: true });
     };
 
-    settle();
+    void settle();
   }, [navigate]);
 
-  if (isInvite && ready) return <SetPasswordForm />;
+  if (error && ready) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-paper px-4 text-center">
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+        <a href="/nodo-inmo/login" className="text-sm text-navy underline">
+          Volver al login
+        </a>
+      </div>
+    );
+  }
+
+  if (needsPassword && ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-paper px-4">
+        <RequiredPasswordForm
+          supabase={supabase}
+          title="Definí tu nueva contraseña"
+          description="Tu acceso fue blanqueado. Elegí una contraseña nueva y repetila para continuar."
+          submitLabel="Continuar"
+          onSuccess={() => navigate("/", { replace: true })}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-paper">

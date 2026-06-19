@@ -1,15 +1,22 @@
 /**
  * AuthCallbackPage — handles OAuth and landing-login redirects with hash tokens.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/shared/lib/supabase";
-import { enforceNodeAccess, nodeLoginUrlWithAuthError } from "@nodocore/shared-components";
+import {
+  enforceNodeAccess,
+  fetchMustSetPassword,
+  nodeLoginUrlWithAuthError,
+  RequiredPasswordForm,
+} from "@nodocore/shared-components";
 import { LANDING_LOGIN_URL } from "@/shared/lib/auth-redirect";
 import { hideAppSplash } from "@/shared/lib/app-splash";
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.substring(1));
@@ -30,6 +37,13 @@ export function AuthCallbackPage() {
         return;
       }
 
+      if (await fetchMustSetPassword(supabase)) {
+        hideAppSplash();
+        setNeedsPassword(true);
+        setReady(true);
+        return;
+      }
+
       navigate("/admin/dashboard", { replace: true });
       hideAppSplash();
     };
@@ -39,6 +53,20 @@ export function AuthCallbackPage() {
       window.location.replace(nodeLoginUrlWithAuthError(LANDING_LOGIN_URL));
     });
   }, [navigate]);
+
+  if (needsPassword && ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-paper px-4">
+        <RequiredPasswordForm
+          supabase={supabase}
+          onSuccess={() => {
+            hideAppSplash();
+            navigate("/admin/dashboard", { replace: true });
+          }}
+        />
+      </div>
+    );
+  }
 
   return null;
 }

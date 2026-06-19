@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NODES } from "@/lib/nodes";
 import type { ClientUnitStatus } from "@/lib/registration/types";
+import { requirePanelTeamMember } from "@/lib/panel/panel-api-auth";
 
 const ALLOWED: ClientUnitStatus[] = [
   "pending_review",
@@ -13,24 +13,8 @@ const ALLOWED: ClientUnitStatus[] = [
 ];
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 401 });
-  }
-
-  const { data: caller } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (caller?.role !== "admin") {
-    return NextResponse.json({ error: "Solo administradores." }, { status: 403 });
-  }
+  const auth = await requirePanelTeamMember();
+  if (!auth.ok) return auth.response;
 
   const body = await request.json().catch(() => ({}));
   const clientUnitId = String(body.client_unit_id ?? "").trim();

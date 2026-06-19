@@ -37,6 +37,7 @@ const PANEL_MANAGED_NAV = [
 const AI_STORAGE_KEY = "nodo-panel-ai-settings";
 
 function readAiSettings() {
+  if (typeof window === "undefined") return { geminiApiKey: "" };
   try {
     const raw = localStorage.getItem(AI_STORAGE_KEY);
     if (raw) return { geminiApiKey: JSON.parse(raw).geminiApiKey ?? "" };
@@ -50,8 +51,8 @@ export function PanelSettingsModuleProvider({ children }: { children: ReactNode 
   const { profile, loading: profileLoading, refresh } = usePanelOrgProfile();
   const staff = usePanelStaff();
   const [sessionRole, setSessionRole] = useState<string | null>(null);
-  const [themeSettings, setThemeState] = useState<ThemeSettings>(readPanelThemeFromStorage);
-  const [aiSettings, setAiState] = useState(readAiSettings);
+  const [themeSettings, setThemeState] = useState<ThemeSettings>(PANEL_DEFAULT_THEME);
+  const [aiSettings, setAiState] = useState({ geminiApiKey: "" });
   const [logoSignedUrl, setLogoSignedUrl] = useState<string | null>(null);
   const [pdfLogoSignedUrl, setPdfLogoSignedUrl] = useState<string | null>(null);
   const [isUpsertingProfile, setIsUpsertingProfile] = useState(false);
@@ -59,6 +60,11 @@ export function PanelSettingsModuleProvider({ children }: { children: ReactNode 
   const [isUpdatingUserProfile, setIsUpdatingUserProfile] = useState(false);
 
   useApplyPanelTheme(themeSettings);
+
+  useEffect(() => {
+    setThemeState(readPanelThemeFromStorage());
+    setAiState(readAiSettings());
+  }, []);
 
   useEffect(() => {
     async function loadSessionRole() {

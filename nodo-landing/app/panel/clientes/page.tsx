@@ -4,7 +4,7 @@ import { useState, useEffect, Fragment } from "react";
 import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, RotateCcw, Database, AlertTriangle } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
-import { NODES, type NodeDef } from "@/lib/nodes";
+import { NODES, unitHasClientAccessCredentials, type NodeDef } from "@/lib/nodes";
 import {
   defaultPlanCodeForUnit,
   getPlanSelectOptions,
@@ -290,6 +290,21 @@ export default function ClientesPage() {
       setError("El nombre es obligatorio.");
       return;
     }
+
+    for (const u of formUnits) {
+      if (u.status === "pausado") continue;
+      if (!unitHasClientAccessCredentials(u.access_user)) continue;
+      const pwd = u.access_password.trim();
+      if (!pwd) continue;
+      const nodeDef = NODES.find((n) => n.code === u.unit_code);
+      if (pwd.length < 8) {
+        setError(
+          `${nodeDef?.label ?? u.unit_code}: la contraseña de acceso debe tener al menos 8 caracteres (debe coincidir con Auth).`,
+        );
+        return;
+      }
+    }
+
     setSaving(true);
     setError("");
     setNoticeMessage(null);
@@ -315,8 +330,6 @@ export default function ClientesPage() {
         return;
       }
       clientId = editingClient.id;
-      // Rebuild the nodos from scratch.
-      await supabase.from("client_units").delete().eq("client_id", clientId);
     } else {
       const { data: inserted, error: err } = await supabase.from("clients").insert(clientPayload).select().single();
       if (err || !inserted) {
@@ -332,7 +345,6 @@ export default function ClientesPage() {
       const prev = prevUnits.find((p) => p.unit_code === u.unit_code);
       const sameUser = prev?.access_user === u.access_user.trim() && !!u.access_user.trim();
       return {
-        client_id: clientId,
         unit_code: u.unit_code,
         plan: normalizePlanCode(planes, u.unit_code, u.plan.trim()) || null,
         status: u.status,
@@ -345,13 +357,16 @@ export default function ClientesPage() {
       };
     });
 
-    if (unitRows.length > 0) {
-      const { error: err } = await supabase.from("client_units").insert(unitRows);
-      if (err) {
-        setError("Cliente guardado pero error en los nodos: " + err.message);
-        setSaving(false);
-        return;
-      }
+    const unitsRes = await fetch("/api/admin/save-client-units", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ client_id: clientId, units: unitRows }),
+    });
+    const unitsJson = await unitsRes.json();
+    if (!unitsRes.ok || !unitsJson.ok) {
+      setError("Cliente guardado pero error en los nodos: " + (unitsJson.error ?? "error desconocido"));
+      setSaving(false);
+      return;
     }
 
     // Map unit_code → nodo-user-id for suspend/reactivate (existing + newly provisioned).
@@ -362,6 +377,7 @@ export default function ClientesPage() {
 
     // Provision admin users for onboarding/activo nodos with new or changed credentials.
     const provisionErrors: string[] = [];
+    const freshlyProvisioned = new Set<string>();
     for (const u of formUnits) {
       const nodeDef = NODES.find((n) => n.code === u.unit_code);
       if (!nodeDef?.provisionable) continue;
@@ -393,6 +409,7 @@ export default function ClientesPage() {
       if (json.ok) {
         const userId = json.user_id as string | undefined;
         if (userId) provisionedUserIds.set(u.unit_code, userId);
+        freshlyProvisioned.add(u.unit_code);
         await supabase
           .from("client_units")
           .update({ provisioned_at: new Date().toISOString(), provision_user_id: userId ?? null })
@@ -400,6 +417,45 @@ export default function ClientesPage() {
           .eq("unit_code", u.unit_code);
       } else {
         provisionErrors.push(`${nodeDef.label}: ${json.error ?? "error desconocido"}`);
+      }
+    }
+
+    // Register access_user in node_email_access (login guard for nodos).
+    const syncAccessRes = await fetch("/api/admin/sync-client-unit-access", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ client_id: clientId }),
+    });
+    const syncAccessJson = await syncAccessRes.json();
+    if (!syncAccessRes.ok || !syncAccessJson.ok) {
+      provisionErrors.push(
+        `Acceso al nodo: ${syncAccessJson.error ?? "no se pudo sincronizar el email de acceso"}`,
+      );
+    }
+
+    // Sync password + Auth claims on every save (idempotent repair for dashboard clients).
+    for (const u of formUnits) {
+      if (!unitHasClientAccessCredentials(u.access_user)) continue;
+      const newPassword = u.access_password.trim();
+      if (!newPassword || u.status === "pausado") continue;
+
+      const nodeDef = NODES.find((n) => n.code === u.unit_code);
+      const res = await fetch("/api/admin/client-unit-password-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: clientId,
+          unit_code: u.unit_code,
+          password: newPassword,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        provisionErrors.push(
+          `${nodeDef?.label ?? u.unit_code} (contraseña): ${json.error ?? "error desconocido"}`,
+        );
+      } else if (json.user_id) {
+        provisionedUserIds.set(u.unit_code, json.user_id as string);
       }
     }
 
@@ -549,7 +605,9 @@ export default function ClientesPage() {
       provision_user_id: json.user_id ?? unit.provision_user_id,
     });
     copy(json.password);
-    setError("Contraseña blanqueada. La temporal quedó copiada al portapapeles.");
+    setNoticeMessage(
+      "Contraseña blanqueada. El usuario deberá definir una clave nueva al ingresar.",
+    );
   }
 
   function closePurgeModal() {
@@ -1329,21 +1387,48 @@ export default function ClientesPage() {
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 12 }}>
                           {(() => {
                             const nodeDef = NODES.find((n) => n.code === activeFormUnit.unit_code);
-                            if (!nodeDef?.provisionable) {
-                              return <p style={{ margin: 0, fontSize: 11.5, color: "var(--color-slate2)" }}>Este módulo no tiene provisionamiento automático configurado.</p>;
+                            if (!unitHasClientAccessCredentials(activeFormUnit.access_user)) {
+                              return (
+                                <p style={{ margin: 0, fontSize: 11.5, color: "var(--color-slate2)" }}>
+                                  Completá el email de acceso para gestionar credenciales en cualquier nodo.
+                                </p>
+                              );
                             }
-                            if (!activeFormUnit.access_user.trim() || !activeFormUnit.access_password.trim()) {
-                              return <p style={{ margin: 0, fontSize: 11.5, color: "#B5630C", fontWeight: 600 }}>Completá usuario y contraseña inicial para crear o actualizar el acceso.</p>;
+                            if (!activeFormUnit.access_password.trim()) {
+                              return (
+                                <p style={{ margin: 0, fontSize: 11.5, color: "#B5630C", fontWeight: 600 }}>
+                                  Definí una contraseña temporal o usá Blanquear para forzar cambio al ingresar.
+                                </p>
+                              );
                             }
-                            if (activeFormUnit.status !== "activo") {
-                              return <p style={{ margin: 0, fontSize: 11.5, color: "var(--color-slate2)" }}>El acceso se sincroniza cuando el estado está activo.</p>;
+                            if (activeFormUnit.status !== "activo" && activeFormUnit.status !== "onboarding") {
+                              return (
+                                <p style={{ margin: 0, fontSize: 11.5, color: "var(--color-slate2)" }}>
+                                  El acceso se sincroniza cuando el estado está activo u onboarding.
+                                </p>
+                              );
                             }
-                            if (activeFormUnit.provisioned_at) {
-                              return <p style={{ margin: 0, fontSize: 11.5, color: "#1F8A5B", fontWeight: 600 }}>✓ Acceso ya creado en {nodeDef.label}</p>;
+                            if (nodeDef?.provisionable && activeFormUnit.provisioned_at) {
+                              return (
+                                <p style={{ margin: 0, fontSize: 11.5, color: "#1F8A5B", fontWeight: 600 }}>
+                                  ✓ Acceso ya creado en {nodeDef.label}
+                                </p>
+                              );
                             }
-                            return <p style={{ margin: 0, fontSize: 11.5, color: "#2A6FDB", fontWeight: 500 }}>Al guardar se creará el acceso de administrador en {nodeDef.label}.</p>;
+                            if (nodeDef?.provisionable) {
+                              return (
+                                <p style={{ margin: 0, fontSize: 11.5, color: "#2A6FDB", fontWeight: 500 }}>
+                                  Al guardar se creará o actualizará el acceso en {nodeDef.label}.
+                                </p>
+                              );
+                            }
+                            return (
+                              <p style={{ margin: 0, fontSize: 11.5, color: "#2A6FDB", fontWeight: 500 }}>
+                                Al guardar se actualiza la contraseña en Auth para {nodeDef?.label ?? activeFormUnit.unit_code}.
+                              </p>
+                            );
                           })()}
-                          {editingClient && (
+                          {editingClient && unitHasClientAccessCredentials(activeFormUnit.access_user) && (
                             <button
                               type="button"
                               onClick={() => resetUnitPassword(activeFormUnit)}

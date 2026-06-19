@@ -1,25 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
 import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
+import { requirePanelTeamMember } from "@/lib/panel/panel-api-auth";
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return Response.json({ error: "No autorizado." }, { status: 401 });
-  }
-
-  const { data: caller } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (caller?.role !== "admin") {
-    return Response.json({ error: "Solo los administradores pueden suspender accesos." }, { status: 403 });
-  }
+  const auth = await requirePanelTeamMember();
+  if (!auth.ok) return auth.response;
 
   const body = await request.json().catch(() => ({}));
   const nodoCode = String(body.nodo_code ?? "").trim();

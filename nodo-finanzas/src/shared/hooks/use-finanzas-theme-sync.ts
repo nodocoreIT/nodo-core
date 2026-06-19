@@ -1,16 +1,25 @@
-/**
- * Theme sync hook for nodo-finanzas.
- * No auth — theme is localStorage-only (no DB round-trip needed).
- * The Zustand store in use-theme-settings already hydrates from localStorage on init.
- */
-export function useFinanzasThemeSync() {
-  // No-op: localStorage hydration is handled by the Zustand store directly.
-}
+import { useEffect } from "react";
+import { isEmptyThemeSettings, mergeThemeSettings } from "@nodocore/shared-components";
+import { supabase } from "@/shared/lib/supabase";
+import { useThemeStore, DEFAULT_SETTINGS, type ThemeSettings } from "./use-theme-settings";
 
 /**
- * Stub kept for call-site compatibility.
- * With no auth/user context, theme settings are not persisted to DB.
+ * Loads theme from Auth app_metadata (seeded at dashboard provisioning) or
+ * falls back to the nodo Finanzas defaults in localStorage.
  */
-export async function saveFinanzasThemeSettings(): Promise<void> {
-  // No-op: no DB write without user context.
+export function useFinanzasThemeSync() {
+  const { setSettings } = useThemeStore();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      const metaTheme = data.session?.user.app_metadata?.theme_settings;
+      if (!isEmptyThemeSettings(metaTheme)) {
+        setSettings(mergeThemeSettings(metaTheme, DEFAULT_SETTINGS));
+      }
+    });
+  }, [setSettings]);
+}
+
+export async function saveFinanzasThemeSettings(_settings: ThemeSettings): Promise<void> {
+  // Finanzas theme customizations persist in localStorage; provisioning seeds app_metadata.
 }

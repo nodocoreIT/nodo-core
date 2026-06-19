@@ -3,8 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   authAdminForUnitCode,
   ensureAuthUserForUnit,
-  generateTemporaryPassword,
-  syncNodeEmailAccessForClient,
+  MIN_ACCESS_PASSWORD_LENGTH,
 } from "@/lib/registration/client-unit-auth";
 import { requirePanelTeamMember } from "@/lib/panel/panel-api-auth";
 
@@ -13,18 +12,31 @@ export async function POST(request: NextRequest) {
   if (!auth.ok) return auth.response;
 
   const body = await request.json().catch(() => ({}));
-  const clientUnitId = String(body.client_unit_id ?? "").trim();
+  const clientId = String(body.client_id ?? "").trim();
+  const unitCode = String(body.unit_code ?? "").trim();
+  const password = String(body.password ?? "").trim();
 
-  if (!clientUnitId) {
-    return NextResponse.json({ error: "client_unit_id es obligatorio." }, { status: 400 });
+  if (!clientId || !unitCode || !password) {
+    return NextResponse.json(
+      { error: "client_id, unit_code y password son obligatorios." },
+      { status: 400 },
+    );
+  }
+
+  if (password.length < MIN_ACCESS_PASSWORD_LENGTH) {
+    return NextResponse.json(
+      { error: `La contraseña debe tener al menos ${MIN_ACCESS_PASSWORD_LENGTH} caracteres.` },
+      { status: 400 },
+    );
   }
 
   const landingAdmin = createAdminClient();
   const { data: unit, error: unitErr } = await landingAdmin
     .from("client_units")
-    .select("id, unit_code, access_user, provision_user_id, plan, client_id, clients(name)")
-    .eq("id", clientUnitId)
-    .single();
+    .select("id, unit_code, access_user, provision_user_id, plan, clients(name)")
+    .eq("client_id", clientId)
+    .eq("unit_code", unitCode)
+    .maybeSingle();
 
   if (unitErr || !unit) {
     return NextResponse.json({ error: "Nodo contratado no encontrado." }, { status: 404 });
@@ -39,14 +51,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `El nodo "${unit.unit_code}" no está configurado.` }, { status: 400 });
   }
 
-  const temporaryPassword = generateTemporaryPassword();
   const clientName =
     (unit.clients as { name?: string } | null)?.name ?? unit.access_user;
 
   const ensured = await ensureAuthUserForUnit(authAdmin, {
     unit,
-    password: temporaryPassword,
-    mustSetPassword: true,
+    password,
+    mustSetPassword: false,
     unitCode: unit.unit_code,
     clientName,
     plan: unit.plan ?? undefined,
@@ -59,20 +70,12 @@ export async function POST(request: NextRequest) {
   await landingAdmin
     .from("client_units")
     .update({
-      access_password: temporaryPassword,
-      password_set_at: null,
+      access_password: password,
+      password_set_at: new Date().toISOString(),
       provision_user_id: ensured.userId,
       provisioned_at: new Date().toISOString(),
     })
-    .eq("id", clientUnitId);
+    .eq("id", unit.id);
 
-  if (unit.client_id) {
-    await syncNodeEmailAccessForClient(landingAdmin, unit.client_id);
-  }
-
-  return NextResponse.json({
-    ok: true,
-    password: temporaryPassword,
-    user_id: ensured.userId,
-  });
+  return NextResponse.json({ ok: true, user_id: ensured.userId });
 }

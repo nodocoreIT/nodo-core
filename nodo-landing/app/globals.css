@@ -27,6 +27,17 @@
   --color-card-foreground: #16202E;
   --color-muted: #EBF1F7;
   --color-muted-foreground: #647890;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #16202E;
+  --color-accent: #DEE7F1;
+  --color-accent-foreground: #1B2A41;
+  --color-input: #DEE7F1;
+  --color-ring: #DA5A0E;
+  --color-primary: #DA5A0E;
+  --color-secondary: #DEE7F1;
+  --color-secondary-foreground: #1B2A41;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
 
   /* Fonts */
   --font-display: var(--font-sora), system-ui, sans-serif;

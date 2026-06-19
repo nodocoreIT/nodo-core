@@ -1,17 +1,21 @@
 /**
  * LoginPage — email + password form using shadcn primitives.
- *
- * On success, navigates to "/" (root, which RoleRouter will dispatch
- * to the correct portal based on app_metadata.role).
  */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth, useSupabase, enforceNodeAccess, INVALID_LOGIN_MESSAGE } from "@nodocore/shared-components";
-import { Button } from "@nodocore/shared-components";
-import { Input } from "@nodocore/shared-components";
-import { Label } from "@nodocore/shared-components";
+import {
+  useAuth,
+  useSupabase,
+  enforceNodeAccess,
+  INVALID_LOGIN_MESSAGE,
+  fetchMustSetPassword,
+  RequiredPasswordForm,
+} from "@nodocore/shared-components";
 import { Card, CardContent, CardHeader } from "@nodocore/shared-components";
 import { BrandMark } from "@/shared/components/brand-mark";
+import { Input } from "@nodocore/shared-components";
+import { Label } from "@nodocore/shared-components";
+import { Button } from "@nodocore/shared-components";
 
 export function LoginPage() {
   const { signInWithPassword } = useAuth();
@@ -20,13 +24,13 @@ export function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [needsNewPassword, setNeedsNewPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    // Client-side guard: do not call the API with empty credentials
     if (!email.trim() || !password.trim()) {
       return;
     }
@@ -54,7 +58,14 @@ export function LoginPage() {
       return;
     }
 
+    if (await fetchMustSetPassword(supabase)) {
+      setNeedsNewPassword(true);
+      setLoading(false);
+      return;
+    }
+
     navigate("/");
+    setLoading(false);
   }
 
   return (
@@ -64,43 +75,50 @@ export function LoginPage() {
           <BrandMark className="text-2xl" iconClassName="h-9 w-9" />
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} noValidate className="space-y-4">
-            <div className="space-y-1">
-              <Label htmlFor="login-email">Email</Label>
-              <Input
-                id="login-email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@email.com"
-                required
-              />
-            </div>
+          {needsNewPassword ? (
+            <RequiredPasswordForm
+              supabase={supabase}
+              onSuccess={() => navigate("/")}
+            />
+          ) : (
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
+              <div className="space-y-1">
+                <Label htmlFor="login-email">Email</Label>
+                <Input
+                  id="login-email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tu@email.com"
+                  required
+                />
+              </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="login-password">Contraseña</Label>
-              <Input
-                id="login-password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Ingresé contraseña…"
-                required
-              />
-            </div>
+              <div className="space-y-1">
+                <Label htmlFor="login-password">Contraseña</Label>
+                <Input
+                  id="login-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Ingresé contraseña…"
+                  required
+                />
+              </div>
 
-            {error && (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
-            )}
+              {error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Cargando…" : "Iniciar sesión"}
-            </Button>
-          </form>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Cargando…" : "Iniciar sesión"}
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>
