@@ -18,6 +18,8 @@ nodo-landing/public/finanzas/
 .env
 .env.*
 !.env.example
+.secrets/*
+!.secrets/README.md
 
 # OS
 .DS_Store
