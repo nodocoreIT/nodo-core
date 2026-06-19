@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Search, Plus, Edit, Trash2, Receipt, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { foldForSearch } from '@nodocore/shared-components';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MonthPicker } from '@/components/ui/month-picker';
@@ -32,11 +33,11 @@ export function GastosDiariosPage() {
     );
 
     if (busqueda.trim()) {
-      const t = busqueda.toLowerCase();
+      const t = foldForSearch(busqueda);
       list = list.filter(
         (g) =>
-          g.descripcion.toLowerCase().includes(t) ||
-          (g.detalle && g.detalle.toLowerCase().includes(t))
+          foldForSearch(g.descripcion).includes(t) ||
+          (g.detalle && foldForSearch(g.detalle).includes(t))
       );
     }
 
@@ -133,7 +134,7 @@ export function GastosDiariosPage() {
             placeholder="Buscar por descripción..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className="w-full pl-9 pr-9 py-2 rounded-xl border border-mist focus:border-brand focus:ring-1 focus:ring-brand text-sm outline-none h-10"
+            className="w-full pl-9 pr-9 py-2 rounded-xl border border-mist bg-white focus:border-brand focus:ring-1 focus:ring-brand text-sm outline-none h-10"
           />
           {busqueda && (
             <button
@@ -151,6 +152,7 @@ export function GastosDiariosPage() {
             onChange={(r) => setRubroFiltro(r?.id ?? null)}
             placeholder="Todos los rubros"
             hideLabel
+            triggerClassName="bg-white"
           />
         </div>
       </div>

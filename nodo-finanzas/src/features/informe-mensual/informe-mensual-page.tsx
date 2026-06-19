@@ -584,12 +584,70 @@ export function InformeMensualPage() {
         </Card>
       </div>
 
-      {/* Desglose por Rubro — table */}
+      {/* Desglose por Rubro — table (desktop) / cards (mobile) */}
       <Card className="overflow-hidden p-0">
-        <div className="px-6 py-4 border-b border-mist bg-mist/30">
+        <div className="px-4 md:px-6 py-4 border-b border-mist bg-mist/30">
           <h3 className="text-lg font-bold text-navy">Desglose por Rubro</h3>
         </div>
-        <div className="overflow-x-auto">
+
+        {/* Mobile: stacked cards without horizontal scroll */}
+        <div className="md:hidden">
+          {datosRubro.length === 0 ? (
+            <p className="px-4 py-12 text-center text-slate2 font-medium italic text-sm">
+              No hay gastos registrados en este período
+            </p>
+          ) : (
+            <>
+              <div className="divide-y divide-mist">
+                {datosRubro.map((item, index) => {
+                  const porcentaje = totalMensual > 0 ? (item.value / totalMensual) * 100 : 0;
+                  return (
+                    <div key={item.name} className="px-4 py-3">
+                      <div className="flex items-start justify-between gap-3 mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                          />
+                          <span className="font-medium text-navy text-sm leading-snug">
+                            {item.name}
+                          </span>
+                        </div>
+                        <span className="text-xs font-semibold text-slate2 shrink-0">
+                          {porcentaje.toFixed(1)}%
+                        </span>
+                      </div>
+                      <p className="text-sm sm:text-base font-bold text-brand leading-tight mb-2">
+                        {formatearMoneda(item.value, 'ARS')}
+                      </p>
+                      <div className="w-full bg-mist rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${porcentaje}%`,
+                            backgroundColor: COLORS[index % COLORS.length],
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-between gap-3 px-4 py-3 bg-mist/20 border-t border-mist">
+                <span className="font-bold text-navy text-sm">TOTAL</span>
+                <div className="text-right">
+                  <p className="font-bold text-brand text-sm leading-tight">
+                    {formatearMoneda(totalMensual, 'ARS')}
+                  </p>
+                  <p className="text-xs font-medium text-navy">100%</p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Desktop: full table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="text-left bg-mist/20">

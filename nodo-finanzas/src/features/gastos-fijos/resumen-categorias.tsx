@@ -40,7 +40,7 @@ export function ResumenCategorias() {
   if (resumen.length === 0) return null;
 
   return (
-    <Card title="Gastos por Rubro">
+    <Card title="Gastos por Rubro" collapsible>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {resumen.map(([rubroId, data]) => {
           const rubro = rubros.find((r) => r.id === rubroId);

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff, PiggyBank, History, ArrowLeftRight, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useForm, Controller } from 'react-hook-form';
@@ -14,6 +14,7 @@ import { useFinanzas } from '@/hooks/use-finanzas';
 import { useDolar } from '@/hooks/use-dolar';
 import { formatearMoneda, formatearFecha, obtenerFechaActual } from '@/utils/formatters';
 import { FinanzasService } from '@/services/finanzas-service';
+import { VoiceTransferButton } from '@/features/saldos/components/voice-transfer-button';
 import type { Cuenta, Moneda, TipoCuenta, MovimientoCuenta } from '@/types';
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
@@ -82,12 +83,12 @@ function MovimientosModal({ cuenta, onClose }: MovimientosModalProps) {
   const [movimientos, setMovimientos] = useState<MovimientoCuenta[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useState(() => {
+  useEffect(() => {
     FinanzasService.obtenerMovimientosCuenta(cuenta.id)
       .then((data) => setMovimientos(data))
       .catch(() => toast.error('Error al cargar movimientos'))
       .finally(() => setLoading(false));
-  });
+  }, [cuenta.id]);
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
@@ -221,19 +222,54 @@ export function SaldosPage() {
 
   async function onSubmitTransferencia(data: FormTransferencia) {
     try {
-      await finanzas.transferirDinero({
+      const ok = await finanzas.transferirDinero({
         cuentaOrigenId: data.cuentaOrigenId,
         cuentaDestinoId: data.cuentaDestinoId,
         monto: data.monto,
         descripcion: data.descripcion || 'Transferencia entre cuentas',
         fecha: new Date().toISOString().split('T')[0],
       });
+      if (!ok) {
+        toast.error('No se pudo completar la transferencia');
+        return;
+      }
       toast.success('Transferencia realizada');
       resetTrans();
       setModalTransferencia(false);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Error en la transferencia');
     }
+  }
+
+  async function handleVoiceTransfer(data: {
+    cuentaOrigenId: string;
+    cuentaDestinoId: string;
+    monto: number;
+    descripcion?: string;
+  }) {
+    const origen = finanzas.cuentas.find((c) => c.id === data.cuentaOrigenId);
+    const destino = finanzas.cuentas.find((c) => c.id === data.cuentaDestinoId);
+    if (!origen || !destino) {
+      toast.error('No se encontraron las cuentas');
+      return;
+    }
+
+    const ok = await finanzas.transferirDinero({
+      cuentaOrigenId: data.cuentaOrigenId,
+      cuentaDestinoId: data.cuentaDestinoId,
+      monto: data.monto,
+      descripcion: data.descripcion ?? `Transferencia ${origen.nombre} → ${destino.nombre}`,
+      fecha: new Date().toISOString().split('T')[0],
+    });
+
+    if (!ok) {
+      toast.error('No se pudo completar la transferencia');
+      return;
+    }
+
+    toast.success(
+      `Transferencia: ${formatearMoneda(data.monto, origen.moneda)} de ${origen.nombre} a ${destino.nombre}`,
+    );
   }
 
   // ── Eliminar ───────────────────────────────────────────────────────────────
@@ -293,6 +329,10 @@ export function SaldosPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          <VoiceTransferButton
+            cuentas={finanzas.cuentas}
+            onTransferExtracted={handleVoiceTransfer}
+          />
           <Button variant="outline" size="sm" onClick={() => setModalTransferencia(true)}>
             <ArrowLeftRight className="h-4 w-4" />
             <span className="hidden sm:inline">Transferir</span>
@@ -340,7 +380,82 @@ export function SaldosPage() {
             </Button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            {/* Mobile: card list */}
+            <div className="md:hidden divide-y divide-mist/60">
+              {cuentasOrdenadas.map((cuenta) => (
+                <div
+                  key={cuenta.id}
+                  className={`py-3 ${!cuenta.activa ? 'opacity-50' : ''}`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-ink text-sm leading-snug">{cuenta.nombre}</p>
+                      <p className="text-[11px] text-slate2 mt-0.5">
+                        Actualizado: {formatearFecha(cuenta.fechaActualizacion)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        onClick={() => setCuentaMovimientos(cuenta)}
+                        className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"
+                        title="Ver movimientos"
+                      >
+                        <History className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => abrirModalCuenta(cuenta)}
+                        className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"
+                        title="Editar"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setCuentaAEliminar(cuenta)}
+                        className="p-1.5 text-slate2 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className={`inline-flex px-2 py-0.5 text-[11px] font-bold rounded-full ${tipoBadgeClass(cuenta.tipo)}`}>
+                      {tipoLabel(cuenta.tipo)}
+                    </span>
+                    <span className={`inline-flex px-2 py-0.5 text-[11px] font-bold rounded-full ${
+                      cuenta.moneda === 'USD' ? 'bg-brand/10 text-brand' : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {cuenta.moneda}
+                    </span>
+                    <button
+                      onClick={() => finanzas.actualizarCuenta(cuenta.id, { activa: !cuenta.activa })}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded-full transition-colors ${
+                        cuenta.activa
+                          ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                          : 'bg-mist text-slate2 hover:bg-mist'
+                      }`}
+                    >
+                      {cuenta.activa ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                      {cuenta.activa ? 'Activa' : 'Inactiva'}
+                    </button>
+                  </div>
+
+                  <p className={`text-base font-bold leading-tight ${cuenta.saldoActual < 0 ? 'text-red-600' : 'text-ink'}`}>
+                    {formatearMoneda(cuenta.saldoActual, cuenta.moneda)}
+                  </p>
+                  {cuenta.moneda === 'USD' && dolar.cotizacion && (
+                    <p className="text-xs text-slate2 mt-0.5">
+                      ≈ {formatearMoneda(dolar.convertirUSDaARS(cuenta.saldoActual))}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-mist">
@@ -421,7 +536,8 @@ export function SaldosPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </Card>
 
@@ -493,9 +609,19 @@ export function SaldosPage() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-lg font-bold text-ink">Transferencia entre Cuentas</h3>
-              <button onClick={() => { setModalTransferencia(false); resetTrans(); }} className="p-1.5 hover:bg-mist rounded-lg text-slate2">
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <VoiceTransferButton
+                  cuentas={finanzas.cuentas}
+                  onTransferExtracted={async (data) => {
+                    await handleVoiceTransfer(data);
+                    setModalTransferencia(false);
+                    resetTrans();
+                  }}
+                />
+                <button onClick={() => { setModalTransferencia(false); resetTrans(); }} className="p-1.5 hover:bg-mist rounded-lg text-slate2">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleTrans(onSubmitTransferencia)} className="space-y-4">

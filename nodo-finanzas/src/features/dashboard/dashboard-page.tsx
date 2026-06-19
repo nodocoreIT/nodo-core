@@ -84,12 +84,12 @@ export function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-brand/20">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Total ARS</p>
-          <p className="text-xl font-black text-ink mt-1">{formatearMoneda(totalARS)}</p>
+          <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(totalARS)}</p>
         </Card>
 
         <Card className="border-brand/20">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Total USD</p>
-          <p className="text-xl font-black text-ink mt-1">{formatearMoneda(totalUSD, 'USD')}</p>
+          <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(totalUSD, 'USD')}</p>
           {dolar.cotizacion && totalUSD > 0 && (
             <p className="text-[10px] text-slate2 mt-0.5">≈ {formatearMoneda(dolar.convertirUSDaARS(totalUSD))}</p>
           )}
@@ -97,7 +97,7 @@ export function DashboardPage() {
 
         <Card>
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Gastos del mes</p>
-          <p className="text-xl font-black text-ink mt-1">{formatearMoneda(gastosMes)}</p>
+          <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(gastosMes)}</p>
           <p className="text-[10px] text-slate2 mt-0.5">{mesActualStr}</p>
         </Card>
 
