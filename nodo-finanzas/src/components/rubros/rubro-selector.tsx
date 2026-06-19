@@ -11,6 +11,7 @@ interface RubroSelectorProps {
   error?: string;
   required?: boolean;
   hideLabel?: boolean;
+  triggerClassName?: string;
 }
 
 export function RubroSelector({
@@ -21,6 +22,7 @@ export function RubroSelector({
   error,
   required,
   hideLabel = false,
+  triggerClassName,
 }: RubroSelectorProps) {
   const { rubrosActivos } = useRubros();
 
@@ -54,6 +56,7 @@ export function RubroSelector({
         emptyLabel={placeholder}
         searchPlaceholder="Buscar rubro..."
         aria-label={label}
+        triggerClassName={triggerClassName}
       />
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>

@@ -10,7 +10,7 @@ interface RubroDisplayProps {
 export function RubroDisplay({ rubro, fallback = 'Sin rubro', showDescription = true }: RubroDisplayProps) {
   if (!rubro) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-mist text-slate2">
+      <span className="inline-flex items-center gap-1 text-sm font-bold text-slate2">
         {fallback}
       </span>
     );
@@ -18,7 +18,7 @@ export function RubroDisplay({ rubro, fallback = 'Sin rubro', showDescription = 
 
   return (
     <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-mist text-ink"
+      className="inline-flex items-center gap-1 text-sm font-bold text-ink"
       title={showDescription && rubro.descripcion ? rubro.descripcion : undefined}
     >
       <span>{rubro.emoji}</span>

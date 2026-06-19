@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "../../lib/utils";
+import { cn, foldForSearch } from "../../lib/utils";
 import type { FormSelectOption } from "./form-select";
 
 export interface SearchableSelectProps {
@@ -58,7 +58,7 @@ export function SearchableSelect({
     search.trim() === ""
       ? normalized
       : normalized.filter((option) =>
-          option.label.toLowerCase().includes(search.toLowerCase()),
+          foldForSearch(option.label).includes(foldForSearch(search)),
         );
 
   const selectedLabel =

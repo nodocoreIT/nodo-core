@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useForm, Controller } from 'react-hook-form';
@@ -10,8 +10,14 @@ import { Input, Select } from '@/components/ui/input';
 import { MoneyInput } from '@/components/ui/money-input';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { useFinanzas } from '@/hooks/use-finanzas';
-import { getFechaHoy } from '@/utils/formatters';
+import { useRubros } from '@/hooks/use-rubros';
+import { getFechaHoy, formatearMoneda } from '@/utils/formatters';
 import { capitalizarDescripcion } from '@/utils/capitalizar-descripcion';
+import { VoiceGastoButton } from '@/features/gastos-diarios/components/voice-gasto-button';
+import {
+  parseGastoDictado,
+  type ParsedGastoDictado,
+} from '@/features/gastos-diarios/lib/parse-gasto-dictado';
 import type { FormaDePago, GastoDiario } from '@/types';
 
 const schema = z.object({
@@ -50,7 +56,10 @@ const FORMAS_PAGO: Array<{ value: FormaDePago; label: string }> = [
 
 export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando, datosIniciales }: Props) {
   const finanzas = useFinanzas();
+  const { rubrosActivos } = useRubros();
   const [procesando, setProcesando] = useState(false);
+  const [dictadoPreview, setDictadoPreview] = useState<ParsedGastoDictado | null>(null);
+  const [ultimoDictado, setUltimoDictado] = useState('');
 
   const defaults: FormData = gastoEditando
     ? {
@@ -115,6 +124,63 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
     label: i === 0 ? '1 cuota (contado)' : `${i + 1} cuotas`,
   }));
 
+  const formaPagoLabels = Object.fromEntries(FORMAS_PAGO.map((item) => [item.value, item.label])) as Record<
+    FormaDePago,
+    string
+  >;
+
+  const applyParsedGasto = useCallback(
+    (parsed: ParsedGastoDictado) => {
+      if (parsed.fecha) setValue('fecha', parsed.fecha);
+      if (parsed.monto) setValue('monto', parsed.monto);
+      if (parsed.descripcion) setValue('descripcion', parsed.descripcion);
+      if (parsed.formaPago) setValue('formaPago', parsed.formaPago);
+      if (parsed.rubroId) {
+        setValue('rubroId', parsed.rubroId);
+        if (parsed.rubroCodigo) setValue('rubro', parsed.rubroCodigo);
+      }
+      if (parsed.tarjetaId) setValue('tarjetaId', parsed.tarjetaId);
+      if (parsed.cuotas) setValue('cuotas', parsed.cuotas);
+      if (parsed.cuentaId) setValue('cuentaId', parsed.cuentaId);
+    },
+    [setValue],
+  );
+
+  const handleDictado = useCallback(
+    async (transcript: string) => {
+      const parsed = parseGastoDictado({
+        texto: transcript,
+        rubros: rubrosActivos,
+        tarjetas: tarjetasActivas,
+        cuentas: cuentasActivas,
+        fechaReferencia: getFechaHoy(),
+      });
+
+      setUltimoDictado(transcript);
+      setDictadoPreview(parsed);
+      applyParsedGasto(parsed);
+
+      if (!parsed.monto && !parsed.descripcion && !parsed.rubroId) {
+        throw new Error('EMPTY_PARSE');
+      }
+
+      const resumen = [
+        parsed.monto ? formatearMoneda(parsed.monto) : null,
+        parsed.descripcion ?? null,
+        parsed.formaPago ? formaPagoLabels[parsed.formaPago] : null,
+      ]
+        .filter(Boolean)
+        .join(' · ');
+
+      if (parsed.advertencias.length > 0) {
+        toast(resumen || 'Dictado interpretado con advertencias', { icon: '⚠️' });
+      } else {
+        toast.success(resumen ? `Dictado aplicado: ${resumen}` : 'Dictado aplicado al formulario');
+      }
+    },
+    [applyParsedGasto, cuentasActivas, formaPagoLabels, rubrosActivos, tarjetasActivas],
+  );
+
   async function onSubmit(data: FormData) {
     setProcesando(true);
     try {
@@ -172,6 +238,63 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
       </nav>
 
       <Card>
+        {!gastoEditando && (
+          <div className="mb-5 rounded-xl border border-brand/20 bg-brand/5 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-ink">Cargá el gasto hablando</p>
+                <p className="text-xs text-slate2 mt-1">
+                  Ej: &quot;Hoy gasté 250 pesos en el médico con Mercado Pago&quot;
+                </p>
+              </div>
+              <VoiceGastoButton onTranscript={handleDictado} disabled={procesando} />
+            </div>
+
+            {dictadoPreview && (
+              <div className="mt-4 rounded-lg border border-mist bg-white/80 p-3 text-sm">
+                <p className="font-medium text-ink">Interpretación del dictado</p>
+                {ultimoDictado && (
+                  <p className="text-xs text-slate2 mt-1 italic">&quot;{ultimoDictado}&quot;</p>
+                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {dictadoPreview.monto && (
+                    <span className="rounded-full bg-mist px-2.5 py-1 text-xs font-medium text-ink">
+                      {formatearMoneda(dictadoPreview.monto)}
+                    </span>
+                  )}
+                  {dictadoPreview.descripcion && (
+                    <span className="rounded-full bg-mist px-2.5 py-1 text-xs font-medium text-ink">
+                      {dictadoPreview.descripcion}
+                    </span>
+                  )}
+                  {dictadoPreview.formaPago && (
+                    <span className="rounded-full bg-mist px-2.5 py-1 text-xs font-medium text-ink">
+                      {formaPagoLabels[dictadoPreview.formaPago]}
+                    </span>
+                  )}
+                  {dictadoPreview.rubroId && (
+                    <span className="rounded-full bg-mist px-2.5 py-1 text-xs font-medium text-ink">
+                      {rubrosActivos.find((rubro) => rubro.id === dictadoPreview.rubroId)?.nombre ?? 'Rubro detectado'}
+                    </span>
+                  )}
+                  {dictadoPreview.cuotas && dictadoPreview.cuotas > 1 && (
+                    <span className="rounded-full bg-mist px-2.5 py-1 text-xs font-medium text-ink">
+                      {dictadoPreview.cuotas} cuotas
+                    </span>
+                  )}
+                </div>
+                {dictadoPreview.advertencias.length > 0 && (
+                  <ul className="mt-2 space-y-1 text-xs text-amber-700">
+                    {dictadoPreview.advertencias.map((warning) => (
+                      <li key={warning}>• {warning}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Hidden fields */}
           <input type="hidden" {...register('planId')} />

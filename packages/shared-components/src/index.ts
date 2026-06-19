@@ -1,5 +1,5 @@
 // ─── Lib ─────────────────────────────────────────────────────────────────────
-export { cn } from "./lib/utils";
+export { cn, foldForSearch } from "./lib/utils";
 export {
   normalizeDocumentDigits,
   formatDocumentThousands,

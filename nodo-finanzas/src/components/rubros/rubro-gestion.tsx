@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Edit, Trash2, X, Save, Tag } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Plus, Edit, Trash2, X, Save, Tag, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -38,8 +38,22 @@ export function RubroGestion() {
   const [rubroAEliminar, setRubroAEliminar] = useState<Rubro | null>(null);
   const [eliminando, setEliminando] = useState(false);
   const [limpiandoInactivos, setLimpiandoInactivos] = useState(false);
+  const [busqueda, setBusqueda] = useState('');
 
   const rubrosInactivos = rubros.filter(r => !r.activo && !r.esSistema);
+
+  const rubrosFiltrados = useMemo(() => {
+    const sorted = [...rubrosActivos].sort((a, b) => a.orden - b.orden);
+    const termino = busqueda.trim().toLowerCase();
+    if (!termino) return sorted;
+
+    return sorted.filter(
+      (rubro) =>
+        rubro.nombre.toLowerCase().includes(termino) ||
+        rubro.codigo.toLowerCase().includes(termino) ||
+        rubro.descripcion?.toLowerCase().includes(termino),
+    );
+  }, [rubrosActivos, busqueda]);
 
   const {
     register,
@@ -167,22 +181,46 @@ export function RubroGestion() {
         </Button>
       </div>
 
-      {/* List */}
-      {rubrosInactivos.length > 0 && (
-        <div className="flex items-center justify-between rounded-xl border border-mist bg-mist/30 px-4 py-3 text-sm">
-          <p className="text-slate2">
-            Hay {rubrosInactivos.length} rubro{rubrosInactivos.length === 1 ? '' : 's'} deshabilitado{rubrosInactivos.length === 1 ? '' : 's'} del sistema anterior.
-          </p>
-          <Button
-            size="sm"
-            variant="outline"
-            loading={limpiandoInactivos}
-            onClick={handleLimpiarInactivos}
-          >
-            Eliminar todos
-          </Button>
+      {/* Search + inactive cleanup */}
+      <div className="space-y-2">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate2" />
+          <input
+            type="text"
+            placeholder="Buscar rubro..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="block w-full bg-white pl-10 pr-9 py-2 border border-mist rounded-lg text-sm text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+          />
+          {busqueda && (
+            <button
+              type="button"
+              onClick={() => setBusqueda('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate2 hover:text-ink"
+              aria-label="Limpiar búsqueda"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
-      )}
+
+        {rubrosInactivos.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-mist/80 bg-mist/20 px-3 py-2">
+            <p className="text-[11px] text-slate2">
+              Hay {rubrosInactivos.length} rubro{rubrosInactivos.length === 1 ? '' : 's'} deshabilitado{rubrosInactivos.length === 1 ? '' : 's'} del sistema anterior.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              loading={limpiandoInactivos}
+              onClick={handleLimpiarInactivos}
+              className="h-7 shrink-0 px-2 py-0.5 text-[10px] font-semibold"
+            >
+              Eliminar todos
+            </Button>
+          </div>
+        )}
+      </div>
 
       <Card>
         {rubrosActivos.length === 0 ? (
@@ -194,9 +232,13 @@ export function RubroGestion() {
               Crear primer rubro
             </Button>
           </div>
+        ) : rubrosFiltrados.length === 0 ? (
+          <div className="text-center py-10">
+            <p className="text-sm text-slate2">No hay rubros que coincidan con &ldquo;{busqueda}&rdquo;.</p>
+          </div>
         ) : (
           <div className="divide-y divide-mist/60">
-            {[...rubrosActivos].sort((a, b) => a.orden - b.orden).map((rubro) => (
+            {rubrosFiltrados.map((rubro) => (
               <div key={rubro.id} className="flex items-center justify-between py-3">
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{rubro.emoji}</span>
