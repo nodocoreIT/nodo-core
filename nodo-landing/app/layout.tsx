@@ -22,7 +22,11 @@ export const metadata: Metadata = {
   title: "Nodo Core — Ecosistema de gestión inteligente",
   description:
     "El ecosistema que centraliza, conecta y potencia. Una sola plataforma que articula cada unidad de negocio con transparencia tecnológica.",
-  icons: { icon: "/favicon.png" },
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

@@ -270,7 +270,9 @@ export function RegistroGastoFijo({ onVolver, onGastoRegistrado, gastoEditando, 
             <Select
               label="Tarjeta"
               {...register('tarjetaId')}
-              options={[{ value: '', label: 'Seleccioná una tarjeta...' }, ...tarjetasActivas]}
+              options={tarjetasActivas}
+              allowEmpty
+              emptyLabel="Seleccioná una tarjeta..."
               error={errors.tarjetaId?.message}
             />
           )}
@@ -281,10 +283,9 @@ export function RegistroGastoFijo({ onVolver, onGastoRegistrado, gastoEditando, 
               <Select
                 label="Cuenta origen / Caja"
                 {...register('cuentaBancariaId')}
-                options={[
-                  { value: '', label: 'Seleccioná una cuenta...' },
-                  ...cuentasBancariasActivas,
-                ]}
+                options={cuentasBancariasActivas}
+                allowEmpty
+                emptyLabel="Seleccioná una cuenta..."
                 error={errors.cuentaBancariaId?.message}
               />
             )}
@@ -298,26 +299,23 @@ export function RegistroGastoFijo({ onVolver, onGastoRegistrado, gastoEditando, 
               <Select
                 label="Plan de Ahorro"
                 {...register('planId')}
-                options={[
-                  { value: '', label: 'Ninguno' },
-                  ...finanzas.planesAhorro.map((p) => ({ value: p.id, label: p.detalle })),
-                ]}
+                options={finanzas.planesAhorro.map((p) => ({ value: p.id, label: p.detalle }))}
+                allowEmpty
+                emptyLabel="Ninguno"
               />
               <Select
                 label="Préstamo"
                 {...register('prestamoId')}
-                options={[
-                  { value: '', label: 'Ninguno' },
-                  ...finanzas.prestamos.map((p) => ({ value: p.id, label: p.concepto })),
-                ]}
+                options={finanzas.prestamos.map((p) => ({ value: p.id, label: p.concepto }))}
+                allowEmpty
+                emptyLabel="Ninguno"
               />
               <Select
                 label="Pago Tarjeta"
                 {...register('pagoTarjetaId')}
-                options={[
-                  { value: '', label: 'Ninguno' },
-                  ...finanzas.tarjetas.map((t) => ({ value: t.id, label: t.nombre })),
-                ]}
+                options={finanzas.tarjetas.map((t) => ({ value: t.id, label: t.nombre }))}
+                allowEmpty
+                emptyLabel="Ninguno"
               />
             </div>
           </div>

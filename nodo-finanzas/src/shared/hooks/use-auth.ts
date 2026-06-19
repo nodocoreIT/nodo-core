@@ -20,7 +20,6 @@ export function useAuth() {
       }
       const allowed = await userHasNodeAccess(supabase, FINANZAS_UNIT_CODE);
       if (!allowed) {
-        await supabase.auth.signOut();
         if (!cancelled) setAccessDenied(true);
         return;
       }

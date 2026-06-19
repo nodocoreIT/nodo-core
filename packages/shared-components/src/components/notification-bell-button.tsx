@@ -22,7 +22,7 @@ export function NotificationBellButton({
     <button
       type="button"
       className={cn(
-        "relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-navy transition-colors hover:bg-navy/5 hover:text-brand focus:outline-none",
+        "relative inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center overflow-visible rounded-full text-navy transition-colors hover:bg-navy/5 hover:text-brand focus:outline-none",
         className,
       )}
       {...props}

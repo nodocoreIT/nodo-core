@@ -16,6 +16,10 @@ export {
   AUTH_ERROR_CREDENTIALS,
   nodeLoginUrlWithAuthError,
 } from "./lib/verify-node-access";
+export {
+  createNodoAuthClient,
+  nodoAuthStorageKey,
+} from "./lib/create-nodo-auth-client";
 
 // ─── Providers ───────────────────────────────────────────────────────────────
 export { SupabaseProvider, useSupabase } from "./providers/supabase-provider";
@@ -40,10 +44,15 @@ export {
   type NotificationBellButtonProps,
 } from "./components/notification-bell-button";
 export {
+  NotificationBellBadge,
+  type NotificationBellBadgeProps,
+} from "./components/notification-bell-badge";
+export {
   PasswordResetPanel,
   type PasswordResetPanelProps,
 } from "./components/password-reset-panel";
 export { usePasswordRecoveryBootstrap, isRecoveryHash } from "./hooks/use-password-recovery-bootstrap";
+export { useFixedDocumentTitle } from "./hooks/use-fixed-document-title";
 export { PlanGate, type PlanTier } from "./components/plan-gate";
 export { RequireAuth } from "./components/require-auth";
 

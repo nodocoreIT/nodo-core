@@ -26,6 +26,7 @@ import {
   PortalHeaderActions,
   PortalHeaderMobileActions,
   useSearchStore,
+  useFixedDocumentTitle,
 } from "@nodocore/shared-components";
 import { BrandMark } from "@/shared/components/brand-mark";
 import { ProfileDialog } from "@/features/profile/components/profile-dialog";
@@ -169,6 +170,8 @@ export function AdminLayout() {
   const email = user?.email ?? "";
   const displayName = fullName || email;
 
+  useFixedDocumentTitle("Nodo | Inmo");
+
   return (
     <InmoSettingsModuleProvider>
     <div className="flex h-[100dvh] overflow-hidden bg-paper">
@@ -188,7 +191,7 @@ export function AdminLayout() {
         )}
       >
         {/* Brand mark — full sidebar width */}
-        <div className="relative flex h-16 w-full flex-shrink-0 items-center">
+        <div className="relative mt-2.5 flex h-16 w-full flex-shrink-0 items-center">
           <BrandMark onDark fillWidth iconClassName="h-6 w-6" />
           <button
             type="button"

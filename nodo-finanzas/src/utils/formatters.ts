@@ -1,6 +1,75 @@
 import type { Moneda } from '@/types';
 
 /**
+ * Símbolo corto para inputs de monto (sin espacio trailing).
+ */
+export const simboloMoneda = (moneda: Moneda = 'ARS'): string =>
+  moneda === 'USD' ? 'U$S' : '$';
+
+/**
+ * Limpia texto mientras el usuario escribe (solo dígitos y una coma decimal).
+ */
+export const sanitizarEntradaMonto = (valor: string): string => {
+  const sinSeparadores = valor.replace(/\./g, '');
+  let limpio = sinSeparadores.replace(/[^\d,]/g, '');
+
+  const commaIdx = limpio.indexOf(',');
+  if (commaIdx < 0) return limpio;
+
+  const parteEntera = limpio.slice(0, commaIdx);
+  const parteDecimal = limpio.slice(commaIdx + 1).replace(/,/g, '').slice(0, 2);
+  const terminaEnComa = limpio.endsWith(',');
+
+  if (terminaEnComa && !parteDecimal) return `${parteEntera},`;
+  return `${parteEntera},${parteDecimal}`;
+};
+
+/**
+ * Aplica separadores de miles mientras el usuario escribe (es-AR: 1.234.567,89).
+ */
+export const formatearMontoInputEnVivo = (valor: string): string => {
+  if (!valor) return '';
+
+  const terminaEnComa = valor.endsWith(',');
+  const [parteEnteraRaw = '', parteDecimalRaw = ''] = valor.split(',');
+  const digitosEnteros = parteEnteraRaw.replace(/\D/g, '');
+  const digitosDecimales = parteDecimalRaw.replace(/\D/g, '').slice(0, 2);
+
+  if (!digitosEnteros && !digitosDecimales && !terminaEnComa) return '';
+
+  const enterosFormateados = digitosEnteros
+    ? Number(digitosEnteros).toLocaleString('es-AR')
+    : '0';
+
+  if (terminaEnComa && !digitosDecimales) return `${enterosFormateados},`;
+  if (digitosDecimales || terminaEnComa) return `${enterosFormateados},${digitosDecimales}`;
+  return enterosFormateados;
+};
+
+/**
+ * Formatea un monto para mostrar en inputs (sin símbolo, con separadores locales).
+ */
+export const formatearMontoInput = (monto: number, _moneda: Moneda = 'ARS'): string => {
+  if (!Number.isFinite(monto) || monto === 0) return '';
+  return new Intl.NumberFormat('es-AR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(monto);
+};
+
+/**
+ * Parsea texto ingresado en un input de monto a número.
+ */
+export const parsearMontoInput = (valor: string): number => {
+  const trimmed = valor.trim();
+  if (!trimmed) return 0;
+
+  const normalized = trimmed.replace(/\./g, '').replace(',', '.');
+  const parsed = parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+/**
  * Formatea un número como moneda
  */
 export const formatearMoneda = (monto: number, moneda: Moneda = 'ARS'): string => {

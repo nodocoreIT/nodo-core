@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Receipt, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MoneyInput } from '@/components/ui/money-input';
 import { FormSelect, SearchableSelect } from '@nodocore/shared-components';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { useFinanzas } from '@/hooks/use-finanzas';
-import { getFechaHoy } from '@/utils/formatters';
+import { formatearMoneda, getFechaHoy } from '@/utils/formatters';
 import toast from 'react-hot-toast';
 import type { Tarjeta, RubroConsumo } from '@/types';
 
@@ -29,7 +30,7 @@ export function RegistroConsumo({
   const [rubroId, setRubroId] = useState('');
   const [rubroCodigo, setRubroCodigo] = useState('');
   const [detalle, setDetalle] = useState('');
-  const [monto, setMonto] = useState('');
+  const [monto, setMonto] = useState(0);
   const [moneda, setMoneda] = useState<'ARS' | 'USD'>('ARS');
   const [cuotas, setCuotas] = useState(1);
   const [gastoFijo, setGastoFijo] = useState(false);
@@ -43,14 +44,14 @@ export function RegistroConsumo({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tarjetaId || !lugar || !rubroId || !monto || parseFloat(monto) === 0) {
+    if (!tarjetaId || !lugar || !rubroId || monto <= 0) {
       toast.error('Completá todos los campos requeridos');
       return;
     }
 
     try {
       setProcesando(true);
-      const montoNum = parseFloat(monto);
+      const montoNum = monto;
       const montoPorCuota = montoNum / cuotas;
       const codigoOperacion = crypto.randomUUID();
 
@@ -229,16 +230,12 @@ export function RegistroConsumo({
 
             {/* Monto y moneda */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2 flex flex-col gap-1">
-                <label className="text-sm font-medium text-ink">Monto *</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
+              <div className="md:col-span-2">
+                <MoneyInput
+                  label="Monto *"
                   value={monto}
-                  onChange={(e) => setMonto(e.target.value)}
-                  placeholder="0.00"
-                  className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
+                  onChange={setMonto}
+                  moneda={moneda}
                   required
                 />
               </div>
@@ -266,13 +263,10 @@ export function RegistroConsumo({
                   label: option.label,
                 }))}
               />
-              {cuotas > 1 && parseFloat(monto) > 0 && (
+              {cuotas > 1 && monto > 0 && (
                 <p className="text-xs text-slate2 mt-1">
                   Se registrarán {cuotas} cuotas de{' '}
-                  {moneda === 'ARS' ? '$' : 'USD '}
-                  {(parseFloat(monto) / cuotas).toLocaleString('es-AR', {
-                    minimumFractionDigits: 2,
-                  })}
+                  {formatearMoneda(monto / cuotas, moneda)}
                 </p>
               )}
             </div>

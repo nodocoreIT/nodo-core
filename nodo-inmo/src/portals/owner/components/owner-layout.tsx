@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { LayoutDashboard, Home, HandCoins, LogOut, Menu, X } from "lucide-react";
-import { Button, useAuth } from "@nodocore/shared-components";
+import { Button, useAuth, useFixedDocumentTitle } from "@nodocore/shared-components";
 import { BrandMark } from "@/shared/components/brand-mark";
 import { cn } from "@/shared/lib/utils";
 
@@ -41,6 +41,8 @@ export function OwnerLayout() {
   const displayName = fullName || email;
   const title = ROUTE_TITLES[pathname] ?? "Portal Propietario";
 
+  useFixedDocumentTitle("Nodo | Inmo");
+
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-paper">
       {/* Mobile overlay */}
@@ -59,7 +61,7 @@ export function OwnerLayout() {
         )}
       >
         {/* Brand — full sidebar width */}
-        <div className="relative flex h-16 w-full flex-shrink-0 items-center">
+        <div className="relative mt-2.5 flex h-16 w-full flex-shrink-0 items-center">
           <BrandMark onDark fillWidth iconClassName="h-6 w-6" />
           <button
             type="button"

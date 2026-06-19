@@ -19,9 +19,14 @@ const hanken = Hanken_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Nodo Salud — Clínica Virtual",
+  title: "Nodo | Clinicas",
   description:
     "Telemedicina profesional con agenda, videoconsultas, historial clínico e informes con IA.",
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

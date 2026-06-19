@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MoneyInput } from '@/components/ui/money-input';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
 import type { ConsumoTarjeta } from '@/types';
 
@@ -22,8 +23,8 @@ export function ModalEditarConsumo({
   const [fechaCompra, setFechaCompra] = useState('');
   const [rubroId, setRubroId] = useState('');
   const [detalle, setDetalle] = useState('');
-  const [importeARS, setImporteARS] = useState('');
-  const [importeUSD, setImporteUSD] = useState('');
+  const [importeARS, setImporteARS] = useState(0);
+  const [importeUSD, setImporteUSD] = useState(0);
 
   useEffect(() => {
     if (consumo) {
@@ -32,8 +33,8 @@ export function ModalEditarConsumo({
       setFechaCompra(consumo.fechaCompra ? consumo.fechaCompra.slice(0, 10) : consumo.fecha.slice(0, 10));
       setRubroId(consumo.rubroId ?? '');
       setDetalle(consumo.detalle ?? '');
-      setImporteARS(consumo.importeARS ? String(consumo.importeARS) : '');
-      setImporteUSD(consumo.importeUSD ? String(consumo.importeUSD) : '');
+      setImporteARS(consumo.importeARS ?? 0);
+      setImporteUSD(consumo.importeUSD ?? 0);
     }
   }, [consumo]);
 
@@ -46,8 +47,8 @@ export function ModalEditarConsumo({
       fechaCompra,
       rubroId: rubroId || undefined,
       detalle,
-      importeARS: importeARS ? parseFloat(importeARS) : 0,
-      importeUSD: importeUSD ? parseFloat(importeUSD) : undefined,
+      importeARS,
+      importeUSD: importeUSD > 0 ? importeUSD : undefined,
     };
     onSave(cambios);
   };
@@ -69,7 +70,7 @@ export function ModalEditarConsumo({
               type="text"
               value={lugar}
               onChange={(e) => setLugar(e.target.value)}
-              className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
+              className="border border-mist rounded-lg px-3 py-2 text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-brand"
             />
           </div>
 
@@ -80,7 +81,7 @@ export function ModalEditarConsumo({
                 type="date"
                 value={fechaCompra}
                 onChange={(e) => setFechaCompra(e.target.value)}
-                className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
+                className="border border-mist rounded-lg px-3 py-2 text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-brand"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -89,7 +90,7 @@ export function ModalEditarConsumo({
                 type="date"
                 value={fecha}
                 onChange={(e) => setFecha(e.target.value)}
-                className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
+                className="border border-mist rounded-lg px-3 py-2 text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-brand"
               />
             </div>
           </div>
@@ -105,33 +106,23 @@ export function ModalEditarConsumo({
               type="text"
               value={detalle}
               onChange={(e) => setDetalle(e.target.value)}
-              className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
+              className="border border-mist rounded-lg px-3 py-2 text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-brand"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-ink">Importe ARS</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={importeARS}
-                onChange={(e) => setImporteARS(e.target.value)}
-                className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-ink">Importe USD</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={importeUSD}
-                onChange={(e) => setImporteUSD(e.target.value)}
-                className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-              />
-            </div>
+            <MoneyInput
+              label="Importe ARS"
+              value={importeARS}
+              onChange={setImporteARS}
+              moneda="ARS"
+            />
+            <MoneyInput
+              label="Importe USD"
+              value={importeUSD}
+              onChange={setImporteUSD}
+              moneda="USD"
+            />
           </div>
         </div>
 

@@ -93,6 +93,10 @@ export function StaffAdminLayout({ children }: { children: React.ReactNode }) {
         : "Gestión");
   const displayName = staff?.fullName ?? "Staff";
 
+  useEffect(() => {
+    document.title = "Nodo | Obra";
+  }, []);
+
   const handleLogout = async () => {
     await obraApi.logout();
     router.push("/login");
@@ -125,7 +129,7 @@ export function StaffAdminLayout({ children }: { children: React.ReactNode }) {
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-16 flex-shrink-0 items-center justify-between px-5">
+        <div className="mt-2.5 flex h-16 flex-shrink-0 items-center justify-between px-5">
           <BrandMark onDark iconClassName="h-6 w-6" />
           <button
             type="button"

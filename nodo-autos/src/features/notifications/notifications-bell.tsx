@@ -7,16 +7,16 @@ import {
 
 export function NotificationsBell() {
   const navigate = useNavigate();
-  const { items, count, loading, error } = useNotifications();
+  const { items, loading, error } = useNotifications();
 
   return (
     <NotificationsDropdown
       items={items}
-      count={count}
       loading={loading}
       error={error}
       kindStyles={AUTOS_NOTIFICATION_KIND_STYLES}
       onNavigate={(href) => navigate(href)}
+      storageKey="autos"
     />
   );
 }

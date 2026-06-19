@@ -118,7 +118,6 @@ export function AuthProvider({
 
       if (config.allowedRoles?.length) {
         if (!claims.role || !config.allowedRoles.includes(claims.role)) {
-          await supabase.auth.signOut();
           if (!cancelled) setAccessDenied(true);
           return;
         }
@@ -127,7 +126,6 @@ export function AuthProvider({
       if (config.unitCode) {
         const allowed = await userHasNodeAccess(supabase, config.unitCode);
         if (!allowed) {
-          await supabase.auth.signOut();
           if (!cancelled) setAccessDenied(true);
           return;
         }

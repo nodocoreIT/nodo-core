@@ -126,7 +126,7 @@ export function BrandMark({
   return (
     <span
       className={cn(
-        fillWidth ? "flex w-full min-w-0 items-center gap-2" : "inline-flex items-center gap-2",
+        fillWidth ? "flex w-full min-w-0 items-center gap-2 px-5" : "inline-flex items-center gap-2",
         className,
       )}
     >

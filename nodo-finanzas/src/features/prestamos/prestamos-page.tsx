@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MoneyInput } from '@/components/ui/money-input';
 import { FormSelect } from '@nodocore/shared-components';
 import { Spinner } from '@/components/ui/spinner';
 import { useFinanzas } from '@/hooks/use-finanzas';
@@ -491,18 +492,13 @@ export function PrestamosPage() {
                   />
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium text-ink">Monto Original *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.montoOriginal}
-                    onChange={(e) => setForm((f) => ({ ...f, montoOriginal: e.target.value }))}
-                    className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-                    required
-                  />
-                </div>
+                <MoneyInput
+                  label="Monto Original *"
+                  value={parseFloat(form.montoOriginal) || 0}
+                  onChange={(v) => setForm((f) => ({ ...f, montoOriginal: v ? String(v) : '' }))}
+                  moneda={form.moneda}
+                  required
+                />
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-ink">Moneda</label>
                   <FormSelect
@@ -515,17 +511,12 @@ export function PrestamosPage() {
                   />
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium text-ink">Saldo Pendiente</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.saldoPendiente}
-                    onChange={(e) => setForm((f) => ({ ...f, saldoPendiente: e.target.value }))}
-                    className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-                  />
-                </div>
+                <MoneyInput
+                  label="Saldo Pendiente"
+                  value={parseFloat(form.saldoPendiente) || 0}
+                  onChange={(v) => setForm((f) => ({ ...f, saldoPendiente: v ? String(v) : '' }))}
+                  moneda={form.moneda}
+                />
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-ink">Fecha Inicio *</label>
                   <input
@@ -583,28 +574,18 @@ export function PrestamosPage() {
                         className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
                       />
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-sm font-medium text-ink">Importe Cuota</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={form.importeCuota}
-                        onChange={(e) => setForm((f) => ({ ...f, importeCuota: e.target.value }))}
-                        className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-sm font-medium text-ink">Saldo Cancelación</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={form.saldoCancelacion}
-                        onChange={(e) => setForm((f) => ({ ...f, saldoCancelacion: e.target.value }))}
-                        className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-                      />
-                    </div>
+                    <MoneyInput
+                      label="Importe Cuota"
+                      value={parseFloat(form.importeCuota) || 0}
+                      onChange={(v) => setForm((f) => ({ ...f, importeCuota: v ? String(v) : '' }))}
+                      moneda={form.moneda}
+                    />
+                    <MoneyInput
+                      label="Saldo Cancelación"
+                      value={parseFloat(form.saldoCancelacion) || 0}
+                      onChange={(v) => setForm((f) => ({ ...f, saldoCancelacion: v ? String(v) : '' }))}
+                      moneda={form.moneda}
+                    />
                   </>
                 )}
 

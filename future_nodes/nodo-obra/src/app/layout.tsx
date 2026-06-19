@@ -19,9 +19,14 @@ const hanken = Hanken_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Nodo Obra",
+  title: "Nodo | Obra",
   description:
     "Gestión de obras y proyectos de construcción con panel de dirección Nodo.",
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

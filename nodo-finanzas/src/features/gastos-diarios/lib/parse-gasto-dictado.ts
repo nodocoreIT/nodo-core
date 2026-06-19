@@ -43,13 +43,33 @@ const RUBRO_KEYWORDS: Array<{ keywords: RegExp; codes: string[] }> = [
   { keywords: /\b(?:escuela|colegio|universidad|cuota\s+escolar)\b/i, codes: ['ESCUELA'] },
 ];
 
-function normalize(text: string): string {
+function normalize(text: string | null | undefined): string {
+  if (!text) return '';
   return text
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/** Normaliza símbolos de moneda y espacios raros del dictado por voz. */
+export function preprocessDictadoText(texto: string): string {
+  return texto
+    .replace(/[\uFF04\uFFE1\u20BF₡₹₽]/g, '$')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function parsedTieneDatosUtiles(parsed: ParsedGastoDictado): boolean {
+  return Boolean(
+    parsed.monto ||
+    parsed.descripcion ||
+    parsed.rubroId ||
+    parsed.formaPago ||
+    parsed.fecha,
+  );
 }
 
 function parseArgentineNumber(raw: string): number {
@@ -71,6 +91,114 @@ function parseArgentineNumber(raw: string): number {
   return Number.parseFloat(value);
 }
 
+function parseSpanishWordsAmount(text: string): number | undefined {
+  const words = text
+    .replace(/\s+y\s+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (words.length === 0) return undefined;
+
+  const units: Record<string, number> = {
+    cero: 0,
+    uno: 1,
+    un: 1,
+    una: 1,
+    dos: 2,
+    tres: 3,
+    cuatro: 4,
+    cinco: 5,
+    seis: 6,
+    siete: 7,
+    ocho: 8,
+    nueve: 9,
+    diez: 10,
+    once: 11,
+    doce: 12,
+    trece: 13,
+    catorce: 14,
+    quince: 15,
+    veinte: 20,
+    treinta: 30,
+    cuarenta: 40,
+    cincuenta: 50,
+    sesenta: 60,
+    setenta: 70,
+    ochenta: 80,
+    noventa: 90,
+  };
+
+  const hundreds: Record<string, number> = {
+    cien: 100,
+    ciento: 100,
+    doscientos: 200,
+    doscientas: 200,
+    trescientos: 300,
+    trescientas: 300,
+    cuatrocientos: 400,
+    cuatrocientas: 400,
+    quinientos: 500,
+    quinientas: 500,
+    seiscientos: 600,
+    seiscientas: 600,
+    setecientos: 700,
+    setecientas: 700,
+    ochocientos: 800,
+    ochocientas: 800,
+    novecientos: 900,
+    novecientas: 900,
+  };
+
+  let total = 0;
+  let current = 0;
+
+  for (const word of words) {
+    if (word === 'mil') {
+      current = (current || 1) * 1000;
+      total += current;
+      current = 0;
+      continue;
+    }
+
+    if (hundreds[word] != null) {
+      current += hundreds[word];
+      continue;
+    }
+
+    if (units[word] != null) {
+      current += units[word];
+      continue;
+    }
+
+    return undefined;
+  }
+
+  total += current;
+  return total > 0 ? total : undefined;
+}
+
+function extractMontoFromWords(text: string): number | undefined {
+  const normalized = normalize(text);
+
+  const beforePesos = normalized.match(
+    /(?:gast[eé]|pagu[eé]|gasto\s+de|de|un\s+gasto\s+de)\s+(?:un\s+)?([a-z\s]+?)\s+pesos?\b/,
+  );
+  if (beforePesos?.[1]) {
+    const amount = parseSpanishWordsAmount(beforePesos[1].trim());
+    if (amount) return amount;
+  }
+
+  const lucasWords = normalized.match(
+    /([a-z\s]+?)\s+lucas?\b/,
+  );
+  if (lucasWords?.[1]) {
+    const base = parseSpanishWordsAmount(lucasWords[1].trim());
+    if (base) return base * 1000;
+  }
+
+  return undefined;
+}
+
 function extractMonto(text: string): number | undefined {
   const normalized = normalize(text);
 
@@ -88,6 +216,7 @@ function extractMonto(text: string): number | undefined {
 
   const patterns = [
     /\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/,
+    /(?:gast[eé]|pagu[eé])\s*(?:ayer|hoy|ante\s*ayer)?\s*(?:un\s+)?(?:gasto\s+(?:de\s+)?)?\$?\s*(\d+(?:[.,]\d+)?)/,
     /(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)\s*(?:pesos?|ars)\b/,
     /(?:gasto|gaste|pague|pague|compre|por|de)\s+(?:un\s+)?(?:gasto\s+)?(?:de\s+)?(\d{1,3}(?:\.\d{3})+|\d+(?:,\d{1,2})?)/,
     /\b(\d{1,3}(?:\.\d{3})+)\b/,
@@ -101,7 +230,7 @@ function extractMonto(text: string): number | undefined {
     if (!Number.isNaN(amount) && amount > 0) return amount;
   }
 
-  return undefined;
+  return extractMontoFromWords(text);
 }
 
 function extractFecha(text: string, referencia: string): string | undefined {
@@ -174,7 +303,15 @@ function scoreRubro(rubro: Rubro, normalizedText: string): number {
 
   for (const entry of RUBRO_KEYWORDS) {
     if (!entry.keywords.test(normalizedText)) continue;
-    if (entry.codes.some((code) => codigo === normalize(code) || nombre.includes(normalize(code)))) {
+    if (
+      entry.codes.some((code) => {
+        const codeNorm = normalize(code);
+        return (
+          (codigo && codigo === codeNorm) ||
+          (nombre && (nombre.includes(codeNorm) || codeNorm.includes(nombre)))
+        );
+      })
+    ) {
       score += 3;
     }
   }
@@ -261,6 +398,11 @@ function stripKnownFragments(text: string): string {
 function extractDescripcion(text: string): string | undefined {
   const normalized = normalize(text);
 
+  const superMatch = normalized.match(/\b(?:en\s+(?:el\s+)?)?(super(?:mercado)?|almacen|farmacia|restaurante?)\b/);
+  if (superMatch?.[1]) {
+    return capitalizePhrase(superMatch[1] === 'super' ? 'Supermercado' : superMatch[1]);
+  }
+
   const enMatch = normalized.match(
     /(?:en\s+(?:el|la|los|las)\s+)?([a-z][a-z\s]{1,30}?)(?:\s+pagando|\s+con\s+|\s+por\s+\d|\s*$)/,
   );
@@ -281,7 +423,7 @@ function capitalizePhrase(text: string): string {
 }
 
 export function parseGastoDictado(context: ParseGastoDictadoContext): ParsedGastoDictado {
-  const texto = context.texto.trim();
+  const texto = preprocessDictadoText(context.texto.trim());
   const fechaReferencia = context.fechaReferencia ?? getFechaHoy();
   const camposDetectados: string[] = [];
   const advertencias: string[] = [];

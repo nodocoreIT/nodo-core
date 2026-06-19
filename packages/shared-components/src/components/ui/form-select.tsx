@@ -61,15 +61,21 @@ export function FormSelect({
   emptyLabel = "—",
   "aria-label": ariaLabel,
 }: FormSelectProps) {
-  const radixValue = resolveRadixValue(value, options, allowEmpty);
+  const emptyOption = options.find((option) => option.value === "");
+  const safeOptions = options.filter((option) => option.value !== "");
+  const resolvedAllowEmpty = allowEmpty || emptyOption !== undefined;
+  const resolvedEmptyLabel = emptyLabel ?? emptyOption?.label ?? "—";
+
+  const radixValue = resolveRadixValue(value, safeOptions, resolvedAllowEmpty);
 
   useEffect(() => {
     const safe = value ?? "";
-    const isValidOption = safe !== "" && options.some((option) => option.value === safe);
+    const isValidOption =
+      safe !== "" && safeOptions.some((option) => option.value === safe);
     if (isValidOption || safe === "") return;
 
-    onChange(allowEmpty ? "" : options[0]?.value ?? "");
-  }, [value, options, allowEmpty, onChange]);
+    onChange(resolvedAllowEmpty ? "" : safeOptions[0]?.value ?? "");
+  }, [value, safeOptions, resolvedAllowEmpty, onChange]);
 
   return (
     <div className={cn("relative", className)}>
@@ -86,10 +92,10 @@ export function FormSelect({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {allowEmpty && (
-            <SelectItem value={EMPTY_SELECT_VALUE}>{emptyLabel}</SelectItem>
+          {resolvedAllowEmpty && (
+            <SelectItem value={EMPTY_SELECT_VALUE}>{resolvedEmptyLabel}</SelectItem>
           )}
-          {options.map((option) => (
+          {safeOptions.map((option) => (
             <SelectItem
               key={option.value}
               value={option.value}

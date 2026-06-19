@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AdminPortalPage } from "@/portals/admin/admin-portal-page";
 import { AuthCallbackPage } from "@/features/auth/callback/auth-callback-page";
 import { useAuth } from "@/shared/hooks/use-auth";
@@ -16,20 +16,36 @@ function UnauthenticatedRedirect() {
   return null;
 }
 
+/** Hide splash once auth is ready and on every client-side navigation. */
+function SplashAutoHide({ loading }: { loading: boolean }) {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (loading) return;
+    hideAppSplash();
+  }, [loading, location.pathname]);
+
+  return null;
+}
+
 export function AppRouter() {
   const { session, loading } = useAuth();
 
   useEffect(() => {
     if (loading) return;
-    const onCallback = window.location.pathname.includes("/auth/callback");
-    if (!onCallback) hideAppSplash();
+    hideAppSplash();
   }, [loading]);
 
-  // Keep index.html splash visible while auth resolves (avoids bg-paper flash).
+  useEffect(() => {
+    const failSafe = window.setTimeout(() => hideAppSplash(), 10_000);
+    return () => window.clearTimeout(failSafe);
+  }, []);
+
   if (loading) return null;
 
   return (
     <BrowserRouter basename="/finanzas">
+      <SplashAutoHide loading={loading} />
       <Routes>
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route

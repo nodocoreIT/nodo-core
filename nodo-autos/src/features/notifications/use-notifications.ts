@@ -40,4 +40,8 @@ export const AUTOS_NOTIFICATION_KIND_STYLES = {
     icon: Calendar,
     iconColor: "text-sky-600 bg-sky-50",
   },
+  default: {
+    icon: AlertTriangle,
+    iconColor: "text-slate2 bg-slate-100",
+  },
 } as const;

@@ -18,10 +18,11 @@ export interface NotificationKindStyle {
 
 export interface NotificationsDropdownProps {
   items: AppNotification[];
-  count: number;
   loading?: boolean;
   error?: string | null;
   kindStyles: Record<string, NotificationKindStyle>;
   onNavigate: (href: string) => void;
   headerRingClass?: string;
+  /** localStorage scope for dismissed notifications (per nodo). */
+  storageKey?: string;
 }

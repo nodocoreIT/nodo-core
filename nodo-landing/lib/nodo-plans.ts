@@ -1,6 +1,6 @@
 export type PlanTier = "starter" | "pro";
 
-export type NodoStatus = "development" | "planned" | "not_started";
+export type NodoStatus = "available" | "development" | "planned" | "not_started";
 
 export interface PlanPricing {
   monthly: number;
@@ -34,7 +34,7 @@ export const NODO_PLANS: NodoPlanConfig[] = [
   {
     slug: "inmo",
     label: "Nodo Inmo",
-    status: "development",
+    status: "available",
     description: "Gestión inmobiliaria de nueva generación, con respaldo de martilleros públicos.",
     plans: {
       starter: { monthly: 75, annual: 65, currency: "USD" },
@@ -105,8 +105,26 @@ export const NODO_PLANS: NodoPlanConfig[] = [
   {
     slug: "obra",
     label: "Nodo Obra",
-    status: "not_started",
+    status: "development",
     description: "Administración de proyectos constructivos: avances, gastos, registros y pagos.",
+  },
+  {
+    slug: "autos",
+    label: "Nodo Autos",
+    status: "available",
+    description: "Gestión de concesionarias: stock de vehículos, clientes, publicaciones y contratos.",
+  },
+  {
+    slug: "clinica",
+    label: "Nodo Clínica",
+    status: "development",
+    description: "Telemedicina profesional: consultorios virtuales, recetas digitales e informes con IA.",
+  },
+  {
+    slug: "finanzas",
+    label: "Nodo Finanzas",
+    status: "available",
+    description: "Finanzas personales: gastos, tarjetas, préstamos, planes de ahorro e informe mensual.",
   },
   {
     slug: "contable",
@@ -120,25 +138,25 @@ export const NODO_PLANS: NodoPlanConfig[] = [
     status: "not_started",
     description: "Plataforma de comercio digital integrada al ecosistema NODO.",
   },
-  {
-    slug: "automotores",
-    label: "Nodo Automotores",
-    status: "not_started",
-    description: "Gestión de concesionarias y compraventa de vehículos.",
-  },
 ];
 
 export function getNodoPlanBySlug(slug: string): NodoPlanConfig | undefined {
   return NODO_PLANS.find((n) => n.slug === slug);
 }
 
+export function isNodoPlanAccessible(status: NodoStatus): boolean {
+  return status === "available" || status === "development";
+}
+
 export const STATUS_LABEL: Record<NodoStatus, string> = {
+  available: "Disponible",
   development: "En desarrollo",
   planned: "Planificado",
   not_started: "Sin comenzar",
 };
 
 export const STATUS_COLOR: Record<NodoStatus, { bg: string; text: string }> = {
+  available: { bg: "rgba(31, 138, 91, 0.15)", text: "#1F8A5B" },
   development: { bg: "rgba(218,90,14,.15)", text: "var(--color-brand)" },
   planned: { bg: "rgba(45,140,255,.12)", text: "rgba(100,180,255,.9)" },
   not_started: { bg: "rgba(255,255,255,.06)", text: "rgba(234,240,247,.4)" },

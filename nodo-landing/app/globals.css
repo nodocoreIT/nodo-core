@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+@source "../../packages/shared-components/src/**/*.{ts,tsx}";
+@source "../../packages/nodo-modules/src/**/*.{ts,tsx}";
+
 /* Brand tokens stay as CSS vars (not inline) so login can override per nodo. */
 @theme {
   /* Colors */
@@ -16,6 +19,14 @@
   --color-mist-200: #EBF1F7;
   --color-ink: #16202E;
   --color-footer: #0D1722;
+  --color-border: #DEE7F1;
+  --color-foreground: #16202E;
+  --color-primary-foreground: #ffffff;
+  --color-background: #F5F8FC;
+  --color-card: #ffffff;
+  --color-card-foreground: #16202E;
+  --color-muted: #EBF1F7;
+  --color-muted-foreground: #647890;
 
   /* Fonts */
   --font-display: var(--font-sora), system-ui, sans-serif;
@@ -38,6 +49,9 @@
   --brand-glow: rgba(218, 90, 14, 0.4);
   --brand-glow-strong: rgba(218, 90, 14, 0.55);
   --brand-glow-soft: rgba(218, 90, 14, 0.2);
+  --color-sidebar-bg: var(--color-navy-900);
+  --color-sidebar-border: rgba(255, 255, 255, 0.1);
+  --color-sidebar-text: rgba(234, 240, 247, 0.72);
 }
 
 @layer utilities {
@@ -151,14 +165,6 @@ h1, h2, h3, h4 {
 }
 
 /* Panel responsive */
-@media (max-width: 920px) {
-  .panel-grid {
-    grid-template-columns: 1fr !important;
-  }
-  .panel-sidebar {
-    display: none !important;
-  }
-}
 @media (max-width: 1180px) {
   .kanban-board {
     grid-template-columns: repeat(2, minmax(240px, 1fr)) !important;

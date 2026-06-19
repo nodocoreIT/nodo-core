@@ -201,7 +201,7 @@ export const NODES: NodeDef[] = [
   {
     code: "Finanzas",
     slug: "finanzas",
-    label: "Nodo Finanzas Personales",
+    label: "Nodo Finanzas",
     parentSlug: "it",
     inDevelopment: false,
     description:
