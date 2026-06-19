@@ -1,7 +1,18 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
+import {
+  getNodoAuthCode,
+  nodoAuthProjectParam,
+} from "@/lib/supabase/nodo-auth-config";
+import {
+  RECOVERY_COOKIE_MAX_AGE,
+  RECOVERY_PROJECT_COOKIE,
+  RECOVERY_RETURN_COOKIE,
+} from "@/lib/auth/recovery-cookies";
 import {
   sendContactEmail,
   sendRegistrationVerificationEmail,
@@ -125,14 +136,34 @@ export async function requestPasswordReset(
   }
 
   try {
-    const admin = createAdminClient();
+    const authCode = getNodoAuthCode(nodeSlug);
+    const nodoAdmin = authCode ? createNodoAdminClient(authCode) : null;
+    const admin = nodoAdmin ?? createAdminClient();
     const nodeLabel = getNodeMailLabel(nodeSlug);
     const loginPath = loginPathOverride?.trim() || getNodeLoginPath(nodeSlug);
     const baseOrigin = resolveRegistrationOrigin(origin);
 
-    // Supabase PKCE recovery lands on /auth/confirm with token_hash, then we redirect to node login.
     const loginReturn = `${loginPath}?mode=reset-password`;
-    const redirectToUrl = `${baseOrigin}/auth/confirm?next=${encodeURIComponent(loginReturn)}`;
+    const project = nodoAuthProjectParam(authCode);
+    const confirmQuery = project
+      ? `project=${encodeURIComponent(project)}&next=${encodeURIComponent(loginReturn)}`
+      : `next=${encodeURIComponent(loginReturn)}`;
+    const redirectToUrl = `${baseOrigin}/auth/confirm?${confirmQuery}`;
+
+    const cookieStore = await cookies();
+    cookieStore.set(RECOVERY_RETURN_COOKIE, loginReturn, {
+      path: "/",
+      maxAge: RECOVERY_COOKIE_MAX_AGE,
+      sameSite: "lax",
+    });
+    if (project) {
+      cookieStore.set(RECOVERY_PROJECT_COOKIE, project, {
+        path: "/",
+        maxAge: RECOVERY_COOKIE_MAX_AGE,
+        sameSite: "lax",
+      });
+    }
+
     let { data, error } = await admin.auth.admin.generateLink({
       type: "recovery",
       email: email.trim(),

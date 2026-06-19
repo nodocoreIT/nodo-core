@@ -6,6 +6,7 @@ import { VehicleFormPage } from "@/features/vehicles/vehicle-form-page";
 import { VehicleDetailPage } from "@/features/vehicles/vehicle-detail-page";
 import { CustomersListPage } from "@/features/customers/customers-list-page";
 import { PublicationsPage } from "@/features/publications/publications-page";
+import { PublicationDetailPage } from "@/features/publications/publication-detail-page";
 import { ConfigPage } from "@/features/config/config-page";
 import { ContractsPage } from "@/features/contracts/contracts-page";
 
@@ -21,6 +22,7 @@ export function AdminPortalPage() {
         <Route path="vehiculos/:id/editar" element={<VehicleFormPage />} />
         <Route path="clientes" element={<CustomersListPage />} />
         <Route path="publicaciones" element={<PublicationsPage />} />
+        <Route path="publicaciones/:id" element={<PublicationDetailPage />} />
         <Route path="contratos" element={<ContractsPage />} />
         <Route path="configuracion" element={<ConfigPage />} />
       </Route>

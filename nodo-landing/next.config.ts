@@ -12,6 +12,7 @@ const NODO_FINANZAS_URL = process.env.NODO_FINANZAS_URL ?? "http://localhost:517
 const isDev = process.env.NODE_ENV !== "production";
 
 const nextConfig: NextConfig = {
+  transpilePackages: ["@nodocore/shared-components"],
   allowedDevOrigins: ["127.0.0.1", "192.168.1.37"],
   // Bundle the SPA index.html files into the Lambda so Route Handlers
   // can serve them via readFileSync. On Vercel, public/ is on the CDN

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getNodeRegistrationConfig, isSelfServicePlan } from "@/lib/registration/node-config";
-import { ensureLandingAuthUser } from "@/lib/registration/provision";
+import {
+  ensureLandingAuthUser,
+  provisionNodoAccess,
+} from "@/lib/registration/provision";
 
 const ONBOARDING_TTL_HOURS = 72;
 
@@ -251,16 +254,48 @@ export async function GET(request: NextRequest) {
     }
 
     if (selfService && row.password) {
-      const userRole =
-        row.plan === "paciente" ? "paciente" : row.plan === "inmo" ? "inmo" : "medico";
+      let provisionUserId: string | null = null;
 
-      await ensureLandingAuthUser(
-        admin,
-        row.email,
-        row.password,
-        row.full_name,
-        userRole,
-      );
+      if (unitCode.toLowerCase() === "finanzas") {
+        const provision = await provisionNodoAccess({
+          nodoCode: unitCode,
+          clientName: row.full_name,
+          email: row.email,
+          password: row.password,
+          plan: row.plan,
+        });
+        if (!provision.ok || !provision.user_id) {
+          console.error("finanzas provision on verify:", provision.error);
+          return NextResponse.redirect(
+            new URL(
+              `/${redirectSlug}/login?error=No+se+pudo+activar+tu+cuenta.+Contacta+soporte.`,
+              request.url,
+            ),
+          );
+        }
+        provisionUserId = provision.user_id;
+      } else {
+        const userRole =
+          row.plan === "paciente" ? "paciente" : row.plan === "inmo" ? "inmo" : "medico";
+
+        provisionUserId = await ensureLandingAuthUser(
+          admin,
+          row.email,
+          row.password,
+          row.full_name,
+          userRole,
+        );
+      }
+
+      if (provisionUserId && clientUnitId) {
+        await admin
+          .from("client_units")
+          .update({
+            provision_user_id: provisionUserId,
+            provisioned_at: new Date().toISOString(),
+          })
+          .eq("id", clientUnitId);
+      }
     }
 
     await admin

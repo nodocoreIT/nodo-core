@@ -1,6 +1,7 @@
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createNodoServerClient } from "@/lib/supabase/nodo-server";
 
 /** Exchange Supabase recovery/sign-in tokens and redirect to the target page. */
 export async function GET(request: NextRequest) {
@@ -9,6 +10,7 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type") as EmailOtpType | null;
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/";
+  const project = searchParams.get("project");
 
   const redirectTarget = new URL(next, request.url);
 
@@ -17,7 +19,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(redirectTarget);
   };
 
-  const supabase = await createClient();
+  const supabase = project
+    ? await createNodoServerClient(project)
+    : await createClient();
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);

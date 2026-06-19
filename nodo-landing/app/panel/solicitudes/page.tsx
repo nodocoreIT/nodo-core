@@ -40,6 +40,24 @@ type IdentityCheck = {
   created_at: string;
 };
 
+type ClientUnitRow = {
+  id: string;
+  client_id: string;
+  unit_code: string;
+  plan: string | null;
+  status: string;
+  created_at: string;
+  docs_verified_at: string | null;
+  admin_notes: string | null;
+};
+
+type ClientRow = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+};
+
 type Solicitud = {
   id: string;
   client_id: string;
@@ -97,7 +115,7 @@ export default function SolicitudesPage() {
         .order("created_at", { ascending: false }),
     ]);
 
-    const unitIds = (units ?? []).map((u) => u.id);
+    const unitIds = (units ?? []).map((u: ClientUnitRow) => u.id);
     let docsByUnit: Record<string, VerificationDoc[]> = {};
 
     if (unitIds.length > 0) {
@@ -110,8 +128,10 @@ export default function SolicitudesPage() {
       }
     }
 
-    const clientMap = new Map((clients ?? []).map((c) => [c.id, c]));
-    const profileMap = new Map((profiles ?? []).map((p) => [p.client_unit_id, p]));
+    const clientMap = new Map((clients ?? []).map((c: ClientRow) => [c.id, c]));
+    const profileMap = new Map(
+      (profiles ?? []).map((p: OnboardingProfile & { client_unit_id: string }) => [p.client_unit_id, p]),
+    );
     const identityMap = new Map<string, IdentityCheck>();
     for (const check of identityChecks ?? []) {
       if (!identityMap.has(check.client_unit_id)) {
@@ -119,7 +139,7 @@ export default function SolicitudesPage() {
       }
     }
 
-    const rows: Solicitud[] = (units ?? []).map((u) => ({
+    const rows: Solicitud[] = (units ?? []).map((u: ClientUnitRow) => ({
       ...u,
       client: clientMap.get(u.client_id) ?? null,
       profile: profileMap.get(u.id) ?? null,

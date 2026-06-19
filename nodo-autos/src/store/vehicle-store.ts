@@ -97,6 +97,8 @@ type VehicleRow = {
   documents: Vehicle['documents'] | null;
   is_published: boolean;
   public_slug: string;
+  social_title: string | null;
+  social_description: string | null;
   internal_notes: string | null;
   responsible_user_id: string | null;
   tags: string[] | null;
@@ -111,6 +113,7 @@ type PublicationRow = {
   vehicle_id: string;
   channel: Publication['channel'];
   status: Publication['status'];
+  external_id: string | null;
   post_link: string | null;
   post_text: string | null;
   hashtags: string[] | null;
@@ -252,6 +255,8 @@ export const mapVehicleRow = (row: VehicleRow): Vehicle => ({
   photos: row.photos ?? [],
   isPublished: row.is_published,
   publicSlug: row.public_slug,
+  socialTitle: row.social_title ?? undefined,
+  socialDescription: row.social_description ?? undefined,
   internalNotes: row.internal_notes ?? undefined,
   responsibleUserId: row.responsible_user_id ?? undefined,
   tags: row.tags ?? [],
@@ -267,6 +272,7 @@ const mapPublicationRow = (row: PublicationRow): Publication => ({
   vehicleId: row.vehicle_id,
   channel: row.channel,
   status: row.status,
+  externalId: row.external_id ?? undefined,
   postLink: row.post_link ?? undefined,
   postText: row.post_text ?? undefined,
   hashtags: row.hashtags ?? undefined,
@@ -354,6 +360,8 @@ export const toVehicleInsert = (
   photos: data.photos ?? [],
   is_published: data.isPublished,
   public_slug: data.publicSlug,
+  social_title: data.socialTitle ?? null,
+  social_description: data.socialDescription ?? null,
   internal_notes: data.internalNotes ?? null,
   responsible_user_id: data.responsibleUserId ?? null,
   tags: data.tags ?? [],
@@ -398,6 +406,8 @@ const toVehicleUpdate = (
   if (updates.photos !== undefined) row.photos = updates.photos ?? [];
   if (updates.isPublished !== undefined) row.is_published = updates.isPublished;
   if (updates.publicSlug !== undefined) row.public_slug = updates.publicSlug;
+  if (updates.socialTitle !== undefined) row.social_title = updates.socialTitle ?? null;
+  if (updates.socialDescription !== undefined) row.social_description = updates.socialDescription ?? null;
   if (updates.internalNotes !== undefined) row.internal_notes = updates.internalNotes ?? null;
   if (updates.responsibleUserId !== undefined) row.responsible_user_id = updates.responsibleUserId ?? null;
   if (updates.tags !== undefined) row.tags = updates.tags ?? [];
@@ -410,6 +420,7 @@ const toPublicationInsert = (data: Omit<Publication, 'id' | 'createdAt'>): Parti
   vehicle_id: data.vehicleId,
   channel: data.channel,
   status: data.status,
+  external_id: data.externalId ?? null,
   post_link: data.postLink ?? null,
   post_text: data.postText ?? null,
   hashtags: data.hashtags ?? null,
@@ -417,11 +428,10 @@ const toPublicationInsert = (data: Omit<Publication, 'id' | 'createdAt'>): Parti
   error_message: data.errorMessage ?? null,
 });
 
-const toPublicationUpdate = (updates: Partial<Publication>): Partial<PublicationRow> => {
+const toPublicationUpdate = (updates: PublicationChannelUpdates): Partial<PublicationRow> => {
   const row: Partial<PublicationRow> = {};
-  if (updates.vehicleId !== undefined) row.vehicle_id = updates.vehicleId;
-  if (updates.channel !== undefined) row.channel = updates.channel;
   if (updates.status !== undefined) row.status = updates.status;
+  if (updates.externalId !== undefined) row.external_id = updates.externalId ?? null;
   if (updates.postLink !== undefined) row.post_link = updates.postLink ?? null;
   if (updates.postText !== undefined) row.post_text = updates.postText ?? null;
   if (updates.hashtags !== undefined) row.hashtags = updates.hashtags ?? null;
@@ -495,6 +505,16 @@ const configuredClienteId =
   (import.meta.env.VITE_TEST_TENANT_ID as string | undefined)?.trim() ||
   null;
 
+type PublicationChannelUpdates = {
+  status?: Publication['status'];
+  externalId?: string | null;
+  postLink?: string | null;
+  postText?: string | null;
+  hashtags?: string[];
+  lastPublishedAt?: string | null;
+  errorMessage?: string | null;
+};
+
 interface VehicleStoreState {
   loading: boolean;
   error: string | null;
@@ -521,6 +541,11 @@ interface VehicleStoreState {
   publications: Publication[];
   addPublication: (publication: Omit<Publication, 'id' | 'createdAt'>) => Promise<void>;
   updatePublication: (id: string, updates: Partial<Publication>) => Promise<void>;
+  upsertPublicationForChannel: (
+    vehicleId: string,
+    channel: Publication['channel'],
+    updates: PublicationChannelUpdates,
+  ) => Promise<Publication>;
   getPublicationsByVehicle: (vehicleId: string) => Publication[];
 
   // Audit Logs
@@ -843,6 +868,48 @@ export const useVehicleStore = create<VehicleStoreState>()(
           }));
         } catch (error) {
           set({ error: normalizeError(error, 'Error al actualizar la publicación') });
+          throw error;
+        }
+      },
+
+      upsertPublicationForChannel: async (vehicleId, channel, updates) => {
+        try {
+          set({ error: null });
+          const existing = get().publications.find((p) => p.vehicleId === vehicleId && p.channel === channel);
+          if (existing) {
+            const payload = toPublicationUpdate(updates);
+            const { data, error } = await supabase
+              .from('publications')
+              .update(payload)
+              .eq('id', existing.id)
+              .select('*')
+              .single();
+            if (error) throw error;
+            const mapped = mapPublicationRow(data as PublicationRow);
+            set((state) => ({
+              publications: state.publications.map((p) => (p.id === existing.id ? mapped : p)),
+            }));
+            return mapped;
+          }
+
+          const payload = toPublicationInsert({
+            vehicleId,
+            channel,
+            status: updates.status ?? 'borrador',
+            externalId: updates.externalId ?? undefined,
+            postLink: updates.postLink ?? undefined,
+            postText: updates.postText ?? undefined,
+            hashtags: updates.hashtags,
+            lastPublishedAt: updates.lastPublishedAt ?? undefined,
+            errorMessage: updates.errorMessage ?? undefined,
+          });
+          const { data, error } = await supabase.from('publications').insert(payload).select('*').single();
+          if (error) throw error;
+          const mapped = mapPublicationRow(data as PublicationRow);
+          set((state) => ({ publications: [...state.publications, mapped] }));
+          return mapped;
+        } catch (error) {
+          set({ error: normalizeError(error, 'Error al guardar la publicación') });
           throw error;
         }
       },

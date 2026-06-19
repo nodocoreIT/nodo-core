@@ -416,6 +416,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.4)
+      '@nodocore/shared-components':
+        specifier: workspace:*
+        version: link:../packages/shared-components
       '@supabase/ssr':
         specifier: ^0.10.3
         version: 0.10.3(@supabase/supabase-js@2.108.1)

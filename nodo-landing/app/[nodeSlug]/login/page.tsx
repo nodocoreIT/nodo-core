@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import EcosystemDiagram from "@/components/EcosystemDiagram";
 import { Layers } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { getNodeBySlug } from "@/lib/nodes";
+import {
+  PasswordResetPanel,
+  usePasswordRecoveryBootstrap,
+} from "@nodocore/shared-components";
+import { createNodeBrowserClient } from "@/lib/supabase/nodo-browser";
+import { getNodeBySlug, getNodeMailLabel } from "@/lib/nodes";
 import {
   submitDoctorRegistration,
   submitPatientRegistration,
@@ -194,6 +198,22 @@ function LoginForm() {
   const modeParam = searchParams.get("mode") || "login";
   const roleParam = searchParams.get("role") || "paciente";
 
+  const authSupabase = useMemo(
+    () => createNodeBrowserClient(nodeParam),
+    [nodeParam],
+  );
+
+  const initialAuthMode =
+    modeParam === "reset-password"
+      ? "reset-password"
+      : modeParam === "first-access"
+        ? "first-access"
+        : modeParam === "register"
+          ? "register"
+          : modeParam === "forgot"
+            ? "forgot"
+            : "login";
+
   const isClinicaNode =
     nodeParam === "nodo-clinica" ||
     nodeParam === "clinica-virtual" ||
@@ -206,19 +226,7 @@ function LoginForm() {
 
   // Modes: "login" or "register" (only for clinica-virtual)
   // Modes: "login", "register", "forgot" or "reset-password"
-  const [authMode, setAuthMode] = useState<
-    "login" | "register" | "forgot" | "reset-password" | "first-access"
-  >(
-    modeParam === "reset-password"
-      ? "reset-password"
-      : modeParam === "first-access"
-        ? "first-access"
-        : modeParam === "register"
-          ? "register"
-          : modeParam === "forgot"
-            ? "forgot"
-            : "login",
-  );
+  // authMode is driven by usePasswordRecoveryBootstrap (+ manual toggles below)
   // Register role: "paciente" or "medico"
   const [registerRole, setRegisterRole] = useState<"paciente" | "medico">(
     roleParam === "medico" ? "medico" : "paciente",
@@ -237,6 +245,19 @@ function LoginForm() {
   const [nameError, setNameError] = useState("");
   const [generalError, setGeneralError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const {
+    authMode,
+    setAuthMode,
+    bootstrapping: recoveryBootstrapping,
+  } = usePasswordRecoveryBootstrap({
+    supabase: authSupabase,
+    modeParam,
+    searchParams,
+    initialMode: initialAuthMode,
+    onError: (message) => setGeneralError(message),
+  });
+
   const [transitionTarget, setTransitionTarget] = useState<{
     label: string;
     code: string;
@@ -269,172 +290,12 @@ function LoginForm() {
   const urlError = searchParams.get("error");
   const showResend = searchParams.get("resend") === "1";
   const [resendLoading, setResendLoading] = useState(false);
-  const [recoveryBootstrapping, setRecoveryBootstrapping] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const params = new URLSearchParams(window.location.search);
-    return (
-      window.location.hash.includes("type=recovery") ||
-      params.has("code") ||
-      params.has("token_hash") ||
-      params.get("mode") === "reset-password"
-    );
-  });
 
   useEffect(() => {
     if (urlError && authMode !== "reset-password") {
       setGeneralError(decodeURIComponent(urlError.replace(/\+/g, " ")));
     }
   }, [urlError, authMode]);
-
-  function clearRecoveryUrlError() {
-    setGeneralError("");
-    const url = new URL(window.location.href);
-    if (url.searchParams.has("error")) {
-      url.searchParams.delete("error");
-      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-    }
-  }
-
-  useEffect(() => {
-    const supabase = createClient();
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setAuthMode("reset-password");
-        setRecoveryBootstrapping(false);
-        clearRecoveryUrlError();
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function bootstrapRecoverySession() {
-      const tokenHash = searchParams.get("token_hash");
-      const recoveryType = searchParams.get("type");
-      const shouldBootstrap =
-        modeParam === "reset-password" ||
-        window.location.hash.includes("type=recovery") ||
-        searchParams.has("code") ||
-        (tokenHash !== null && recoveryType === "recovery");
-
-      if (!shouldBootstrap) {
-        setRecoveryBootstrapping(false);
-        return;
-      }
-
-      setRecoveryBootstrapping(true);
-      const supabase = createClient();
-
-      if (tokenHash && recoveryType === "recovery") {
-        const { error } = await supabase.auth.verifyOtp({
-          type: "recovery",
-          token_hash: tokenHash,
-        });
-        if (cancelled) return;
-        if (error) {
-          setGeneralError(
-            "El enlace de recuperación expiró o ya fue usado. Solicitá uno nuevo.",
-          );
-          setRecoveryBootstrapping(false);
-          return;
-        }
-        setAuthMode("reset-password");
-        const url = new URL(window.location.href);
-        url.searchParams.delete("token_hash");
-        url.searchParams.delete("type");
-        window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-        clearRecoveryUrlError();
-        setRecoveryBootstrapping(false);
-        return;
-      }
-
-      const code = searchParams.get("code");
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (cancelled) return;
-        if (error) {
-          setGeneralError(
-            "El enlace de recuperación expiró o ya fue usado. Solicitá uno nuevo.",
-          );
-          setRecoveryBootstrapping(false);
-          return;
-        }
-        setAuthMode("reset-password");
-        const url = new URL(window.location.href);
-        url.searchParams.delete("code");
-        window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-        clearRecoveryUrlError();
-        setRecoveryBootstrapping(false);
-        return;
-      }
-
-      const hash = window.location.hash.substring(1);
-      if (hash) {
-        const params = new URLSearchParams(hash);
-        const accessToken = params.get("access_token");
-        const refreshToken = params.get("refresh_token");
-        const type = params.get("type");
-
-        if (accessToken && refreshToken) {
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          if (cancelled) return;
-          if (error) {
-            setGeneralError("No se pudo validar el enlace de recuperación.");
-            setRecoveryBootstrapping(false);
-            return;
-          }
-        }
-
-        if (type === "recovery" || modeParam === "reset-password") {
-          setAuthMode("reset-password");
-          window.history.replaceState(
-            null,
-            "",
-            `${window.location.pathname}${window.location.search}`,
-          );
-          clearRecoveryUrlError();
-          setRecoveryBootstrapping(false);
-          return;
-        }
-      }
-
-      if (modeParam === "reset-password") {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (cancelled) return;
-        if (user) {
-          setAuthMode("reset-password");
-          clearRecoveryUrlError();
-        } else {
-          // La sesión puede llegar un instante después vía cookies / PASSWORD_RECOVERY.
-          await new Promise((resolve) => setTimeout(resolve, 600));
-          if (cancelled) return;
-          const {
-            data: { user: retryUser },
-          } = await supabase.auth.getUser();
-          if (retryUser) {
-            setAuthMode("reset-password");
-            clearRecoveryUrlError();
-          }
-        }
-      }
-
-      setRecoveryBootstrapping(false);
-    }
-
-    bootstrapRecoverySession();
-    return () => {
-      cancelled = true;
-    };
-  }, [modeParam, searchParams]);
 
   function unitCodeForResend(): string {
     if (isAutosNode) return "Autos";
@@ -520,22 +381,24 @@ function LoginForm() {
     }
     const needsPassword =
       authMode === "login" ||
-      (authMode === "register" && isClinicaNode && registerRole === "paciente");
+      (authMode === "register" && isClinicaNode && registerRole === "paciente") ||
+      (authMode === "register" && isFinanzasNode);
 
-    if (needsPassword && password.trim().length < 4) {
-      setPasswordError(
-        authMode === "login"
-          ? "Ingrese su contraseña."
-          : "La contraseña debe tener al menos 6 caracteres.",
-      );
-      valid = false;
+    if (needsPassword) {
+      if (authMode === "login" && password.trim().length < 4) {
+        setPasswordError("Ingrese su contraseña.");
+        valid = false;
+      } else if (authMode === "register" && password.trim().length < 6) {
+        setPasswordError("La contraseña debe tener al menos 6 caracteres.");
+        valid = false;
+      }
     }
     if (!valid) return;
 
     setLoading(true);
 
     if (authMode === "login") {
-      const supabase = createClient();
+      const supabase = authSupabase;
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password.trim(),
@@ -626,6 +489,7 @@ function LoginForm() {
           email,
           plan,
           origin: originUrl,
+          password: isFinanzasNode ? password.trim() : undefined,
         });
 
         if (result.status === "error") {
@@ -693,7 +557,7 @@ function LoginForm() {
 
   const handleGoogleRegister = async () => {
     setLoading(true);
-    const supabase = createClient();
+    const supabase = authSupabase;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -708,7 +572,7 @@ function LoginForm() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    const supabase = createClient();
+    const supabase = authSupabase;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -790,7 +654,7 @@ function LoginForm() {
       return;
     }
 
-    const supabase = createClient();
+    const supabase = authSupabase;
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password: password.trim(),
@@ -823,36 +687,14 @@ function LoginForm() {
     }
   }
 
-  async function handleResetPasswordSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setPasswordError("");
-    setGeneralError("");
-
-    if (password.trim().length < 6) {
-      setPasswordError("La contraseña debe tener al menos 6 caracteres.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setPasswordError("Las contraseñas no coinciden.");
-      return;
-    }
-
-    setLoading(true);
-    const supabase = createClient();
-
-    const { error } = await supabase.auth.updateUser({
-      password: password.trim(),
+  async function handleResetPassword(newPassword: string): Promise<string | null> {
+    const { error } = await authSupabase.auth.updateUser({
+      password: newPassword,
     });
 
-    if (error) {
-      setGeneralError(error.message);
-      setLoading(false);
-      return;
-    }
+    if (error) return error.message;
 
-    await supabase.auth.signOut();
-    setPassword("");
-    setConfirmPassword("");
+    await authSupabase.auth.signOut();
     setSuccessModal({
       open: true,
       type: "reset_success",
@@ -860,7 +702,7 @@ function LoginForm() {
         "Tu contraseña se restableció correctamente. Ya podés iniciar sesión con tu nueva clave.",
     });
     setAuthMode("login");
-    setLoading(false);
+    return null;
   }
 
   const inputBase =
@@ -1426,76 +1268,10 @@ function LoginForm() {
                 </div>
               </form>
             ) : authMode === "reset-password" ? (
-              <form onSubmit={handleResetPasswordSubmit} noValidate>
-                <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
-                  ◎ Restablecer contraseña
-                </span>
-                <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
-                  Nueva contraseña
-                </h1>
-                <p className="text-slate2 text-[14.5px] mb-6">
-                  Ingresá una nueva contraseña segura para tu cuenta.
-                </p>
-
-                <div className="mb-4">
-                  <label
-                    htmlFor="reset-pass"
-                    className="block text-[13px] font-semibold text-navy mb-1.5"
-                  >
-                    Nueva contraseña
-                  </label>
-                  <input
-                    id="reset-pass"
-                    type="password"
-                    placeholder="Mínimo 6 caracteres"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setPasswordError("");
-                    }}
-                    className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
-                  />
-                </div>
-
-                <div className="mb-4">
-                  <label
-                    htmlFor="reset-pass-confirm"
-                    className="block text-[13px] font-semibold text-navy mb-1.5"
-                  >
-                    Confirmar contraseña
-                  </label>
-                  <input
-                    id="reset-pass-confirm"
-                    type="password"
-                    placeholder="Repetí la contraseña"
-                    value={confirmPassword}
-                    onChange={(e) => {
-                      setConfirmPassword(e.target.value);
-                      setPasswordError("");
-                    }}
-                    className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
-                  />
-                  {passwordError && (
-                    <p className="text-[12.5px] text-[#C0392B] mt-1.5">
-                      {passwordError}
-                    </p>
-                  )}
-                </div>
-
-                {generalError && (
-                  <p className="text-[13px] text-[#C0392B] mb-3 text-center">
-                    {generalError}
-                  </p>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  {loading ? "Restableciendo…" : "Restablecer contraseña"}
-                </button>
-              </form>
+              <PasswordResetPanel
+                nodeLabel={getNodeMailLabel(nodeParam)}
+                onResetPassword={handleResetPassword}
+              />
             ) : (
               /* Register Mode */
               <div>
@@ -1585,8 +1361,40 @@ function LoginForm() {
                         )}
                       </div>
 
+                      {isFinanzasNode && (
+                        <>
+                          <div className="mb-3">
+                            <label
+                              htmlFor={`${simpleRegisterContent.idPrefix}-password`}
+                              className="block text-[13px] font-semibold text-navy mb-1.5"
+                            >
+                              Contraseña
+                            </label>
+                            <input
+                              id={`${simpleRegisterContent.idPrefix}-password`}
+                              type="password"
+                              placeholder="Mínimo 6 caracteres"
+                              value={password}
+                              onChange={(e) => {
+                                setPassword(e.target.value);
+                                setPasswordError("");
+                              }}
+                              className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
+                              autoComplete="new-password"
+                            />
+                            {passwordError && (
+                              <p className="text-[12.5px] text-[#C0392B] mt-1.5">
+                                {passwordError}
+                              </p>
+                            )}
+                          </div>
+                        </>
+                      )}
+
                       <p className="text-slate2 text-[12px] mb-4 text-center">
-                        Te enviaremos un correo para verificar tu email. La contraseña la configurás después de la habilitación.
+                        {isFinanzasNode
+                          ? "Te enviaremos un correo para verificar tu email y activar tu cuenta."
+                          : "Te enviaremos un correo para verificar tu email. La contraseña la configurás después de la habilitación."}
                       </p>
 
                       {generalError && (
