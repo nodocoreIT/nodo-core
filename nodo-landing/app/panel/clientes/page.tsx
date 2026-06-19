@@ -654,7 +654,7 @@ export default function ClientesPage() {
     display: "block",
   };
 
-  const modalSelectProps = { modal: false, contentClassName: "z-[200]" } as const;
+  const modalSelectProps = { contentClassName: "z-[200]" } as const;
 
   const allSelected = filtered.length > 0 && selected.size === filtered.length;
   const activeFormUnit = formUnits.find((u) => u.key === activeUnitKey) ?? formUnits[0];
