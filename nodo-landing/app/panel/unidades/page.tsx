@@ -111,17 +111,19 @@ function NodoCard({ nodo }: { nodo: NodoPlanConfig }) {
         {nodo.description}
       </p>
 
-      {nodo.plans && (
-        <div style={{ display: "flex", gap: 8, marginTop: "auto", flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, color: "var(--color-slate2)" }}>
-            Starter USD {nodo.plans.starter.monthly}/mes
-          </span>
-          <span style={{ fontSize: 12, color: "var(--color-slate2)" }}>·</span>
-          <span style={{ fontSize: 12, color: "var(--color-slate2)" }}>
-            Pro USD {nodo.plans.pro.monthly}/mes
+      {nodo.plans ? (
+        <div style={{ marginTop: "auto" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: accent.brand }}>
+            Configurar planes y funcionalidades →
           </span>
         </div>
-      )}
+      ) : isClickable ? (
+        <div style={{ marginTop: "auto" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: accent.brand }}>
+            Configurar planes →
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 
@@ -145,8 +147,8 @@ export default function UnidadesPage() {
       <Topbar breadcrumb="Nodo Core · Ecosistema" title="Unidades de negocio" />
       <div style={{ flex: 1, overflowY: "auto", padding: "28px 32px" }}>
         <p style={{ margin: "0 0 24px", fontSize: 14, color: "var(--color-slate2)", maxWidth: 720 }}>
-          Cada nodo es una unidad de negocio del ecosistema. Las tarjetas usan el color de marca de cada
-          módulo. Hacé click en las unidades activas para ver detalle y planes.
+          Cada nodo es una unidad de negocio del ecosistema. Entrá a una unidad para configurar planes,
+          precios y la matriz de funcionalidades incluidas en cada plan.
         </p>
 
         <section style={{ marginBottom: 32 }}>

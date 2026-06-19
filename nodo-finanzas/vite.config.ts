@@ -29,6 +29,12 @@ export default defineConfig({
     ],
     alias: {
       "@": resolve(__dirname, "./src"),
+      react: resolve(__dirname, "node_modules/react"),
+      "react-dom": resolve(__dirname, "node_modules/react-dom"),
+      "@tanstack/react-query": resolve(
+        __dirname,
+        "node_modules/@tanstack/react-query",
+      ),
       "@nodocore/shared-components/styles": resolve(
         monorepoRoot,
         "packages/shared-components/src/styles",

@@ -22,7 +22,6 @@ const AUTH_CONFIG = {
     marketing: "/admin",
   },
   unitCode: "Autos",
-  allowedRoles: ["administrador", "vendedor", "marketing"],
 };
 
 interface AppProvidersProps {

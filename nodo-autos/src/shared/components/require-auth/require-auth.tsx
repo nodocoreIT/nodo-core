@@ -4,24 +4,56 @@
  * Security note: This guard is a UX convenience ONLY. The actual security
  * boundary is Postgres Row-Level Security (RLS) enforced server-side.
  */
+import { useEffect, useState, type ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@nodocore/shared-components";
-import type { ReactNode } from "react";
+import { autosDb } from "@/shared/lib/supabase";
+
+const AUTOS_ROLES = new Set(["administrador", "vendedor", "marketing"]);
 
 interface RequireAuthProps {
   children: ReactNode;
 }
 
 export function RequireAuth({ children }: RequireAuthProps) {
-  const { isLoading, session, role } = useAuth();
+  const { isLoading, session } = useAuth();
+  const [autosRole, setAutosRole] = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
 
-  if (isLoading) return null;
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) {
+      setAutosRole(null);
+      setRoleLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setRoleLoading(true);
+
+    autosDb()
+      .from("users")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setAutosRole((data?.role as string | undefined) ?? null);
+        setRoleLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
+
+  if (isLoading || roleLoading) return null;
 
   if (!session) {
     return <Navigate to="/login" replace />;
   }
 
-  if (!role) {
+  if (!autosRole || !AUTOS_ROLES.has(autosRole)) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-paper px-4 text-center">
         <h2 className="text-2xl text-navy">Acceso pendiente</h2>
