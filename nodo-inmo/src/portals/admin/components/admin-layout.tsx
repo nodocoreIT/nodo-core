@@ -46,6 +46,7 @@ import { InmoSettingsModuleProvider } from "@/shared/lib/inmo-settings-module";
 import { FeedbackFAB } from "@/features/feedback/components/feedback-node";
 import { NotificationsBell } from "@/features/dashboard/components/notifications-bell";
 import { IPCBadge } from "@/features/ipc/components/IPCBadge";
+import { INMO_DEFAULT_EMPLOYEE_SECTIONS } from "@/shared/lib/inmo-staff-nav";
 
 // ── Nav item definition ───────────────────────────────────────────────────────
 
@@ -76,7 +77,7 @@ const NAV_ITEMS: NavItem[] = [
 // JWT role → display name (matches settings-dialog role permission keys)
 const ROLE_DISPLAY: Record<string, string> = {
   admin:   "Administrador",
-  agent:   "Vendedor",
+  agent:   "Empleado",
   tenant:  "Inquilino",
   owner:   "Propietario",
 };
@@ -148,13 +149,18 @@ export function AdminLayout() {
   const themeSettings = profile?.theme_settings as Record<string, unknown> | null;
   const userPermissions = themeSettings?.userPermissions as Record<string, string[]> | undefined;
   const rolePermissions = themeSettings?.rolePermissions as Record<string, string[]> | undefined;
-  const displayRole = ROLE_DISPLAY[role ?? ""] ?? "Colega";
+  const displayRole = ROLE_DISPLAY[role ?? ""] ?? "Empleado";
   const userId = user?.id;
 
   const visibleNav = NAV_ITEMS.filter((item) => {
     if (item.adminOnly && role !== "admin") return false;
     if (userId && userPermissions?.[userId]) {
       return userPermissions[userId].includes(item.to);
+    }
+    if (role === "agent") {
+      return INMO_DEFAULT_EMPLOYEE_SECTIONS.includes(
+        item.to as (typeof INMO_DEFAULT_EMPLOYEE_SECTIONS)[number],
+      );
     }
     if (rolePermissions?.[displayRole]) {
       return rolePermissions[displayRole].includes(item.to);
