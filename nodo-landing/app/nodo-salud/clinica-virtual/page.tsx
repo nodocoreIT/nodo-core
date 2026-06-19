@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
+import { CLINICA_ACCENT } from "@/lib/node-accents";
 
 export default function ClinicaVirtualPage() {
   return (
@@ -39,7 +40,7 @@ export default function ClinicaVirtualPage() {
                 NODO | Salud
               </Link>
               <ChevronRight className="h-3.5 w-3.5 text-white/30" />
-              <span className="text-brand font-semibold">Clínica Virtual</span>
+              <span className="text-teal-400 font-semibold">Clínica Virtual</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -57,14 +58,13 @@ export default function ClinicaVirtualPage() {
             aria-hidden
             className="pointer-events-none absolute inset-0"
             style={{
-              background:
-                "radial-gradient(60% 55% at 50% 38%, rgba(218,90,14,.15), transparent 75%)",
+              background: `radial-gradient(60% 55% at 50% 38%, rgba(${CLINICA_ACCENT.rgb},.15), transparent 75%)`,
             }}
           />
 
           <div className="relative max-w-6xl mx-auto px-4 sm:px-8">
             <div className="max-w-3xl">
-              <p className="text-brand-300 text-xs sm:text-sm font-bold tracking-widest uppercase mb-4">
+              <p className="text-teal-300 text-xs sm:text-sm font-bold tracking-widest uppercase mb-4">
                 Plataforma Multi-Médico · Clinica Virtual
               </p>
 
@@ -86,7 +86,11 @@ export default function ClinicaVirtualPage() {
               <div className="flex flex-wrap gap-4 mt-8">
                 <Link
                   href="/nodo-clinica/login"
-                  className="inline-flex items-center justify-center px-6 py-3 text-sm font-bold rounded-lg bg-brand text-white hover:bg-brand-600 active:scale-[.98] transition-all duration-150 shadow-lg shadow-brand/20"
+                  className="inline-flex items-center justify-center px-6 py-3 text-sm font-bold rounded-lg text-white active:scale-[.98] transition-all duration-150 shadow-lg"
+                  style={{
+                    background: `linear-gradient(135deg, ${CLINICA_ACCENT.brand}, ${CLINICA_ACCENT.brand600})`,
+                    boxShadow: `0 8px 24px -8px rgba(${CLINICA_ACCENT.rgb},.35)`,
+                  }}
                 >
                   Entrar a Clínica Virtual
                 </Link>

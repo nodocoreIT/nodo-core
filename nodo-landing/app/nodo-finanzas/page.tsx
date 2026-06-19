@@ -4,6 +4,10 @@ import Link from "next/link";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 import {
+  FINANZAS_ACCENT,
+  getNodoLogoSrc,
+} from "@/lib/node-accents";
+import {
   Coins,
   Bell,
   CreditCard,
@@ -14,6 +18,8 @@ import {
   Check,
   ArrowRight,
 } from "lucide-react";
+
+const finanzasLogoSrc = getNodoLogoSrc("finanzas");
 
 const FEATURES = [
   {
@@ -82,8 +88,7 @@ export default function NodoFinanzasPage() {
             aria-hidden
             className="pointer-events-none absolute inset-0"
             style={{
-              background:
-                "radial-gradient(60% 55% at 50% 38%, rgba(5,150,105,.15), transparent 70%)",
+              background: `radial-gradient(60% 55% at 50% 38%, rgba(${FINANZAS_ACCENT.rgb},.15), transparent 70%)`,
             }}
           />
 
@@ -92,15 +97,22 @@ export default function NodoFinanzasPage() {
               <Coins className="h-9 w-9" strokeWidth={1.75} />
             </span>
 
-            <p className="text-[13px] font-bold uppercase tracking-[.16em] text-emerald-400 mb-4">
-              Módulo de Nodo IT
-            </p>
-
             <h1
-              className="font-display font-extrabold text-white"
+              className="font-display font-extrabold text-white flex flex-wrap items-center justify-center gap-x-4 gap-y-1"
               style={{ fontSize: "clamp(36px,5vw,64px)", lineHeight: 1.06 }}
             >
-              Finanzas Personales
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={finanzasLogoSrc}
+                alt="Nodo"
+                style={{
+                  height: "0.78em",
+                  width: "auto",
+                  display: "inline-block",
+                }}
+              />
+              <span style={{ color: "#fff", fontWeight: 400 }}>|</span>
+              Finanzas
             </h1>
 
             <p

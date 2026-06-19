@@ -32,11 +32,14 @@ const EMOJI_PRESETS = ['🏠', '🚗', '🎓', '💊', '🍔', '✈️', '🎬',
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function RubroGestion() {
-  const { rubros, loading, crearRubro, actualizarRubro, eliminarRubro } = useRubros();
+  const { rubros, rubrosActivos, loading, crearRubro, actualizarRubro, eliminarRubro, eliminarRubrosInactivos } = useRubros();
   const [modal, setModal] = useState(false);
   const [rubroEditando, setRubroEditando] = useState<Rubro | null>(null);
   const [rubroAEliminar, setRubroAEliminar] = useState<Rubro | null>(null);
   const [eliminando, setEliminando] = useState(false);
+  const [limpiandoInactivos, setLimpiandoInactivos] = useState(false);
+
+  const rubrosInactivos = rubros.filter(r => !r.activo && !r.esSistema);
 
   const {
     register,
@@ -65,7 +68,7 @@ export function RubroGestion() {
       });
     } else {
       setRubroEditando(null);
-      reset({ nombre: '', codigo: '', emoji: '📦', color: '', descripcion: '', orden: rubros.length });
+      reset({ nombre: '', codigo: '', emoji: '📦', color: '', descripcion: '', orden: rubrosActivos.length });
     }
     setModal(true);
   }
@@ -123,6 +126,22 @@ export function RubroGestion() {
     }
   }
 
+  async function handleLimpiarInactivos() {
+    setLimpiandoInactivos(true);
+    try {
+      const n = await eliminarRubrosInactivos();
+      if (n > 0) {
+        toast.success(`${n} rubro${n === 1 ? '' : 's'} eliminado${n === 1 ? '' : 's'}`);
+      } else {
+        toast.error('No se pudieron eliminar los rubros inactivos');
+      }
+    } catch {
+      toast.error('Error al eliminar rubros inactivos');
+    } finally {
+      setLimpiandoInactivos(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -149,8 +168,24 @@ export function RubroGestion() {
       </div>
 
       {/* List */}
+      {rubrosInactivos.length > 0 && (
+        <div className="flex items-center justify-between rounded-xl border border-mist bg-mist/30 px-4 py-3 text-sm">
+          <p className="text-slate2">
+            Hay {rubrosInactivos.length} rubro{rubrosInactivos.length === 1 ? '' : 's'} deshabilitado{rubrosInactivos.length === 1 ? '' : 's'} del sistema anterior.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            loading={limpiandoInactivos}
+            onClick={handleLimpiarInactivos}
+          >
+            Eliminar todos
+          </Button>
+        </div>
+      )}
+
       <Card>
-        {rubros.length === 0 ? (
+        {rubrosActivos.length === 0 ? (
           <div className="text-center py-10">
             <Tag className="h-10 w-10 mx-auto opacity-20 mb-3" />
             <p className="font-semibold text-ink">Sin rubros</p>
@@ -161,8 +196,8 @@ export function RubroGestion() {
           </div>
         ) : (
           <div className="divide-y divide-mist/60">
-            {[...rubros].sort((a, b) => a.orden - b.orden).map((rubro) => (
-              <div key={rubro.id} className={`flex items-center justify-between py-3 ${!rubro.activo ? 'opacity-40' : ''}`}>
+            {[...rubrosActivos].sort((a, b) => a.orden - b.orden).map((rubro) => (
+              <div key={rubro.id} className="flex items-center justify-between py-3">
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{rubro.emoji}</span>
                   <div>
@@ -289,7 +324,7 @@ export function RubroGestion() {
       <ModalConfirmacion
         open={!!rubroAEliminar}
         title="Eliminar Rubro"
-        message={`¿Eliminás el rubro "${rubroAEliminar?.nombre}"? Los gastos que lo usan quedarán sin categoría.`}
+        message={`¿Eliminás el rubro "${rubroAEliminar?.nombre}"? Se borra permanentemente. Los gastos vinculados conservan el nombre pero quedan sin rubro asignado.`}
         confirmText="Sí, eliminar"
         cancelText="Cancelar"
         onConfirm={handleEliminar}

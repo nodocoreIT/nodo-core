@@ -11,7 +11,7 @@ import {
   usePasswordRecoveryBootstrap,
 } from "@nodocore/shared-components";
 import { createNodeBrowserClient } from "@/lib/supabase/nodo-browser";
-import { getNodeBySlug, getNodeMailLabel } from "@/lib/nodes";
+import { getNodeBySlug, getNodeMailLabel, getChildNodes, needsModulePicker } from "@/lib/nodes";
 import {
   submitDoctorRegistration,
   submitPatientRegistration,
@@ -19,15 +19,26 @@ import {
   submitInmoRegistration,
 } from "@/app/actions";
 import { submitNodeRegistration } from "@/app/actions/registration";
+import {
+  DEFAULT_ACCENT,
+  getLoginAccent,
+  getNodoLogoSrc,
+  applyLoginAccent,
+  type NodeAccent,
+} from "@/lib/node-accents";
 
 function NodeTransitionOverlay({
   label,
   code,
   Icon,
+  logoSrc = "/logos/nodo%20nar.png",
+  accent = DEFAULT_ACCENT,
 }: {
   label: string;
   code: string;
   Icon: React.ElementType;
+  logoSrc?: string;
+  accent?: NodeAccent;
 }) {
   const [mounted, setMounted] = useState(false);
   const [barWidth, setBarWidth] = useState(0);
@@ -54,7 +65,7 @@ function NodeTransitionOverlay({
           opacity: mounted ? 1 : 0,
           transition: "opacity 0.6s ease",
           background:
-            "radial-gradient(55% 55% at 50% 52%, rgba(218,90,14,.22), transparent 70%)",
+            `radial-gradient(55% 55% at 50% 52%, rgba(${accent.rgb},.22), transparent 70%)`,
         }}
       />
 
@@ -74,7 +85,7 @@ function NodeTransitionOverlay({
             style={{
               width: 128,
               height: 128,
-              backgroundColor: "rgba(218,90,14,.12)",
+              backgroundColor: `rgba(${accent.rgb},.12)`,
               animation: "nodo-ping 1.5s cubic-bezier(0,0,.2,1) infinite",
             }}
           />
@@ -83,7 +94,7 @@ function NodeTransitionOverlay({
             style={{
               width: 100,
               height: 100,
-              backgroundColor: "rgba(218,90,14,.08)",
+              backgroundColor: `rgba(${accent.rgb},.08)`,
               animation: "nodo-ping 1.5s cubic-bezier(0,0,.2,1) 0.3s infinite",
             }}
           />
@@ -92,13 +103,13 @@ function NodeTransitionOverlay({
             style={{
               width: 84,
               height: 84,
-              backgroundColor: "rgba(218,90,14,.15)",
-              border: "1.5px solid rgba(218,90,14,.35)",
+              backgroundColor: `rgba(${accent.rgb},.15)`,
+              border: `1.5px solid rgba(${accent.rgb},.35)`,
             }}
           >
             <Icon
               aria-hidden
-              style={{ width: 38, height: 38, color: "var(--color-brand)" }}
+              style={{ width: 38, height: 38, color: accent.brand }}
               strokeWidth={1.6}
             />
           </span>
@@ -117,7 +128,7 @@ function NodeTransitionOverlay({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logos/nodo%20nar.png"
+            src={logoSrc}
             alt="Nodo"
             style={{
               height: "0.78em",
@@ -138,7 +149,7 @@ function NodeTransitionOverlay({
               style={{
                 width: 6,
                 height: 6,
-                backgroundColor: "var(--color-brand)",
+                backgroundColor: accent.brand,
                 opacity: 0.3,
                 animation: `nodo-bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
               }}
@@ -155,7 +166,7 @@ function NodeTransitionOverlay({
         <div
           style={{
             height: "100%",
-            backgroundColor: "var(--color-brand)",
+            backgroundColor: accent.brand,
             width: `${barWidth}%`,
             transition: "width 1.4s cubic-bezier(.4,0,.2,1)",
           }}
@@ -223,6 +234,16 @@ function LoginForm() {
   const isFinanzasNode =
     nodeParam === "nodo-finanzas" || nodeParam === "finanzas";
   const isSimpleRegisterNode = isInmoNode || isAutosNode || isFinanzasNode;
+  const loginAccent = getLoginAccent(nodeParam);
+  const loginNodoLogoSrc = isFinanzasNode
+    ? "/logos/nodo ver.png"
+    : isAutosNode
+      ? "/logos/nodo roj.png"
+      : isClinicaNode
+        ? getNodoLogoSrc("clinica")
+        : "/logos/nodo nar.png";
+
+  useEffect(() => applyLoginAccent(loginAccent), [loginAccent]);
 
   // Modes: "login" or "register" (only for clinica-virtual)
   // Modes: "login", "register", "forgot" or "reset-password"
@@ -262,6 +283,7 @@ function LoginForm() {
     label: string;
     code: string;
     Icon: React.ElementType;
+    logoSrc?: string;
   } | null>(null);
   const [successModal, setSuccessModal] = useState<{
     open: boolean;
@@ -281,6 +303,11 @@ function LoginForm() {
         : nodeParam;
 
   const matchedNode = getNodeBySlug(cleanSlug);
+  const childModules = getChildNodes(cleanSlug);
+  const showModulePicker =
+    needsModulePicker(nodeParam) &&
+    authMode === "login" &&
+    !recoveryBootstrapping;
 
   const registrationOrigin =
     typeof window !== "undefined"
@@ -438,7 +465,14 @@ function LoginForm() {
         TIcon = matchedNode?.Icon ?? Layers;
       }
 
-      setTransitionTarget({ label: tLabel, code: tCode, Icon: TIcon });
+      setTransitionTarget({
+        label: tLabel,
+        code: tCode,
+        Icon: TIcon,
+        ...(isFinanzasNode || isAutosNode || isClinicaNode
+          ? { logoSrc: loginNodoLogoSrc }
+          : {}),
+      });
 
       const { access_token, refresh_token } = data.session!;
       setTimeout(() => {
@@ -710,7 +744,7 @@ function LoginForm() {
   const inputNormal = "border-mist text-ink";
   const inputError = "border-[#C0392B] shadow-[0_0_0_4px_rgba(192,57,43,.12)]";
   const inputFocus =
-    "focus:border-brand focus:shadow-[0_0_0_4px_rgba(218,90,14,.16)]";
+    "focus:border-brand focus:shadow-[0_0_0_4px_var(--login-focus-ring)]";
 
   const simpleRegisterContent = isInmoNode
     ? {
@@ -769,6 +803,8 @@ function LoginForm() {
           label={transitionTarget.label}
           code={transitionTarget.code}
           Icon={transitionTarget.Icon}
+          logoSrc={transitionTarget.logoSrc}
+          accent={loginAccent}
         />
       )}
 
@@ -793,8 +829,7 @@ function LoginForm() {
             aria-hidden
             className="absolute inset-0 pointer-events-none"
             style={{
-              background:
-                "radial-gradient(70% 50% at 30% 30%, rgba(218,90,14,.20), transparent 70%)",
+              background: `radial-gradient(70% 50% at 30% 30%, rgba(${loginAccent.rgb},.20), transparent 70%)`,
             }}
           />
 
@@ -825,7 +860,7 @@ function LoginForm() {
                 <span className="flex items-center gap-[0.3em]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="/logos/nodo nar.png"
+                    src={loginNodoLogoSrc}
                     alt="NODO"
                     style={{
                       height: "0.82em",
@@ -863,6 +898,7 @@ function LoginForm() {
           <div className="w-[min(420px,100%)]">
             {/* If node is Clinica Virtual or Inmo, show Iniciar / Registrar toggle */}
             {(isClinicaNode || isSimpleRegisterNode) &&
+              !showModulePicker &&
               (authMode === "login" || authMode === "register") && (
                 <div className="flex border-b border-mist mb-6">
                   <button
@@ -899,6 +935,56 @@ function LoginForm() {
                 <p className="text-slate2 text-[14.5px] font-medium">
                   Validando enlace de recuperación…
                 </p>
+              </div>
+            ) : showModulePicker ? (
+              <div>
+                <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
+                  ◎ {matchedNode?.label ?? "NODO"}
+                </span>
+
+                <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
+                  Elegí tu módulo
+                </h1>
+                <p className="text-slate2 text-[14.5px] mb-6">
+                  {matchedNode?.code ?? "Este nodo"} incluye varios portales.
+                  Seleccioná el que querés usar para iniciar sesión.
+                </p>
+
+                <div className="flex flex-col gap-3">
+                  {childModules.map((mod) => {
+                    const modAccent = getLoginAccent(`nodo-${mod.slug}`);
+                    const ModIcon = mod.Icon;
+                    return (
+                      <Link
+                        key={mod.slug}
+                        href={`/nodo-${mod.slug}/login`}
+                        className="group flex items-start gap-4 rounded-xl border border-mist bg-white p-4 transition-all duration-150 hover:border-brand hover:bg-brand/5 hover:shadow-sm"
+                        style={{
+                          borderLeftWidth: 4,
+                          borderLeftColor: modAccent.brand,
+                        }}
+                      >
+                        <span
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+                          style={{
+                            backgroundColor: `rgba(${modAccent.rgb}, 0.12)`,
+                            color: modAccent.brand,
+                          }}
+                        >
+                          <ModIcon aria-hidden className="h-5 w-5" strokeWidth={1.75} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-display text-[17px] font-bold text-ink group-hover:text-brand transition-colors">
+                            {mod.label}
+                          </span>
+                          <span className="mt-1 block text-[13.5px] leading-snug text-slate2">
+                            {mod.description}
+                          </span>
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
             ) : authMode === "login" ? (
               <div>
@@ -1602,7 +1688,7 @@ function LoginForm() {
                           <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-3.5 rounded-md bg-emerald-600 text-white font-semibold text-[15px] hover:bg-emerald-700 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                            className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                           >
                             {loading
                               ? "Registrando…"
@@ -1926,7 +2012,7 @@ function LoginForm() {
             ) : (
               // Patient / Google register success view
               <>
-                <div className="h-14 w-14 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-5 border border-emerald-500/20">
+                <div className="h-14 w-14 bg-brand/10 text-brand rounded-full flex items-center justify-center mx-auto mb-5 border border-brand/20">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-7 w-7"
@@ -1942,7 +2028,7 @@ function LoginForm() {
                     />
                   </svg>
                 </div>
-                <h3 className="font-display font-extrabold text-emerald-600 text-[21px] mb-2.5">
+                <h3 className="font-display font-extrabold text-brand text-[21px] mb-2.5">
                   ¡Bienvenido a NODO!
                 </h3>
                 <p className="text-slate2 text-[14px] leading-relaxed mb-6">
@@ -1957,7 +2043,7 @@ function LoginForm() {
                     });
                     router.push("/panel");
                   }}
-                  className="w-full py-3 rounded-lg bg-emerald-600 text-white font-bold text-[14.5px] hover:bg-emerald-700 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-emerald-600/15"
+                  className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
                 >
                   Ingresar al Panel
                 </button>
