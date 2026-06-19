@@ -6,13 +6,10 @@ import {
   Info,
 } from "lucide-react";
 import { NotificationsDropdown } from "@nodocore/nodo-modules/notifications";
+import type { NotificationKindStyle } from "@nodocore/nodo-modules/notifications";
 import { useNotifications } from "@/features/dashboard/hooks/use-notifications";
-import type { NotificationKind } from "@/features/dashboard/lib/build-notifications";
 
-const KIND_STYLES: Record<
-  NotificationKind,
-  { icon: typeof AlertTriangle; iconColor: string }
-> = {
+const KIND_STYLES: Record<string, NotificationKindStyle> = {
   overdue_payment: {
     icon: AlertTriangle,
     iconColor: "text-rose-600 bg-rose-50",
