@@ -10,6 +10,7 @@ import {
   Label,
   Card,
   CardContent,
+  FormSelect,
 } from "@nodocore/shared-components";
 import { useVehicleStore } from "@/store/vehicle-store";
 
@@ -27,6 +28,13 @@ const customerSchema = z.object({
 
 type CustomerFormValues = z.infer<typeof customerSchema>;
 
+const DOCUMENT_TYPE_OPTIONS = [
+  { value: "DNI", label: "DNI" },
+  { value: "CUIT", label: "CUIT" },
+  { value: "CUIL", label: "CUIL" },
+  { value: "Pasaporte", label: "Pasaporte" },
+];
+
 export function CustomersListPage() {
   const { customers, addCustomer, deleteCustomer, loadInitialData, loading } =
     useVehicleStore();
@@ -42,10 +50,14 @@ export function CustomersListPage() {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<CustomerFormValues>({
     resolver: zodResolver(customerSchema),
   });
+
+  const documentType = watch("documentType") ?? "";
 
   const filtered = customers.filter((c) => {
     if (!search) return true;
@@ -199,16 +211,13 @@ export function CustomersListPage() {
                 </div>
                 <div className="space-y-1">
                   <Label>Tipo documento</Label>
-                  <select
-                    {...register("documentType")}
-                    className="w-full rounded-md border border-mist bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-                  >
-                    <option value="">Seleccionar</option>
-                    <option value="DNI">DNI</option>
-                    <option value="CUIT">CUIT</option>
-                    <option value="CUIL">CUIL</option>
-                    <option value="Pasaporte">Pasaporte</option>
-                  </select>
+                  <FormSelect
+                    value={documentType}
+                    onChange={(value) => setValue("documentType", value)}
+                    options={DOCUMENT_TYPE_OPTIONS}
+                    allowEmpty
+                    emptyLabel="Seleccionar"
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label>Número documento</Label>

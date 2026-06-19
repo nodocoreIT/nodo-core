@@ -103,6 +103,16 @@ export {
 } from "./components/ui/form";
 export { PaginationControls } from "./components/ui/pagination";
 export { Combobox } from "./components/ui/combobox";
+export {
+  FormSelect,
+  EMPTY_SELECT_VALUE,
+  type FormSelectOption,
+  type FormSelectProps,
+} from "./components/ui/form-select";
+export {
+  SearchableSelect,
+  type SearchableSelectProps,
+} from "./components/ui/searchable-select";
 
 // ─── Hooks ───────────────────────────────────────────────────────────────────
 export {

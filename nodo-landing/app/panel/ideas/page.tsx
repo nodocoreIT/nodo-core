@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Pencil, Trash2, ArrowRightCircle } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
+import { FormSelect } from "@nodocore/shared-components";
 import { NODES } from "@/lib/nodes";
 
 type IdeaArea = "desarrollo" | "marketing" | "negocio" | "operaciones" | "otro";
@@ -366,15 +367,13 @@ export default function IdeasPage() {
 
                   {/* Actions */}
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, paddingTop: 12, borderTop: "1px solid var(--color-mist)" }}>
-                    <select
+                    <FormSelect
                       value={idea.status}
-                      onChange={(e) => changeStatus(idea, e.target.value as IdeaStatus)}
-                      style={{ ...inputStyle, width: "auto", flex: 1, padding: "6px 8px", fontSize: 12.5 }}
-                    >
-                      {STATUSES.map((s) => (
-                        <option key={s.value} value={s.value}>{s.label}</option>
-                      ))}
-                    </select>
+                      onChange={(value) => changeStatus(idea, value as IdeaStatus)}
+                      options={STATUSES.map((status) => ({ value: status.value, label: status.label }))}
+                      className="flex-1"
+                      triggerClassName="text-xs py-1.5"
+                    />
 
                     {!promoted && (
                       <button
@@ -470,11 +469,11 @@ export default function IdeasPage() {
 
                 <div>
                   <label style={labelStyle}>Campo de acción</label>
-                  <select value={formArea} onChange={(e) => setFormArea(e.target.value as IdeaArea)} style={inputStyle}>
-                    {AREAS.map((a) => (
-                      <option key={a.value} value={a.value}>{a.label}</option>
-                    ))}
-                  </select>
+                  <FormSelect
+                    value={formArea}
+                    onChange={(value) => setFormArea(value as IdeaArea)}
+                    options={AREAS.map((area) => ({ value: area.value, label: area.label }))}
+                  />
                 </div>
 
                 {error && <p style={{ margin: 0, fontSize: 12.5, color: "#C0392B" }}>{error}</p>}

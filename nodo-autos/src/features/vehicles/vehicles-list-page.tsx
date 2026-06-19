@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, LayoutGrid, List, Search, Pencil, Trash2, Car, Filter } from "lucide-react";
+import { Plus, LayoutGrid, List, Search, Pencil, Trash2, Car, Filter, FileSpreadsheet } from "lucide-react";
 import {
   Button,
   Input,
@@ -73,13 +73,23 @@ export function VehiclesListPage() {
       {/* Toolbar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-bold text-navy">Stock de vehículos</h2>
-        <Button
-          onClick={() => navigate("/admin/vehiculos/nuevo")}
-          className="bg-brand hover:bg-brand-600 text-white gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Nuevo vehículo
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/admin/vehiculos/importar")}
+            className="gap-2"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Importar Excel
+          </Button>
+          <Button
+            onClick={() => navigate("/admin/vehiculos/nuevo")}
+            className="bg-brand hover:bg-brand-600 text-white gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo vehículo
+          </Button>
+        </div>
       </div>
 
       {/* Search + filters toolbar */}

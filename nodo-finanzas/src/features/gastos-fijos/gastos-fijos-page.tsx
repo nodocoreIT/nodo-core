@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { FormSelect, SearchableSelect } from '@nodocore/shared-components';
 import { ModalConfirmacion } from '@/components/ui/modal-confirmacion';
 import { RubroDisplay } from '@/components/rubros/rubro-display';
 import { Spinner } from '@/components/ui/spinner';
@@ -247,18 +248,18 @@ export function GastosFijosPage() {
             )}
           </div>
           <div className="flex gap-2">
-            <select
+            <SearchableSelect
               value={rubroFiltro}
-              onChange={(e) => setRubroFiltro(e.target.value)}
-              className="flex-1 sm:w-48 border border-mist rounded-lg px-3 py-2 text-sm bg-white focus:ring-1 focus:ring-brand focus:border-brand outline-none"
-            >
-              <option value="">Todos los rubros</option>
-              {rubrosUnicos.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.emoji} {normalizarCodigoRubro(r.nombre)}
-                </option>
-              ))}
-            </select>
+              onChange={setRubroFiltro}
+              options={rubrosUnicos.map((rubro) => ({
+                value: rubro.id,
+                label: `${rubro.emoji} ${normalizarCodigoRubro(rubro.nombre)}`,
+              }))}
+              allowEmpty
+              emptyLabel="Todos los rubros"
+              searchPlaceholder="Buscar rubro..."
+              className="flex-1 sm:w-48"
+            />
 
             <button
               className={`px-3 py-2 border rounded-lg text-xs font-bold transition-all ${
@@ -423,17 +424,17 @@ export function GastosFijosPage() {
                 <>
                   <div className="flex flex-col gap-1">
                     <label className="text-sm font-medium text-ink">Medio de Pago</label>
-                    <select
+                    <FormSelect
                       value={formaPagoModal}
-                      onChange={(e) => setFormaPagoModal(e.target.value)}
-                      className="w-full px-3 py-2 border border-mist rounded-lg text-sm bg-white focus:ring-1 focus:ring-brand outline-none"
-                    >
-                      <option value="EFECTIVO">Efectivo</option>
-                      <option value="DEBITO">Débito Automático</option>
-                      <option value="TARJETA">Tarjeta de Crédito</option>
-                      <option value="TRANSFERENCIA BANCO">Transferencia Bancaria</option>
-                      <option value="MERCADO_PAGO">Mercado Pago</option>
-                    </select>
+                      onChange={setFormaPagoModal}
+                      options={[
+                        { value: 'EFECTIVO', label: 'Efectivo' },
+                        { value: 'DEBITO', label: 'Débito Automático' },
+                        { value: 'TARJETA', label: 'Tarjeta de Crédito' },
+                        { value: 'TRANSFERENCIA BANCO', label: 'Transferencia Bancaria' },
+                        { value: 'MERCADO_PAGO', label: 'Mercado Pago' },
+                      ]}
+                    />
                   </div>
 
                   {(formaPagoModal === 'DEBITO' ||
@@ -442,18 +443,18 @@ export function GastosFijosPage() {
                     formaPagoModal === 'EFECTIVO') && (
                     <div className="flex flex-col gap-1">
                       <label className="text-sm font-medium text-ink">Cuenta / Caja</label>
-                      <select
+                      <FormSelect
                         value={cuentaSeleccionadaId}
-                        onChange={(e) => setCuentaSeleccionadaId(e.target.value)}
-                        className="w-full px-3 py-2 border border-mist rounded-lg text-sm bg-white focus:ring-1 focus:ring-brand outline-none"
-                      >
-                        <option value="">Seleccioná una cuenta...</option>
-                        {finanzas.cuentas.filter((c) => c.activa).map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.nombre} ({formatearMoneda(c.saldoActual, c.moneda)})
-                          </option>
-                        ))}
-                      </select>
+                        onChange={setCuentaSeleccionadaId}
+                        options={finanzas.cuentas
+                          .filter((cuenta) => cuenta.activa)
+                          .map((cuenta) => ({
+                            value: cuenta.id,
+                            label: `${cuenta.nombre} (${formatearMoneda(cuenta.saldoActual, cuenta.moneda)})`,
+                          }))}
+                        allowEmpty
+                        emptyLabel="Seleccioná una cuenta..."
+                      />
                     </div>
                   )}
                 </>

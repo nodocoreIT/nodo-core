@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, Select } from '@/components/ui/input';
 import { MoneyInput } from '@/components/ui/money-input';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { useFinanzas } from '@/hooks/use-finanzas';
@@ -231,47 +231,36 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
               )}
             />
 
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-ink">Forma de Pago</label>
-              <select
-                {...register('formaPago')}
-                className="w-full px-3 py-2 rounded-lg border border-mist focus:border-brand focus:ring-1 focus:ring-brand text-sm bg-white outline-none"
-              >
-                {FORMAS_PAGO.map((f) => (
-                  <option key={f.value} value={f.value}>{f.label}</option>
-                ))}
-              </select>
-              {errors.formaPago && <p className="text-xs text-red-600">{errors.formaPago.message}</p>}
-            </div>
+            <Select
+              label="Forma de Pago"
+              options={FORMAS_PAGO}
+              error={errors.formaPago?.message}
+              {...register('formaPago')}
+            />
           </div>
 
           {/* Tarjeta fields */}
           {formaPago === 'TARJETA' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-ink">Tarjeta <span className="text-red-500">*</span></label>
-                <select
-                  {...register('tarjetaId')}
-                  className="w-full px-3 py-2 rounded-lg border border-mist focus:border-brand focus:ring-1 focus:ring-brand text-sm bg-white outline-none"
-                >
-                  <option value="">— Seleccioná una tarjeta —</option>
-                  {tarjetasActivas.map((t) => (
-                    <option key={t.id} value={t.id}>{t.nombre} - {t.banco}</option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="Tarjeta"
+                options={tarjetasActivas.map((t) => ({
+                  value: t.id,
+                  label: `${t.nombre} - ${t.banco}`,
+                }))}
+                allowEmpty
+                emptyLabel="— Seleccioná una tarjeta —"
+                {...register('tarjetaId')}
+              />
 
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-ink">Cuotas</label>
-                <select
-                  {...register('cuotas', { valueAsNumber: true })}
-                  className="w-full px-3 py-2 rounded-lg border border-mist focus:border-brand focus:ring-1 focus:ring-brand text-sm bg-white outline-none"
-                >
-                  {opcionesCuotas.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="Cuotas"
+                options={opcionesCuotas.map((option) => ({
+                  value: String(option.value),
+                  label: option.label,
+                }))}
+                {...register('cuotas', { valueAsNumber: true })}
+              />
             </div>
           )}
 
@@ -287,18 +276,16 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
 
           {/* Non-card account selector */}
           {(formaPago === 'DEBITO' || formaPago === 'MERCADO_PAGO' || formaPago === 'EFECTIVO' || formaPago === 'TRANSFERENCIA BANCO') && (
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-ink">Cuenta origen</label>
-              <select
-                {...register('cuentaId')}
-                className="w-full px-3 py-2 rounded-lg border border-mist focus:border-brand focus:ring-1 focus:ring-brand text-sm bg-white outline-none"
-              >
-                <option value="">Seleccioná una cuenta</option>
-                {cuentasActivas.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nombre} — {new Intl.NumberFormat('es-AR').format(c.saldoActual)}</option>
-                ))}
-              </select>
-            </div>
+            <Select
+              label="Cuenta origen"
+              options={cuentasActivas.map((c) => ({
+                value: c.id,
+                label: `${c.nombre} — ${new Intl.NumberFormat('es-AR').format(c.saldoActual)}`,
+              }))}
+              allowEmpty
+              emptyLabel="Seleccioná una cuenta"
+              {...register('cuentaId')}
+            />
           )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-mist">

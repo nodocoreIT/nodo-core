@@ -12,6 +12,12 @@ import type {
 import type { SalesContractData } from '@/types/contract';
 import { supabase } from '@/shared/lib/supabase';
 import { matchesVehicleSearch } from '@/shared/lib/utils';
+import { generateVehicleSlug } from '@/shared/lib/utils';
+import {
+  type ImportVehicleRow,
+  importRowToVehiclePayload,
+} from '@/features/vehicles/lib/vehicle-import';
+import { parseDigitsToNumber } from '@/utils/contract-calculations';
 
 // ─── Row types (DB shape) ─────────────────────────────────────────────────────
 
@@ -535,6 +541,7 @@ interface VehicleStoreState {
   addVehicle: (vehicle: Omit<Vehicle, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'>) => Promise<void>;
   updateVehicle: (id: string, updates: Partial<Vehicle>) => Promise<void>;
   deleteVehicle: (id: string) => Promise<void>;
+  importVehicles: (rows: ImportVehicleRow[]) => Promise<{ successCount: number; errors: string[] }>;
   getVehicleById: (id: string) => Vehicle | undefined;
   filterVehicles: (filters: VehicleFilters) => Vehicle[];
 
@@ -815,6 +822,97 @@ export const useVehicleStore = create<VehicleStoreState>()(
           set({ error: normalizeError(error, 'Error al eliminar el vehículo') });
           throw error;
         }
+      },
+
+      importVehicles: async (rows) => {
+        const clienteId = get().currentCliente?.id;
+        if (!clienteId) {
+          return { successCount: 0, errors: ['No hay una concesionaria configurada.'] };
+        }
+
+        const errors: string[] = [];
+        let successCount = 0;
+        const usedSlugs = new Set<string>();
+        const existingByPlate = new Map<string, { id: string; publicSlug: string }>();
+
+        for (let index = 0; index < rows.length; index += 1) {
+          const row = rows[index];
+          const brand = row.brand.trim();
+          const model = row.model.trim();
+          const year = parseDigitsToNumber(row.year);
+          const fuelType = row.fuel_type.trim();
+          const licensePlate = row.license_plate.trim().toUpperCase();
+          const missingFields: string[] = [];
+
+          if (!brand) missingFields.push('marca');
+          if (!model) missingFields.push('modelo');
+          if (!year) missingFields.push('año');
+          if (!fuelType) missingFields.push('combustible');
+
+          if (missingFields.length > 0) {
+            errors.push(`Ítem ${index + 1}: faltan datos obligatorios (${missingFields.join(', ')}).`);
+            continue;
+          }
+
+          const slugSeed = licensePlate || `import-${Date.now()}-${index}`;
+          const baseSlug = generateVehicleSlug({ brand, model, licensePlate: slugSeed });
+          let publicSlug = baseSlug;
+          let suffix = 1;
+          while (usedSlugs.has(publicSlug)) {
+            publicSlug = `${baseSlug}-${suffix}`;
+            suffix += 1;
+          }
+          usedSlugs.add(publicSlug);
+
+          try {
+            const vehiclePayload = importRowToVehiclePayload(row, clienteId, publicSlug);
+
+            if (licensePlate) {
+              let existing = existingByPlate.get(licensePlate);
+              if (!existing) {
+                const stored = get().vehicles.find(
+                  (vehicle) =>
+                    vehicle.clienteId === clienteId &&
+                    vehicle.licensePlate?.toUpperCase() === licensePlate,
+                );
+                if (stored) {
+                  existing = { id: stored.id, publicSlug: stored.publicSlug };
+                } else {
+                  const { data, error } = await supabase
+                    .from('vehicles')
+                    .select('id, public_slug')
+                    .eq('cliente_id', clienteId)
+                    .eq('license_plate', licensePlate)
+                    .maybeSingle();
+                  if (error) throw error;
+                  if (data?.id) {
+                    existing = { id: data.id, publicSlug: data.public_slug };
+                  }
+                }
+                if (existing) existingByPlate.set(licensePlate, existing);
+              }
+
+              if (existing) {
+                await get().updateVehicle(existing.id, {
+                  ...vehiclePayload,
+                  publicSlug: existing.publicSlug,
+                  clienteId,
+                });
+              } else {
+                await get().addVehicle(vehiclePayload);
+              }
+            } else {
+              await get().addVehicle(vehiclePayload);
+            }
+
+            successCount += 1;
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Error desconocido.';
+            errors.push(`Ítem ${index + 1}: ${message}`);
+          }
+        }
+
+        return { successCount, errors };
       },
 
       getVehicleById: (id) => get().vehicles.find((v) => v.id === id),

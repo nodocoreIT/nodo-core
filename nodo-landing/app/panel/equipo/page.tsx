@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
+import { FormSelect } from "@nodocore/shared-components";
 
 type Member = {
   id: string;
@@ -372,16 +373,16 @@ export default function EquipoPage() {
 
                 <div>
                   <label style={labelStyle}>Rol</label>
-                  <select
+                  <FormSelect
                     value={formRole}
-                    onChange={(e) => setFormRole(e.target.value)}
-                    style={inputStyle}
-                  >
-                    <option value="admin">Administrador</option>
-                    <option value="dev">Desarrollador</option>
-                    <option value="designer">Diseñador</option>
-                    <option value="manager">Gerente</option>
-                  </select>
+                    onChange={setFormRole}
+                    options={[
+                      { value: "admin", label: "Administrador" },
+                      { value: "dev", label: "Desarrollador" },
+                      { value: "designer", label: "Diseñador" },
+                      { value: "manager", label: "Gerente" },
+                    ]}
+                  />
                 </div>
 
                 {!editingMember && (

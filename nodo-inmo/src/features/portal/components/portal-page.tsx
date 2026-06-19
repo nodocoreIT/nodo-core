@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@nodocore/shared-components";
+import { Button, FormSelect } from "@nodocore/shared-components";
 import { usePortalProperties, type PortalProperty } from "../hooks/use-portal-properties";
 import { PropertyCard } from "./property-card";
 import { PropertyDetailDialog } from "./property-detail-dialog";
@@ -66,53 +66,49 @@ export function PortalPage() {
           </div>
 
           {/* Operation */}
-          <select
+          <FormSelect
             value={filters.operation}
-            onChange={(e) => update("operation", e.target.value as PortalFilters["operation"])}
-            className={cn(
-              "rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30",
+            onChange={(value) => update("operation", value as PortalFilters["operation"])}
+            options={[
+              { value: "all", label: "Alquiler o Venta" },
+              ...Object.entries(OPERATION_LABELS).map(([value, label]) => ({ value, label })),
+            ]}
+            triggerClassName={cn(
               filters.operation !== "all" ? "border-brand bg-brand/5 font-medium" : "border-border bg-background",
             )}
-          >
-            <option value="all">Alquiler o Venta</option>
-            {Object.entries(OPERATION_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </select>
+          />
 
           {/* Property type */}
-          <select
+          <FormSelect
             value={filters.property_type}
-            onChange={(e) => update("property_type", e.target.value)}
-            className={cn(
-              "rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30",
+            onChange={(value) => update("property_type", value)}
+            options={Object.entries(PROPERTY_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
+            allowEmpty
+            emptyLabel="Todos los tipos"
+            triggerClassName={cn(
               filters.property_type ? "border-brand bg-brand/5 font-medium" : "border-border bg-background",
             )}
-          >
-            <option value="">Todos los tipos</option>
-            {Object.entries(PROPERTY_TYPE_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </select>
+          />
         </div>
 
         {/* Row 2: rooms + price + amenity chips */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Rooms */}
-          <select
-            value={filters.rooms ?? ""}
-            onChange={(e) => update("rooms", e.target.value ? Number(e.target.value) : null)}
-            className={cn(
-              "rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30",
+          <FormSelect
+            value={filters.rooms !== null ? String(filters.rooms) : ""}
+            onChange={(value) => update("rooms", value ? Number(value) : null)}
+            options={[
+              { value: "1", label: "1" },
+              { value: "2", label: "2" },
+              { value: "3", label: "3" },
+              { value: "4", label: "4+" },
+            ]}
+            allowEmpty
+            emptyLabel="Ambientes"
+            triggerClassName={cn(
               filters.rooms !== null ? "border-brand bg-brand/5 font-medium" : "border-border bg-background",
             )}
-          >
-            <option value="">Ambientes</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4+</option>
-          </select>
+          />
 
           {/* Price max */}
           <input

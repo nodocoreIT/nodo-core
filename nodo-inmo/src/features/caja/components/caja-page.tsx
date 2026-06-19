@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Plus, ArrowUpRight, ArrowDownRight, Pencil, Trash2 } from "lucide-react";
-import { PaginationControls } from "@nodocore/shared-components";
+import { PaginationControls, FormSelect } from "@nodocore/shared-components";
 import { Button } from "@nodocore/shared-components";
 import {
   AlertDialog,
@@ -149,38 +149,42 @@ export function CajaPage() {
           placeholder="Concepto"
           className="rounded-md border border-border bg-card px-3 py-1.5 text-sm"
         />
-        <select
+        <FormSelect
           value={filterSource}
-          onChange={(e) => { setFilterSource(e.target.value); setPage(0); }}
-          className="rounded-md border border-border bg-card px-3 py-1.5 text-sm"
+          onChange={(value) => {
+            setFilterSource(value);
+            setPage(0);
+          }}
+          options={sources.map((source) => ({ value: source, label: source }))}
+          allowEmpty
+          emptyLabel="Todos los orígenes"
           aria-label="Filtrar por origen"
-        >
-          <option value="">Todos los orígenes</option>
-          {sources.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-        <select
+        />
+        <FormSelect
           value={filterAccount}
-          onChange={(e) => { setFilterAccount(e.target.value); setPage(0); }}
-          className="rounded-md border border-border bg-card px-3 py-1.5 text-sm"
+          onChange={(value) => {
+            setFilterAccount(value);
+            setPage(0);
+          }}
+          options={accounts.map((account) => ({ value: account, label: account }))}
+          allowEmpty
+          emptyLabel="Todas las cuentas"
           aria-label="Filtrar por cuenta"
-        >
-          <option value="">Todas las cuentas</option>
-          {accounts.map((a) => (
-            <option key={a} value={a}>{a}</option>
-          ))}
-        </select>
-        <select
+        />
+        <FormSelect
           value={filterType}
-          onChange={(e) => { setFilterType(e.target.value as "" | "income" | "expense"); setPage(0); }}
-          className="rounded-md border border-border bg-card px-3 py-1.5 text-sm"
+          onChange={(value) => {
+            setFilterType(value as "" | "income" | "expense");
+            setPage(0);
+          }}
+          options={[
+            { value: "income", label: "Solo ingresos" },
+            { value: "expense", label: "Solo egresos" },
+          ]}
+          allowEmpty
+          emptyLabel="Ingreso y egreso"
           aria-label="Filtrar por tipo"
-        >
-          <option value="">Ingreso y egreso</option>
-          <option value="income">Solo ingresos</option>
-          <option value="expense">Solo egresos</option>
-        </select>
+        />
         {(filterDate || filterConcept || filterSource || filterAccount || filterType) && (
           <button
             type="button"

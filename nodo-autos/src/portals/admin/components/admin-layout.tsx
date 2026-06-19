@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button, useAuth } from "@nodocore/shared-components";
 import { cn } from "@/shared/lib/utils";
+import { useDealershipBrand } from "@/shared/hooks/use-dealership-brand";
 
 interface NavItem {
   to: string;
@@ -49,6 +50,7 @@ function initials(value: string): string {
 export function AdminLayout() {
   const { user, signOut } = useAuth();
   const { pathname } = useLocation();
+  const { name: dealershipName, logoUrl } = useDealershipBrand();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -61,11 +63,14 @@ export function AdminLayout() {
     return () => media.removeEventListener("change", listener);
   }, []);
 
-  // Find best matching title
-  const title =
+  const pageTitle =
     Object.entries(ROUTE_TITLES)
       .sort((a, b) => b[0].length - a[0].length)
-      .find(([key]) => pathname.startsWith(key))?.[1] ?? "Nodo Autos";
+      .find(([key]) => pathname.startsWith(key))?.[1] ?? "Panel";
+
+  useEffect(() => {
+    document.title = `${pageTitle} · ${dealershipName}`;
+  }, [pageTitle, dealershipName]);
 
   const fullName = (user?.user_metadata?.full_name as string | undefined) ?? "";
   const email = user?.email ?? "";
@@ -98,10 +103,18 @@ export function AdminLayout() {
       >
         {/* Brand */}
         <div className="flex h-16 flex-shrink-0 items-center justify-between px-5 border-b border-navy-700">
-          <div className="flex items-center gap-2">
-            <Car className="h-5 w-5 text-brand" />
-            <span className="font-display font-bold text-white text-sm">
-              Nodo Autos
+          <div className="flex min-w-0 items-center gap-2">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={dealershipName}
+                className="h-8 w-auto max-w-[7rem] object-contain"
+              />
+            ) : (
+              <Car className="h-5 w-5 shrink-0 text-brand" />
+            )}
+            <span className="truncate font-display text-sm font-bold text-white">
+              {dealershipName}
             </span>
           </div>
           <button
@@ -179,9 +192,9 @@ export function AdminLayout() {
             </button>
             <div>
               <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate2">
-                Nodo Autos · Panel Admin
+                {dealershipName} · Panel Admin
               </p>
-              <h1 className="text-base sm:text-xl font-bold text-navy mt-1.5">{title}</h1>
+              <h1 className="text-base sm:text-xl font-bold text-navy mt-1.5">{pageTitle}</h1>
             </div>
           </div>
         </header>

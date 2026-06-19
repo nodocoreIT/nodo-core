@@ -1,4 +1,4 @@
-import React from 'react';
+import { SearchableSelect } from '@nodocore/shared-components';
 import { useRubros } from '@/hooks/use-rubros';
 import { normalizarCodigoRubro } from '@/utils/rubro-formatters';
 import type { Rubro } from '@/types';
@@ -24,13 +24,17 @@ export function RubroSelector({
 }: RubroSelectorProps) {
   const { rubrosActivos } = useRubros();
 
-  function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const id = e.target.value;
+  const options = rubrosActivos.map((rubro) => ({
+    value: rubro.id,
+    label: `${rubro.emoji} ${normalizarCodigoRubro(rubro.nombre)}`,
+  }));
+
+  function handleChange(id: string) {
     if (!id) {
       onChange(null);
       return;
     }
-    const found = rubrosActivos.find((r) => r.id === id);
+    const found = rubrosActivos.find((rubro) => rubro.id === id);
     onChange(found ?? null);
   }
 
@@ -42,22 +46,15 @@ export function RubroSelector({
           {required && <span className="text-red-500 ml-0.5">*</span>}
         </label>
       )}
-      <select
+      <SearchableSelect
         value={rubroId ?? ''}
         onChange={handleChange}
-        className={`w-full px-3 py-2 rounded-lg border text-sm bg-white transition-colors outline-none h-10
-          ${error
-            ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-400'
-            : 'border-mist focus:border-brand focus:ring-1 focus:ring-brand'
-          }`}
-      >
-        <option value="">{placeholder}</option>
-        {rubrosActivos.map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.emoji} {normalizarCodigoRubro(r.nombre)}
-          </option>
-        ))}
-      </select>
+        options={options}
+        allowEmpty
+        emptyLabel={placeholder}
+        searchPlaceholder="Buscar rubro..."
+        aria-label={label}
+      />
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );

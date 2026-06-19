@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Eye, FileText, Share2, Wallet } from "lucide-react";
-import { Button } from "@nodocore/shared-components";
+import { Button, FormSelect } from "@nodocore/shared-components";
 import {
   Table,
   TableBody,
@@ -116,18 +116,12 @@ export function GananciasPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select
+          <FormSelect
             value={periodYm}
-            onChange={(e) => setPeriodYm(e.target.value)}
-            className="rounded-md border border-border bg-card px-3 py-2 text-sm"
+            onChange={setPeriodYm}
+            options={months.map((ym) => ({ value: ym, label: formatPeriodTitle(ym) }))}
             aria-label="Período visualizado"
-          >
-            {months.map((ym) => (
-              <option key={ym} value={ym}>
-                {formatPeriodTitle(ym)}
-              </option>
-            ))}
-          </select>
+          />
           <Button
             size="sm"
             variant="outline"

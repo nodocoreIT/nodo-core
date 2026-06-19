@@ -44,6 +44,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormSelect,
 } from "@nodocore/shared-components";
 
 const profileSchema = z
@@ -751,18 +752,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <label htmlFor="settings-section" className="sr-only">
               Sección de configuración
             </label>
-            <select
+            <FormSelect
               id="settings-section"
               value={activeTab}
-              onChange={(e) => setActiveTab(e.target.value as SettingsTabId)}
-              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm font-semibold text-navy"
-            >
-              {SETTINGS_TABS.map((tab) => (
-                <option key={tab.id} value={tab.id}>
-                  {tab.label}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setActiveTab(value as SettingsTabId)}
+              options={SETTINGS_TABS.map((tab) => ({ value: tab.id, label: tab.label }))}
+              triggerClassName="font-semibold text-navy"
+            />
           </div>
 
           <div className="flex-1 overflow-y-auto p-6">
@@ -1365,27 +1361,25 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="memberRole">Rol del Usuario</Label>
-                  <select
+                  <FormSelect
                     id="memberRole"
                     value={newMember.role}
-                    onChange={(e) =>
-                      setNewMember({ ...newMember, role: e.target.value })
-                    }
+                    onChange={(value) => setNewMember({ ...newMember, role: value })}
                     disabled={
                       !!selectedUserId &&
                       users.find((u) => u.id === selectedUserId)?.role === "Administrador"
                     }
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {selectedUserId &&
-                      users.find((u) => u.id === selectedUserId)?.role === "Administrador" && (
-                        <option value="Administrador">Administrador</option>
-                      )}
-                    <option value="Vendedor">Vendedor</option>
-                    <option value="Inquilino">Inquilino</option>
-                    <option value="Propietario">Propietario</option>
-                    <option value="Colega">Colega</option>
-                  </select>
+                    options={[
+                      ...(selectedUserId &&
+                      users.find((u) => u.id === selectedUserId)?.role === "Administrador"
+                        ? [{ value: "Administrador", label: "Administrador" }]
+                        : []),
+                      { value: "Vendedor", label: "Vendedor" },
+                      { value: "Inquilino", label: "Inquilino" },
+                      { value: "Propietario", label: "Propietario" },
+                      { value: "Colega", label: "Colega" },
+                    ]}
+                  />
                 </div>
 
                 {authRole === "admin" && (

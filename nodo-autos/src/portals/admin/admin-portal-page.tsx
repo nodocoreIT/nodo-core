@@ -4,6 +4,7 @@ import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { VehiclesListPage } from "@/features/vehicles/vehicles-list-page";
 import { VehicleFormPage } from "@/features/vehicles/vehicle-form-page";
 import { VehicleDetailPage } from "@/features/vehicles/vehicle-detail-page";
+import { VehicleImportPage } from "@/features/vehicles/vehicle-import-page";
 import { CustomersListPage } from "@/features/customers/customers-list-page";
 import { PublicationsPage } from "@/features/publications/publications-page";
 import { PublicationDetailPage } from "@/features/publications/publication-detail-page";
@@ -17,6 +18,7 @@ export function AdminPortalPage() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="vehiculos" element={<VehiclesListPage />} />
+        <Route path="vehiculos/importar" element={<VehicleImportPage />} />
         <Route path="vehiculos/nuevo" element={<VehicleFormPage />} />
         <Route path="vehiculos/:id" element={<VehicleDetailPage />} />
         <Route path="vehiculos/:id/editar" element={<VehicleFormPage />} />

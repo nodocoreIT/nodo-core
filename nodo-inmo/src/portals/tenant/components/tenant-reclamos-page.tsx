@@ -11,6 +11,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/shared/components/ui/dialog";
+import { FormSelect } from "@nodocore/shared-components";
 import { cn } from "@/shared/lib/utils";
 
 // ── Status badge ──────────────────────────────────────────────────────────────
@@ -132,30 +133,30 @@ function NewReclamoForm({ contactId, orgId, onSuccess, onCancel }: NewReclamoFor
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className={labelClass}>Categoría</label>
-          <select
-            className={inputClass}
+          <FormSelect
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            <option value="maintenance">Mantenimiento</option>
-            <option value="payment">Pago</option>
-            <option value="neighbor">Vecinos</option>
-            <option value="general">General</option>
-            <option value="other">Otro</option>
-          </select>
+            onChange={setCategory}
+            options={[
+              { value: "maintenance", label: "Mantenimiento" },
+              { value: "payment", label: "Pago" },
+              { value: "neighbor", label: "Vecinos" },
+              { value: "general", label: "General" },
+              { value: "other", label: "Otro" },
+            ]}
+          />
         </div>
 
         <div>
           <label className={labelClass}>Prioridad</label>
-          <select
-            className={inputClass}
+          <FormSelect
             value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-          >
-            <option value="alta">Alta</option>
-            <option value="media">Media</option>
-            <option value="baja">Baja</option>
-          </select>
+            onChange={setPriority}
+            options={[
+              { value: "alta", label: "Alta" },
+              { value: "media", label: "Media" },
+              { value: "baja", label: "Baja" },
+            ]}
+          />
         </div>
       </div>
 

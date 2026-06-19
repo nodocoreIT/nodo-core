@@ -6,6 +6,7 @@ import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
 import { NODES } from "@/lib/nodes";
 import { NODO_PLANS } from "@/lib/nodo-plans";
+import { FormSelect } from "@nodocore/shared-components";
 
 type ClientStatus =
   | "activo"
@@ -835,18 +836,15 @@ export default function ClientesPage() {
                         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
                           <div style={{ flex: 1 }}>
                             <label style={labelStyle}>Módulo</label>
-                            <select
+                            <FormSelect
                               value={u.unit_code}
-                              onChange={(e) => {
-                                const newCode = e.target.value;
+                              onChange={(newCode) => {
                                 const nodePlans = NODO_PLANS.find((n) => n.slug === newCode.toLowerCase());
                                 const firstPlan = nodePlans?.plans ? Object.keys(nodePlans.plans)[0] : "";
                                 updateFormUnit(u.key, { unit_code: newCode, plan: firstPlan });
                               }}
-                              style={inputStyle}
-                            >
-                              {NODES.map((n) => <option key={n.code} value={n.code}>{n.label}</option>)}
-                            </select>
+                              options={NODES.map((node) => ({ value: node.code, label: node.label }))}
+                            />
                           </div>
                           <div style={{ flex: 1 }}>
                             <label style={labelStyle}>Plan</label>
@@ -854,13 +852,14 @@ export default function ClientesPage() {
                               const nodePlans = NODO_PLANS.find((n) => n.slug === u.unit_code.toLowerCase());
                               if (nodePlans?.plans) {
                                 return (
-                                  <select value={u.plan} onChange={(e) => updateFormUnit(u.key, { plan: e.target.value })} style={inputStyle}>
-                                    {Object.entries(nodePlans.plans).map(([tier, pricing]) => (
-                                      <option key={tier} value={tier}>
-                                        {tier.charAt(0).toUpperCase() + tier.slice(1)} — {pricing.currency} {pricing.monthly}/mes
-                                      </option>
-                                    ))}
-                                  </select>
+                                  <FormSelect
+                                    value={u.plan}
+                                    onChange={(value) => updateFormUnit(u.key, { plan: value })}
+                                    options={Object.entries(nodePlans.plans).map(([tier, pricing]) => ({
+                                      value: tier,
+                                      label: `${tier.charAt(0).toUpperCase() + tier.slice(1)} — ${pricing.currency} ${pricing.monthly}/mes`,
+                                    }))}
+                                  />
                                 );
                               }
                               return (
@@ -873,13 +872,17 @@ export default function ClientesPage() {
                         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
                           <div style={{ flex: 1 }}>
                             <label style={labelStyle}>Estado</label>
-                            <select value={u.status} onChange={(e) => updateFormUnit(u.key, { status: e.target.value as ClientStatus })} style={inputStyle}>
-                              <option value="activo">Activo</option>
-                              <option value="pausado">Pausado</option>
-                              <option value="pending_review">Pendiente revisión</option>
-                              <option value="pending_onboarding">Onboarding pendiente</option>
-                              <option value="onboarding">Onboarding</option>
-                            </select>
+                            <FormSelect
+                              value={u.status}
+                              onChange={(value) => updateFormUnit(u.key, { status: value as ClientStatus })}
+                              options={[
+                                { value: "activo", label: "Activo" },
+                                { value: "pausado", label: "Pausado" },
+                                { value: "pending_review", label: "Pendiente revisión" },
+                                { value: "pending_onboarding", label: "Onboarding pendiente" },
+                                { value: "onboarding", label: "Onboarding" },
+                              ]}
+                            />
                           </div>
                           <div style={{ flex: 1 }}>
                             <label style={labelStyle}>Avance (%)</label>

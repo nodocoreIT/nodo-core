@@ -24,6 +24,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { FormSelect } from '@nodocore/shared-components';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { useRubros } from '@/hooks/use-rubros';
 import { formatearMoneda } from '@/utils/formatters';
@@ -232,17 +233,12 @@ export function InformeMensualPage() {
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <select
+          <FormSelect
             value={filtroMes}
-            onChange={(e) => setFiltroMes(e.target.value)}
-            className="text-sm font-bold text-navy bg-transparent focus:outline-none px-2 cursor-pointer appearance-none text-center min-w-[140px]"
-          >
-            {opcionesMeses.map((op) => (
-              <option key={op.value} value={op.value}>
-                {op.label}
-              </option>
-            ))}
-          </select>
+            onChange={setFiltroMes}
+            options={opcionesMeses}
+            triggerClassName="text-sm font-bold text-navy bg-transparent border-none shadow-none focus:ring-0 px-2 min-w-[140px] h-9"
+          />
           <button
             onClick={() => {
               const idx = opcionesMeses.findIndex((o) => o.value === filtroMes);
