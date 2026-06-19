@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { NODES, getLoginHrefForNode, type NodeDef } from "@/lib/nodes";
 
 interface EcosystemDiagramProps {
@@ -46,6 +47,10 @@ function kt(t: number, cycleDur: number) {
 
 const ACTIVE_TWO_LEG_DUR = 2.4;
 const ACTIVE_ONE_LEG_DUR = 1.8;
+const CORE_CLICKS_FOR_LOGIN = 5;
+const CORE_CLICK_RESET_MS = 2500;
+/** Core button size as % of diagram width (CORE_R * 2 / W). */
+const CORE_HIT_SIZE_PCT = ((CORE_R * 2) / W) * 100;
 
 export default function EcosystemDiagram({
   dark = false,
@@ -55,8 +60,11 @@ export default function EcosystemDiagram({
   activeNodeSlug,
   isLoginPage = false,
 }: EcosystemDiagramProps) {
+  const router = useRouter();
   const [hoveredParentSlug, setHoveredParentSlug] = useState<string | null>(null);
+  const [coreClickCount, setCoreClickCount] = useState(0);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const coreClickResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleHoverChange = (hovered: boolean, slug: string) => {
     if (hovered) {
@@ -65,6 +73,22 @@ export default function EcosystemDiagram({
     } else {
       hideTimer.current = setTimeout(() => setHoveredParentSlug(null), 2000);
     }
+  };
+
+  const handleCoreClick = () => {
+    if (isLoginPage) return;
+
+    if (coreClickResetTimer.current) clearTimeout(coreClickResetTimer.current);
+
+    const next = coreClickCount + 1;
+    if (next >= CORE_CLICKS_FOR_LOGIN) {
+      setCoreClickCount(0);
+      router.push("/login");
+      return;
+    }
+
+    setCoreClickCount(next);
+    coreClickResetTimer.current = setTimeout(() => setCoreClickCount(0), CORE_CLICK_RESET_MS);
   };
 
   const resolved: NodeDef[] = units
@@ -328,6 +352,17 @@ export default function EcosystemDiagram({
           Core
         </text>
       </svg>
+
+      {/* Core — 5 clicks → panel login (landing only) */}
+      {!isLoginPage && (
+        <button
+          type="button"
+          onClick={handleCoreClick}
+          className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-0 bg-transparent p-0 cursor-default"
+          style={{ width: `${CORE_HIT_SIZE_PCT}%`, height: `${CORE_HIT_SIZE_PCT}%` }}
+          aria-label="Nodo Core"
+        />
+      )}
 
       {/* ── HTML overlays ─────────────────────────────────────────────────── */}
 
