@@ -64,6 +64,7 @@
 @import "tailwindcss";
 @import "@nodocore/shared-components/styles/interactive.css";
 @source "../../packages/shared-components/src/**/*.{ts,tsx}";
+@source "../../packages/nodo-modules/src/**/*.{ts,tsx}";
 
 /* ─── Base styles ──────────────────────────────────────────── */
 body {

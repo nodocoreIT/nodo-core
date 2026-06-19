@@ -30,6 +30,23 @@ export default defineConfig({
         monorepoRoot,
         "packages/shared-components/src/styles",
       ),
+      "@nodocore/nodo-modules/agenda": resolve(
+        monorepoRoot,
+        "packages/nodo-modules/src/agenda/index.ts",
+      ),
+      "@nodocore/nodo-modules/caja": resolve(
+        monorepoRoot,
+        "packages/nodo-modules/src/caja/index.ts",
+      ),
+      "@nodocore/nodo-modules/notifications": resolve(
+        monorepoRoot,
+        "packages/nodo-modules/src/notifications/index.ts",
+      ),
+      "@nodocore/nodo-modules/settings": resolve(
+        monorepoRoot,
+        "packages/nodo-modules/src/settings/index.ts",
+      ),
+      "@nodocore/nodo-modules": resolve(monorepoRoot, "packages/nodo-modules/src/index.ts"),
       // Compile from source so Vite shares one React instance (dist bundle breaks hooks).
       "@nodocore/shared-components": resolve(
         monorepoRoot,
@@ -39,7 +56,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ["react", "react-dom", "react/jsx-runtime"],
-    exclude: ["@nodocore/shared-components"],
+    exclude: ["@nodocore/shared-components", "@nodocore/nodo-modules"],
   },
   test: {
     globals: true,

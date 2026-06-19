@@ -1,12 +1,12 @@
 import { useEffect } from "react";
-import { supabase } from "@/shared/lib/supabase";
+import { autosDb } from "@/shared/lib/supabase";
 import { useThemeStore, type ThemeSettings } from "./use-theme-settings";
 
 export function useAutosThemeSync() {
   const { setSettings } = useThemeStore();
 
   useEffect(() => {
-    supabase
+    autosDb()
       .from("clientes")
       .select("theme_settings")
       .single()
@@ -19,7 +19,7 @@ export function useAutosThemeSync() {
 }
 
 export async function saveAutosThemeSettings(settings: ThemeSettings): Promise<void> {
-  await supabase
+  await autosDb()
     .from("clientes")
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .update({ theme_settings: settings as any });

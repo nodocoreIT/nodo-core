@@ -2,7 +2,6 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-// Mock supabase BEFORE importing hooks
 vi.mock("@/shared/lib/supabase", () => ({
   supabase: {
     schema: vi.fn(() => ({
@@ -35,13 +34,14 @@ vi.mock("@nodocore/shared-components", async (importOriginal) => {
   };
 });
 
-// Mock feature hooks
 const mockUseTasks = vi.fn();
-vi.mock("@/features/agenda/hooks/use-tasks", () => ({
-  useTasks: () => mockUseTasks(),
-  useCreateTask: () => ({ mutateAsync: vi.fn() }),
-  useUpdateTask: () => ({ mutateAsync: vi.fn() }),
-  useDeleteTask: () => ({ mutateAsync: vi.fn() }),
+vi.mock("@/shared/lib/inmo-module-hooks", () => ({
+  createInmoTasksHooks: () => ({
+    useTasks: () => mockUseTasks(),
+    useCreateTask: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useUpdateTask: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useDeleteTask: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  }),
 }));
 
 vi.mock("@/features/properties/hooks/use-properties", () => ({
@@ -50,6 +50,10 @@ vi.mock("@/features/properties/hooks/use-properties", () => ({
 
 vi.mock("@/features/contacts/hooks/use-contacts", () => ({
   useContacts: () => ({ data: [], isLoading: false }),
+}));
+
+vi.mock("@/shared/hooks/use-staff", () => ({
+  useStaff: () => ({ users: [] }),
 }));
 
 import { MemoryRouter } from "react-router-dom";
@@ -91,7 +95,7 @@ describe("AgendaPage", () => {
 
     render(<AgendaPage />, { wrapper });
     expect(
-      screen.getByText(/no tenés tareas agendadas para este día/i)
+      screen.getByText(/no tenés tareas agendadas para este día/i),
     ).toBeInTheDocument();
   });
 
@@ -123,9 +127,9 @@ describe("AgendaPage", () => {
 
     expect(screen.getByText("Firma de contrato de Callao 500")).toBeInTheDocument();
     expect(screen.getByText("Traer duplicados y sellos")).toBeInTheDocument();
-    expect(screen.getAllByText("Firma de Contrato").length).toBeGreaterThan(0); // Category badge
-    expect(screen.getAllByText("Alta").length).toBeGreaterThan(0); // Priority badge
-    expect(screen.getAllByText("Ramiro Tule").length).toBeGreaterThan(0); // Assignee badge
+    expect(screen.getAllByText("Firma de Contrato").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Alta").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ramiro Tule").length).toBeGreaterThan(0);
   });
 
   it("renders Nueva Tarea button", () => {
@@ -136,8 +140,6 @@ describe("AgendaPage", () => {
     });
 
     render(<AgendaPage />, { wrapper });
-    expect(
-      screen.getByRole("button", { name: /nueva tarea/i })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /nueva tarea/i })).toBeInTheDocument();
   });
 });

@@ -40,7 +40,8 @@ import { AgencyProfileForm } from "@/features/agency-profile/components/agency-p
 import { useAuth } from "@nodocore/shared-components";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import { cn } from "@/shared/lib/utils";
-import { SettingsDialog } from "./settings-dialog";
+import { SettingsDialog } from "@nodocore/nodo-modules/settings";
+import { InmoSettingsModuleProvider } from "@/shared/lib/inmo-settings-module";
 import { FeedbackFAB } from "@/features/feedback/components/feedback-node";
 import { NotificationsBell } from "@/features/dashboard/components/notifications-bell";
 import { IPCBadge } from "@/features/ipc/components/IPCBadge";
@@ -169,6 +170,7 @@ export function AdminLayout() {
   const displayName = fullName || email;
 
   return (
+    <InmoSettingsModuleProvider>
     <div className="flex h-[100dvh] overflow-hidden bg-paper">
       {/* Mobile Sidebar/Drawer Overlay */}
       {mobileMenuOpen && (
@@ -340,5 +342,6 @@ export function AdminLayout() {
       {/* Floating feedback node (only on Dashboard/Inicio) */}
       {pathname === "/admin/dashboard" && <FeedbackFAB />}
     </div>
+    </InmoSettingsModuleProvider>
   );
 }
