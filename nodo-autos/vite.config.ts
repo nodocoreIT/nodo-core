@@ -20,11 +20,13 @@ export default defineConfig({
     origin: "http://localhost:3000",
   },
   resolve: {
-    dedupe: ["react", "react-dom", "react/jsx-runtime"],
+    dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
     alias: {
       "@": resolve(__dirname, "./src"),
       react: resolve(__dirname, "node_modules/react"),
       "react-dom": resolve(__dirname, "node_modules/react-dom"),
+      "react/jsx-runtime": resolve(__dirname, "node_modules/react/jsx-runtime.js"),
+      "react/jsx-dev-runtime": resolve(__dirname, "node_modules/react/jsx-dev-runtime.js"),
       "@nodocore/shared-components/styles": resolve(
         monorepoRoot,
         "packages/shared-components/src/styles",
@@ -37,7 +39,15 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ["react", "react-dom", "react/jsx-runtime"],
+    include: [
+      "react",
+      "react-dom",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "@tanstack/react-query",
+      "zustand",
+      "sonner",
+    ],
     exclude: ["@nodocore/shared-components"],
   },
   test: {

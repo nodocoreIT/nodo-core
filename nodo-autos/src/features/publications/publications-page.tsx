@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Car, Globe, Search, Share2 } from "lucide-react";
+import { Car, Check, Globe, Search, Share2, X } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -9,6 +9,7 @@ import {
   Input,
 } from "@nodocore/shared-components";
 import { useVehicleStore } from "@/store/vehicle-store";
+import { matchesVehicleSearch } from "@/shared/lib/utils";
 import type { PublicationChannel, PublicationStatus } from "@/types";
 import {
   SOCIAL_PLATFORMS,
@@ -39,10 +40,6 @@ const STATUS_LABEL: Record<PublicationStatus, string> = {
   fallido: "Fallido",
 };
 
-function matchesQuery(value: string, query: string) {
-  return value.toLowerCase().includes(query);
-}
-
 export function PublicationsPage() {
   const navigate = useNavigate();
   const { vehicles, publications, loadInitialData, loading } = useVehicleStore();
@@ -53,25 +50,16 @@ export function PublicationsPage() {
   }, [loadInitialData]);
 
   const filteredVehicles = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = searchQuery.trim();
     if (!query) return vehicles;
-    return vehicles.filter((vehicle) => {
-      const haystack = [
-        vehicle.licensePlate || "",
-        vehicle.brand,
-        vehicle.model,
-        vehicle.version || "",
-        String(vehicle.year),
-      ];
-      return haystack.some((field) => matchesQuery(field, query));
-    });
+    return vehicles.filter((vehicle) => matchesVehicleSearch(vehicle, query));
   }, [vehicles, searchQuery]);
 
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-navy">Publicaciones</h2>
+          <h2 className="text-xl font-bold text-navy">Redes Sociales</h2>
           <p className="text-sm text-slate2 mt-1">
             Gestioná la publicación de vehículos en Instagram, Facebook y otros canales.
           </p>
@@ -164,27 +152,25 @@ export function PublicationsPage() {
                         isPlatformPublished(
                           getPublicationForPlatform(publications, v.id, ch),
                         );
+                      const isPublished =
+                        socialPublished || pub?.status === "publicado";
 
                       return (
                         <div key={ch} className="flex justify-center">
-                          {socialPublished || pub ? (
+                          {isPublished ? (
+                            <span title="Publicado" className="inline-flex items-center justify-center">
+                              <Check className="h-5 w-5 text-emerald-600 stroke-[2.5]" />
+                            </span>
+                          ) : pub && pub.status !== "borrador" ? (
                             <span
-                              className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                                socialPublished || pub?.status === "publicado"
-                                  ? STATUS_BADGE.publicado
-                                  : pub
-                                    ? STATUS_BADGE[pub.status]
-                                    : STATUS_BADGE.borrador
-                              }`}
+                              className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[pub.status]}`}
                             >
-                              {socialPublished || pub?.status === "publicado"
-                                ? STATUS_LABEL.publicado
-                                : pub
-                                  ? STATUS_LABEL[pub.status]
-                                  : "—"}
+                              {STATUS_LABEL[pub.status]}
                             </span>
                           ) : (
-                            <span className="text-xs text-slate2-300">—</span>
+                            <span title="Sin publicar" className="inline-flex items-center justify-center">
+                              <X className="h-5 w-5 text-red-400 stroke-[2.5]" />
+                            </span>
                           )}
                         </div>
                       );

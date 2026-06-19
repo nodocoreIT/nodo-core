@@ -14,6 +14,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@nodocore/shared-components";
+import { VehicleTabBar, type VehicleTab } from "@/features/vehicles/components/vehicle-tab-bar";
+import { VehicleQrPanel } from "@/features/vehicles/components/vehicle-qr-panel";
+import { VehicleDocumentsPanel } from "@/features/vehicles/components/vehicle-documents-panel";
+import type { VehicleDocument } from "@/types";
 import { useVehicleStore } from "@/store/vehicle-store";
 import { supabase } from "@/shared/lib/supabase";
 import { generateVehicleSlug } from "@/shared/lib/utils";
@@ -89,6 +93,8 @@ export function VehicleFormPage() {
   // ── Features/equipment state ───────────────────────────────────────────────
   const [features, setFeatures] = useState<string[]>(existing?.features ?? []);
   const [featureInput, setFeatureInput] = useState("");
+  const [documents, setDocuments] = useState<VehicleDocument[]>(existing?.documents ?? []);
+  const [activeTab, setActiveTab] = useState<VehicleTab>("datos");
 
   const {
     register,
@@ -150,6 +156,7 @@ export function VehicleFormPage() {
       });
       setPhotos(existing.photos ?? []);
       setFeatures(existing.features ?? []);
+      setDocuments(existing.documents ?? []);
     }
   }, [existing, reset]);
 
@@ -290,7 +297,7 @@ export function VehicleFormPage() {
       isPublished: existing?.isPublished ?? false,
       photos,
       features,
-      documents: existing?.documents ?? [],
+      documents,
       tags: existing?.tags ?? [],
     };
 
@@ -309,7 +316,7 @@ export function VehicleFormPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 w-full max-w-6xl">
       <button
         type="button"
         onClick={() => navigate(-1)}
@@ -323,7 +330,26 @@ export function VehicleFormPage() {
         {isEdit ? "Editar vehículo" : "Nuevo vehículo"}
       </h2>
 
+      <VehicleTabBar
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        showExtendedTabs={isEdit && Boolean(existing)}
+      />
+
+      {isEdit && activeTab === "qr" && existing && (
+        <Card className="border-slate-200 rounded-xl shadow-sm">
+          <CardContent className="pt-6">
+            <VehicleQrPanel
+              vehicle={existing}
+              clienteIdentificador={currentCliente?.identificador}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        {activeTab === "datos" && (
+          <>
         {/* Identificación */}
         <Card className="border-slate-200 rounded-xl shadow-sm">
           <CardHeader>
@@ -392,89 +418,6 @@ export function VehicleFormPage() {
                 <option value="nuevo">Nuevo</option>
               </select>
             </FormField>
-          </CardContent>
-        </Card>
-
-        {/* Fotos */}
-        <Card className="border-slate-200 rounded-xl shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm text-slate2 uppercase tracking-wide">
-              Fotos
-              {photos.length > 0 && (
-                <span className="ml-2 font-normal normal-case text-slate2/60">
-                  {photos.length} foto{photos.length > 1 ? "s" : ""} · la primera es la portada
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Upload button */}
-            <div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingPhotos}
-                className="flex items-center gap-2 rounded-lg border-2 border-dashed border-mist px-5 py-4 text-sm text-slate2 hover:border-brand hover:text-brand transition-colors disabled:opacity-50 w-full justify-center"
-              >
-                <Upload size={18} />
-                {uploadingPhotos ? "Subiendo fotos…" : "Seleccioná fotos (máx. 5MB c/u)"}
-              </button>
-            </div>
-
-            {/* Photo grid */}
-            {photos.length > 0 && (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                {photos.map((url, index) => (
-                  <div key={url} className="relative group aspect-square">
-                    <img
-                      src={url}
-                      alt={`Foto ${index + 1}`}
-                      className="w-full h-full object-cover rounded-lg border border-mist"
-                    />
-                    {index === 0 && (
-                      <span className="absolute top-1 left-1 rounded bg-brand px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                        Portada
-                      </span>
-                    )}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
-                      {index > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => movePhoto(index, index - 1)}
-                          className="rounded bg-white/90 p-1 text-navy hover:bg-white"
-                          title="Mover a la izquierda"
-                        >
-                          <GripVertical size={14} />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => removePhoto(index)}
-                        className="rounded bg-white/90 p-1 text-red-600 hover:bg-white"
-                        title="Eliminar foto"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {photos.length === 0 && (
-              <div className="flex flex-col items-center justify-center gap-2 py-8 text-center text-slate2/60">
-                <ImageIcon size={32} />
-                <p className="text-xs">Sin fotos aún. La primera que subas será la portada.</p>
-              </div>
-            )}
           </CardContent>
         </Card>
 
@@ -620,8 +563,105 @@ export function VehicleFormPage() {
             />
           </CardContent>
         </Card>
+          </>
+        )}
 
-        {/* Notas internas */}
+        {activeTab === "fotos" && (
+          <Card className="border-slate-200 rounded-xl shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm text-slate2 uppercase tracking-wide">
+                Fotos del vehículo
+                {photos.length > 0 && (
+                  <span className="ml-2 font-normal normal-case text-slate2/60">
+                    {photos.length} foto{photos.length > 1 ? "s" : ""} · la primera es la portada
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPhotos}
+                  className="flex items-center gap-2 rounded-lg border-2 border-dashed border-mist px-5 py-4 text-sm text-slate2 hover:border-brand hover:text-brand transition-colors disabled:opacity-50 w-full justify-center"
+                >
+                  <Upload size={18} />
+                  {uploadingPhotos ? "Subiendo fotos…" : "Seleccioná fotos (máx. 5MB c/u)"}
+                </button>
+              </div>
+
+              {photos.length > 0 && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {photos.map((url, index) => (
+                    <div key={url} className="relative group aspect-square">
+                      <img
+                        src={url}
+                        alt={`Foto ${index + 1}`}
+                        className="w-full h-full object-cover rounded-lg border border-mist"
+                      />
+                      {index === 0 && (
+                        <span className="absolute top-1 left-1 rounded bg-brand px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                          Portada
+                        </span>
+                      )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                        {index > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => movePhoto(index, index - 1)}
+                            className="rounded bg-white/90 p-1 text-navy hover:bg-white"
+                            title="Mover a la izquierda"
+                          >
+                            <GripVertical size={14} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removePhoto(index)}
+                          className="rounded bg-white/90 p-1 text-red-600 hover:bg-white"
+                          title="Eliminar foto"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {photos.length === 0 && (
+                <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-slate2/60">
+                  <ImageIcon size={32} />
+                  <p className="text-xs">Sin fotos aún. La primera que subas será la portada.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {isEdit && activeTab === "documentacion" && (
+          <Card className="border-slate-200 rounded-xl shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm text-slate2 uppercase tracking-wide">
+                Documentación del vehículo
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <VehicleDocumentsPanel documents={documents} onChange={setDocuments} />
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === "notas" && (
         <Card className="border-slate-200 rounded-xl shadow-sm">
           <CardHeader>
             <CardTitle className="text-sm text-slate2 uppercase tracking-wide">Notas internas</CardTitle>
@@ -635,7 +675,9 @@ export function VehicleFormPage() {
             />
           </CardContent>
         </Card>
+        )}
 
+        {activeTab !== "qr" && (
         <div className="flex gap-3">
           <Button type="button" variant="outline" onClick={() => navigate(-1)}>
             Cancelar
@@ -646,9 +688,10 @@ export function VehicleFormPage() {
             className="bg-brand hover:bg-brand-600 text-white gap-2"
           >
             <Save className="h-4 w-4" />
-            {isSubmitting ? "Guardando…" : "Guardar vehículo"}
+            {isSubmitting ? "Guardando…" : isEdit ? "Guardar cambios" : "Guardar vehículo"}
           </Button>
         </div>
+        )}
       </form>
     </div>
   );

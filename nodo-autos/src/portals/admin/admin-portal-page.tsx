@@ -23,7 +23,8 @@ export function AdminPortalPage() {
         <Route path="clientes" element={<CustomersListPage />} />
         <Route path="publicaciones" element={<PublicationsPage />} />
         <Route path="publicaciones/:id" element={<PublicationDetailPage />} />
-        <Route path="contratos" element={<ContractsPage />} />
+        <Route path="documentacion" element={<ContractsPage />} />
+        <Route path="contratos" element={<Navigate to="/admin/documentacion" replace />} />
         <Route path="configuracion" element={<ConfigPage />} />
       </Route>
     </Routes>

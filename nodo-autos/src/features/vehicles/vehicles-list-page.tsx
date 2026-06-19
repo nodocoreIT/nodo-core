@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, LayoutGrid, List, Search, Pencil, Trash2, Car } from "lucide-react";
+import { Plus, LayoutGrid, List, Search, Pencil, Trash2, Car, Filter } from "lucide-react";
 import {
   Button,
   Input,
@@ -8,19 +8,22 @@ import {
   CardContent,
 } from "@nodocore/shared-components";
 import { useVehicleStore } from "@/store/vehicle-store";
-import { formatPrice, formatKilometers } from "@/shared/lib/utils";
-import { cn } from "@/shared/lib/utils";
-import type { VehicleStatus, VehicleCondition, Vehicle } from "@/types";
+import { formatPrice, formatKilometers, cn } from "@/shared/lib/utils";
+import type { Vehicle, VehicleFilters } from "@/types";
 import { toast } from "sonner";
+import {
+  VehicleFiltersPanel,
+  countActiveVehicleFilters,
+} from "./components/vehicle-filters-panel";
 
-const STATUS_BADGE: Record<VehicleStatus, string> = {
+const STATUS_BADGE: Record<Vehicle["status"], string> = {
   disponible: "status-disponible",
   reservado: "status-reservado",
   vendido: "status-vendido",
   en_preparacion: "status-en_preparacion",
 };
 
-const STATUS_LABEL: Record<VehicleStatus, string> = {
+const STATUS_LABEL: Record<Vehicle["status"], string> = {
   disponible: "Disponible",
   reservado: "Reservado",
   vendido: "Vendido",
@@ -29,33 +32,31 @@ const STATUS_LABEL: Record<VehicleStatus, string> = {
 
 export function VehiclesListPage() {
   const navigate = useNavigate();
-  const { vehicles, loadInitialData, deleteVehicle, loading } = useVehicleStore();
+  const { vehicles, loadInitialData, deleteVehicle, filterVehicles, loading } =
+    useVehicleStore();
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<VehicleStatus | "">("");
-  const [conditionFilter, setConditionFilter] = useState<VehicleCondition | "">("");
+  const [filters, setFilters] = useState<VehicleFilters>({});
+  const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  const activeFilterCount = countActiveVehicleFilters(filters);
+  const filtered = filterVehicles(filters);
 
   useEffect(() => {
     void loadInitialData();
   }, [loadInitialData]);
 
-  const filtered = vehicles.filter((v) => {
-    if (statusFilter && v.status !== statusFilter) return false;
-    if (conditionFilter && v.condition !== conditionFilter) return false;
-    if (search) {
-      const s = search.toLowerCase();
-      if (
-        !v.brand.toLowerCase().includes(s) &&
-        !v.model.toLowerCase().includes(s) &&
-        !(v.version ?? "").toLowerCase().includes(s) &&
-        !String(v.year).includes(s)
-      )
-        return false;
-    }
-    return true;
-  });
+  function handleFilterChange<K extends keyof VehicleFilters>(
+    key: K,
+    value: VehicleFilters[K],
+  ) {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function clearPanelFilters() {
+    setFilters((prev) => ({ search: prev.search }));
+  }
 
   async function handleDelete(id: string) {
     try {
@@ -81,67 +82,86 @@ export function VehiclesListPage() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate2" />
-          <Input
-            placeholder="Buscar por marca, modelo, año…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+      {/* Search + filters toolbar */}
+      <Card className="border-slate-200 rounded-xl shadow-sm">
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative min-w-0 flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate2" />
+              <Input
+                placeholder="Buscar por marca, modelo, patente, año…"
+                value={filters.search ?? ""}
+                onChange={(e) => handleFilterChange("search", e.target.value || undefined)}
+                className="pl-9"
+              />
+            </div>
 
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as VehicleStatus | "")}
-          className="rounded-md border border-mist bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-        >
-          <option value="">Todos los estados</option>
-          <option value="disponible">Disponible</option>
-          <option value="reservado">Reservado</option>
-          <option value="vendido">Vendido</option>
-          <option value="en_preparacion">En preparación</option>
-        </select>
+            <div className="flex items-center gap-2 sm:ml-auto">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowFilters((open) => !open)}
+                className={cn(
+                  "gap-2",
+                  (showFilters || activeFilterCount > 0) &&
+                    "border-brand text-brand bg-brand/5",
+                )}
+              >
+                <Filter className="h-4 w-4" />
+                Filtros
+                {activeFilterCount > 0 ? (
+                  <span className="rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    {activeFilterCount}
+                  </span>
+                ) : null}
+              </Button>
 
-        <select
-          value={conditionFilter}
-          onChange={(e) => setConditionFilter(e.target.value as VehicleCondition | "")}
-          className="rounded-md border border-mist bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-        >
-          <option value="">Condición</option>
-          <option value="nuevo">Nuevo</option>
-          <option value="usado">Usado</option>
-        </select>
+              <div className="flex overflow-hidden rounded-md border border-mist">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  className={cn(
+                    "px-3 py-2 transition-colors",
+                    viewMode === "grid"
+                      ? "bg-navy text-white"
+                      : "bg-white text-slate2 hover:bg-mist",
+                  )}
+                  aria-label="Vista cuadrícula"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("list")}
+                  className={cn(
+                    "px-3 py-2 transition-colors",
+                    viewMode === "list"
+                      ? "bg-navy text-white"
+                      : "bg-white text-slate2 hover:bg-mist",
+                  )}
+                  aria-label="Vista lista"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
 
-        <div className="flex rounded-md border border-mist overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setViewMode("grid")}
-            className={cn(
-              "px-3 py-2 transition-colors",
-              viewMode === "grid" ? "bg-navy text-white" : "bg-white text-slate2 hover:bg-mist",
-            )}
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("list")}
-            className={cn(
-              "px-3 py-2 transition-colors",
-              viewMode === "list" ? "bg-navy text-white" : "bg-white text-slate2 hover:bg-mist",
-            )}
-          >
-            <List className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+          {showFilters ? (
+            <VehicleFiltersPanel
+              filters={filters}
+              onChange={handleFilterChange}
+              onClear={clearPanelFilters}
+              className="mt-4"
+            />
+          ) : null}
+        </CardContent>
+      </Card>
 
       {/* Count */}
       <p className="text-sm text-slate2">
-        {filtered.length} vehículo{filtered.length !== 1 ? "s" : ""}
+        Mostrando {filtered.length} de {vehicles.length} vehículo
+        {vehicles.length !== 1 ? "s" : ""}
       </p>
 
       {/* Loading */}

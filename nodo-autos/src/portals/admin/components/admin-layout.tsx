@@ -24,8 +24,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/vehiculos", label: "Vehículos", icon: Car },
   { to: "/admin/clientes", label: "Clientes", icon: Users },
-  { to: "/admin/publicaciones", label: "Publicaciones", icon: Share2 },
-  { to: "/admin/contratos", label: "Contratos", icon: FileText },
+  { to: "/admin/publicaciones", label: "Redes Sociales", icon: Share2 },
+  { to: "/admin/documentacion", label: "Documentación", icon: FileText },
   { to: "/admin/configuracion", label: "Configuración", icon: Settings },
 ];
 
@@ -33,8 +33,8 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/dashboard": "Dashboard",
   "/admin/vehiculos": "Vehículos",
   "/admin/clientes": "Clientes",
-  "/admin/publicaciones": "Publicaciones",
-  "/admin/contratos": "Contratos",
+  "/admin/publicaciones": "Redes Sociales",
+  "/admin/documentacion": "Documentación",
   "/admin/configuracion": "Configuración",
 };
 
