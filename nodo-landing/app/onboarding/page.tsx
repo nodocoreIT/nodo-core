@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, type ChangeEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import NeuralNodesBackground from "@/components/NeuralNodesBackground";
+import { DocumentNumberInput } from "@nodocore/shared-components";
 
 const inputClass =
   "mt-1 w-full rounded-lg px-3 py-2.5 text-sm bg-white border border-slate-200 text-navy placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand/25 focus:border-brand transition-shadow";
@@ -288,16 +289,14 @@ function OnboardingForm() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className="block">
                     <span className={labelClass}>Número de DNI (opcional)</span>
-                    <input
-                      inputMode="numeric"
-                      maxLength={8}
+                    <DocumentNumberInput
+                      className={inputClass}
+                      documentType="DNI"
                       value={documentNumber}
                       onChange={(e) => {
-                        setDocumentNumber(e.target.value.replace(/\D/g, ""));
+                        setDocumentNumber(e.target.value);
                         resetIdentityCheck();
                       }}
-                      className={inputClass}
-                      placeholder="12345678"
                     />
                   </label>
                   <label className="block">

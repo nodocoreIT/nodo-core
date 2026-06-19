@@ -21,6 +21,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.4.0
         version: 5.4.0(react-hook-form@7.78.0(react@19.2.7))
+      '@nodocore/nodo-modules':
+        specifier: workspace:*
+        version: link:../packages/nodo-modules
       '@nodocore/shared-components':
         specifier: workspace:*
         version: link:../packages/shared-components
@@ -492,6 +495,46 @@ importers:
         version: 4.3.0
       typescript:
         specifier: ^5
+        version: 5.9.3
+
+  packages/nodo-modules:
+    dependencies:
+      '@nodocore/shared-components':
+        specifier: workspace:*
+        version: link:../shared-components
+      '@supabase/supabase-js':
+        specifier: '>=2.0.0'
+        version: 2.108.1
+      '@tanstack/react-query':
+        specifier: '>=5.0.0'
+        version: 5.101.0(react@19.2.7)
+      lucide-react:
+        specifier: '>=0.400.0'
+        version: 1.18.0(react@19.2.7)
+      react:
+        specifier: 19.2.7
+        version: 19.2.7
+      react-dom:
+        specifier: 19.2.7
+        version: 19.2.7(react@19.2.7)
+      react-router-dom:
+        specifier: '>=7.0.0'
+        version: 7.17.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.1.5
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.1.5
+        version: 19.2.3(@types/react@19.2.17)
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      tailwind-merge:
+        specifier: ^3.3.0
+        version: 3.6.0
+      typescript:
+        specifier: ^5.8.3
         version: 5.9.3
 
   packages/shared-components:

@@ -10,10 +10,18 @@ import {
   LogOut,
   Menu,
   X,
+  Calendar,
+  Wallet,
 } from "lucide-react";
-import { Button, useAuth } from "@nodocore/shared-components";
+import {
+  Button,
+  PortalHeaderActions,
+  PortalHeaderMobileActions,
+  useAuth,
+} from "@nodocore/shared-components";
 import { cn } from "@/shared/lib/utils";
 import { useDealershipBrand } from "@/shared/hooks/use-dealership-brand";
+import { NotificationsBell } from "@/features/notifications/notifications-bell";
 
 interface NavItem {
   to: string;
@@ -26,15 +34,21 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/vehiculos", label: "Vehículos", icon: Car },
   { to: "/admin/clientes", label: "Clientes", icon: Users },
   { to: "/admin/publicaciones", label: "Redes Sociales", icon: Share2 },
+  { to: "/admin/caja", label: "Caja", icon: Wallet },
+  { to: "/admin/agenda", label: "Agenda y Tareas", icon: Calendar },
   { to: "/admin/documentacion", label: "Documentación", icon: FileText },
   { to: "/admin/configuracion", label: "Configuración", icon: Settings },
 ];
 
 const ROUTE_TITLES: Record<string, string> = {
   "/admin/dashboard": "Dashboard",
-  "/admin/vehiculos": "Vehículos",
+  "/admin/vehiculos/importar": "Importación masiva",
+  "/admin/vehiculos/nuevo": "Nuevo vehículo",
+  "/admin/vehiculos": "Stock de vehículos",
   "/admin/clientes": "Clientes",
-  "/admin/publicaciones": "Redes Sociales",
+  "/admin/publicaciones": "Publicaciones",
+  "/admin/caja": "Caja",
+  "/admin/agenda": "Agenda y Tareas",
   "/admin/documentacion": "Documentación",
   "/admin/configuracion": "Configuración",
 };
@@ -63,10 +77,22 @@ export function AdminLayout() {
     return () => media.removeEventListener("change", listener);
   }, []);
 
-  const pageTitle =
-    Object.entries(ROUTE_TITLES)
-      .sort((a, b) => b[0].length - a[0].length)
-      .find(([key]) => pathname.startsWith(key))?.[1] ?? "Panel";
+  const pageTitle = (() => {
+    if (pathname.endsWith("/editar")) return "Editar vehículo";
+    if (/^\/admin\/publicaciones\/[^/]+$/.test(pathname)) return "Publicación en redes";
+    if (
+      /^\/admin\/vehiculos\/[^/]+$/.test(pathname) &&
+      !pathname.endsWith("/nuevo") &&
+      !pathname.endsWith("/importar")
+    ) {
+      return "Detalle del vehículo";
+    }
+    return (
+      Object.entries(ROUTE_TITLES)
+        .sort((a, b) => b[0].length - a[0].length)
+        .find(([key]) => pathname.startsWith(key))?.[1] ?? "Panel"
+    );
+  })();
 
   useEffect(() => {
     document.title = `${pageTitle} · ${dealershipName}`;
@@ -181,22 +207,28 @@ export function AdminLayout() {
       {/* Main */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Header */}
-        <header className="flex min-h-16 items-center justify-between gap-4 border-b border-border bg-[#EEF3F8] px-4 sm:px-6 py-3 shadow-sm flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="block md:hidden text-navy hover:text-brand"
-              onClick={() => setMobileMenuOpen(true)}
-            >
-              <Menu className="h-6 w-6" />
-            </button>
-            <div>
-              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate2">
-                {dealershipName} · Panel Admin
-              </p>
-              <h1 className="text-base sm:text-xl font-bold text-navy mt-1.5">{pageTitle}</h1>
+        <header className="flex min-h-16 flex-col gap-3 border-b border-border bg-[#EEF3F8] px-4 py-3 shadow-sm flex-shrink-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
+          <div className="flex items-center justify-between gap-3 sm:justify-start">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="block md:hidden text-navy hover:text-brand"
+                onClick={() => setMobileMenuOpen(true)}
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+              <div>
+                <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate2">
+                  {dealershipName} · Panel Admin
+                </p>
+                <h1 className="text-base sm:text-xl font-bold text-navy mt-1.5">{pageTitle}</h1>
+              </div>
             </div>
+
+            <PortalHeaderMobileActions notifications={<NotificationsBell />} />
           </div>
+
+          <PortalHeaderActions notifications={<NotificationsBell />} />
         </header>
 
         {/* Content */}

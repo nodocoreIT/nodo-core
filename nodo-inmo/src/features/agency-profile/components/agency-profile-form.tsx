@@ -4,8 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
-import { Button } from "@nodocore/shared-components";
-import { Input } from "@nodocore/shared-components";
+import { Button, Input, DocumentNumberInput } from "@nodocore/shared-components";
 import {
   Form,
   FormControl,
@@ -170,11 +169,13 @@ export function AgencyProfileForm({ onSuccess }: AgencyProfileFormProps) {
             <FormItem>
               <FormLabel htmlFor="profile-cuit">CUIT</FormLabel>
               <FormControl>
-                <Input
+                <DocumentNumberInput
                   id="profile-cuit"
                   aria-label="CUIT"
-                  placeholder="XX-XXXXXXXX-X"
+                  format="cuit"
+                  placeholder="20-12345678-9"
                   {...field}
+                  value={field.value ?? ""}
                 />
               </FormControl>
               <FormMessage />

@@ -71,8 +71,7 @@ export function VehiclesListPage() {
   return (
     <div className="space-y-5">
       {/* Toolbar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-bold text-navy">Stock de vehículos</h2>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"

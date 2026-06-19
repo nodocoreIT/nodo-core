@@ -138,8 +138,7 @@ export function VehicleImportPage() {
             Volver a vehículos
           </Link>
           <div>
-            <h2 className="text-2xl font-bold text-navy">Importación masiva desde Excel</h2>
-            <p className="mt-1 text-sm text-slate2">
+            <p className="text-sm text-slate2">
               Subí un archivo .xlsx con el template. Si la patente ya existe, se actualiza el vehículo.
             </p>
           </div>

@@ -10,6 +10,8 @@ import { PublicationsPage } from "@/features/publications/publications-page";
 import { PublicationDetailPage } from "@/features/publications/publication-detail-page";
 import { ConfigPage } from "@/features/config/config-page";
 import { ContractsPage } from "@/features/contracts/contracts-page";
+import { AutosAgendaPage } from "@/features/agenda/agenda-page";
+import { AutosCajaPage } from "@/features/caja/caja-page";
 
 export function AdminPortalPage() {
   return (
@@ -25,6 +27,8 @@ export function AdminPortalPage() {
         <Route path="clientes" element={<CustomersListPage />} />
         <Route path="publicaciones" element={<PublicationsPage />} />
         <Route path="publicaciones/:id" element={<PublicationDetailPage />} />
+        <Route path="caja" element={<AutosCajaPage />} />
+        <Route path="agenda" element={<AutosAgendaPage />} />
         <Route path="documentacion" element={<ContractsPage />} />
         <Route path="contratos" element={<Navigate to="/admin/documentacion" replace />} />
         <Route path="configuracion" element={<ConfigPage />} />
