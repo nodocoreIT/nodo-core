@@ -131,7 +131,6 @@ function mapRpcRow(row: RpcRow): PublicVehicleView {
       sitioWeb: c.sitio_web ?? undefined,
       instagramUrl: c.instagram_url ?? undefined,
       facebookUrl: c.facebook_url ?? undefined,
-      creadoEn: "",
     },
     contacts: (row.contacts ?? []).map((user) => ({
       id: user.id,

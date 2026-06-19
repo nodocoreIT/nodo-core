@@ -24,7 +24,6 @@ import {
   formatCurrency,
   formatCurrencyInput,
   parseDigitsToNumber,
-  formatThousands,
 } from '@/utils/contract-calculations';
 import { matchesVehicleSearch } from '@/shared/lib/utils';
 import { FormSelect, SearchableSelect, DocumentNumberInput } from '@nodocore/shared-components';
