@@ -18,8 +18,9 @@ export function annualMonthlyFromMonthly(monthly: number): number {
 }
 
 export function getPlansForUnit(planes: NodePlan[], unitCode: string): NodePlan[] {
+  const code = unitCode.trim().toLowerCase();
   return planes
-    .filter((plan) => plan.unit_code === unitCode && plan.is_active)
+    .filter((plan) => plan.unit_code.trim().toLowerCase() === code && plan.is_active)
     .sort((a, b) => a.sort_order - b.sort_order || a.price_monthly - b.price_monthly);
 }
 
@@ -38,6 +39,14 @@ export function normalizePlanCode(
   const options = getPlansForUnit(planes, unitCode);
   const exact = options.find((option) => option.code.toLowerCase() === raw);
   if (exact) return exact.code;
+
+  const byLabel = options.find(
+    (option) =>
+      option.label.toLowerCase() === raw ||
+      option.label.toLowerCase().startsWith(raw) ||
+      raw.startsWith(option.label.toLowerCase()),
+  );
+  if (byLabel) return byLabel.code;
 
   const fuzzy = options.find(
     (option) => raw.includes(option.code.toLowerCase()) || option.code.toLowerCase().includes(raw),
