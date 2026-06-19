@@ -432,8 +432,40 @@ function defaultSections(managedNav: { to: string; label: string }[]): string[] 
   return managedNav.map((n) => n.to);
 }
 
-function getUserSections(perms: Record<string, string[]>, userId: string, managedNav: { to: string; label: string }[]): string[] {
-  return perms[userId] ?? defaultSections(managedNav);
+function employeeDefaultSections(module: {
+  defaultEmployeeSections?: string[];
+  managedNav: { to: string; label: string }[];
+}): string[] {
+  return module.defaultEmployeeSections ?? defaultSections(module.managedNav);
+}
+
+function roleUsesSectionPicker(
+  role: string,
+  module: {
+    adminDisplayRole: string;
+    staffSectionRole?: string;
+    fixedAccessRoles?: string[];
+  },
+): boolean {
+  if (module.fixedAccessRoles?.includes(role)) return false;
+  if (module.staffSectionRole) return role === module.staffSectionRole;
+  return role !== module.adminDisplayRole;
+}
+
+function sectionsForMemberRole(
+  role: string,
+  module: {
+    adminDisplayRole: string;
+    staffSectionRole?: string;
+    defaultEmployeeSections?: string[];
+    managedNav: { to: string; label: string }[];
+  },
+): string[] {
+  if (role === module.adminDisplayRole) return defaultSections(module.managedNav);
+  if (module.staffSectionRole && role === module.staffSectionRole) {
+    return employeeDefaultSections(module);
+  }
+  return defaultSections(module.managedNav);
 }
 
 interface SettingsDialogProps {
@@ -509,7 +541,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   // ── User section visibility ─────────────────────────────────────────────────
   const [userPermissions, setUserPermissions] = useState<Record<string, string[]>>({});
-  const [draftSections, setDraftSections] = useState<string[]>(() => defaultSections(managedNav));
+  const [draftSections, setDraftSections] = useState<string[]>(() =>
+    employeeDefaultSections(module),
+  );
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [savingPerms, setSavingPerms] = useState(false);
   const [permsSaved, setPermsSaved] = useState(false);
@@ -548,8 +582,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       if (selected && selected.role !== newMember.role) {
         await updateMemberRole(selectedUserId, newMember.role);
       }
-      const next = { ...userPermissions, [selectedUserId]: draftSections };
-      await persistUserPermissions(next);
+      if (roleUsesSectionPicker(newMember.role, module)) {
+        const next = { ...userPermissions, [selectedUserId]: draftSections };
+        await persistUserPermissions(next);
+      }
       setPermsSaved(true);
       setTimeout(() => setPermsSaved(false), 3000);
     } catch (err) {
@@ -564,14 +600,25 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const handleSelectUser = (user: StaffUser) => {
     setSelectedUserId(user.id);
     setNewMember({ name: user.name, email: user.email, role: user.role });
-    setDraftSections(getUserSections(userPermissions, user.id, managedNav));
+    setDraftSections(
+      roleUsesSectionPicker(user.role, module)
+        ? (userPermissions[user.id] ?? employeeDefaultSections(module))
+        : sectionsForMemberRole(user.role, module),
+    );
     setMemberActionError(null);
   };
 
   const handleNewUser = () => {
     setSelectedUserId(null);
     setNewMember({ name: "", email: "", role: module.defaultInviteRole });
-    setDraftSections(defaultSections(managedNav));
+    setDraftSections(sectionsForMemberRole(module.defaultInviteRole, module));
+  };
+
+  const handleMemberRoleChange = (role: string) => {
+    setNewMember({ ...newMember, role });
+    if (roleUsesSectionPicker(role, module)) {
+      setDraftSections(sectionsForMemberRole(role, module));
+    }
   };
 
   // ── Dynamic Users state ─────────────────────────────────────────────────────
@@ -628,19 +675,27 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     setInviteError(null);
     setInviteSuccessMessage(null);
     try {
-      const { id: userId, invited } = await inviteUser(
+      const { id: userId, invited, emailSent, emailWarning } = await inviteUser(
         newMember.name,
         newMember.email,
         newMember.role,
         module.inviteRequiresPassword ? invitePassword.trim() : undefined,
       );
-      const next = { ...userPermissions, [userId]: draftSections };
-      await persistUserPermissions(next);
+      if (roleUsesSectionPicker(newMember.role, module)) {
+        const next = { ...userPermissions, [userId]: draftSections };
+        await persistUserPermissions(next);
+      }
       handleNewUser();
       setInvitePassword("");
-      setInviteSuccessMessage(
-        invited ? module.inviteMessages.invited : module.inviteMessages.existing,
-      );
+      const baseMessage = invited
+        ? module.inviteMessages.invited
+        : module.inviteMessages.existing;
+      const emailNote =
+        emailSent === false
+          ? module.inviteMessages.emailSkipped ??
+            `Usuario agregado, pero no se pudo enviar el correo${emailWarning ? `: ${emailWarning}` : "."}`
+          : null;
+      setInviteSuccessMessage(emailNote ? `${baseMessage} ${emailNote}` : baseMessage);
       setTimeout(() => setInviteSuccessMessage(null), 5000);
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "No se pudo enviar la invitación");
@@ -648,6 +703,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       setIsInviting(false);
     }
   };
+
+  const showSectionPicker =
+    effectiveRole === module.adminRole &&
+    roleUsesSectionPicker(newMember.role, module);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -1334,29 +1393,26 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   <FormSelect
                     id="memberRole"
                     value={newMember.role}
-                    onChange={(value) => setNewMember({ ...newMember, role: value })}
+                    onChange={handleMemberRoleChange}
                     disabled={
                       !!selectedUserId &&
                       users.find((u) => u.id === selectedUserId)?.role === module.adminDisplayRole
                     }
-                    options={[
-                      ...(selectedUserId &&
+                    options={
+                      selectedUserId &&
                       users.find((u) => u.id === selectedUserId)?.role === module.adminDisplayRole
                         ? [{ value: module.adminDisplayRole, label: module.adminDisplayRole }]
-                        : []),
-                      ...module.roleOptions.filter(
-                        (option) => option.value !== module.adminDisplayRole,
-                      ),
-                    ]}
+                        : [...module.roleOptions]
+                    }
                   />
                 </div>
 
-                {effectiveRole === module.adminRole && (
+                {showSectionPicker && (
                   <div className="md:col-span-3 space-y-2 border-t border-border pt-4">
                     <div>
                       <h4 className="text-sm font-bold text-navy">Secciones visibles</h4>
                       <p className="text-xs text-slate2">
-                        Marcá qué partes del panel verá este usuario. El rol se define arriba.
+                        Marcá qué partes del panel verá este empleado. Propietarios e inquilinos usan su portal propio.
                       </p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">

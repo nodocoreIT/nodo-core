@@ -9,15 +9,12 @@ import {
   upsertOrgMember,
 } from "../_shared/inmo-admin.ts";
 import { sendInmoStaffNotifyEmail } from "../_shared/staff-notify.ts";
-
-// Display role → DB role (shared.org_members.role constraint)
-const DB_ROLES: Record<string, string> = {
-  Administrador: "admin",
-  Vendedor: "agent",
-  Inquilino: "tenant",
-  Propietario: "owner",
-  Colega: "agent",
-};
+import { DISPLAY_TO_DB_ROLE } from "../_shared/org-member-roles.ts";
+import {
+  inmoAuthCallbackUrl,
+  inmoLoginUrl,
+  resolvePublicLandingOrigin,
+} from "../_shared/landing-url.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -63,10 +60,13 @@ Deno.serve(async (req) => {
 
     const normalizedEmail = email.trim().toLowerCase();
     const displayName = name?.trim() || normalizedEmail.split("@")[0];
-    const dbRole = DB_ROLES[memberRole] ?? "agent";
+    const dbRole = DISPLAY_TO_DB_ROLE[memberRole] ?? "agent";
     const orgName = await getOrgName(sql, orgId);
-    const landingOrigin = new URL(redirectTo).origin;
-    const loginUrl = `${landingOrigin}/inmo/login`;
+    const landingOrigin = resolvePublicLandingOrigin(redirectTo);
+    const authCallbackUrl = landingOrigin
+      ? inmoAuthCallbackUrl(landingOrigin)
+      : redirectTo;
+    const loginUrl = landingOrigin ? inmoLoginUrl(landingOrigin) : `${new URL(redirectTo).origin}/inmo/login`;
 
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -76,15 +76,10 @@ Deno.serve(async (req) => {
 
     const existingUserId = await findAuthUserIdByEmail(sql, normalizedEmail);
     if (existingUserId) {
-      if (await isOrgMember(sql, orgId, existingUserId)) {
-        return json(
-          { error: "Este usuario ya pertenece a este nodo Inmo." },
-          409,
-        );
-      }
-
+      const alreadyMember = await isOrgMember(sql, orgId, existingUserId);
       await upsertOrgMember(sql, orgId, existingUserId, dbRole);
-      await sendInmoStaffNotifyEmail(redirectTo, {
+
+      const mail = await sendInmoStaffNotifyEmail(redirectTo, {
         kind: "added",
         email: normalizedEmail,
         name: displayName,
@@ -92,7 +87,13 @@ Deno.serve(async (req) => {
         loginUrl,
       });
 
-      return json({ id: existingUserId, invited: false, emailSent: true });
+      return json({
+        id: existingUserId,
+        invited: false,
+        updated: alreadyMember,
+        emailSent: mail.sent,
+        emailWarning: mail.sent ? undefined : mail.reason,
+      });
     }
 
     const { data: linkData, error: linkError } =
@@ -101,7 +102,7 @@ Deno.serve(async (req) => {
         email: normalizedEmail,
         options: {
           data: { full_name: displayName },
-          redirectTo,
+          redirectTo: authCallbackUrl,
         },
       });
 
@@ -113,7 +114,7 @@ Deno.serve(async (req) => {
     }
 
     await upsertOrgMember(sql, orgId, linkData.user.id, dbRole);
-    await sendInmoStaffNotifyEmail(redirectTo, {
+    const mail = await sendInmoStaffNotifyEmail(redirectTo, {
       kind: "invite",
       email: normalizedEmail,
       name: displayName,
@@ -121,7 +122,12 @@ Deno.serve(async (req) => {
       actionUrl: linkData.properties.action_link,
     });
 
-    return json({ id: linkData.user.id, invited: true, emailSent: true });
+    return json({
+      id: linkData.user.id,
+      invited: true,
+      emailSent: mail.sent,
+      emailWarning: mail.sent ? undefined : mail.reason,
+    });
   } catch (err) {
     return json({ error: String(err) }, 500);
   } finally {

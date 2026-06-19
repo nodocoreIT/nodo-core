@@ -19,23 +19,16 @@ import { useStaff } from "@/shared/hooks/use-staff";
 import { useUpdateProfile } from "@/features/profile/hooks/use-update-profile";
 import { useCashAccounts } from "@/shared/hooks/use-cash-accounts";
 import { supabase } from "@/shared/lib/supabase";
+import {
+  INMO_ADMIN_DISPLAY_ROLE,
+  INMO_DEFAULT_EMPLOYEE_SECTIONS,
+  INMO_EMPLOYEE_DISPLAY_ROLE,
+  INMO_FIXED_ACCESS_ROLES,
+  INMO_MANAGED_NAV,
+  INMO_STAFF_ROLE_OPTIONS,
+} from "@/shared/lib/inmo-staff-nav";
 
-const INMO_MANAGED_NAV = [
-  { to: "/admin/dashboard", label: "Inicio" },
-  { to: "/admin/properties", label: "Propiedades" },
-  { to: "/admin/owners", label: "Propietarios" },
-  { to: "/admin/tenants", label: "Inquilinos" },
-  { to: "/admin/contracts", label: "Contratos" },
-  { to: "/admin/payments", label: "Pagos" },
-  { to: "/admin/caja", label: "Caja" },
-  { to: "/admin/rendiciones", label: "Rendiciones" },
-  { to: "/admin/ganancias", label: "Ganancias" },
-  { to: "/admin/documentos", label: "Documentos" },
-  { to: "/admin/agenda", label: "Agenda y Tareas" },
-  { to: "/admin/reclamos", label: "Reclamos" },
-  { to: "/admin/portal", label: "Portales (Pro)" },
-  { to: "/admin/automatizaciones", label: "Automatizaciones (Pro)" },
-];
+const INMO_MANAGED_NAV_LIST = INMO_MANAGED_NAV.map((item) => ({ ...item }));
 
 export function InmoSettingsModuleProvider({ children }: { children: React.ReactNode }) {
   const { settings, setSettings, resetSettings } = useThemeSettings();
@@ -73,22 +66,22 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
 
   const value = useMemo((): SettingsModuleContextValue => {
     return {
-      managedNav: INMO_MANAGED_NAV,
-      roleOptions: [
-        { value: "Vendedor", label: "Vendedor" },
-        { value: "Inquilino", label: "Inquilino" },
-        { value: "Propietario", label: "Propietario" },
-        { value: "Colega", label: "Colega" },
-      ],
+      managedNav: INMO_MANAGED_NAV_LIST,
+      roleOptions: [...INMO_STAFF_ROLE_OPTIONS],
+      fixedAccessRoles: [...INMO_FIXED_ACCESS_ROLES],
+      staffSectionRole: INMO_EMPLOYEE_DISPLAY_ROLE,
+      defaultEmployeeSections: [...INMO_DEFAULT_EMPLOYEE_SECTIONS],
       inviteMessages: {
         invited:
           "Invitación enviada por correo. La persona recibirá un enlace para activar la cuenta y elegir su contraseña.",
         existing:
           "Usuario agregado a este nodo Inmo. Le enviamos un correo para avisarle que ya puede ingresar con su email y contraseña habituales.",
+        emailSkipped:
+          "El usuario quedó agregado, pero el aviso por correo no se envió (revisá NODO_LANDING_URL / SMTP en producción).",
       },
       adminRole: "admin",
-      adminDisplayRole: "Administrador",
-      defaultInviteRole: "Colega",
+      adminDisplayRole: INMO_ADMIN_DISPLAY_ROLE,
+      defaultInviteRole: INMO_EMPLOYEE_DISPLAY_ROLE,
       themeSettings: settings,
       setThemeSettings: setSettings,
       resetThemeSettings: resetSettings,

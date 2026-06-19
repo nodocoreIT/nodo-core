@@ -97,7 +97,12 @@ export interface StaffApi {
   loading: boolean;
   error: string | null;
   fetchMembers: () => Promise<void>;
-  inviteUser: (name: string, email: string, role: string, password?: string) => Promise<{ id: string; invited: boolean }>;
+  inviteUser: (name: string, email: string, role: string, password?: string) => Promise<{
+    id: string;
+    invited: boolean;
+    emailSent?: boolean;
+    emailWarning?: string;
+  }>;
   updateMemberRole: (userId: string, role: string) => Promise<void>;
   removeMember: (userId: string) => Promise<void>;
 }
@@ -110,10 +115,16 @@ export interface SettingsModuleContextValue {
   inviteRequiresPassword?: boolean;
   managedNav: NavSection[];
   roleOptions: { value: string; label: string }[];
-  inviteMessages: { invited: string; existing: string };
+  inviteMessages: { invited: string; existing: string; emailSkipped?: string };
   adminRole: string;
   adminDisplayRole: string;
   defaultInviteRole: string;
+  /** Roles with fixed portal access — hide the section picker (e.g. Propietario, Inquilino). */
+  fixedAccessRoles?: string[];
+  /** Display role label for staff with configurable admin sections (e.g. Empleado). */
+  staffSectionRole?: string;
+  /** Default nav paths when inviting or switching to staffSectionRole. */
+  defaultEmployeeSections?: string[];
 
   themeSettings: ThemeSettings;
   setThemeSettings: (next: Partial<ThemeSettings>) => void;

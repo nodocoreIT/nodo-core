@@ -1,15 +1,22 @@
 import { create } from "zustand";
 import { supabase } from "@/shared/lib/supabase";
-import { dbRoleFromDisplay } from "@/shared/lib/org-member-roles";
-import { readJwtClaims } from "@/shared/lib/jwt-claims";
 
-async function resolveOrgId(): Promise<string> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const orgId = readJwtClaims(session).orgId;
-  if (!orgId) throw new Error("No se pudo determinar la organización");
-  return orgId;
+async function invokeFunction<T>(name: string, body?: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(name, body ? { body } : undefined);
+
+  if (error) {
+    let detail = error.message;
+    try {
+      const responseBody = await (error as { context?: { json?: () => Promise<{ error?: string }> } })
+        .context?.json?.();
+      if (responseBody?.error) detail = responseBody.error;
+    } catch {
+      // ignore
+    }
+    throw new Error(detail);
+  }
+
+  return data as T;
 }
 
 export interface StaffUser {
@@ -25,7 +32,12 @@ interface StaffStore {
   loading: boolean;
   error: string | null;
   fetchMembers: () => Promise<void>;
-  inviteUser: (name: string, email: string, role: string) => Promise<{ id: string; invited: boolean }>;
+  inviteUser: (name: string, email: string, role: string) => Promise<{
+    id: string;
+    invited: boolean;
+    emailSent?: boolean;
+    emailWarning?: string;
+  }>;
   updateMemberRole: (userId: string, role: string) => Promise<void>;
   removeMember: (userId: string) => Promise<void>;
 }
@@ -38,19 +50,8 @@ export const useStaffStore = create<StaffStore>((set, get) => ({
   fetchMembers: async () => {
     set({ loading: true, error: null });
     try {
-      const { data, error } = await supabase.functions.invoke("list-org-members");
-      if (error) {
-        let detail = error.message;
-        try {
-          const body = await (error as { context?: { json?: () => Promise<{ error?: string }> } }).context?.json?.();
-          if (body?.error) detail = body.error;
-        } catch {
-          // ignore
-        }
-        throw new Error(detail);
-      }
-
-      const members = (data as { members?: StaffUser[] })?.members ?? [];
+      const data = await invokeFunction<{ members?: StaffUser[] }>("list-org-members");
+      const members = data.members ?? [];
       set({ users: members, loading: false });
     } catch (err) {
       set({
@@ -61,40 +62,39 @@ export const useStaffStore = create<StaffStore>((set, get) => ({
   },
 
   inviteUser: async (name, email, role) => {
-    const redirectTo = `${window.location.origin}/inmo/auth/callback`;
+    const landingOrigin =
+      import.meta.env.VITE_NODO_LANDING_URL?.replace(/\/$/, "") ||
+      (typeof window !== "undefined" &&
+      !/localhost|127\.0\.0\.1/i.test(window.location.origin)
+        ? window.location.origin
+        : "");
+    const redirectTo = landingOrigin
+      ? `${landingOrigin}/inmo/auth/callback`
+      : `${window.location.origin}/inmo/auth/callback`;
 
-    const { data, error } = await supabase.functions.invoke("invite-member", {
-      body: { name, email, role, redirectTo },
+    const data = await invokeFunction<{
+      id: string;
+      invited?: boolean;
+      emailSent?: boolean;
+      emailWarning?: string;
+    }>("invite-member", {
+      name,
+      email,
+      role,
+      redirectTo,
     });
 
-    if (error) {
-      let detail = error.message;
-      try {
-        const body = await (error as { context?: { json?: () => Promise<{ error?: string }> } }).context?.json?.();
-        if (body?.error) detail = body.error;
-      } catch {
-        // ignore
-      }
-      throw new Error(detail);
-    }
-
     await get().fetchMembers();
-    const payload = data as { id: string; invited?: boolean };
-    return { id: payload.id, invited: payload.invited !== false };
+    return {
+      id: data.id,
+      invited: data.invited !== false,
+      emailSent: data.emailSent,
+      emailWarning: data.emailWarning,
+    };
   },
 
   updateMemberRole: async (userId, role) => {
-    const orgId = await resolveOrgId();
-
-    const dbRole = dbRoleFromDisplay(role);
-    const { error } = await supabase
-      .schema("shared")
-      .from("org_members")
-      .update({ role: dbRole })
-      .eq("org_id", orgId)
-      .eq("user_id", userId);
-
-    if (error) throw new Error(error.message);
+    await invokeFunction("update-org-member-role", { userId, role });
 
     set((state) => ({
       users: state.users.map((u) => (u.id === userId ? { ...u, role } : u)),
@@ -102,16 +102,7 @@ export const useStaffStore = create<StaffStore>((set, get) => ({
   },
 
   removeMember: async (userId) => {
-    const orgId = await resolveOrgId();
-
-    const { error } = await supabase
-      .schema("shared")
-      .from("org_members")
-      .delete()
-      .eq("org_id", orgId)
-      .eq("user_id", userId);
-
-    if (error) throw new Error(error.message);
+    await invokeFunction("remove-org-member", { userId });
 
     set((state) => ({
       users: state.users.filter((u) => u.id !== userId),
