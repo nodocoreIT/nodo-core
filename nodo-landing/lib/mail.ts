@@ -300,16 +300,20 @@ export async function sendPasswordResetEmail({
   });
 }
 
-export async function sendInmoStaffInviteEmail({
+export async function sendStaffInviteEmail({
   name,
   email,
   inviteUrl,
   orgName,
+  inviterName,
+  nodeLabel,
 }: {
   name: string;
   email: string;
   inviteUrl: string;
   orgName: string;
+  inviterName?: string;
+  nodeLabel: string;
 }): Promise<void> {
   if (!isMailConfigured()) {
     throw new Error(
@@ -324,11 +328,19 @@ export async function sendInmoStaffInviteEmail({
     auth: { user: USER, pass: PASS },
   });
 
+  const subject = inviterName
+    ? `${inviterName} te invitó a unirse a ${orgName} en ${nodeLabel}`
+    : `Invitación al equipo de ${orgName} en ${nodeLabel}`;
+
+  const bodyIntro = inviterName
+    ? `<strong>${inviterName}</strong> te invitó a unirte al equipo de <strong>${orgName}</strong>.`
+    : `Fuiste invitado a unirte al equipo de <strong>${orgName}</strong>.`;
+
   await transporter.sendMail({
-    from: `"NODO Inmo" <${USER}>`,
+    from: `"${nodeLabel}" <${USER}>`,
     to: email,
-    subject: `Invitación al equipo de ${orgName} en NODO | Inmo`,
-    text: `Hola ${name},\n\nTe invitaron a unirte al equipo de ${orgName} en NODO | Inmo. Para activar tu cuenta, elegí tu contraseña en el siguiente enlace:\n\n${inviteUrl}\n\nSi no esperabas esta invitación, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO Inmo`,
+    subject,
+    text: `Hola ${name},\n\n${inviterName ? `${inviterName} te` : "Te"} invitó a unirte al equipo de ${orgName} en ${nodeLabel}. Para activar tu cuenta, elegí tu contraseña en el siguiente enlace:\n\n${inviteUrl}\n\nSi no esperabas esta invitación, podés ignorar este correo.\n\nSaludos,\nEl equipo de ${nodeLabel}`,
     attachments: [
       {
         filename: "logo_compuesto.png",
@@ -341,10 +353,10 @@ export async function sendInmoStaffInviteEmail({
         <div style="text-align:center;margin-bottom:20px;">
           <img src="cid:nodologo" alt="NODO Core" style="height:32px;display:inline-block;"/>
         </div>
-        <h2 style="color:#DA5A0E;margin-top:0;font-size:20px;text-align:center;">Te invitaron a NODO | Inmo</h2>
+        <h2 style="color:#DA5A0E;margin-top:0;font-size:20px;text-align:center;">Te invitaron a ${nodeLabel}</h2>
         <p style="color:#647890;font-size:15px;line-height:1.5;">
           Hola <strong>${name}</strong>,<br/><br/>
-          Te sumaron al equipo de <strong>${orgName}</strong>. Activá tu acceso y elegí tu contraseña:
+          ${bodyIntro} Activá tu acceso y elegí tu contraseña:
         </p>
         <div style="margin:24px 0;text-align:center;">
           <a href="${inviteUrl}" style="background-color:#DA5A0E;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;font-size:15px;">
@@ -360,16 +372,31 @@ export async function sendInmoStaffInviteEmail({
   });
 }
 
-export async function sendInmoStaffAddedEmail({
+// Backwards-compatible wrapper — kept so existing callers don't break.
+export async function sendInmoStaffInviteEmail(args: {
+  name: string;
+  email: string;
+  inviteUrl: string;
+  orgName: string;
+  inviterName?: string;
+}): Promise<void> {
+  return sendStaffInviteEmail({ ...args, nodeLabel: "NODO | Inmo" });
+}
+
+export async function sendStaffAddedEmail({
   name,
   email,
   orgName,
   loginUrl,
+  inviterName,
+  nodeLabel,
 }: {
   name: string;
   email: string;
   orgName: string;
   loginUrl: string;
+  inviterName?: string;
+  nodeLabel: string;
 }): Promise<void> {
   if (!isMailConfigured()) {
     throw new Error(
@@ -384,11 +411,19 @@ export async function sendInmoStaffAddedEmail({
     auth: { user: USER, pass: PASS },
   });
 
+  const subject = inviterName
+    ? `${inviterName} te agregó al equipo de ${orgName} en ${nodeLabel}`
+    : `Te agregaron al equipo de ${orgName} en ${nodeLabel}`;
+
+  const bodyIntro = inviterName
+    ? `<strong>${inviterName}</strong> te agregó al equipo de <strong>${orgName}</strong> en ${nodeLabel}.`
+    : `Te agregaron al equipo de <strong>${orgName}</strong> en ${nodeLabel}.`;
+
   await transporter.sendMail({
-    from: `"NODO Inmo" <${USER}>`,
+    from: `"${nodeLabel}" <${USER}>`,
     to: email,
-    subject: `Te agregaron al equipo de ${orgName} en NODO | Inmo`,
-    text: `Hola ${name},\n\nTe agregaron al equipo de ${orgName} en NODO | Inmo. Ya podés ingresar con tu email y contraseña habituales:\n\n${loginUrl}\n\nSaludos,\nEl equipo de NODO Inmo`,
+    subject,
+    text: `Hola ${name},\n\n${inviterName ? `${inviterName} te agregó` : "Te agregaron"} al equipo de ${orgName} en ${nodeLabel}. Ya podés ingresar con tu email y contraseña habituales:\n\n${loginUrl}\n\nSaludos,\nEl equipo de ${nodeLabel}`,
     attachments: [
       {
         filename: "logo_compuesto.png",
@@ -404,11 +439,11 @@ export async function sendInmoStaffAddedEmail({
         <h2 style="color:#DA5A0E;margin-top:0;font-size:20px;text-align:center;">Acceso habilitado</h2>
         <p style="color:#647890;font-size:15px;line-height:1.5;">
           Hola <strong>${name}</strong>,<br/><br/>
-          Te agregaron al equipo de <strong>${orgName}</strong> en NODO | Inmo. Ingresá con tu email y contraseña habituales:
+          ${bodyIntro} Ingresá con tu email y contraseña habituales:
         </p>
         <div style="margin:24px 0;text-align:center;">
           <a href="${loginUrl}" style="background-color:#DA5A0E;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;font-size:15px;">
-            Ingresar a NODO Inmo
+            Ingresar a ${nodeLabel}
           </a>
         </div>
         <p style="color:#9DACBE;font-size:12px;line-height:1.4;">
@@ -418,6 +453,17 @@ export async function sendInmoStaffAddedEmail({
       </div>
     `,
   });
+}
+
+// Backwards-compatible wrapper — kept so existing callers don't break.
+export async function sendInmoStaffAddedEmail(args: {
+  name: string;
+  email: string;
+  orgName: string;
+  loginUrl: string;
+  inviterName?: string;
+}): Promise<void> {
+  return sendStaffAddedEmail({ ...args, nodeLabel: "NODO | Inmo" });
 }
 
 export async function sendInmoVerificationEmail({

@@ -16,12 +16,6 @@ function envPair(prefix: string): NodoConfig | null {
   const url = process.env[`${prefix}_SUPABASE_URL`];
   const key = process.env[`${prefix}_SERVICE_ROLE_KEY`];
   if (url && key) return { url, serviceRoleKey: key };
-
-  // Dev fallback: nodos that share the landing Supabase project.
-  const landingUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const landingKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (landingUrl && landingKey) return { url: landingUrl, serviceRoleKey: landingKey };
-
   return null;
 }
 

@@ -7,6 +7,8 @@ type StaffNotifyPayload =
       name: string;
       orgName: string;
       actionUrl: string;
+      inviterName?: string;
+      nodeLabel?: string;
     }
   | {
       kind: "added";
@@ -14,6 +16,8 @@ type StaffNotifyPayload =
       name: string;
       orgName: string;
       loginUrl: string;
+      inviterName?: string;
+      nodeLabel?: string;
     };
 
 export type StaffNotifyResult =

@@ -2,11 +2,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import postgres from "npm:postgres@3";
 import { corsHeaders } from "../_shared/cors.ts";
 import {
+  createOrgInvitation,
   findAuthUserIdByEmail,
   getOrgName,
-  isOrgMember,
   resolveInmoAdminOrgId,
-  upsertOrgMember,
 } from "../_shared/inmo-admin.ts";
 import { sendInmoStaffNotifyEmail } from "../_shared/staff-notify.ts";
 import { DISPLAY_TO_DB_ROLE } from "../_shared/org-member-roles.ts";
@@ -50,9 +49,11 @@ Deno.serve(async (req) => {
       email: string;
       role: string;
       redirectTo: string;
+      inviterName?: string;
+      nodeLabel?: string;
     };
 
-    const { name, email, role: memberRole, redirectTo } = body;
+    const { name, email, role: memberRole, redirectTo, nodeLabel } = body;
 
     if (!email || !redirectTo) {
       return json({ error: "email and redirectTo are required" }, 400);
@@ -66,7 +67,16 @@ Deno.serve(async (req) => {
     const authCallbackUrl = landingOrigin
       ? inmoAuthCallbackUrl(landingOrigin)
       : redirectTo;
-    const loginUrl = landingOrigin ? inmoLoginUrl(landingOrigin) : `${new URL(redirectTo).origin}/inmo/login`;
+    const loginUrl = landingOrigin
+      ? inmoLoginUrl(landingOrigin)
+      : `${new URL(redirectTo).origin}/inmo/login`;
+
+    // Inviter display name: from request body, or fall back to JWT metadata.
+    const inviterName =
+      body.inviterName?.trim() ||
+      (user.user_metadata?.full_name as string | undefined)?.trim() ||
+      user.email ||
+      "Un administrador";
 
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -74,10 +84,19 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
     const existingUserId = await findAuthUserIdByEmail(sql, normalizedEmail);
     if (existingUserId) {
-      const alreadyMember = await isOrgMember(sql, orgId, existingUserId);
-      await upsertOrgMember(sql, orgId, existingUserId, dbRole);
+      // Existing user: create invitation record (membership happens on acceptance).
+      const token = await createOrgInvitation(sql, {
+        orgId,
+        inviteeEmail: normalizedEmail,
+        inviteeUserId: existingUserId,
+        invitedByUserId: user.id,
+        role: dbRole,
+        expiresAt,
+      });
 
       const mail = await sendInmoStaffNotifyEmail(redirectTo, {
         kind: "added",
@@ -85,17 +104,20 @@ Deno.serve(async (req) => {
         name: displayName,
         orgName,
         loginUrl,
+        inviterName,
+        nodeLabel: nodeLabel ?? "NODO | Inmo",
       });
 
       return json({
         id: existingUserId,
         invited: false,
-        updated: alreadyMember,
+        invitationToken: token,
         emailSent: mail.sent,
         emailWarning: mail.sent ? undefined : mail.reason,
       });
     }
 
+    // New user: generate magic link instead of sending Supabase-branded invite.
     const { data: linkData, error: linkError } =
       await adminClient.auth.admin.generateLink({
         type: "invite",
@@ -106,25 +128,41 @@ Deno.serve(async (req) => {
         },
       });
 
-    if (linkError || !linkData?.user?.id || !linkData.properties?.action_link) {
+    if (linkError || !linkData?.user?.id) {
       return json(
         { error: linkError?.message ?? "No se pudo generar el enlace de invitación" },
         400,
       );
     }
 
-    await upsertOrgMember(sql, orgId, linkData.user.id, dbRole);
+    const userId = linkData.user.id;
+    const actionUrl = linkData.properties?.action_link ?? authCallbackUrl;
+
+    // Create invitation record for the new user (invitee_user_id is already set
+    // because generateLink provisions the auth.users row immediately).
+    const token = await createOrgInvitation(sql, {
+      orgId,
+      inviteeEmail: normalizedEmail,
+      inviteeUserId: userId,
+      invitedByUserId: user.id,
+      role: dbRole,
+      expiresAt,
+    });
+
     const mail = await sendInmoStaffNotifyEmail(redirectTo, {
       kind: "invite",
       email: normalizedEmail,
       name: displayName,
       orgName,
-      actionUrl: linkData.properties.action_link,
+      actionUrl,
+      inviterName,
+      nodeLabel: nodeLabel ?? "NODO | Inmo",
     });
 
     return json({
-      id: linkData.user.id,
+      id: userId,
       invited: true,
+      invitationToken: token,
       emailSent: mail.sent,
       emailWarning: mail.sent ? undefined : mail.reason,
     });

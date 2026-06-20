@@ -42,6 +42,7 @@ import { useAuth } from "@nodocore/shared-components";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import { cn } from "@/shared/lib/utils";
 import { SettingsDialog } from "@nodocore/nodo-modules/settings";
+import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { InmoSettingsModuleProvider } from "@/shared/lib/inmo-settings-module";
 import { FeedbackFAB } from "@/features/feedback/components/feedback-node";
 import { NotificationsBell } from "@/features/dashboard/components/notifications-bell";
@@ -304,6 +305,7 @@ export function AdminLayout() {
             <PortalHeaderMobileActions
               metrics={<IPCBadge />}
               notifications={<NotificationsBell />}
+              trailing={<NodoSwitcher />}
             />
           </div>
 
@@ -315,6 +317,7 @@ export function AdminLayout() {
             }
             metrics={<IPCBadge />}
             notifications={<NotificationsBell />}
+            trailing={<NodoSwitcher />}
           />
         </header>
 

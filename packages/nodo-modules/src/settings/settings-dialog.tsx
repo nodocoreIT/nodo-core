@@ -696,7 +696,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             `Usuario agregado, pero no se pudo enviar el correo${emailWarning ? `: ${emailWarning}` : "."}`
           : null;
       setInviteSuccessMessage(emailNote ? `${baseMessage} ${emailNote}` : baseMessage);
-      setTimeout(() => setInviteSuccessMessage(null), 5000);
+      setTimeout(() => setInviteSuccessMessage(null), 7000);
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "No se pudo enviar la invitación");
     } finally {
@@ -711,6 +711,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[800px] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden bg-white data-[state=open]:animate-none data-[state=closed]:animate-none">
+        {isInviting && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-white/40">
+            <div className="flex flex-col items-center gap-3 bg-white rounded-xl px-8 py-6 shadow-xl border border-border">
+              <Loader2 className="h-8 w-8 animate-spin text-brand" />
+              <span className="text-sm font-semibold text-navy">Invitando usuario...</span>
+            </div>
+          </div>
+        )}
           <nav
             aria-label="Secciones de configuración"
             className="hidden sm:flex sm:w-52 md:w-56 flex-shrink-0 flex-col border-r border-border bg-slate-50 overflow-y-auto"
