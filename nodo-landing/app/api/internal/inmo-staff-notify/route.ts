@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   isMailConfigured,
-  sendInmoStaffAddedEmail,
-  sendInmoStaffInviteEmail,
+  sendStaffAddedEmail,
+  sendStaffInviteEmail,
 } from "@/lib/mail";
 
 type InvitePayload = {
@@ -11,6 +11,8 @@ type InvitePayload = {
   name: string;
   orgName: string;
   actionUrl: string;
+  inviterName?: string;
+  nodeLabel?: string;
 };
 
 type AddedPayload = {
@@ -19,6 +21,8 @@ type AddedPayload = {
   name: string;
   orgName: string;
   loginUrl: string;
+  inviterName?: string;
+  nodeLabel?: string;
 };
 
 type NotifyPayload = InvitePayload | AddedPayload;
@@ -54,6 +58,8 @@ export async function POST(request: NextRequest) {
   const email = body.email?.trim().toLowerCase();
   const name = body.name?.trim();
   const orgName = body.orgName?.trim();
+  const inviterName = body.inviterName?.trim();
+  const nodeLabel = body.nodeLabel?.trim() || "NODO | Inmo";
 
   if (!email || !name || !orgName || !body.kind) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -65,22 +71,26 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Missing actionUrl" }, { status: 400 });
       }
 
-      await sendInmoStaffInviteEmail({
+      await sendStaffInviteEmail({
         email,
         name,
         orgName,
         inviteUrl: body.actionUrl.trim(),
+        inviterName,
+        nodeLabel,
       });
     } else {
       if (!body.loginUrl?.trim()) {
         return NextResponse.json({ error: "Missing loginUrl" }, { status: 400 });
       }
 
-      await sendInmoStaffAddedEmail({
+      await sendStaffAddedEmail({
         email,
         name,
         orgName,
         loginUrl: body.loginUrl.trim(),
+        inviterName,
+        nodeLabel,
       });
     }
 

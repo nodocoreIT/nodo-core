@@ -73,11 +73,11 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
       defaultEmployeeSections: [...INMO_DEFAULT_EMPLOYEE_SECTIONS],
       inviteMessages: {
         invited:
-          "Invitación enviada por correo. La persona recibirá un enlace para activar la cuenta y elegir su contraseña.",
+          "Usuario invitado correctamente. Le enviamos un correo para que realice la activación de su cuenta.",
         existing:
-          "Usuario agregado a este nodo Inmo. Le enviamos un correo para avisarle que ya puede ingresar con su email y contraseña habituales.",
+          "Usuario agregado correctamente. Le enviamos un correo para avisarle que ya puede ingresar.",
         emailSkipped:
-          "El usuario quedó agregado, pero el aviso por correo no se envió (revisá NODO_LANDING_URL / SMTP en producción).",
+          "El usuario fue agregado, pero no se pudo enviar el correo de notificación.",
       },
       adminRole: "admin",
       adminDisplayRole: INMO_ADMIN_DISPLAY_ROLE,
