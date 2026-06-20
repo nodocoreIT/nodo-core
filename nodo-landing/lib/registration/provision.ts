@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getNodeDefaultTheme, isEmptyThemeSettings } from "@nodocore/shared-components/lib/node-default-theme";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
+import { syncNodeEmailAccessForClient } from "@/lib/registration/client-unit-auth";
 import {
   finanzasThemeAppMetadata,
   seedAutosClienteTheme,
@@ -196,6 +198,264 @@ async function ensureInmoAccess(
   return { orgId: membership.orgId };
 }
 
+async function ensureTiendaAccess(
+  admin: SupabaseClient,
+  params: {
+    userId: string;
+    email: string;
+    clientName: string;
+    password: string;
+    plan: string;
+  },
+): Promise<{ orgId: string } | { error: string }> {
+  const { userId, email, clientName, password, plan } = params;
+  const tier = planToTier(plan);
+
+  const { data: orgId, error: rpcErr } = await admin.rpc("admin_ensure_tienda_membership", {
+    p_user_id: userId,
+    p_client_name: clientName,
+    p_email: email,
+    p_plan: plan,
+    p_product: "tienda",
+  });
+
+  if (rpcErr) {
+    return { error: "Error al asegurar membresía tienda: " + rpcErr.message };
+  }
+
+  if (!orgId) {
+    return { error: "No se pudo resolver la organización tienda." };
+  }
+
+  const { data: userData } = await admin.auth.admin.getUserById(userId);
+  const currentAppMetadata = userData.user?.app_metadata ?? {};
+
+  const updatePayload: {
+    password?: string;
+    app_metadata: Record<string, unknown>;
+  } = {
+    app_metadata: {
+      ...currentAppMetadata,
+      org_id: orgId,
+      role: "admin",
+      plan: tier,
+      must_set_password: false,
+    },
+  };
+
+  if (password) {
+    updatePayload.password = password;
+  }
+
+  const { error: authErr } = await admin.auth.admin.updateUserById(userId, updatePayload);
+
+  if (authErr) {
+    return { error: "Error al actualizar credenciales tienda: " + authErr.message };
+  }
+
+  await seedTiendaOrgProfile(admin, orgId as string, clientName);
+  await seedTiendaStore(admin, orgId as string, clientName);
+
+  return { orgId: orgId as string };
+}
+
+function toStoreSlug(text: string): string {
+  return (
+    text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "mi-tienda"
+  );
+}
+
+async function seedTiendaStore(
+  admin: SupabaseClient,
+  orgId: string,
+  storeName: string,
+): Promise<void> {
+  const name = storeName.trim() || "Mi Tienda";
+  const slug = toStoreSlug(name);
+
+  const { data: existing } = await admin
+    .schema("nodo_tienda")
+    .from("stores")
+    .select("id")
+    .eq("org_id", orgId)
+    .maybeSingle();
+
+  if (existing) return;
+
+  await admin.schema("nodo_tienda").from("stores").insert({
+    org_id: orgId,
+    slug,
+    name,
+    is_active: true,
+  });
+}
+
+async function ensureTiendaClientUnitAccess(
+  landingAdmin: SupabaseClient<any, any, any>,
+  params: {
+    userId: string;
+    email: string;
+    clientName: string;
+    plan: string;
+  },
+): Promise<{ ok: true; clientId: string } | { error: string }> {
+  const { userId, email, clientName, plan } = params;
+
+  const { data: existingClient, error: clientLookupErr } = await landingAdmin
+    .from("clients")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (clientLookupErr) {
+    return { error: "Error al leer cliente: " + clientLookupErr.message };
+  }
+
+  let clientId = existingClient?.id as string | undefined;
+
+  if (!clientId) {
+    const { data: newClient, error: clientErr } = await landingAdmin
+      .from("clients")
+      .insert({
+        name: clientName || email,
+        email,
+      })
+      .select("id")
+      .single();
+
+    if (clientErr || !newClient) {
+      return {
+        error: "Error al crear cliente: " + (clientErr?.message ?? "sin respuesta"),
+      };
+    }
+
+    clientId = newClient.id;
+  }
+
+  if (!clientId) {
+    return { error: "No se pudo resolver el cliente." };
+  }
+
+  const resolvedClientId = clientId;
+
+  const { data: existingUnit, error: unitLookupErr } = await landingAdmin
+    .from("client_units")
+    .select("id")
+    .eq("client_id", resolvedClientId)
+    .eq("unit_code", "tienda")
+    .maybeSingle();
+
+  if (unitLookupErr) {
+    return { error: "Error al leer unidad tienda: " + unitLookupErr.message };
+  }
+
+  if (!existingUnit) {
+    const { error: insertErr } = await landingAdmin.from("client_units").insert({
+      client_id: resolvedClientId,
+      unit_code: "tienda",
+      plan,
+      status: "activo",
+      progress: 100,
+      access_user: email,
+      provision_user_id: userId,
+      provisioned_at: new Date().toISOString(),
+    });
+
+    if (insertErr) {
+      return { error: "Error al registrar unidad tienda: " + insertErr.message };
+    }
+  } else {
+    const { error: updateErr } = await landingAdmin
+      .from("client_units")
+      .update({
+        access_user: email,
+        provision_user_id: userId,
+        status: "activo",
+        plan,
+      })
+      .eq("id", existingUnit.id);
+
+    if (updateErr) {
+      return { error: "Error al actualizar unidad tienda: " + updateErr.message };
+    }
+  }
+
+  await syncNodeEmailAccessForClient(
+    landingAdmin as Parameters<typeof syncNodeEmailAccessForClient>[0],
+    resolvedClientId,
+  );
+  return { ok: true, clientId: resolvedClientId };
+}
+
+/** Re-sync tienda org membership, JWT claims, and dashboard access on SPA login. */
+export async function syncTiendaUserClaims(params: {
+  userId: string;
+  email: string;
+  clientName: string;
+  plan?: string;
+}): Promise<{ ok: true; org_id: string } | { ok: false; error: string }> {
+  const admin = createNodoAdminClient("tienda");
+  if (!admin) {
+    return { ok: false, error: 'Nodo "tienda" no configurado.' };
+  }
+
+  const plan = params.plan ?? "starter";
+  const membership = await ensureTiendaAccess(admin, {
+    userId: params.userId,
+    email: params.email,
+    clientName: params.clientName,
+    password: "",
+    plan,
+  });
+
+  if ("error" in membership) {
+    return { ok: false, error: membership.error };
+  }
+
+  const landingAdmin = createAdminClient();
+  const unitAccess = await ensureTiendaClientUnitAccess(landingAdmin, {
+    userId: params.userId,
+    email: params.email,
+    clientName: params.clientName,
+    plan,
+  });
+
+  if ("error" in unitAccess) {
+    return { ok: false, error: unitAccess.error };
+  }
+
+  return { ok: true, org_id: membership.orgId };
+}
+
+async function seedTiendaOrgProfile(
+  admin: SupabaseClient,
+  orgId: string,
+  storeName: string,
+): Promise<void> {
+  const { data: existing } = await admin
+    .schema("nodo_tienda")
+    .from("org_profiles")
+    .select("id")
+    .eq("org_id", orgId)
+    .maybeSingle();
+
+  if (existing) return;
+
+  await admin.schema("nodo_tienda").from("org_profiles").insert({
+    org_id: orgId,
+    store_name: storeName || "Mi Tienda",
+    currency: "ARS",
+    country: "AR",
+    timezone: "America/Argentina/Buenos_Aires",
+    theme_settings: getNodeDefaultTheme("Tienda"),
+  });
+}
+
 /** Re-sync org membership + JWT claims for dashboard-managed Inmo users. */
 export async function syncInmoUserClaims(params: {
   nodoCode: string;
@@ -332,6 +592,25 @@ export async function provisionNodoAccess(params: {
         };
       }
 
+      if (code === "tienda") {
+        const tiendaResult = await ensureTiendaAccess(admin, {
+          userId,
+          email,
+          clientName,
+          password,
+          plan,
+        });
+        if ("error" in tiendaResult) {
+          return { ok: false, error: tiendaResult.error };
+        }
+        return {
+          ok: true,
+          existing: true,
+          user_id: userId,
+          org_id: tiendaResult.orgId,
+        };
+      }
+
       await admin.auth.admin.updateUserById(userId, { password });
       return { ok: true, existing: true, user_id: userId };
     }
@@ -358,6 +637,23 @@ export async function provisionNodoAccess(params: {
     }
 
     return { ok: true, user_id: userId, org_id: claims.orgId };
+  }
+
+  if (code === "tienda") {
+    const tiendaResult = await ensureTiendaAccess(admin, {
+      userId,
+      email,
+      clientName,
+      password,
+      plan,
+    });
+
+    if ("error" in tiendaResult) {
+      await admin.auth.admin.deleteUser(userId);
+      return { ok: false, error: tiendaResult.error };
+    }
+
+    return { ok: true, user_id: userId, org_id: tiendaResult.orgId };
   }
 
   if (code === "autos") {

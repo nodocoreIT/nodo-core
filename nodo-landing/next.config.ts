@@ -8,6 +8,7 @@ const NODO_INMO_URL = process.env.NODO_INMO_URL ?? "http://localhost:5173";
 const NODO_CLINICA_URL = process.env.NODO_CLINICA_URL ?? "http://localhost:5174";
 const NODO_AUTOS_URL = process.env.NODO_AUTOS_URL ?? "http://localhost:5175";
 const NODO_FINANZAS_URL = process.env.NODO_FINANZAS_URL ?? "http://localhost:5176";
+const NODO_TIENDA_URL = process.env.NODO_TIENDA_URL ?? "http://localhost:5177";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -22,6 +23,7 @@ const nextConfig: NextConfig = {
     "/inmo/[[...slug]]": ["./public/inmo/index.html"],
     "/autos/[[...slug]]": ["./public/autos/index.html"],
     "/finanzas/[[...slug]]": ["./public/finanzas/index.html"],
+    "/tienda/[[...slug]]": ["./public/tienda/index.html"],
   },
   turbopack: {
     root: path.resolve(__dirname, ".."),
@@ -48,6 +50,9 @@ const nextConfig: NextConfig = {
           // ── nodo-finanzas ──────────────────────────────────────────────────
           { source: "/finanzas", destination: `${NODO_FINANZAS_URL}/finanzas` },
           { source: "/finanzas/:path*", destination: `${NODO_FINANZAS_URL}/finanzas/:path*` },
+          // ── nodo-tienda ─────────────────────────────────────────────────────
+          { source: "/tienda", destination: `${NODO_TIENDA_URL}/tienda` },
+          { source: "/tienda/:path*", destination: `${NODO_TIENDA_URL}/tienda/:path*` },
         ],
       };
     }
