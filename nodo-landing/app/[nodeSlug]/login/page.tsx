@@ -247,6 +247,7 @@ function LoginForm() {
   const isAutosNode = nodeParam === "nodo-autos" || nodeParam === "autos";
   const isFinanzasNode =
     nodeParam === "nodo-finanzas" || nodeParam === "finanzas";
+  const isTiendaNode = nodeParam === "nodo-tienda" || nodeParam === "tienda";
   const isSimpleRegisterNode = isInmoNode || isAutosNode || isFinanzasNode;
   const loginAccent = getLoginAccent(nodeParam);
   const loginNodoLogoSrc = isFinanzasNode
@@ -430,7 +431,11 @@ function LoginForm() {
     let tCode = "Core";
     let TIcon: React.ElementType = Layers;
 
-    if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
+    if (isTiendaNode) {
+      tLabel = matchedNode?.label ?? "Nodo Tienda";
+      tCode = matchedNode?.code ?? "Tienda";
+      TIcon = matchedNode?.Icon ?? Layers;
+    } else if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
       tLabel = matchedNode?.label ?? "Nodo Inmo";
       tCode = matchedNode?.code ?? "Inmo";
       TIcon = matchedNode?.Icon ?? Layers;
@@ -463,7 +468,9 @@ function LoginForm() {
 
     const { access_token, refresh_token } = session;
     setTimeout(() => {
-      if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
+      if (isTiendaNode) {
+        window.location.href = `/tienda/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+      } else if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
         window.location.href = `/inmo/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
       } else if (
         nodeParam === "nodo-clinica" ||
@@ -583,7 +590,8 @@ function LoginForm() {
         return;
       }
 
-      if (matchedNode?.code) {
+      // Tienda provisions on first access at the SPA auth callback — skip gate here
+      if (matchedNode?.code && !isTiendaNode) {
         const access = await enforceNodeAccess(supabase, matchedNode.code);
         if (!access.ok) {
           setGeneralError(access.message);
@@ -935,7 +943,7 @@ function LoginForm() {
 
       <div className="min-h-screen grid grid-cols-1 login-split">
         {/* Brand panel (left) */}
-        <aside className="login-brand-panel relative overflow-hidden bg-navy-900 text-white p-12 flex-col justify-between hidden">
+        <aside className="login-brand-panel relative overflow-hidden bg-navy-900 text-white px-12 py-10 flex-col min-h-screen hidden">
           <div
             aria-hidden
             className="absolute inset-0 pointer-events-none"
@@ -944,7 +952,7 @@ function LoginForm() {
             }}
           />
 
-          <div className="relative z-[1]">
+          <div className="relative z-[1] shrink-0">
             <Image
               src="/logos/logo compuesto estrella az letra blancazzz.png"
               alt="Nodo Core"
@@ -954,15 +962,17 @@ function LoginForm() {
             />
           </div>
 
-          <div className="relative z-[1]">
+          <div className="relative z-[1] login-brand-diagram">
             <EcosystemDiagram
               dark
               interactive
               isLoginPage
               activeNodeSlug={activeNodeSlug}
-              className="w-[min(420px,65%)] aspect-square mx-auto my-3"
+              className="w-[min(480px,96%)] aspect-square mx-auto"
             />
+          </div>
 
+          <div className="relative z-[1] shrink-0 login-brand-copy">
             <h2
               className="font-display font-extrabold text-white max-w-[14em]"
               style={{ fontSize: "clamp(26px,2.6vw,34px)", lineHeight: 1.15 }}
@@ -994,13 +1004,13 @@ function LoginForm() {
             >
               {panelDesc}
             </p>
-          </div>
 
-          <div
-            className="relative z-[1] text-[13px]"
-            style={{ color: "rgba(234,240,247,.5)" }}
-          >
-            © 2026 Nodo Core · Transparencia tecnológica
+            <p
+              className="mt-8 text-[13px]"
+              style={{ color: "rgba(234,240,247,.5)" }}
+            >
+              © 2026 Nodo Core · Transparencia tecnológica
+            </p>
           </div>
         </aside>
 

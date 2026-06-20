@@ -8,6 +8,7 @@ import {
   Wheat,
   Calculator,
   Car,
+  ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
 
@@ -256,6 +257,30 @@ export const NODES: NodeDef[] = [
       },
     ],
     provisionable: true,
+  },
+  {
+    code: "Tienda",
+    slug: "tienda",
+    label: "Nodo Tienda",
+    provisionable: true,
+    inDevelopment: false,
+    description: "Plataforma de e-commerce SaaS: creá y administrá tu tienda online con tu dominio propio.",
+    Icon: ShoppingBag,
+    intro: "NODO Tienda es tu plataforma de e-commerce completa. Creá tu tienda online, personalizá tu identidad visual, gestioná productos, inventario, pedidos y clientes desde un solo panel. Con el plan Pro, conectá tu dominio propio y activá el portal de clientes.",
+    highlights: [
+      {
+        title: "Tienda personalizada",
+        description: "Configurá colores, tipografías, logo y banners. Tu tienda, tu marca.",
+      },
+      {
+        title: "Gestión completa",
+        description: "Productos con variantes, control de inventario, pedidos con estados y trazabilidad.",
+      },
+      {
+        title: "Dominio propio (Pro)",
+        description: "Conectá www.tutienda.com a tu nodo. Certificado SSL automático incluido.",
+      },
+    ],
   },
 ];
 

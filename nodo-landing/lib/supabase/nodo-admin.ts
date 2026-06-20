@@ -37,6 +37,8 @@ function getNodoConfig(nodoCode: string): NodoConfig | null {
       return envPair("NODO_CLINICA") ?? envPair("NODO_SALUD");
     case "finanzas":
       return envPair("NODO_FINANZAS");
+    case "tienda":
+      return envPair("NODO_TIENDA");
     default:
       return null;
   }

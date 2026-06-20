@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+:root {
+  --store-primary: #6366f1;
+  --store-secondary: #1e1b4b;
+  --store-radius: 12px;
+}
