@@ -43,6 +43,21 @@ function isAuthorized(request: NextRequest): boolean {
 
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
+    // Temporary debug — remove after confirming fix
+    const hasToken = !!request.headers.get("authorization");
+    const hasInmoKey = !!process.env.NODO_INMO_SERVICE_ROLE_KEY;
+    const hasLandingKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const tokenPrefix = request.headers.get("authorization")?.slice(0, 15) ?? "none";
+    const inmoPrefix = process.env.NODO_INMO_SERVICE_ROLE_KEY?.slice(0, 10) ?? "unset";
+    const landingPrefix = process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 10) ?? "unset";
+    console.error("staff-notify auth failed", {
+      hasToken,
+      hasInmoKey,
+      hasLandingKey,
+      tokenPrefix,
+      inmoPrefix,
+      landingPrefix,
+    });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
