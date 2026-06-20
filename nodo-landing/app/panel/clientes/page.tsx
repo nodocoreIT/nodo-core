@@ -433,11 +433,19 @@ export default function ClientesPage() {
       );
     }
 
-    // Sync password + Auth claims on every save (idempotent repair for dashboard clients).
+    // Sync password + Auth claims — only when credentials actually changed.
     for (const u of formUnits) {
       if (!unitHasClientAccessCredentials(u.access_user)) continue;
       const newPassword = u.access_password.trim();
       if (!newPassword || u.status === "pausado") continue;
+
+      // Skip if this nodo's credentials are identical to what's already in the DB.
+      const prevForPwd = prevUnits.find((p) => p.unit_code === u.unit_code);
+      const credentialsUnchanged =
+        !!prevForPwd?.provisioned_at &&
+        prevForPwd.access_user === u.access_user.trim() &&
+        prevForPwd.access_password === newPassword;
+      if (credentialsUnchanged) continue;
 
       const nodeDef = NODES.find((n) => n.code === u.unit_code);
       const res = await fetch("/api/admin/client-unit-password-update", {
@@ -459,12 +467,17 @@ export default function ClientesPage() {
       }
     }
 
-    // Sync ban status: pausado → ban, onboarding/activo → unban.
+    // Sync ban status: only when status changed or the nodo was just provisioned.
     for (const u of formUnits) {
       const nodeDef = NODES.find((n) => n.code === u.unit_code);
       if (!nodeDef?.provisionable) continue;
       const userId = provisionedUserIds.get(u.unit_code);
       if (!userId) continue;
+
+      const prevForStatus = prevUnits.find((p) => p.unit_code === u.unit_code);
+      const statusUnchanged = prevForStatus && prevForStatus.status === u.status;
+      if (statusUnchanged && !freshlyProvisioned.has(u.unit_code)) continue;
+
       await fetch("/api/nodo-suspend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1217,15 +1230,25 @@ export default function ClientesPage() {
           </div>
         )}
 
+        {/* Saving full-screen overlay — blocks all interaction while saving */}
+        {showForm && saving && (
+          <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)", background: "rgba(18,30,47,.30)" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, background: "white", borderRadius: 16, padding: "28px 36px", boxShadow: "0 16px 48px rgba(18,30,47,.22)" }}>
+              <Loader2 size={34} style={{ color: "var(--color-brand)", animation: "spin 1s linear infinite" }} />
+              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-navy)", fontFamily: "var(--font-sans)" }}>Guardando...</span>
+            </div>
+          </div>
+        )}
+
         {/* Form modal */}
         {showForm && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(18,30,47,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
-            <div style={{ background: "white", borderRadius: 12, width: "min(760px, 96vw)", maxHeight: "92vh", overflowY: "auto", boxShadow: "0 12px 40px rgba(18,30,47,.18)" }}>
+            <div style={{ background: "white", borderRadius: 12, width: "min(760px, 96vw)", maxHeight: "92vh", overflowY: "auto", boxShadow: "0 12px 40px rgba(18,30,47,.18)", position: "relative" }}>
               <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-mist)", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: "white", zIndex: 1 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-navy)", fontFamily: "var(--font-display)" }}>
                   {editingClient ? "Editar cliente" : "Nuevo cliente"}
                 </h3>
-                <button onClick={() => setShowForm(false)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--color-slate2)", fontSize: 20, lineHeight: 1, padding: "2px 4px" }}>×</button>
+                <button onClick={() => setShowForm(false)} disabled={saving} style={{ background: "transparent", border: "none", cursor: saving ? "not-allowed" : "pointer", color: "var(--color-slate2)", fontSize: 20, lineHeight: 1, padding: "2px 4px" }}>×</button>
               </div>
 
               <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>

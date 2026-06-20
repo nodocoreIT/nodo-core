@@ -72,9 +72,17 @@ export const useStaffStore = create<StaffStore>((set, get) => ({
       ? `${landingOrigin}/inmo/auth/callback`
       : `${window.location.origin}/inmo/auth/callback`;
 
+    // Resolve the caller's display name to include in the invitation email.
+    const { data: { user: callerUser } } = await supabase.auth.getUser();
+    const inviterName =
+      (callerUser?.user_metadata?.full_name as string | undefined)?.trim() ||
+      callerUser?.email ||
+      undefined;
+
     const data = await invokeFunction<{
       id: string;
       invited?: boolean;
+      invitationToken?: string;
       emailSent?: boolean;
       emailWarning?: string;
     }>("invite-member", {
@@ -82,6 +90,7 @@ export const useStaffStore = create<StaffStore>((set, get) => ({
       email,
       role,
       redirectTo,
+      inviterName,
     });
 
     await get().fetchMembers();

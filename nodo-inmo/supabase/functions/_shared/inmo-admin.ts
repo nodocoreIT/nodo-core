@@ -71,3 +71,32 @@ export async function getOrgName(
   `;
   return rows[0]?.name ?? "tu inmobiliaria";
 }
+
+export async function createOrgInvitation(
+  sql: postgres.Sql,
+  params: {
+    orgId: string;
+    inviteeEmail: string;
+    inviteeUserId: string | null;
+    invitedByUserId: string;
+    role: string;
+    expiresAt: Date;
+  },
+): Promise<string> {
+  const rows = await sql`
+    INSERT INTO shared.org_invitations
+      (org_id, invitee_email, invitee_user_id, invited_by_user_id, role, expires_at)
+    VALUES
+      (${params.orgId}::uuid, ${params.inviteeEmail}, ${params.inviteeUserId}::uuid,
+       ${params.invitedByUserId}::uuid, ${params.role},
+       ${params.expiresAt.toISOString()})
+    ON CONFLICT (org_id, invitee_email) WHERE status = 'pending'
+    DO UPDATE SET
+      invited_by_user_id = EXCLUDED.invited_by_user_id,
+      role = EXCLUDED.role,
+      expires_at = EXCLUDED.expires_at,
+      token = gen_random_uuid()
+    RETURNING token::text
+  `;
+  return rows[0].token as string;
+}
