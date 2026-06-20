@@ -22,7 +22,7 @@ export function useNotifications(today: Date = new Date()): NotificationsState {
   const items = useMemo(() => {
     if (loading || error) return [];
     return buildNotifications(tasks.data ?? [], metrics, {
-      isAdmin: role === "admin",
+      isAdmin: role === "admin" || role === "super_admin",
       today,
     });
   }, [tasks.data, metrics, role, today, loading, error]);

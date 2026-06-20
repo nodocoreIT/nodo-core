@@ -79,7 +79,7 @@ export function AgencyProfileForm({ onSuccess }: AgencyProfileFormProps) {
   });
 
   // Guard: only admins see the form (R-A18)
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "super_admin") {
     return null;
   }
 

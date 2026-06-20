@@ -13,6 +13,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@nodocore/shared-components";
 
 const ROLE_DESTINATIONS: Record<string, string> = {
+  super_admin: "/admin",
   admin: "/admin",
   agent: "/admin",
   owner: "/owner",
