@@ -77,6 +77,7 @@ const NAV_ITEMS: NavItem[] = [
 
 // JWT role → display name (matches settings-dialog role permission keys)
 const ROLE_DISPLAY: Record<string, string> = {
+  super_admin: "Super Admin",
   admin:   "Administrador",
   agent:   "Empleado",
   tenant:  "Inquilino",
@@ -154,7 +155,7 @@ export function AdminLayout() {
   const userId = user?.id;
 
   const visibleNav = NAV_ITEMS.filter((item) => {
-    if (item.adminOnly && role !== "admin") return false;
+    if (item.adminOnly && role !== "admin" && role !== "super_admin") return false;
     if (userId && userPermissions?.[userId]) {
       return userPermissions[userId].includes(item.to);
     }

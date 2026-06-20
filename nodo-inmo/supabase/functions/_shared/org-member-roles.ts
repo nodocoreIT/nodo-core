@@ -9,6 +9,7 @@ export const DISPLAY_TO_DB_ROLE: Record<string, string> = {
 };
 
 export const DB_TO_DISPLAY_ROLE: Record<string, string> = {
+  super_admin: "Super Admin",
   admin: "Administrador",
   agent: "Empleado",
   owner: "Propietario",

@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
       JOIN auth.users u ON u.id = om.user_id
       LEFT JOIN shared.user_profiles up ON up.id = om.user_id
       WHERE om.org_id = ${orgId}::uuid
+        AND om.user_id <> ${user.id}::uuid
       ORDER BY om.created_at ASC
     `;
 

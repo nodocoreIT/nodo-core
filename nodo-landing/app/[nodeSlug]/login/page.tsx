@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
-import EcosystemDiagram from "@/components/EcosystemDiagram";
+import LoginBrandPanel from "@/components/LoginBrandPanel";
+import { LoginFormNodeHeader } from "@/components/LoginFormNodeHeader";
+import { LoginNodeLockup } from "@/components/LoginNodeLockup";
+import { getLoginPanelDetails } from "@/lib/login-panel";
 import { Layers } from "lucide-react";
 import {
   PasswordResetPanel,
@@ -27,7 +29,6 @@ import { submitNodeRegistration } from "@/app/actions/registration";
 import {
   DEFAULT_ACCENT,
   getLoginAccent,
-  getNodoLogoSrc,
   applyLoginAccent,
   type NodeAccent,
 } from "@/lib/node-accents";
@@ -45,13 +46,11 @@ function NodeTransitionOverlay({
   label,
   code,
   Icon,
-  logoSrc = "/logos/nodo%20nar.png",
   accent = DEFAULT_ACCENT,
 }: {
   label: string;
   code: string;
   Icon: React.ElementType;
-  logoSrc?: string;
   accent?: NodeAccent;
 }) {
   const [mounted, setMounted] = useState(false);
@@ -136,23 +135,9 @@ function NodeTransitionOverlay({
         >
           Entrando a
         </p>
-        <h2
-          className="mt-2 font-display font-extrabold text-white text-center flex items-center justify-center gap-x-3.5 gap-y-1"
-          style={{ fontSize: "clamp(28px,5vw,52px)", lineHeight: 1.06 }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={logoSrc}
-            alt=""
-            style={{
-              height: "0.78em",
-              width: "auto",
-              display: "inline-block",
-            }}
-          />
-          <span style={{ color: "#fff", fontWeight: 400 }}>|</span>
-          <span>{code}</span>
-        </h2>
+        <div className="mt-2 flex justify-center">
+          <LoginNodeLockup nodeCode={code} size="panel" />
+        </div>
 
         {/* Dots */}
         <div className="mt-8 flex items-center gap-1.5">
@@ -249,13 +234,6 @@ function LoginForm() {
     nodeParam === "nodo-finanzas" || nodeParam === "finanzas";
   const isSimpleRegisterNode = isInmoNode || isAutosNode || isFinanzasNode;
   const loginAccent = getLoginAccent(nodeParam);
-  const loginNodoLogoSrc = isFinanzasNode
-    ? "/logos/nodo ver.png"
-    : isAutosNode
-      ? "/logos/nodo roj.png"
-      : isClinicaNode
-        ? getNodoLogoSrc("clinica")
-        : "/logos/nodo nar.png";
 
   useEffect(() => applyLoginAccent(loginAccent), [loginAccent]);
 
@@ -310,7 +288,6 @@ function LoginForm() {
     label: string;
     code: string;
     Icon: React.ElementType;
-    logoSrc?: string;
   } | null>(null);
   const [successModal, setSuccessModal] = useState<{
     open: boolean;
@@ -401,27 +378,8 @@ function LoginForm() {
     }
   }
 
-  // Set up details for the left panel based on nodeParam
-  let activeNodeSlug: string | undefined = undefined;
-  let panelTitle = "El núcleo de gestión de su ecosistema.";
-  let panelDesc =
-    "Panel de administración para gestionar clientes, unidades de negocio y el roadmap del Core.";
-
-  if (nodeParam === "nodo-clinica" || nodeParam === "clinica-virtual") {
-    activeNodeSlug = "clinica"; // Connect to Clinica sub-node in diagram
-    panelTitle = "NODO | Clínica Virtual";
-    panelDesc =
-      "Plataforma HealthTech para telemedicina profesional: consultorios virtuales, recetas digitales e informes automatizados con Inteligencia Artificial.";
-  } else if (nodeParam === "nodo-autos" || nodeParam === "autos") {
-    activeNodeSlug = "autos";
-    panelTitle = "NODO | Automotores";
-    panelDesc =
-      "Panel de gestión de stock para concesionarias y agencias: inventario, clientes, publicaciones y contratos de venta digitales.";
-  } else if (matchedNode) {
-    activeNodeSlug = matchedNode.slug;
-    panelTitle = `NODO | ${matchedNode.code}`;
-    panelDesc = matchedNode.description;
-  }
+  const loginPanel = getLoginPanelDetails(nodeParam);
+  const detailNode = getNodeBySlug(loginPanel.activeNodeSlug ?? cleanSlug);
 
   const validEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
@@ -456,9 +414,6 @@ function LoginForm() {
       label: tLabel,
       code: tCode,
       Icon: TIcon,
-      ...(isFinanzasNode || isAutosNode || isClinicaNode
-        ? { logoSrc: loginNodoLogoSrc }
-        : {}),
     });
 
     const { access_token, refresh_token } = session;
@@ -914,7 +869,6 @@ function LoginForm() {
           label={transitionTarget.label}
           code={transitionTarget.code}
           Icon={transitionTarget.Icon}
-          logoSrc={transitionTarget.logoSrc}
           accent={loginAccent}
         />
       )}
@@ -934,75 +888,7 @@ function LoginForm() {
       </Link>
 
       <div className="min-h-screen grid grid-cols-1 login-split">
-        {/* Brand panel (left) */}
-        <aside className="login-brand-panel relative overflow-hidden bg-navy-900 text-white p-12 flex-col justify-between hidden">
-          <div
-            aria-hidden
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background: `radial-gradient(70% 50% at 30% 30%, rgba(${loginAccent.rgb},.20), transparent 70%)`,
-            }}
-          />
-
-          <div className="relative z-[1]">
-            <Image
-              src="/logos/logo compuesto estrella az letra blancazzz.png"
-              alt="Nodo Core"
-              width={140}
-              height={30}
-              style={{ height: "30px", width: "auto" }}
-            />
-          </div>
-
-          <div className="relative z-[1]">
-            <EcosystemDiagram
-              dark
-              interactive
-              isLoginPage
-              activeNodeSlug={activeNodeSlug}
-              className="w-[min(420px,65%)] aspect-square mx-auto my-3"
-            />
-
-            <h2
-              className="font-display font-extrabold text-white max-w-[14em]"
-              style={{ fontSize: "clamp(26px,2.6vw,34px)", lineHeight: 1.15 }}
-            >
-              {panelTitle.includes("|") ? (
-                <span className="flex items-center gap-[0.3em]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={loginNodoLogoSrc}
-                    alt="NODO"
-                    style={{
-                      height: "0.82em",
-                      width: "auto",
-                      display: "inline-block",
-                      verticalAlign: "middle",
-                    }}
-                  />
-                  <span className="text-white/40 font-normal mx-1">|</span>
-                  <span>{panelTitle.split("|")[1].trim()}</span>
-                </span>
-              ) : (
-                panelTitle
-              )}
-            </h2>
-
-            <p
-              className="text-[14.5px] leading-relaxed mt-4 max-w-[32em]"
-              style={{ color: "rgba(234,240,247,.7)" }}
-            >
-              {panelDesc}
-            </p>
-          </div>
-
-          <div
-            className="relative z-[1] text-[13px]"
-            style={{ color: "rgba(234,240,247,.5)" }}
-          >
-            © 2026 Nodo Core · Transparencia tecnológica
-          </div>
-        </aside>
+        <LoginBrandPanel accent={loginAccent} {...loginPanel} />
 
         {/* Form panel (right) */}
         <main className="flex items-center justify-center p-8 bg-paper min-h-screen">
@@ -1157,33 +1043,37 @@ function LoginForm() {
               </form>
             ) : authMode === "login" ? (
               <div>
-                {/* Kicker */}
-                <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
-                  {isClinicaNode
-                    ? "◎ Portal Clínica Virtual"
-                    : isInmoNode
-                      ? "◎ Portal Inmobiliarias"
-                      : isAutosNode
-                        ? "◎ Portal Automotores"
-                        : isFinanzasNode
-                          ? "◎ Portal Finanzas Personales"
-                          : "◎ Acceso administradores"}
-                </span>
-
-                <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
-                  Iniciar sesión
-                </h1>
-                <p className="text-slate2 text-[14.5px] mb-6">
-                  {isClinicaNode
-                    ? "Ingrese sus credenciales de médico o paciente para acceder."
-                    : isInmoNode
-                      ? "Ingrese sus credenciales de dueño de inmobiliaria para acceder."
-                      : isAutosNode
-                        ? "Ingrese sus credenciales para acceder al panel de automotores."
-                        : isFinanzasNode
-                          ? "Ingrese sus credenciales para acceder a finanzas personales."
-                          : "Ingrese sus credenciales para acceder al panel de Nodo Core."}
-                </p>
+                {loginPanel.nodeCode && detailNode ? (
+                  <LoginFormNodeHeader
+                    nodeCode={loginPanel.nodeCode}
+                    wordmarkSlug={loginPanel.activeNodeSlug}
+                    Icon={detailNode.Icon}
+                    accent={loginAccent}
+                    subtitle={
+                      isClinicaNode
+                        ? "Ingrese sus credenciales de médico o paciente para acceder."
+                        : isInmoNode
+                          ? "Ingrese sus credenciales de dueño de inmobiliaria para acceder."
+                          : isAutosNode
+                            ? "Ingrese sus credenciales para acceder al panel de automotores."
+                            : isFinanzasNode
+                              ? "Ingrese sus credenciales para acceder a finanzas personales."
+                              : "Ingrese sus credenciales para acceder."
+                    }
+                  />
+                ) : (
+                  <>
+                    <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
+                      ◎ Acceso administradores
+                    </span>
+                    <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
+                      Iniciar sesión
+                    </h1>
+                    <p className="text-slate2 text-[14.5px] mb-6">
+                      Ingrese sus credenciales para acceder al panel de Nodo Core.
+                    </p>
+                  </>
+                )}
 
                 {(isClinicaNode || isSimpleRegisterNode) && (
                   <>
