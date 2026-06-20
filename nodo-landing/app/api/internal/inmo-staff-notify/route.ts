@@ -28,12 +28,17 @@ type AddedPayload = {
 type NotifyPayload = InvitePayload | AddedPayload;
 
 function isAuthorized(request: NextRequest): boolean {
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceKey) return false;
-
   const authHeader = request.headers.get("authorization");
   const token = authHeader?.replace(/^Bearer\s+/i, "").trim();
-  return token === serviceKey;
+  if (!token) return false;
+
+  // The Edge Function sends nodo-inmo's SUPABASE_SERVICE_ROLE_KEY (a different
+  // Supabase project from nodo-landing). Accept that key as the primary auth.
+  // Also accept landing's own service key as a fallback.
+  const inmoKey = process.env.NODO_INMO_SERVICE_ROLE_KEY;
+  const landingKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  return (!!inmoKey && token === inmoKey) || (!!landingKey && token === landingKey);
 }
 
 export async function POST(request: NextRequest) {
