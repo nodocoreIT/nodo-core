@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Lightbulb,
   LogOut,
+  Mail,
   Settings,
   Users,
   UsersRound,
@@ -51,6 +52,7 @@ const PLATFORM_ITEMS: NavItem[] = [
   { label: "Caja", href: "/panel/caja", icon: Wallet },
   { label: "Equipo", href: "/panel/equipo", icon: UsersRound },
   { label: "Bóveda de contraseñas", href: "/panel/passwords", icon: KeyRound },
+  { label: "Invitaciones", href: "/panel/invitaciones", icon: Mail },
 ];
 
 const ECOSYSTEM_ITEMS: NavItem[] = [
