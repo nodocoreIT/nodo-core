@@ -16,7 +16,7 @@ export function RegisterExpenseButton({ propertyId }: RegisterExpenseButtonProps
   const { role } = useAuth();
   const [open, setOpen] = useState(false);
 
-  if (role !== "admin") return null;
+  if (role !== "admin" && role !== "super_admin") return null;
 
   return (
     <>
