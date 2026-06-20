@@ -150,7 +150,9 @@ html {
     grid-template-columns: 1.05fr 0.95fr;
   }
   .login-brand-panel {
-    display: flex !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-height: 100vh;
   }
 }
 @media (max-width: 880px) {

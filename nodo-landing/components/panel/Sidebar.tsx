@@ -182,7 +182,7 @@ export default function Sidebar({
 
         <div className="px-3 pb-3">
           <a
-            href="https://us05web.zoom.us/j/85456616409?pwd=OmLUE8DbGEkE6ilJpFNdfPEvj3J8Zg.1"
+            href="https://meet.google.com/fbx-yewk-dir?authuser=0&pli=1"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 rounded-sm border border-[var(--color-sidebar-border)] px-3 py-2 text-sm font-medium text-[var(--color-sidebar-text)] transition-colors hover:border-brand hover:bg-brand/10 hover:text-brand"

@@ -55,6 +55,10 @@ Deno.serve(async (req) => {
       return json({ error: "Usuario no encontrado en el equipo." }, 404);
     }
 
+    if (targetRows[0].role === "super_admin") {
+      return json({ error: "No se puede modificar al dueño del nodo." }, 403);
+    }
+
     if (targetRows[0].role === "admin") {
       return json({ error: "No se puede modificar un administrador." }, 403);
     }
@@ -64,7 +68,7 @@ Deno.serve(async (req) => {
       SET role = ${dbRole}
       WHERE org_id = ${orgId}::uuid
         AND user_id = ${userId}::uuid
-        AND role <> 'admin'
+        AND role NOT IN ('admin', 'super_admin')
     `;
 
     return json({ ok: true });

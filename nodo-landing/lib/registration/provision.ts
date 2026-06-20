@@ -168,6 +168,17 @@ async function ensureInmoAccess(
   const { data: userData } = await admin.auth.admin.getUserById(userId);
   const currentAppMetadata = userData.user?.app_metadata ?? {};
 
+  // Determine the caller's role from org_members so the JWT reflects the
+  // correct role (super_admin for the org creator, admin for re-provisioned users).
+  const { data: memberRow } = await admin
+    .schema("shared")
+    .from("org_members")
+    .select("role")
+    .eq("org_id", membership.orgId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  const orgRole = (memberRow?.role as string | undefined) ?? "super_admin";
+
   const updatePayload: {
     password?: string;
     app_metadata: Record<string, unknown>;
@@ -175,7 +186,7 @@ async function ensureInmoAccess(
     app_metadata: {
       ...currentAppMetadata,
       org_id: membership.orgId,
-      role: "admin",
+      role: orgRole,
       plan: tier,
       must_set_password: false,
     },

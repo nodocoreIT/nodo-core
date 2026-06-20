@@ -20,13 +20,14 @@ const queryClient = new QueryClient({
 
 const AUTH_CONFIG = {
   roleDestinations: {
+    super_admin: "/admin",
     admin: "/admin",
     agent: "/admin",
     owner: "/owner",
     tenant: "/tenant",
   },
   unitCode: "Inmo",
-  allowedRoles: ["admin", "agent", "owner", "tenant"],
+  allowedRoles: ["super_admin", "admin", "agent", "owner", "tenant"],
 };
 
 interface AppProvidersProps {

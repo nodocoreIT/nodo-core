@@ -11,10 +11,26 @@ export async function resolveInmoAdminOrgId(
     JOIN shared.organizations o ON o.id = om.org_id
     WHERE om.user_id = ${userId}::uuid
       AND o.product IN ('inmo', 'nodo-inmo')
-      AND om.role = 'admin'
+      AND om.role IN ('admin', 'super_admin')
     LIMIT 1
   `;
   return rows[0]?.org_id ?? null;
+}
+
+/** Returns the caller's DB role within the inmo org, or null if not a member. */
+export async function resolveInmoCallerRole(
+  sql: postgres.Sql,
+  orgId: string,
+  userId: string,
+): Promise<string | null> {
+  const rows = await sql`
+    SELECT role
+    FROM shared.org_members
+    WHERE org_id = ${orgId}::uuid
+      AND user_id = ${userId}::uuid
+    LIMIT 1
+  `;
+  return (rows[0]?.role as string) ?? null;
 }
 
 export async function findAuthUserIdByEmail(

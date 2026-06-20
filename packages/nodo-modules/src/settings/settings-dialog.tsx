@@ -500,6 +500,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   };
   const { role: authRole, user: authUser } = useAuth();
   const effectiveRole = module.sessionRole ?? authRole;
+  const isSuperAdmin = !!module.superAdminRole && effectiveRole === module.superAdminRole;
+  const hasAdminAccess = effectiveRole === module.adminRole || isSuperAdmin;
   const profile = module.profile;
   const { settings, setSettings, resetSettings } = { settings: module.themeSettings, setSettings: module.setThemeSettings, resetSettings: module.resetThemeSettings };
   const upsertProfile = module.upsertProfile;
@@ -637,10 +639,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [deletingUser, setDeletingUser] = useState(false);
 
   useEffect(() => {
-    if (open && activeTab === "users" && effectiveRole === module.adminRole) {
+    if (open && activeTab === "users" && hasAdminAccess) {
       void fetchMembers();
     }
-  }, [open, activeTab, effectiveRole, fetchMembers]);
+  }, [open, activeTab, hasAdminAccess, fetchMembers]);
 
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
@@ -1520,7 +1522,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       <th className="p-3">Nombre</th>
                       <th className="p-3">Rol asignado</th>
                       <th className="p-3">Estado</th>
-                      {effectiveRole === module.adminRole && (
+                      {hasAdminAccess && (
                         <th className="p-3 text-right">Acciones</th>
                       )}
                     </tr>
@@ -1537,6 +1539,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       users.map((user) => {
                         const isSelf = authUser?.id === user.id;
                         const isAdminUser = user.role === module.adminDisplayRole;
+                        const canDelete = !isSelf && (isSuperAdmin || !isAdminUser);
                         return (
                           <tr
                             key={user.id}
@@ -1561,7 +1564,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                 {user.status}
                               </span>
                             </td>
-                            {effectiveRole === module.adminRole && (
+                            {hasAdminAccess && (
                               <td className="p-3">
                                 <div className="flex justify-end gap-1">
                                   <Button
@@ -1580,7 +1583,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                     variant="ghost"
                                     size="sm"
                                     className="h-8 gap-1 text-destructive hover:text-destructive"
-                                    disabled={isSelf || isAdminUser}
+                                    disabled={!canDelete}
                                     onClick={() => setUserToDelete(user)}
                                     aria-label={`Eliminar ${user.name}`}
                                   >
@@ -1595,10 +1598,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       })}
                   </tbody>
                 </table>
-                {effectiveRole === module.adminRole && (
+                {hasAdminAccess && (
                   <p className="text-[11px] text-slate2 px-3 py-2 border-t border-border">
                     Usá <strong>Editar</strong> para cambiar el rol y las secciones visibles.{" "}
-                    <strong>Eliminar</strong> quita el acceso al panel (no borra administradores ni tu propia cuenta).
+                    <strong>Eliminar</strong> quita el acceso al panel{isSuperAdmin ? "." : " (no borra administradores ni tu propia cuenta)."}
                   </p>
                 )}
               </div>

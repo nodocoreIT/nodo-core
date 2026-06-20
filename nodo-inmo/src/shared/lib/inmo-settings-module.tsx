@@ -80,6 +80,7 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
           "El usuario fue agregado, pero no se pudo enviar el correo de notificación.",
       },
       adminRole: "admin",
+      superAdminRole: "super_admin",
       adminDisplayRole: INMO_ADMIN_DISPLAY_ROLE,
       defaultInviteRole: INMO_EMPLOYEE_DISPLAY_ROLE,
       themeSettings: settings,

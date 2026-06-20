@@ -2,9 +2,10 @@
 
 import { useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
-import EcosystemDiagram from "@/components/EcosystemDiagram";
+import LoginBrandPanel from "@/components/LoginBrandPanel";
+import { DEFAULT_ACCENT } from "@/lib/node-accents";
+import { getLoginPanelDetails } from "@/lib/login-panel";
 import { createClient } from "@/lib/supabase/client";
 import { INVALID_LOGIN_MESSAGE } from "@nodocore/shared-components";
 
@@ -111,58 +112,7 @@ function AdminLoginForm() {
       </Link>
 
       <div className="min-h-screen grid grid-cols-1 login-split">
-        {/* Brand panel (left) */}
-        <aside className="login-brand-panel relative overflow-hidden bg-navy-900 text-white p-12 flex-col justify-between hidden">
-          <div
-            aria-hidden
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background:
-                "radial-gradient(70% 50% at 30% 30%, rgba(218,90,14,.20), transparent 70%)",
-            }}
-          />
-
-          <div className="relative z-[1]">
-            <Image
-              src="/logos/logo compuesto estrella az letra blancazzz.png"
-              alt="Nodo Core"
-              width={140}
-              height={30}
-              style={{ height: "30px", width: "auto" }}
-            />
-          </div>
-
-          <div className="relative z-[1]">
-            <EcosystemDiagram
-              dark
-              interactive
-              isLoginPage
-              className="w-[min(420px,65%)] aspect-square mx-auto my-3"
-            />
-
-            <h2
-              className="font-display font-extrabold text-white max-w-[14em]"
-              style={{ fontSize: "clamp(26px,2.6vw,34px)", lineHeight: 1.15 }}
-            >
-              El núcleo de gestión de su ecosistema.
-            </h2>
-
-            <p
-              className="text-[14.5px] leading-relaxed mt-4 max-w-[32em]"
-              style={{ color: "rgba(234,240,247,.7)" }}
-            >
-              Panel de administración para gestionar clientes, unidades de
-              negocio y el roadmap del Core.
-            </p>
-          </div>
-
-          <div
-            className="relative z-[1] text-[13px]"
-            style={{ color: "rgba(234,240,247,.5)" }}
-          >
-            © 2026 Nodo Core · Transparencia tecnológica
-          </div>
-        </aside>
+        <LoginBrandPanel accent={DEFAULT_ACCENT} {...getLoginPanelDetails("")} />
 
         {/* Form panel (right) */}
         <main className="flex items-center justify-center p-8 bg-paper min-h-screen">

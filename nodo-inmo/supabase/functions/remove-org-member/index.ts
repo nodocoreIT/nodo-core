@@ -1,7 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import postgres from "npm:postgres@3";
 import { corsHeaders } from "../_shared/cors.ts";
-import { resolveInmoAdminOrgId } from "../_shared/inmo-admin.ts";
+import { resolveInmoAdminOrgId, resolveInmoCallerRole } from "../_shared/inmo-admin.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -42,6 +42,9 @@ Deno.serve(async (req) => {
       return json({ error: "No podés eliminarte a vos mismo del equipo." }, 400);
     }
 
+    const callerRole = await resolveInmoCallerRole(sql, orgId, user.id);
+    const callerIsSuperAdmin = callerRole === "super_admin";
+
     const targetRows = await sql`
       SELECT role
       FROM shared.org_members
@@ -54,16 +57,28 @@ Deno.serve(async (req) => {
       return json({ error: "Usuario no encontrado en el equipo." }, 404);
     }
 
-    if (targetRows[0].role === "admin") {
+    if (targetRows[0].role === "super_admin") {
+      return json({ error: "No se puede eliminar al dueño del nodo." }, 403);
+    }
+
+    if (targetRows[0].role === "admin" && !callerIsSuperAdmin) {
       return json({ error: "No se puede eliminar un administrador." }, 403);
     }
 
-    await sql`
-      DELETE FROM shared.org_members
-      WHERE org_id = ${orgId}::uuid
-        AND user_id = ${userId}::uuid
-        AND role <> 'admin'
-    `;
+    if (callerIsSuperAdmin) {
+      await sql`
+        DELETE FROM shared.org_members
+        WHERE org_id = ${orgId}::uuid
+          AND user_id = ${userId}::uuid
+      `;
+    } else {
+      await sql`
+        DELETE FROM shared.org_members
+        WHERE org_id = ${orgId}::uuid
+          AND user_id = ${userId}::uuid
+          AND role <> 'admin'
+      `;
+    }
 
     return json({ ok: true });
   } catch (err) {

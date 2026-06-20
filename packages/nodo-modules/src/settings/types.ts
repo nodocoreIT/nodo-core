@@ -117,6 +117,8 @@ export interface SettingsModuleContextValue {
   roleOptions: { value: string; label: string }[];
   inviteMessages: { invited: string; existing: string; emailSkipped?: string };
   adminRole: string;
+  /** DB role string for the org creator (can delete any invited member). */
+  superAdminRole?: string;
   adminDisplayRole: string;
   defaultInviteRole: string;
   /** Roles with fixed portal access — hide the section picker (e.g. Propietario, Inquilino). */
