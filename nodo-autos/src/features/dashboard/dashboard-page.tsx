@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Car, CheckCircle2, Tag, Globe } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@nodocore/shared-components";
+import { Card, CardContent, CardHeader, CardTitle, useAuth } from "@nodocore/shared-components";
 import { useVehicleStore } from "@/store/vehicle-store";
 import { formatPrice, formatDate } from "@/shared/lib/utils";
+import { GuestDashboard } from "./components/guest-dashboard";
 import type { VehicleStatus } from "@/types";
 
 const STATUS_BADGE: Record<VehicleStatus, string> = {
@@ -21,12 +22,17 @@ const STATUS_LABEL: Record<VehicleStatus, string> = {
 };
 
 export function DashboardPage() {
+  const { role } = useAuth();
   const { vehicles, loadInitialData, loading, error } = useVehicleStore();
   const navigate = useNavigate();
 
   useEffect(() => {
-    void loadInitialData();
-  }, [loadInitialData]);
+    if (role !== "guest") void loadInitialData();
+  }, [loadInitialData, role]);
+
+  if (role === "guest") {
+    return <GuestDashboard />;
+  }
 
   const total = vehicles.length;
   const disponibles = vehicles.filter((v) => v.status === "disponible").length;

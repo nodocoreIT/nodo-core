@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FinanzasService } from '@/services/finanzas-service';
-import { useAuth } from '@/shared/hooks/use-auth';
+import { useAuth } from '@nodocore/shared-components';
 import { calcularMesFacturacion } from '@/utils/tarjeta-fechas';
 import { getFechaHoy } from '@/utils/formatters';
 import type {

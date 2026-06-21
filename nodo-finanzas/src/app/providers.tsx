@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Toaster } from "sonner";
+import { SupabaseProvider, AuthProvider } from "@nodocore/shared-components";
+import { supabase } from "@/shared/lib/supabase";
 import { useThemeSettings, useThemeStore } from "@/shared/hooks/use-theme-settings";
 import { useFinanzasThemeSync } from "@/shared/hooks/use-finanzas-theme-sync";
 
@@ -12,6 +14,15 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+const AUTH_CONFIG = {
+  roleDestinations: {
+    super_admin: "/admin/dashboard",
+    member: "/admin/dashboard",
+  },
+  unitCode: "Finanzas",
+  allowedRoles: ["super_admin", "member"],
+};
 
 interface AppProvidersProps {
   children: ReactNode;
@@ -29,10 +40,14 @@ export { useThemeStore };
 export function AppProviders({ children }: AppProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeInitializer>
-        {children}
-        <Toaster richColors position="top-right" />
-      </ThemeInitializer>
+      <SupabaseProvider client={supabase}>
+        <AuthProvider config={AUTH_CONFIG}>
+          <ThemeInitializer>
+            {children}
+            <Toaster richColors position="top-right" />
+          </ThemeInitializer>
+        </AuthProvider>
+      </SupabaseProvider>
     </QueryClientProvider>
   );
 }

@@ -1,4 +1,3 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { create } from "zustand";
 import { supabase } from "@/shared/lib/supabase";
 
@@ -25,7 +24,7 @@ async function invokeFunction<T>(name: string, body?: Record<string, unknown>): 
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export interface AutosStaffUser {
+export interface FinanzasStaffUser {
   id: string;
   name: string;
   email: string;
@@ -33,8 +32,8 @@ export interface AutosStaffUser {
   status: "Activo" | "Pendiente";
 }
 
-interface AutosStaffStore {
-  users: AutosStaffUser[];
+interface FinanzasStaffStore {
+  users: FinanzasStaffUser[];
   loading: boolean;
   error: string | null;
   fetchMembers: () => Promise<void>;
@@ -49,7 +48,7 @@ interface AutosStaffStore {
 
 // ─── Store ───────────────────────────────────────────────────────────────────
 
-export const useAutosStaffStore = create<AutosStaffStore>((set, get) => ({
+export const useFinanzasStaffStore = create<FinanzasStaffStore>((set, get) => ({
   users: [],
   loading: false,
   error: null,
@@ -57,8 +56,8 @@ export const useAutosStaffStore = create<AutosStaffStore>((set, get) => ({
   fetchMembers: async () => {
     set({ loading: true, error: null });
     try {
-      const data = await invokeFunction<{ members?: AutosStaffUser[] }>("list-org-members", {
-        products: ["nodo-autos"],
+      const data = await invokeFunction<{ members?: FinanzasStaffUser[] }>("list-org-members", {
+        products: ["nodo-finanzas"],
       });
       const members = data.members ?? [];
       set({ users: members, loading: false });
@@ -79,8 +78,8 @@ export const useAutosStaffStore = create<AutosStaffStore>((set, get) => ({
         : "");
 
     const redirectTo = landingOrigin
-      ? `${landingOrigin}/autos/auth/callback`
-      : `${window.location.origin}/autos/auth/callback`;
+      ? `${landingOrigin}/finanzas/auth/callback`
+      : `${window.location.origin}/finanzas/auth/callback`;
 
     const {
       data: { user: callerUser },
@@ -90,8 +89,7 @@ export const useAutosStaffStore = create<AutosStaffStore>((set, get) => ({
       callerUser?.email ||
       undefined;
 
-    // Pass the DB role directly (e.g. "seller", "guest") — not a display label.
-    // This avoids the DISPLAY_TO_DB_ROLE fallback that maps Vendedor→agent for inmo.
+    // Pass the DB role directly (e.g. "member") — not a display label.
     const data = await invokeFunction<{
       id: string;
       invited?: boolean;
@@ -104,8 +102,8 @@ export const useAutosStaffStore = create<AutosStaffStore>((set, get) => ({
       role,
       redirectTo,
       inviterName,
-      nodeLabel: "Autos",
-      products: ["nodo-autos"],
+      nodeLabel: "Finanzas",
+      products: ["nodo-finanzas"],
     });
 
     await get().fetchMembers();
@@ -121,7 +119,7 @@ export const useAutosStaffStore = create<AutosStaffStore>((set, get) => ({
     await invokeFunction("update-org-member-role", {
       userId,
       role,
-      products: ["nodo-autos"],
+      products: ["nodo-finanzas"],
     });
 
     set((state) => ({
@@ -132,7 +130,7 @@ export const useAutosStaffStore = create<AutosStaffStore>((set, get) => ({
   removeMember: async (userId) => {
     await invokeFunction("remove-org-member", {
       userId,
-      products: ["nodo-autos"],
+      products: ["nodo-finanzas"],
     });
 
     set((state) => ({ users: state.users.filter((u) => u.id !== userId) }));
@@ -141,22 +139,8 @@ export const useAutosStaffStore = create<AutosStaffStore>((set, get) => ({
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
-export function useAutosStaff() {
+export function useFinanzasStaff() {
   const { users, loading, error, fetchMembers, inviteUser, updateMemberRole, removeMember } =
-    useAutosStaffStore();
+    useFinanzasStaffStore();
   return { users, loading, error, fetchMembers, inviteUser, updateMemberRole, removeMember };
-}
-
-// ─── Retained non-staff hooks ─────────────────────────────────────────────────
-
-export function useSaveManualIpc() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      throw new Error("Índices IPC no aplican en nodo Autos");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ipc", "current"] });
-    },
-  });
 }

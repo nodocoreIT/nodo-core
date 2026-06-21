@@ -20,12 +20,15 @@ import {
   PortalHeaderActions,
   PortalHeaderMobileActions,
   useFixedDocumentTitle,
+  useAuth,
 } from "@nodocore/shared-components";
+import { SettingsDialog } from "@nodocore/nodo-modules/settings";
+import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { cn } from "@/shared/lib/utils";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { DolarCotizacionModal } from "@/components/ui/dolar-cotizacion-modal";
-import { useAuth } from "@/shared/hooks/use-auth";
 import { useDolar } from "@/hooks/use-dolar";
+import { FinanzasSettingsModuleProvider } from "@/shared/lib/finanzas-settings-module";
 
 interface NavItem {
   to: string;
@@ -68,9 +71,12 @@ function initials(value: string): string {
 export function AdminLayout() {
   const { pathname } = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [dolarModalOpen, setDolarModalOpen] = useState(false);
-  const { user, signOut } = useAuth();
+  const { user, role, signOut } = useAuth();
   const dolar = useDolar();
+
+  const isSuperAdmin = role === "super_admin";
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -94,148 +100,173 @@ export function AdminLayout() {
   const email = user?.email ?? "";
   const displayName = fullName || email;
 
+  async function handleSignOut() {
+    await signOut();
+  }
+
   return (
-    <div className="flex h-screen overflow-hidden bg-paper">
-      {/* Mobile overlay */}
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50 md:hidden"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed bottom-0 top-0 left-0 z-50 flex h-screen w-60 flex-shrink-0 flex-col bg-navy text-white transition-transform duration-300 ease-in-out border-r border-navy-700 md:static md:z-auto md:translate-x-0 md:flex",
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
-        )}
-      >
-        {/* Brand */}
-        <div className="mt-2.5 flex h-16 flex-shrink-0 items-center justify-between border-b border-navy-700 px-5">
-          <div className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-brand" />
-            <span className="font-display font-bold text-white text-sm">
-              Nodo Finanzas
-            </span>
-          </div>
-          <button
-            type="button"
-            className="md:hidden text-white/60 hover:text-white"
+    <FinanzasSettingsModuleProvider>
+      <div className="flex h-screen overflow-hidden bg-paper">
+        {/* Mobile overlay */}
+        {mobileMenuOpen && (
+          <div
+            className="fixed inset-0 z-50 bg-black/50 md:hidden"
             onClick={() => setMobileMenuOpen(false)}
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+          />
+        )}
 
-        {/* Nav */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <div className="flex flex-col gap-1">
-            {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end
-                onClick={() => setMobileMenuOpen(false)}
-                className={({ isActive }) =>
-                  cn(
-                    "flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-brand text-white"
-                      : "text-white/60 hover:bg-brand/10 hover:text-brand",
-                  )
-                }
-              >
-                <Icon className="h-4 w-4 flex-shrink-0" />
-                <span>{label}</span>
-              </NavLink>
-            ))}
-          </div>
-        </nav>
-
-        {/* Bottom: usuario + cerrar sesión */}
-        <div className="flex-shrink-0 border-t border-navy-700 p-3">
-          <div className="flex items-center gap-3 px-1 py-1">
-            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
-              {initials(displayName)}
+        {/* Sidebar */}
+        <aside
+          className={cn(
+            "fixed bottom-0 top-0 left-0 z-50 flex h-screen w-60 flex-shrink-0 flex-col bg-navy text-white transition-transform duration-300 ease-in-out border-r border-navy-700 md:static md:z-auto md:translate-x-0 md:flex",
+            mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
+          )}
+        >
+          {/* Brand */}
+          <div className="mt-2.5 flex h-16 flex-shrink-0 items-center justify-between border-b border-navy-700 px-5">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-brand" />
+              <span className="font-display font-bold text-white text-sm">
+                Nodo Finanzas
+              </span>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-white">{displayName}</p>
-              {fullName && (
-                <p className="truncate text-xs text-white/60">{email}</p>
-              )}
-            </div>
-          </div>
-
-          <Button
-            variant="outline"
-            onClick={() => void signOut()}
-            className="mt-2 w-full cursor-pointer justify-center gap-2 border-navy-700 bg-transparent text-white/60 hover:bg-brand/10 hover:text-brand hover:border-brand"
-          >
-            <LogOut className="h-4 w-4" />
-            Cerrar sesión
-          </Button>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Header */}
-        <header className="flex min-h-16 items-center gap-3 sm:gap-4 border-b border-border bg-[#e8faf0] px-4 sm:px-6 py-3 shadow-sm flex-shrink-0">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
             <button
               type="button"
-              className="block md:hidden text-navy hover:text-brand"
-              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden text-white/60 hover:text-white"
+              onClick={() => setMobileMenuOpen(false)}
             >
-              <Menu className="h-6 w-6" />
+              <X className="h-5 w-5" />
             </button>
-            <div className="min-w-0">
-              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate2">
-                Nodo Finanzas · Panel Admin
-              </p>
-              <h1 className="truncate text-base sm:text-xl font-bold text-navy mt-1.5">{title}</h1>
-            </div>
           </div>
 
-          <PortalHeaderMobileActions notifications={<NotificationBell />} />
+          {/* Nav */}
+          <nav className="flex-1 overflow-y-auto px-3 py-4">
+            <div className="flex flex-col gap-1">
+              {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-brand text-white"
+                        : "text-white/60 hover:bg-brand/10 hover:text-brand",
+                    )
+                  }
+                >
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <span>{label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </nav>
 
-          <PortalHeaderActions
-            metrics={
-              <>
+          {/* Bottom: user + settings + logout */}
+          <div className="flex-shrink-0 border-t border-navy-700 p-3">
+            <div className="flex items-center gap-3 px-1 py-1 mb-2">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
+                {initials(displayName)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-white">{displayName}</p>
+                {fullName && (
+                  <p className="truncate text-xs text-white/60">{email}</p>
+                )}
+              </div>
+              {isSuperAdmin && (
                 <button
                   type="button"
-                  id="dolar-badge"
-                  onClick={() => setDolarModalOpen(true)}
-                  title="Ver cotizaciones del dólar"
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/20 transition-colors cursor-pointer whitespace-nowrap"
+                  aria-label="Configuración"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setSettingsOpen(true);
+                  }}
+                  className="flex-shrink-0 rounded-md p-1.5 text-white/60 transition-colors hover:text-brand"
                 >
-                  <DollarSign className="h-3 w-3" />
-                  {dolar.loading && !dolar.cotizacion
-                    ? "USD …"
-                    : dolar.cotizacion
-                      ? `USD ${dolar.tipoDolarSeleccionado.toUpperCase()} · $${dolar.cotizacion.venta.toLocaleString("es-AR")}`
-                      : "USD —"}
+                  <Settings className="h-4 w-4" />
                 </button>
+              )}
+            </div>
 
-                <DolarCotizacionModal
-                  open={dolarModalOpen}
-                  onClose={() => setDolarModalOpen(false)}
-                  tipoSeleccionado={dolar.tipoDolarSeleccionado}
-                  onSelectTipo={(tipo, cotizacion) => dolar.cambiarTipoDolar(tipo, cotizacion)}
-                  onCotizacionesLoaded={(lista) => dolar.sincronizarCotizaciones(lista)}
-                />
-              </>
-            }
-            notifications={<NotificationBell />}
-          />
-        </header>
+            <Button
+              variant="outline"
+              onClick={() => void handleSignOut()}
+              className="w-full cursor-pointer justify-center gap-2 border-navy-700 bg-transparent text-white/60 hover:bg-brand/10 hover:text-brand hover:border-brand"
+            >
+              <LogOut className="h-4 w-4" />
+              Cerrar sesión
+            </Button>
+          </div>
+        </aside>
 
-        {/* Content */}
-        <main className="flex-1 overflow-auto p-6">
-          <Outlet />
-        </main>
+        {/* Main */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Header */}
+          <header className="flex min-h-16 items-center gap-3 sm:gap-4 border-b border-border bg-[#e8faf0] px-4 sm:px-6 py-3 shadow-sm flex-shrink-0">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <button
+                type="button"
+                className="block md:hidden text-navy hover:text-brand"
+                onClick={() => setMobileMenuOpen(true)}
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate2">
+                  Nodo Finanzas · Panel Admin
+                </p>
+                <h1 className="truncate text-base sm:text-xl font-bold text-navy mt-1.5">{title}</h1>
+              </div>
+            </div>
+
+            <PortalHeaderMobileActions
+              notifications={<NotificationBell />}
+              trailing={<NodoSwitcher />}
+            />
+
+            <PortalHeaderActions
+              metrics={
+                <>
+                  <button
+                    type="button"
+                    id="dolar-badge"
+                    onClick={() => setDolarModalOpen(true)}
+                    title="Ver cotizaciones del dólar"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/20 transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    <DollarSign className="h-3 w-3" />
+                    {dolar.loading && !dolar.cotizacion
+                      ? "USD …"
+                      : dolar.cotizacion
+                        ? `USD ${dolar.tipoDolarSeleccionado.toUpperCase()} · $${dolar.cotizacion.venta.toLocaleString("es-AR")}`
+                        : "USD —"}
+                  </button>
+
+                  <DolarCotizacionModal
+                    open={dolarModalOpen}
+                    onClose={() => setDolarModalOpen(false)}
+                    tipoSeleccionado={dolar.tipoDolarSeleccionado}
+                    onSelectTipo={(tipo, cotizacion) => dolar.cambiarTipoDolar(tipo, cotizacion)}
+                    onCotizacionesLoaded={(lista) => dolar.sincronizarCotizaciones(lista)}
+                  />
+                </>
+              }
+              notifications={<NotificationBell />}
+              trailing={<NodoSwitcher />}
+            />
+          </header>
+
+          {/* Content */}
+          <main className="flex-1 overflow-auto p-6">
+            <Outlet />
+          </main>
+        </div>
+
+        <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       </div>
-    </div>
+    </FinanzasSettingsModuleProvider>
   );
 }
