@@ -99,11 +99,11 @@ Deno.serve(async (req) => {
       });
 
       const mail = await sendInmoStaffNotifyEmail(redirectTo, {
-        kind: "added",
+        kind: "invite",
         email: normalizedEmail,
         name: displayName,
         orgName,
-        loginUrl,
+        actionUrl: loginUrl,
         inviterName,
         nodeLabel: nodeLabel ?? "NODO | Inmo",
       });
