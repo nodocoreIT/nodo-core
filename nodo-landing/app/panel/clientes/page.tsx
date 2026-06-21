@@ -510,6 +510,7 @@ export default function ClientesPage() {
           nodo_code: u.unit_code,
           user_id: userId,
           plan: normalizedNextPlan,
+          client_name: formName.trim(),
         }),
       });
     }
