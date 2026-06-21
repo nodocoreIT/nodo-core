@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Building2, Check, AlertCircle } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ChevronDown, Building2, Check, AlertCircle, Loader2 } from "lucide-react";
 import { useSupabase } from "@nodocore/shared-components";
 import { useMyOrgs } from "./use-my-orgs";
 import type { OrgEntry } from "./types";
@@ -16,6 +17,7 @@ export function NodoSwitcher() {
   const { orgs, loading } = useMyOrgs();
   const [open, setOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const [switchError, setSwitchError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -52,6 +54,7 @@ export function NodoSwitcher() {
     if (org.org_id === currentOrgId || switching) return;
     setOpen(false);
     setSwitching(true);
+    setSwitchingTo(org.org_name);
     setSwitchError(null);
 
     try {
@@ -83,8 +86,59 @@ export function NodoSwitcher() {
     }
   }
 
+  const switchOverlay = switching && switchingTo
+    ? createPortal(
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 16,
+            background: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          <Loader2
+            size={36}
+            style={{
+              color: "var(--color-brand, #da5a0e)",
+              animation: "spin 1s linear infinite",
+            }}
+          />
+          <p
+            style={{
+              fontSize: 16,
+              fontWeight: 600,
+              color: "var(--color-navy, #121e2f)",
+              textAlign: "center",
+              margin: 0,
+            }}
+          >
+            Cambiando a la organización de
+          </p>
+          <p
+            style={{
+              fontSize: 20,
+              fontWeight: 700,
+              color: "var(--color-brand, #da5a0e)",
+              textAlign: "center",
+              margin: 0,
+            }}
+          >
+            {switchingTo}
+          </p>
+        </div>,
+        document.body,
+      )
+    : null;
+
   return (
     <div ref={containerRef} style={{ position: "relative" }}>
+      {switchOverlay}
       <button
         type="button"
         disabled={switching}
