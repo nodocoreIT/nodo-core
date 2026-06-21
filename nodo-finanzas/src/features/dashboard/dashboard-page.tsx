@@ -1,14 +1,15 @@
-import { TrendingUp, TrendingDown, HandCoins, CheckCircle, Bell } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { TrendingUp, TrendingDown, HandCoins, CheckCircle, Bell, Plus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { useFinanzas } from '@/hooks/use-finanzas';
-import { useDolar } from '@/hooks/use-dolar';
 import { useNotifications } from '@/hooks/use-notifications';
 import { formatearMoneda, formatearFecha, esFechaDelMesActual } from '@/utils/formatters';
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const finanzas = useFinanzas();
-  const dolar = useDolar();
+
   const { notifications } = useNotifications();
 
   if (finanzas.loading) {
@@ -32,10 +33,11 @@ export function DashboardPage() {
     .filter((c) => c.activa && c.moneda === 'ARS')
     .reduce((s, c) => s + c.saldoActual, 0);
 
-  // Total USD
-  const totalUSD = finanzas.cuentas
-    .filter((c) => c.activa && c.moneda === 'USD')
-    .reduce((s, c) => s + c.saldoActual, 0);
+  // Gastos del día
+  const todayStr = hoy.toISOString().split('T')[0];
+  const gastosDelDia = finanzas.gastosDiarios
+    .filter((g) => g.fecha === todayStr && !g.esSilencioso)
+    .reduce((s, g) => s + g.monto, 0);
 
   // Gastos del mes actual
   const gastosMes = finanzas.gastosDiarios
@@ -73,11 +75,19 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-ink">Bienvenido</h1>
           <p className="text-sm text-slate2 capitalize">{fechaHoy}</p>
         </div>
+        <button
+          type="button"
+          onClick={() => navigate("/admin/gastos-diarios")}
+          className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-brand px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-brand/90 sm:hidden"
+        >
+          <Plus className="h-4 w-4" />
+          Nuevo gasto
+        </button>
       </div>
 
       {/* Summary cards */}
@@ -88,11 +98,8 @@ export function DashboardPage() {
         </Card>
 
         <Card className="border-brand/20">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Total USD</p>
-          <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(totalUSD, 'USD')}</p>
-          {dolar.cotizacion && totalUSD > 0 && (
-            <p className="text-[10px] text-slate2 mt-0.5">≈ {formatearMoneda(dolar.convertirUSDaARS(totalUSD))}</p>
-          )}
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Gastos del Día</p>
+          <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(gastosDelDia)}</p>
         </Card>
 
         <Card>
@@ -171,7 +178,7 @@ export function DashboardPage() {
       </div>
 
       {/* Net balance card */}
-      {(totalARS + (dolar.cotizacion ? dolar.convertirUSDaARS(totalUSD) : 0) - gastosMes) !== 0 && (
+      {(totalARS - gastosMes) !== 0 && (
         <Card className={`${(totalARS - gastosMes) >= 0 ? 'bg-brand/5 border-brand/30' : 'bg-red-50 border-red-200'}`}>
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg ${(totalARS - gastosMes) >= 0 ? 'bg-brand/10' : 'bg-red-100'}`}>

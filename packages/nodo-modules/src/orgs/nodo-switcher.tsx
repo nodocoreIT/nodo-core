@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, Building2, Check, AlertCircle, Loader2 } from "lucide-react";
+import { ChevronDown, ArrowLeftRight, Building2, Check, AlertCircle, Loader2, ExternalLink } from "lucide-react";
 import { useSupabase } from "@nodocore/shared-components";
 import { useMyOrgs } from "./use-my-orgs";
 import type { OrgEntry } from "./types";
@@ -16,14 +16,33 @@ const ROLE_LABELS: Record<string, string> = {
   tenant: "Inquilino",
 };
 
-export function NodoSwitcher() {
+const PRODUCT_META: Record<string, { label: string; color: string }> = {
+  inmo: { label: "Nodo Inmo", color: "#da5a0e" },
+  autos: { label: "Nodo Autos", color: "#C41E3A" },
+  finanzas: { label: "Nodo Finanzas", color: "#059669" },
+};
+
+const PRODUCT_PATHS: Record<string, string> = {
+  inmo: "/inmo/admin/dashboard",
+  autos: "/autos/admin/dashboard",
+  finanzas: "/finanzas/admin/dashboard",
+};
+
+interface NodoSwitcherProps {
+  /** Current product (e.g. "inmo"). Same-product orgs shown first, others grouped below. */
+  product?: string;
+}
+
+export function NodoSwitcher({ product }: NodoSwitcherProps = {}) {
   const supabase = useSupabase();
-  const { orgs, loading } = useMyOrgs();
+  const { orgs: allOrgs, loading } = useMyOrgs();
   const [open, setOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const [switchError, setSwitchError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
 
   // Detect current org from JWT claims.
   const [currentOrgId, setCurrentOrgId] = useState<string | null>(null);
@@ -37,11 +56,15 @@ export function NodoSwitcher() {
     });
   }, [supabase]);
 
-  // Close dropdown when clicking outside.
+  // Close dropdown when clicking outside trigger or dropdown.
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        triggerRef.current && !triggerRef.current.contains(target) &&
+        dropdownRef.current && !dropdownRef.current.contains(target)
+      ) {
         setOpen(false);
       }
     }
@@ -49,17 +72,56 @@ export function NodoSwitcher() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  // Compute dropdown position from the trigger button.
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setDropdownPos({
+      top: rect.bottom + 6,
+      right: window.innerWidth - rect.right,
+    });
+  }, [open]);
+
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 640px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   // Hide when user belongs to only one org (or still loading).
-  if (loading || orgs.length <= 1) return null;
+  if (loading || allOrgs.length <= 1) return null;
 
-  // Own orgs (super_admin) first, then the rest.
-  const sorted = [...orgs].sort((a, b) => {
-    const aOwn = a.role === "super_admin" ? 0 : 1;
-    const bOwn = b.role === "super_admin" ? 0 : 1;
-    return aOwn - bOwn;
-  });
+  // Split orgs: current product first, then other products.
+  const sameProduct = allOrgs
+    .filter((o) => !product || o.product === product)
+    .sort((a, b) => {
+      const aOwn = a.role === "super_admin" ? 0 : 1;
+      const bOwn = b.role === "super_admin" ? 0 : 1;
+      return aOwn - bOwn;
+    });
 
-  const currentOrg = sorted.find((o) => o.org_id === currentOrgId) ?? sorted[0];
+  const otherProducts = allOrgs.filter((o) => product && o.product !== product);
+
+  // Group other-product orgs by product.
+  const otherByProduct: Record<string, OrgEntry[]> = {};
+  for (const org of otherProducts) {
+    if (!otherByProduct[org.product]) otherByProduct[org.product] = [];
+    otherByProduct[org.product].push(org);
+  }
+  // Sort each group: super_admin first.
+  for (const key of Object.keys(otherByProduct)) {
+    otherByProduct[key].sort((a, b) => {
+      const aOwn = a.role === "super_admin" ? 0 : 1;
+      const bOwn = b.role === "super_admin" ? 0 : 1;
+      return aOwn - bOwn;
+    });
+  }
+
+  const currentOrg = sameProduct.find((o) => o.org_id === currentOrgId) ?? sameProduct[0];
 
   async function handleSwitch(org: OrgEntry) {
     if (org.org_id === currentOrgId || switching) return;
@@ -67,6 +129,8 @@ export function NodoSwitcher() {
     setSwitching(true);
     setSwitchingTo(org.org_name);
     setSwitchError(null);
+
+    const isCrossNodo = product && org.product !== product;
 
     try {
       const { error } = await supabase.functions.invoke("switch-org", {
@@ -90,10 +154,17 @@ export function NodoSwitcher() {
 
       // Refresh session so the JWT reflects the new org.
       await supabase.auth.refreshSession();
+
+      if (isCrossNodo) {
+        // Cross-nodo: navigate to the target nodo app.
+        const targetPath = PRODUCT_PATHS[org.product] ?? `/${org.product}/admin/dashboard`;
+        window.location.href = targetPath;
+        return;
+      }
+
+      // Same-nodo: update state and invalidate cache.
       setCurrentOrgId(org.org_id);
-      // Notify the app to invalidate cached data instead of doing a full reload.
       window.dispatchEvent(new CustomEvent("nodo:org-switched"));
-      // Small delay so the overlay stays visible while React re-renders.
       await new Promise((r) => setTimeout(r, 600));
       setSwitching(false);
       setSwitchingTo(null);
@@ -153,10 +224,70 @@ export function NodoSwitcher() {
       )
     : null;
 
+  function renderOrgButton(org: OrgEntry, isCrossNodo = false) {
+    const isCurrent = org.org_id === currentOrgId && !isCrossNodo;
+    return (
+      <button
+        key={org.org_id}
+        type="button"
+        role="option"
+        aria-selected={isCurrent}
+        onClick={() => handleSwitch(org)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          width: "100%",
+          textAlign: "left",
+          border: "none",
+          background: isCurrent ? "var(--color-paper)" : "transparent",
+          padding: "9px 10px",
+          borderRadius: 6,
+          cursor: isCurrent ? "default" : "pointer",
+          gap: 8,
+        }}
+      >
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13.5,
+              fontWeight: 700,
+              color: "var(--color-navy)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {org.org_name}
+          </p>
+          <p
+            style={{
+              margin: "2px 0 0",
+              fontSize: 11.5,
+              color: "var(--color-slate2)",
+            }}
+          >
+            {ROLE_LABELS[org.role] ?? org.role}
+          </p>
+        </div>
+        {isCurrent && (
+          <Check size={14} color="var(--color-brand)" style={{ flexShrink: 0 }} />
+        )}
+        {isCrossNodo && (
+          <ExternalLink size={12} color="var(--color-slate2)" style={{ flexShrink: 0 }} />
+        )}
+      </button>
+    );
+  }
+
+  const hasOtherProducts = Object.keys(otherByProduct).length > 0;
+
   return (
-    <div ref={containerRef} style={{ position: "relative" }}>
+    <>
       {switchOverlay}
       <button
+        ref={triggerRef}
         type="button"
         disabled={switching}
         onClick={() => {
@@ -183,7 +314,7 @@ export function NodoSwitcher() {
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <Building2 size={14} style={{ flexShrink: 0 }} />
+        <ArrowLeftRight size={14} style={{ flexShrink: 0 }} />
         <span
           style={{
             overflow: "hidden",
@@ -191,7 +322,11 @@ export function NodoSwitcher() {
             whiteSpace: "nowrap",
           }}
         >
-          {switching ? "Cambiando..." : (currentOrg?.org_name ?? "Organización")}
+          {switching
+            ? "Cambiando..."
+            : isMobile
+              ? (currentOrg?.org_name?.split(/\s+/)[0] ?? "Org")
+              : (currentOrg?.org_name ?? "Organización")}
         </span>
         <ChevronDown
           size={13}
@@ -203,19 +338,23 @@ export function NodoSwitcher() {
         />
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
+          ref={dropdownRef}
           role="listbox"
           style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            right: 0,
-            minWidth: 220,
+            position: "fixed",
+            top: dropdownPos.top,
+            ...(isMobile
+              ? { left: 12, right: 12 }
+              : { right: dropdownPos.right, minWidth: 260 }),
+            maxHeight: 400,
+            overflowY: "auto",
             background: "white",
             border: "1px solid var(--color-mist)",
             borderRadius: 10,
             boxShadow: "0 8px 24px rgba(18,30,47,.12)",
-            zIndex: 50,
+            zIndex: 9998,
             padding: 4,
           }}
         >
@@ -239,61 +378,56 @@ export function NodoSwitcher() {
             </div>
           )}
 
-          {sorted.map((org) => {
-            const isCurrent = org.org_id === currentOrgId;
-            return (
-              <button
-                key={org.org_id}
-                type="button"
-                role="option"
-                aria-selected={isCurrent}
-                onClick={() => handleSwitch(org)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  width: "100%",
-                  textAlign: "left",
-                  border: "none",
-                  background: isCurrent ? "var(--color-paper)" : "transparent",
-                  padding: "9px 10px",
-                  borderRadius: 6,
-                  cursor: isCurrent ? "default" : "pointer",
-                  gap: 8,
-                }}
-              >
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 13.5,
-                      fontWeight: 700,
-                      color: "var(--color-navy)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {org.org_name}
-                  </p>
-                  <p
-                    style={{
-                      margin: "2px 0 0",
-                      fontSize: 11.5,
-                      color: "var(--color-slate2)",
-                    }}
-                  >
-                    {ROLE_LABELS[org.role] ?? org.role}
-                  </p>
-                </div>
-                {isCurrent && (
-                  <Check size={14} color="var(--color-brand)" style={{ flexShrink: 0 }} />
-                )}
-              </button>
-            );
-          })}
-        </div>
+          {/* Same-product orgs */}
+          {sameProduct.map((org) => renderOrgButton(org, false))}
+
+          {/* Cross-nodo orgs grouped by product */}
+          {hasOtherProducts && (
+            <div
+              style={{
+                borderTop: "1px solid var(--color-mist, #e2e8f0)",
+                margin: "4px 0 2px",
+                paddingTop: 4,
+              }}
+            >
+              {Object.entries(otherByProduct).map(([prod, prodOrgs]) => {
+                const meta = PRODUCT_META[prod];
+                return (
+                  <div key={prod}>
+                    <p
+                      style={{
+                        margin: 0,
+                        padding: "6px 10px 4px",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        color: meta?.color ?? "var(--color-slate2, #64748b)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          backgroundColor: meta?.color ?? "var(--color-slate2)",
+                          flexShrink: 0,
+                        }}
+                      />
+                      {meta?.label ?? prod}
+                    </p>
+                    {prodOrgs.map((org) => renderOrgButton(org, true))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   );
 }

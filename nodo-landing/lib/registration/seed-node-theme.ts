@@ -38,27 +38,6 @@ export async function seedInmoOrgProfileTheme(
   );
 }
 
-/** Ensures nodo_autos.clientes has the default Autos theme for new dashboard clients. */
-export async function seedAutosClienteTheme(
-  admin: SupabaseClient<any, any, any>,
-  clienteId: string,
-): Promise<void> {
-  const autos = admin.schema("nodo_autos");
-  const theme = getNodeDefaultTheme("Autos");
-
-  const { data: existing } = await autos
-    .from("clientes")
-    .select("theme_settings")
-    .eq("id", clienteId)
-    .maybeSingle();
-
-  if (existing && !isEmptyThemeSettings(existing.theme_settings)) return;
-
-  await autos
-    .from("clientes")
-    .update({ theme_settings: theme as unknown as Record<string, unknown> })
-    .eq("id", clienteId);
-}
 
 export function finanzasThemeAppMetadata(): { theme_settings: ThemeSettings } {
   return { theme_settings: getNodeDefaultTheme("Finanzas") };
