@@ -4,28 +4,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/shared/lib/supabase";
+import { acceptPendingInvitations } from "@/shared/lib/accept-pending-invitations";
 import {
   enforceNodeAccess,
   fetchMustSetPassword,
   INVALID_LOGIN_MESSAGE,
   RequiredPasswordForm,
 } from "@nodocore/shared-components";
-
-async function acceptPendingInvitations() {
-  const { data: invitations } = await supabase
-    .schema("shared")
-    .from("org_invitations")
-    .select("token")
-    .eq("status", "pending");
-
-  if (!invitations?.length) return;
-
-  for (const inv of invitations) {
-    await supabase.functions.invoke("accept-invitation", {
-      body: { token: inv.token, action: "accept" },
-    });
-  }
-}
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -57,7 +42,7 @@ export function AuthCallbackPage() {
       }
 
       // Auto-accept any pending invitations so the user is added to org_members.
-      await acceptPendingInvitations();
+      await acceptPendingInvitations(supabase);
 
       const mustReset =
         type === "invite" ||

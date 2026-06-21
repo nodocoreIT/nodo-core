@@ -340,7 +340,7 @@ export async function sendStaffInviteEmail({
     from: `"${nodeLabel}" <${USER}>`,
     to: email,
     subject,
-    text: `Hola ${name},\n\n${inviterName ? `${inviterName} te` : "Te"} invitó a unirte al equipo de ${orgName} en ${nodeLabel}. Para activar tu cuenta, elegí tu contraseña en el siguiente enlace:\n\n${inviteUrl}\n\nSi no esperabas esta invitación, podés ignorar este correo.\n\nSaludos,\nEl equipo de ${nodeLabel}`,
+    text: `Hola ${name},\n\n${inviterName ? `${inviterName} te` : "Te"} invitó a unirte al equipo de ${orgName} en ${nodeLabel}. Hacé clic en el siguiente enlace para aceptar la invitación:\n\n${inviteUrl}\n\nSi no esperabas esta invitación, podés ignorar este correo.\n\nSaludos,\nEl equipo de ${nodeLabel}`,
     attachments: [
       {
         filename: "logo_compuesto.png",
@@ -356,11 +356,11 @@ export async function sendStaffInviteEmail({
         <h2 style="color:#DA5A0E;margin-top:0;font-size:20px;text-align:center;">Te invitaron a ${nodeLabel}</h2>
         <p style="color:#647890;font-size:15px;line-height:1.5;">
           Hola <strong>${name}</strong>,<br/><br/>
-          ${bodyIntro} Activá tu acceso y elegí tu contraseña:
+          ${bodyIntro} Hacé clic en el botón para continuar:
         </p>
         <div style="margin:24px 0;text-align:center;">
           <a href="${inviteUrl}" style="background-color:#DA5A0E;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;font-size:15px;">
-            Activar mi cuenta
+            Aceptar invitación
           </a>
         </div>
         <p style="color:#9DACBE;font-size:12px;line-height:1.4;">

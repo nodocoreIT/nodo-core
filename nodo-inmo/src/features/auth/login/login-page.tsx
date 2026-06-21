@@ -11,6 +11,7 @@ import {
   fetchMustSetPassword,
   RequiredPasswordForm,
 } from "@nodocore/shared-components";
+import { acceptPendingInvitations } from "@/shared/lib/accept-pending-invitations";
 import { Card, CardContent, CardHeader } from "@nodocore/shared-components";
 import { BrandMark } from "@/shared/components/brand-mark";
 import { Input } from "@nodocore/shared-components";
@@ -50,6 +51,9 @@ export function LoginPage() {
       setLoading(false);
       return;
     }
+
+    // Auto-accept any pending invitations before checking access.
+    await acceptPendingInvitations(supabase);
 
     const access = await enforceNodeAccess(supabase, "Inmo");
     if (!access.ok) {
