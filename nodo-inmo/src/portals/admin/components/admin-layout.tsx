@@ -47,7 +47,9 @@ import { InmoSettingsModuleProvider } from "@/shared/lib/inmo-settings-module";
 import { FeedbackFAB } from "@/features/feedback/components/feedback-node";
 import { NotificationsBell } from "@/features/dashboard/components/notifications-bell";
 import { IPCBadge } from "@/features/ipc/components/IPCBadge";
+import { PlanBadge } from "@/features/plan/components/plan-badge";
 import { INMO_DEFAULT_EMPLOYEE_SECTIONS } from "@/shared/lib/inmo-staff-nav";
+import { isProOnlyAdminRoute } from "@/shared/lib/pro-features";
 
 // ── Nav item definition ───────────────────────────────────────────────────────
 
@@ -71,7 +73,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/ganancias", label: "Ganancias", icon: LineChart, adminOnly: true },
   { to: "/admin/documentos", label: "Documentos", icon: FolderOpen },
   { to: "/admin/agenda", label: "Agenda y Tareas", icon: Calendar },
-  { to: "/admin/reclamos", label: "Reclamos", icon: AlertCircle },
+  { to: "/admin/reclamos", label: "Reclamos", icon: AlertCircle, proOnly: true },
   { to: "/admin/portal", label: "Portales", icon: Building2, proOnly: true },
 ];
 
@@ -223,8 +225,8 @@ export function AdminLayout() {
           aria-label="Navegación principal"
         >
           <div className="flex flex-col gap-1">
-            {visibleNav.map(({ to, label, icon: Icon, proOnly }) => {
-              const locked = proOnly && plan !== "pro";
+            {visibleNav.map(({ to, label, icon: Icon, proOnly: proOnlyFlag }) => {
+              const locked = (proOnlyFlag ?? isProOnlyAdminRoute(to)) && plan !== "pro";
               return (
                 <NavLink
                   key={to}
@@ -310,7 +312,12 @@ export function AdminLayout() {
             </div>
 
             <PortalHeaderMobileActions
-              metrics={<IPCBadge />}
+              metrics={
+                <>
+                  <IPCBadge />
+                  <PlanBadge />
+                </>
+              }
               notifications={<NotificationsBell />}
               trailing={<NodoSwitcher />}
             />
@@ -322,7 +329,12 @@ export function AdminLayout() {
                 <GlobalSearchInput placeholder={placeholder} />
               ) : undefined
             }
-            metrics={<IPCBadge />}
+            metrics={
+              <>
+                <IPCBadge />
+                <PlanBadge />
+              </>
+            }
             notifications={<NotificationsBell />}
             trailing={<NodoSwitcher />}
           />

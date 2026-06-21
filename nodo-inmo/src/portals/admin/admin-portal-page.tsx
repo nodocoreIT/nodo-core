@@ -32,7 +32,14 @@ export function AdminPortalPage() {
         <Route path="ganancias" element={<GananciasPage />} />
         <Route path="documentos" element={<DocumentosPage />} />
         <Route path="agenda" element={<AgendaPage />} />
-        <Route path="reclamos" element={<ReclamosAdminPage />} />
+        <Route
+          path="reclamos"
+          element={
+            <PlanGate requiredPlan="pro" fullPage>
+              <ReclamosAdminPage />
+            </PlanGate>
+          }
+        />
         <Route path="portal" element={<PlanGate requiredPlan="pro" fullPage><PortalPage /></PlanGate>} />
       </Route>
     </Routes>
