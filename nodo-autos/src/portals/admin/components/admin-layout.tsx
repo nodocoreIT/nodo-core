@@ -12,6 +12,9 @@ import {
   X,
   Calendar,
   Wallet,
+  Lock,
+  Fingerprint,
+  Bot,
 } from "lucide-react";
 import {
   Button,
@@ -23,7 +26,7 @@ import {
 import { cn } from "@/shared/lib/utils";
 import { useDealershipBrand } from "@/shared/hooks/use-dealership-brand";
 import { NotificationsBell } from "@/features/notifications/notifications-bell";
-import { SettingsDialog } from "@nodocore/nodo-modules/settings";
+import { SettingsDialog, type SettingsTabId } from "@nodocore/nodo-modules/settings";
 import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { AutosSettingsModuleProvider } from "@/shared/lib/autos-settings-module";
 
@@ -64,11 +67,12 @@ function initials(value: string): string {
 }
 
 export function AdminLayout() {
-  const { user, signOut } = useAuth();
+  const { user, plan, signOut } = useAuth();
   const { pathname } = useLocation();
   const { name: dealershipName, logoUrl } = useDealershipBrand();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTabId | undefined>();
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -176,6 +180,47 @@ export function AdminLayout() {
                 <span>{label}</span>
               </NavLink>
             ))}
+
+            {/* Pro features */}
+            <div className="mt-3 pt-3 flex flex-col gap-1">
+              <div className="mb-1 flex items-center gap-2 px-3">
+                <div className="h-px flex-1 bg-brand/40" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-brand">Plan Pro</span>
+                <div className="h-px flex-1 bg-brand/40" />
+              </div>
+              <NavLink
+                to="/admin/nodo-id"
+                onClick={() => setMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-brand text-white"
+                      : "text-white/60 hover:bg-brand/10 hover:text-brand",
+                  )
+                }
+              >
+                <Fingerprint className="h-4 w-4 flex-shrink-0" />
+                <span className="flex-1">Nodo ID</span>
+                {plan !== "pro" && <Lock className="h-3 w-3 opacity-50 flex-shrink-0" />}
+              </NavLink>
+              <NavLink
+                to="/admin/bot-integraciones"
+                onClick={() => setMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-brand text-white"
+                      : "text-white/60 hover:bg-brand/10 hover:text-brand",
+                  )
+                }
+              >
+                <Bot className="h-4 w-4 flex-shrink-0" />
+                <span className="flex-1">Bot e Integraciones</span>
+                {plan !== "pro" && <Lock className="h-3 w-3 opacity-50 flex-shrink-0" />}
+              </NavLink>
+            </div>
           </div>
         </nav>
 
@@ -256,7 +301,14 @@ export function AdminLayout() {
         </main>
       </div>
 
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={(v) => {
+          setSettingsOpen(v);
+          if (!v) setSettingsInitialTab(undefined);
+        }}
+        initialTab={settingsInitialTab}
+      />
     </div>
     </AutosSettingsModuleProvider>
   );

@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ArrowLeftRight, Building2, Check, AlertCircle, Loader2, ExternalLink } from "lucide-react";
+import {
+  ChevronDown,
+  ArrowLeftRight,
+  Building2,
+  Car,
+  Coins,
+  Check,
+  AlertCircle,
+  Loader2,
+  ExternalLink,
+  type LucideIcon,
+} from "lucide-react";
 import { useSupabase } from "@nodocore/shared-components";
 import { useMyOrgs } from "./use-my-orgs";
 import type { OrgEntry } from "./types";
@@ -16,11 +27,15 @@ const ROLE_LABELS: Record<string, string> = {
   tenant: "Inquilino",
 };
 
-const PRODUCT_META: Record<string, { label: string; color: string }> = {
-  inmo: { label: "Nodo Inmo", color: "#da5a0e" },
-  autos: { label: "Nodo Autos", color: "#C41E3A" },
-  finanzas: { label: "Nodo Finanzas", color: "#059669" },
+const PRODUCT_META: Record<string, { label: string; color: string; Icon: LucideIcon }> = {
+  inmo: { label: "Nodo Inmo", color: "#da5a0e", Icon: Building2 },
+  autos: { label: "Nodo Autos", color: "#C41E3A", Icon: Car },
+  finanzas: { label: "Nodo Finanzas", color: "#059669", Icon: Coins },
 };
+
+function getProductIcon(product?: string): LucideIcon {
+  return PRODUCT_META[product ?? ""]?.Icon ?? Building2;
+}
 
 const PRODUCT_PATHS: Record<string, string> = {
   inmo: "/inmo/admin/dashboard",
@@ -153,12 +168,27 @@ export function NodoSwitcher({ product }: NodoSwitcherProps = {}) {
       }
 
       // Refresh session so the JWT reflects the new org.
-      await supabase.auth.refreshSession();
+      // Retry once if the first refresh still has the old org_id.
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      const newOrgId = refreshed?.session?.user?.app_metadata?.org_id;
+      if (newOrgId !== org.org_id) {
+        await new Promise((r) => setTimeout(r, 500));
+        await supabase.auth.refreshSession();
+      }
 
       if (isCrossNodo) {
+        // Skip splash screens on the target nodo.
+        try {
+          sessionStorage.setItem(`nodo-${org.product}-skip-splash`, "1");
+        } catch {
+          // ignore
+        }
         // Cross-nodo: navigate to the target nodo app.
         const targetPath = PRODUCT_PATHS[org.product] ?? `/${org.product}/admin/dashboard`;
         window.location.href = targetPath;
+        // Reset state in case the navigation takes a moment.
+        setSwitching(false);
+        setSwitchingTo(null);
         return;
       }
 
@@ -224,6 +254,9 @@ export function NodoSwitcher({ product }: NodoSwitcherProps = {}) {
       )
     : null;
 
+  const CurrentProductIcon = getProductIcon(product);
+  const currentProductColor = PRODUCT_META[product ?? ""]?.color ?? "var(--color-navy)";
+
   function renderOrgButton(org: OrgEntry, isCrossNodo = false) {
     const isCurrent = org.org_id === currentOrgId && !isCrossNodo;
     return (
@@ -247,7 +280,9 @@ export function NodoSwitcher({ product }: NodoSwitcherProps = {}) {
           gap: 8,
         }}
       >
-        <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ minWidth: 0, flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+          <ArrowLeftRight size={14} color="var(--color-slate2)" style={{ flexShrink: 0 }} />
+          <div style={{ minWidth: 0, flex: 1 }}>
           <p
             style={{
               margin: 0,
@@ -270,6 +305,7 @@ export function NodoSwitcher({ product }: NodoSwitcherProps = {}) {
           >
             {ROLE_LABELS[org.role] ?? org.role}
           </p>
+          </div>
         </div>
         {isCurrent && (
           <Check size={14} color="var(--color-brand)" style={{ flexShrink: 0 }} />
@@ -314,7 +350,7 @@ export function NodoSwitcher({ product }: NodoSwitcherProps = {}) {
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <ArrowLeftRight size={14} style={{ flexShrink: 0 }} />
+        <CurrentProductIcon size={14} color={currentProductColor} style={{ flexShrink: 0 }} />
         <span
           style={{
             overflow: "hidden",

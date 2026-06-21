@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { PlanGate } from "@nodocore/shared-components";
 import { AdminLayout } from "./components/admin-layout";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { VehiclesListPage } from "@/features/vehicles/vehicles-list-page";
@@ -30,6 +31,8 @@ export function AdminPortalPage() {
         <Route path="agenda" element={<AutosAgendaPage />} />
         <Route path="documentacion" element={<ContractsPage />} />
         <Route path="contratos" element={<Navigate to="/admin/documentacion" replace />} />
+        <Route path="nodo-id" element={<PlanGate requiredPlan="pro" fullPage><div /></PlanGate>} />
+        <Route path="bot-integraciones" element={<PlanGate requiredPlan="pro" fullPage><div /></PlanGate>} />
       </Route>
     </Routes>
   );

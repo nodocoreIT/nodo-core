@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { PlanGate } from "@nodocore/shared-components";
 import { AdminLayout } from "./components/admin-layout";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { GastosDiariosPage } from "@/features/gastos-diarios/gastos-diarios-page";
@@ -45,6 +46,8 @@ export function AdminPortalPage() {
         <Route path="saldos" element={<SaldosPage />} />
         <Route path="informe-mensual" element={<InformeMensualPage />} />
         <Route path="configuracion" element={<ConfiguracionPage />} />
+        <Route path="nodo-id" element={<PlanGate requiredPlan="pro" fullPage><div /></PlanGate>} />
+        <Route path="bot-integraciones" element={<PlanGate requiredPlan="pro" fullPage><div /></PlanGate>} />
       </Route>
 
       {LEGACY_PATHS.map((segment) => (
