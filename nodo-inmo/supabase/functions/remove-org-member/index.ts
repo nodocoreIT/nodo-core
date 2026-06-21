@@ -54,6 +54,19 @@ Deno.serve(async (req) => {
     `;
 
     if (targetRows.length === 0) {
+      // Not in org_members — check if there's a pending invitation instead.
+      const pendingRows = await sql`
+        DELETE FROM shared.org_invitations
+        WHERE org_id = ${orgId}::uuid
+          AND (invitee_user_id = ${userId}::uuid OR id = ${userId}::uuid)
+          AND status = 'pending'
+        RETURNING id
+      `;
+
+      if (pendingRows.length > 0) {
+        return json({ ok: true });
+      }
+
       return json({ error: "Usuario no encontrado en el equipo." }, 404);
     }
 
@@ -79,6 +92,13 @@ Deno.serve(async (req) => {
           AND role <> 'admin'
       `;
     }
+
+    // Also clean up any lingering invitation records.
+    await sql`
+      DELETE FROM shared.org_invitations
+      WHERE org_id = ${orgId}::uuid
+        AND invitee_user_id = ${userId}::uuid
+    `;
 
     return json({ ok: true });
   } catch (err) {
