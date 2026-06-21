@@ -157,12 +157,14 @@ export function AdminLayout() {
   const hasFullAccess = role === "admin" || role === "super_admin";
 
   const visibleNav = NAV_ITEMS.filter((item) => {
-    if (item.adminOnly && !hasFullAccess) return false;
     // Admins and super_admins always see every section.
     if (hasFullAccess) return true;
+    // Explicit per-user permissions override everything, including adminOnly.
     if (userId && userPermissions?.[userId]) {
       return userPermissions[userId].includes(item.to);
     }
+    // Without explicit permissions, adminOnly sections are hidden for non-admins.
+    if (item.adminOnly) return false;
     if (role === "agent") {
       return INMO_DEFAULT_EMPLOYEE_SECTIONS.includes(
         item.to as (typeof INMO_DEFAULT_EMPLOYEE_SECTIONS)[number],
