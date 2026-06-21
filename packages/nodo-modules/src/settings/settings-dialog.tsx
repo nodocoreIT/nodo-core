@@ -657,10 +657,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         handleNewUser();
       }
       setUserToDelete(null);
+      await fetchMembers();
     } catch (err) {
       setMemberActionError(
         err instanceof Error ? err.message : "No se pudo eliminar el usuario",
       );
+      setUserToDelete(null);
     } finally {
       setDeletingUser(false);
     }
