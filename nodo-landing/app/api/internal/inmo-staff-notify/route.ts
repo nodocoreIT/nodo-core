@@ -43,18 +43,7 @@ function isAuthorized(request: NextRequest): boolean {
 
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
-    const t = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() ?? "";
-    return NextResponse.json({
-      error: "Unauthorized",
-      _dbg: {
-        tokenStart: t.slice(0, 8),
-        inmoKeyStart: (process.env.NODO_INMO_SERVICE_ROLE_KEY ?? "").slice(0, 8) || "unset",
-        landingKeyStart: (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").slice(0, 8) || "unset",
-        tokenLen: t.length,
-        inmoKeyLen: (process.env.NODO_INMO_SERVICE_ROLE_KEY ?? "").length,
-        landingKeyLen: (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").length,
-      },
-    }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   if (!isMailConfigured()) {
