@@ -49,13 +49,13 @@ begin
     end if;
   end if;
 
-  -- Fallback: no valid current org → pick first membership (first-login or
-  -- stale org_id after the user was removed from the org).
+  -- Fallback: no valid current org → pick the user's OWN org (super_admin)
+  -- first, then fall back to oldest membership.
   if v_org_id is null then
     select org_id, role into v_org_id, v_role
     from shared.org_members
     where user_id = v_uid
-    order by created_at
+    order by (role = 'super_admin') desc, created_at
     limit 1;
   end if;
 

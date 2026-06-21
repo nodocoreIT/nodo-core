@@ -52,11 +52,21 @@ function ThemeInitializer({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function OrgSwitchListener() {
+  useEffect(() => {
+    const handler = () => queryClient.invalidateQueries();
+    window.addEventListener("nodo:org-switched", handler);
+    return () => window.removeEventListener("nodo:org-switched", handler);
+  }, []);
+  return null;
+}
+
 export function AppProviders({ children }: AppProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <SupabaseProvider client={supabase}>
         <AuthProvider config={AUTH_CONFIG}>
+          <OrgSwitchListener />
           <ThemeInitializer>{children}</ThemeInitializer>
         </AuthProvider>
       </SupabaseProvider>

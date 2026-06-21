@@ -1,7 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import postgres from "npm:postgres@3";
 import { corsHeaders } from "../_shared/cors.ts";
-import { resolveInmoAdminOrgId, resolveInmoCallerRole } from "../_shared/inmo-admin.ts";
+import { resolveAdminOrgId, resolveInmoCallerRole } from "../_shared/inmo-admin.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -27,12 +27,13 @@ Deno.serve(async (req) => {
       return json({ error: "Unauthorized" }, 401);
     }
 
-    const orgId = await resolveInmoAdminOrgId(sql, user.id);
+    const body = await req.json() as { userId?: string; products?: string[] };
+
+    const products = body.products ?? ["inmo", "nodo-inmo"];
+    const orgId = await resolveAdminOrgId(sql, user.id, products);
     if (!orgId) {
       return json({ error: "Forbidden: admin role required" }, 403);
     }
-
-    const body = await req.json() as { userId?: string };
     const userId = body.userId?.trim();
     if (!userId) {
       return json({ error: "userId is required" }, 400);

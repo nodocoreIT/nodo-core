@@ -5,7 +5,7 @@ import {
   createOrgInvitation,
   findAuthUserIdByEmail,
   getOrgName,
-  resolveInmoAdminOrgId,
+  resolveAdminOrgId,
 } from "../_shared/inmo-admin.ts";
 import { sendInmoStaffNotifyEmail } from "../_shared/staff-notify.ts";
 import { DISPLAY_TO_DB_ROLE } from "../_shared/org-member-roles.ts";
@@ -39,11 +39,6 @@ Deno.serve(async (req) => {
       return json({ error: "Unauthorized" }, 401);
     }
 
-    const orgId = await resolveInmoAdminOrgId(sql, user.id);
-    if (!orgId) {
-      return json({ error: "Forbidden: admin role required" }, 403);
-    }
-
     const body = await req.json() as {
       name: string;
       email: string;
@@ -51,7 +46,14 @@ Deno.serve(async (req) => {
       redirectTo: string;
       inviterName?: string;
       nodeLabel?: string;
+      products?: string[];
     };
+
+    const products = body.products ?? ["inmo", "nodo-inmo"];
+    const orgId = await resolveAdminOrgId(sql, user.id, products);
+    if (!orgId) {
+      return json({ error: "Forbidden: admin role required" }, 403);
+    }
 
     const { name, email, role: memberRole, redirectTo, nodeLabel } = body;
 
