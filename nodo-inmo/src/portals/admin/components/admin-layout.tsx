@@ -154,8 +154,12 @@ export function AdminLayout() {
   const displayRole = ROLE_DISPLAY[role ?? ""] ?? "Empleado";
   const userId = user?.id;
 
+  const hasFullAccess = role === "admin" || role === "super_admin";
+
   const visibleNav = NAV_ITEMS.filter((item) => {
-    if (item.adminOnly && role !== "admin" && role !== "super_admin") return false;
+    if (item.adminOnly && !hasFullAccess) return false;
+    // Admins and super_admins always see every section.
+    if (hasFullAccess) return true;
     if (userId && userPermissions?.[userId]) {
       return userPermissions[userId].includes(item.to);
     }
