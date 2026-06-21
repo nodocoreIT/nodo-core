@@ -19,6 +19,8 @@ import {
   LineChart,
   Lock,
   AlertCircle,
+  Fingerprint,
+  Bot,
 } from "lucide-react";
 import {
   Button,
@@ -41,7 +43,7 @@ import { AgencyProfileForm } from "@/features/agency-profile/components/agency-p
 import { useAuth } from "@nodocore/shared-components";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import { cn } from "@/shared/lib/utils";
-import { SettingsDialog } from "@nodocore/nodo-modules/settings";
+import { SettingsDialog, type SettingsTabId } from "@nodocore/nodo-modules/settings";
 import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { InmoSettingsModuleProvider } from "@/shared/lib/inmo-settings-module";
 import { FeedbackFAB } from "@/features/feedback/components/feedback-node";
@@ -73,8 +75,13 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/ganancias", label: "Ganancias", icon: LineChart, adminOnly: true },
   { to: "/admin/documentos", label: "Documentos", icon: FolderOpen },
   { to: "/admin/agenda", label: "Agenda y Tareas", icon: Calendar },
+];
+
+const PRO_NAV_ITEMS: NavItem[] = [
   { to: "/admin/reclamos", label: "Reclamos", icon: AlertCircle, proOnly: true },
   { to: "/admin/portal", label: "Portales", icon: Building2, proOnly: true },
+  { to: "/admin/nodo-id", label: "Nodo ID", icon: Fingerprint, proOnly: true },
+  { to: "/admin/bot-integraciones", label: "Bot e Integraciones", icon: Bot, proOnly: true },
 ];
 
 // JWT role → display name (matches settings-dialog role permission keys)
@@ -132,6 +139,7 @@ export function AdminLayout() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [agencyProfileOpen, setAgencyProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTabId | undefined>();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
@@ -247,6 +255,34 @@ export function AdminLayout() {
                 </NavLink>
               );
             })}
+
+            {/* Pro features */}
+            <div className="mt-3 pt-3 flex flex-col gap-1">
+              <div className="mb-1 flex items-center gap-2 px-3">
+                <div className="h-px flex-1 bg-brand/40" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-brand">Plan Pro</span>
+                <div className="h-px flex-1 bg-brand/40" />
+              </div>
+              {PRO_NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-brand text-[var(--color-primary-foreground)]"
+                        : "text-[var(--color-sidebar-text)] hover:bg-brand/10 hover:text-brand",
+                    )
+                  }
+                >
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <span className="flex-1">{label}</span>
+                  {plan !== "pro" && <Lock className="h-3 w-3 opacity-50 flex-shrink-0" />}
+                </NavLink>
+              ))}
+            </div>
           </div>
         </nav>
 
@@ -368,7 +404,14 @@ export function AdminLayout() {
       </Dialog>
 
       {/* Global Config Settings Dialog */}
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={(v) => {
+          setSettingsOpen(v);
+          if (!v) setSettingsInitialTab(undefined);
+        }}
+        initialTab={settingsInitialTab}
+      />
 
       {/* Floating feedback node (only on Dashboard/Inicio) */}
       {pathname === "/admin/dashboard" && <FeedbackFAB />}

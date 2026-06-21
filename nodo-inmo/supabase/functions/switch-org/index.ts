@@ -55,11 +55,15 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
+    // Preserve existing app_metadata (plan, etc.) — only update org_id and role.
+    const { data: userData } = await adminClient.auth.admin.getUserById(user.id);
+    const currentMeta = userData?.user?.app_metadata ?? {};
+
     const { error: updateError } = await adminClient.auth.admin.updateUserById(user.id, {
       app_metadata: {
+        ...currentMeta,
         org_id: targetOrgId,
         role,
-        plan: product,
       },
     });
 

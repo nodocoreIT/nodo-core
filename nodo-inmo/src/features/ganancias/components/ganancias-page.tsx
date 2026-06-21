@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Eye, FileText, Share2, Wallet } from "lucide-react";
+import { ArrowLeft, Eye, Wallet } from "lucide-react";
 import { Button, FormSelect } from "@nodocore/shared-components";
 import {
   Table,
@@ -26,10 +26,6 @@ import {
   formatPeriodTitle,
   type CategoryTotals,
 } from "../lib/monthly-balance";
-import {
-  downloadMonthlyReport,
-  shareMonthlyReport,
-} from "../lib/monthly-report-pdf";
 import { MonthlyReportPdfViewer } from "./monthly-report-pdf-viewer";
 import { cn } from "@/shared/lib/utils";
 
@@ -57,7 +53,6 @@ export function GananciasPage() {
   const { data: agency } = useOrgProfile();
   const { data: logoUrl } = usePdfLogoUrl();
   const [periodYm, setPeriodYm] = useState(currentPeriodYm);
-  const [pdfLoading, setPdfLoading] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const months = useMemo(() => {
@@ -83,16 +78,6 @@ export function GananciasPage() {
     }),
     [agency, periodYm, summary, logoUrl],
   );
-
-  async function handlePdf(download: boolean) {
-    setPdfLoading(true);
-    try {
-      if (download) await downloadMonthlyReport(reportData);
-      else await shareMonthlyReport(reportData);
-    } finally {
-      setPdfLoading(false);
-    }
-  }
 
   const cards = [
     { label: "Adm. Alquileres", totals: summary.admAlquileres, color: "border-green-500" },
@@ -130,26 +115,6 @@ export function GananciasPage() {
           >
             <Eye className="h-4 w-4" />
             Ver PDF
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5"
-            disabled={pdfLoading}
-            onClick={() => void handlePdf(true)}
-          >
-            <FileText className="h-4 w-4 text-destructive" />
-            PDF
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5"
-            disabled={pdfLoading}
-            onClick={() => void handlePdf(false)}
-          >
-            <Share2 className="h-4 w-4" />
-            Enviar
           </Button>
           <Link
             to="/admin/dashboard"

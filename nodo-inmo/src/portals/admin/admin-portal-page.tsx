@@ -41,6 +41,8 @@ export function AdminPortalPage() {
           }
         />
         <Route path="portal" element={<PlanGate requiredPlan="pro" fullPage><PortalPage /></PlanGate>} />
+        <Route path="nodo-id" element={<PlanGate requiredPlan="pro" fullPage><div /></PlanGate>} />
+        <Route path="bot-integraciones" element={<PlanGate requiredPlan="pro" fullPage><div /></PlanGate>} />
       </Route>
     </Routes>
   );
