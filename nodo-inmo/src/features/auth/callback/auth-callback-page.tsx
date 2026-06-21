@@ -11,6 +11,22 @@ import {
   RequiredPasswordForm,
 } from "@nodocore/shared-components";
 
+async function acceptPendingInvitations() {
+  const { data: invitations } = await supabase
+    .schema("shared")
+    .from("org_invitations")
+    .select("token")
+    .eq("status", "pending");
+
+  if (!invitations?.length) return;
+
+  for (const inv of invitations) {
+    await supabase.functions.invoke("accept-invitation", {
+      body: { token: inv.token, action: "accept" },
+    });
+  }
+}
+
 export function AuthCallbackPage() {
   const navigate = useNavigate();
   const [needsPassword, setNeedsPassword] = useState(false);
@@ -39,6 +55,9 @@ export function AuthCallbackPage() {
       } else {
         await supabase.auth.getSession();
       }
+
+      // Auto-accept any pending invitations so the user is added to org_members.
+      await acceptPendingInvitations();
 
       const mustReset =
         type === "invite" ||
