@@ -33,6 +33,14 @@ vi.mock("@/features/dashboard/components/notifications-bell", () => ({
   NotificationsBell: () => <div data-testid="mock-notifications-bell" />,
 }));
 
+vi.mock("@/features/plan/components/plan-badge", () => ({
+  PlanBadge: () => <div data-testid="mock-plan-badge" />,
+}));
+
+vi.mock("@/features/ipc/components/IPCBadge", () => ({
+  IPCBadge: () => null,
+}));
+
 import { AdminLayout } from "@/portals/admin/components/admin-layout";
 
 function renderLayout(role: "admin" | "agent" = "admin") {
@@ -40,6 +48,7 @@ function renderLayout(role: "admin" | "agent" = "admin") {
     user: { email: "admin@nodo.com" },
     role,
     orgId: "org-1",
+    plan: "starter",
     signOut: mockSignOut,
     session: {},
     loading: false,

@@ -34,9 +34,9 @@ begin
   end if;
 
   if v_org_id is null then
-    -- Log what's actually in the table before failing
-    raise notice 'Organizations in DB: %', (select json_agg(row_to_json(o)) from (select id, name, tier, product from shared.organizations limit 10) o);
-    raise exception 'No organization found. Provision one first via the admin panel.';
+    -- Fresh local DB: skip test portal seed until bootstrap-admin creates an org.
+    raise notice 'test_portal_users: no organization yet — skipping seed (run bootstrap-admin.ts).';
+    return;
   end if;
 
   raise notice 'Using org_id: %', v_org_id;
