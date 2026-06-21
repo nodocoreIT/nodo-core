@@ -1,20 +1,33 @@
 import type postgres from "npm:postgres@3";
 
-/** Authorize inmo admin via DB — JWT hook claims are not on auth.users.app_metadata. */
-export async function resolveInmoAdminOrgId(
+/**
+ * Generic org resolver — returns the org_id where the user is admin/super_admin
+ * for any of the given products. Used by all EFs that need to authorize admins
+ * across multiple nodos (inmo, nodo-autos, nodo-finanzas, etc.).
+ */
+export async function resolveAdminOrgId(
   sql: postgres.Sql,
   userId: string,
+  products: string[],
 ): Promise<string | null> {
   const rows = await sql`
     SELECT om.org_id::text AS org_id
     FROM shared.org_members om
     JOIN shared.organizations o ON o.id = om.org_id
     WHERE om.user_id = ${userId}::uuid
-      AND o.product IN ('inmo', 'nodo-inmo')
+      AND o.product = ANY(${products}::text[])
       AND om.role IN ('admin', 'super_admin')
     LIMIT 1
   `;
   return rows[0]?.org_id ?? null;
+}
+
+/** Authorize inmo admin via DB — delegates to resolveAdminOrgId with inmo products. */
+export async function resolveInmoAdminOrgId(
+  sql: postgres.Sql,
+  userId: string,
+): Promise<string | null> {
+  return resolveAdminOrgId(sql, userId, ["inmo", "nodo-inmo"]);
 }
 
 /** Returns the caller's DB role within the inmo org, or null if not a member. */

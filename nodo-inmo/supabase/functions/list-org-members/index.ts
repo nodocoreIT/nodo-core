@@ -1,7 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import postgres from "npm:postgres@3";
 import { corsHeaders } from "../_shared/cors.ts";
-import { resolveInmoAdminOrgId } from "../_shared/inmo-admin.ts";
+import { resolveAdminOrgId } from "../_shared/inmo-admin.ts";
 import { DB_TO_DISPLAY_ROLE } from "./roles.ts";
 
 Deno.serve(async (req) => {
@@ -28,7 +28,18 @@ Deno.serve(async (req) => {
       return json({ error: "Unauthorized" }, 401);
     }
 
-    const orgId = await resolveInmoAdminOrgId(sql, user.id);
+    // Parse optional body for products param; fall back to inmo defaults.
+    let products: string[] = ["inmo", "nodo-inmo"];
+    try {
+      const body = await req.json() as { products?: string[] };
+      if (Array.isArray(body?.products) && body.products.length > 0) {
+        products = body.products;
+      }
+    } catch {
+      // No body or non-JSON body — use defaults.
+    }
+
+    const orgId = await resolveAdminOrgId(sql, user.id, products);
     if (!orgId) {
       return json({ error: "Forbidden: admin role required" }, 403);
     }
