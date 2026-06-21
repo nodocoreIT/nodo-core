@@ -471,6 +471,8 @@ function sectionsForMemberRole(
 interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** If provided, the dialog opens on this tab instead of the first visible one. */
+  initialTab?: SettingsTabId;
 }
 
 const ALL_SETTINGS_TABS: { id: SettingsTabId; label: string }[] = [
@@ -483,11 +485,18 @@ const ALL_SETTINGS_TABS: { id: SettingsTabId; label: string }[] = [
   { id: "ipc", label: "Índices" },
 ];
 
-export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
+export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialogProps) {
   const module = useSettingsModule();
   const managedNav = module.managedNav;
   const settingsTabs = ALL_SETTINGS_TABS.filter((tab) => !module.hiddenTabs?.includes(tab.id));
   const [activeTab, setActiveTab] = useState<SettingsTabId>(settingsTabs[0]?.id ?? "profile");
+
+  // Switch to initialTab when dialog opens with one specified.
+  useEffect(() => {
+    if (open && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [open, initialTab]);
   const { aiSettings, setAiSettings } = { aiSettings: module.aiSettings, setAiSettings: module.setAiSettings };
   const [apiKeyInput, setApiKeyInput] = useState(aiSettings.geminiApiKey);
   const [showApiKey, setShowApiKey] = useState(false);
