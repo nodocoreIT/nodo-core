@@ -91,13 +91,22 @@ revoke all on function nodo_inmo.purge_org_operational_data(uuid) from public;
 grant execute on function nodo_inmo.purge_org_operational_data(uuid) to service_role;
 
 -- Finanzas: purge all rows scoped to a user (personal finance node).
+-- Skipped on fresh Inmo-only local DB until finanzas migrations are applied.
 
+do $outer$
+begin
+  if to_regclass('nodo_finanzas_personales.tarjetas_consumos') is null then
+    raise notice 'purge_user_data: nodo_finanzas_personales not provisioned — skipping';
+    return;
+  end if;
+
+  execute $fn$
 create or replace function nodo_finanzas_personales.purge_user_data(p_user_id uuid)
 returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $$
+as $body$
 declare
   v_counts jsonb := '{}'::jsonb;
   v_n bigint;
@@ -172,7 +181,9 @@ begin
 
   return v_counts;
 end;
-$$;
+$body$;
+$fn$;
 
-revoke all on function nodo_finanzas_personales.purge_user_data(uuid) from public;
-grant execute on function nodo_finanzas_personales.purge_user_data(uuid) to service_role;
+  execute 'revoke all on function nodo_finanzas_personales.purge_user_data(uuid) from public';
+  execute 'grant execute on function nodo_finanzas_personales.purge_user_data(uuid) to service_role';
+end $outer$;
