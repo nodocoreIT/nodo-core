@@ -707,7 +707,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   };
 
   const showSectionPicker =
-    effectiveRole === module.adminRole &&
+    hasAdminAccess &&
     roleUsesSectionPicker(newMember.role, module);
 
   return (

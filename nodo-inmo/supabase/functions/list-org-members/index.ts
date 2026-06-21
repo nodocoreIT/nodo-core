@@ -39,7 +39,8 @@ Deno.serve(async (req) => {
         om.role AS db_role,
         coalesce(up.full_name, u.raw_user_meta_data->>'full_name', split_part(u.email, '@', 1)) AS name,
         u.email,
-        (u.email_confirmed_at IS NOT NULL OR u.last_sign_in_at IS NOT NULL) AS is_active
+        (u.email_confirmed_at IS NOT NULL OR u.last_sign_in_at IS NOT NULL) AS is_active,
+        'member' AS source
       FROM shared.org_members om
       JOIN auth.users u ON u.id = om.user_id
       LEFT JOIN shared.user_profiles up ON up.id = om.user_id
@@ -48,14 +49,35 @@ Deno.serve(async (req) => {
       ORDER BY om.created_at ASC
     `;
 
+    const pending = await sql`
+      SELECT
+        coalesce(oi.invitee_user_id::text, oi.id::text) AS id,
+        oi.role AS db_role,
+        coalesce(u.raw_user_meta_data->>'full_name', split_part(oi.invitee_email, '@', 1)) AS name,
+        oi.invitee_email AS email,
+        false AS is_active,
+        'invitation' AS source
+      FROM shared.org_invitations oi
+      LEFT JOIN auth.users u ON u.id = oi.invitee_user_id
+      WHERE oi.org_id = ${orgId}::uuid
+        AND oi.status = 'pending'
+        AND NOT EXISTS (
+          SELECT 1 FROM shared.org_members om
+          WHERE om.org_id = oi.org_id AND om.user_id = oi.invitee_user_id
+        )
+      ORDER BY oi.created_at ASC
+    `;
+
+    const all = [...members, ...pending];
+
     return json({
-      members: members.map((m) => ({
+      members: all.map((m) => ({
         id: m.id,
         name: m.name ?? m.email,
         email: m.email,
         role: DB_TO_DISPLAY_ROLE[m.db_role] ?? m.db_role,
         dbRole: m.db_role,
-        status: m.is_active ? "Activo" : "Pendiente",
+        status: m.source === 'invitation' ? "Pendiente" : (m.is_active ? "Activo" : "Pendiente"),
       })),
     });
   } catch (err) {
