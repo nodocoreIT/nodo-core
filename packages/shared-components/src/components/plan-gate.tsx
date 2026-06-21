@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { Lock } from "lucide-react";
+import { useAuth } from "../providers/auth-provider";
 
 export type PlanTier = "starter" | "pro";
 
 interface PlanGateProps {
-  /** The user's current plan tier. Pass from your auth context. */
-  currentPlan: PlanTier | null;
+  /** The user's current plan tier. When omitted, reads from useAuth(). */
+  currentPlan?: PlanTier | null;
   /** Minimum plan required to access this content. */
   requiredPlan: PlanTier;
   children: ReactNode;
@@ -29,7 +30,9 @@ export function PlanGate({
   children,
   fullPage = false,
 }: PlanGateProps) {
-  const allowed = hasPlan(currentPlan, requiredPlan);
+  const { plan: authPlan } = useAuth();
+  const resolvedPlan = currentPlan !== undefined ? currentPlan : (authPlan as PlanTier | null);
+  const allowed = hasPlan(resolvedPlan, requiredPlan);
 
   if (allowed) return <>{children}</>;
 
