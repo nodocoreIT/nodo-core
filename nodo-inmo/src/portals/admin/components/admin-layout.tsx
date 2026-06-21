@@ -312,7 +312,7 @@ export function AdminLayout() {
             <PortalHeaderMobileActions
               metrics={<IPCBadge />}
               notifications={<NotificationsBell />}
-              trailing={<NodoSwitcher />}
+              trailing={<NodoSwitcher product="inmo" />}
             />
           </div>
 
@@ -324,7 +324,7 @@ export function AdminLayout() {
             }
             metrics={<IPCBadge />}
             notifications={<NotificationsBell />}
-            trailing={<NodoSwitcher />}
+            trailing={<NodoSwitcher product="inmo" />}
           />
         </header>
 

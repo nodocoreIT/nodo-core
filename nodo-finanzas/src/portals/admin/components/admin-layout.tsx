@@ -26,8 +26,7 @@ import { SettingsDialog } from "@nodocore/nodo-modules/settings";
 import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { cn } from "@/shared/lib/utils";
 import { NotificationBell } from "@/components/ui/notification-bell";
-import { DolarCotizacionModal } from "@/components/ui/dolar-cotizacion-modal";
-import { useDolar } from "@/hooks/use-dolar";
+import { useFinanzas } from "@/hooks/use-finanzas";
 import { FinanzasSettingsModuleProvider } from "@/shared/lib/finanzas-settings-module";
 
 interface NavItem {
@@ -72,9 +71,13 @@ export function AdminLayout() {
   const { pathname } = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [dolarModalOpen, setDolarModalOpen] = useState(false);
   const { user, role, signOut } = useAuth();
-  const dolar = useDolar();
+  const { gastosDiarios = [] } = useFinanzas();
+
+  const today = new Date().toISOString().split("T")[0];
+  const totalGastosHoy = gastosDiarios
+    .filter((g) => g.fecha === today)
+    .reduce((sum, g) => sum + g.monto, 0);
 
   const isSuperAdmin = role === "super_admin";
 
@@ -205,57 +208,39 @@ export function AdminLayout() {
         {/* Main */}
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Header */}
-          <header className="flex min-h-16 items-center gap-3 sm:gap-4 border-b border-border bg-[#e8faf0] px-4 sm:px-6 py-3 shadow-sm flex-shrink-0">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <button
-                type="button"
-                className="block md:hidden text-navy hover:text-brand"
-                onClick={() => setMobileMenuOpen(true)}
-              >
-                <Menu className="h-6 w-6" />
-              </button>
-              <div className="min-w-0">
-                <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate2">
-                  Nodo Finanzas · Panel Admin
-                </p>
-                <h1 className="truncate text-base sm:text-xl font-bold text-navy mt-1.5">{title}</h1>
+          <header className="flex min-h-16 flex-col gap-3 border-b border-border bg-[#e8faf0] px-4 py-3 shadow-sm flex-shrink-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
+            <div className="flex items-center justify-between gap-3 sm:justify-start">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="block md:hidden text-navy hover:text-brand"
+                  onClick={() => setMobileMenuOpen(true)}
+                >
+                  <Menu className="h-6 w-6" />
+                </button>
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate2">
+                    Nodo Finanzas · Panel Admin
+                  </p>
+                  <h1 className="truncate text-base sm:text-xl font-bold text-navy mt-1.5">{title}</h1>
+                </div>
               </div>
-            </div>
 
-            <PortalHeaderMobileActions
-              notifications={<NotificationBell />}
-              trailing={<NodoSwitcher />}
-            />
+              <PortalHeaderMobileActions
+                notifications={<NotificationBell />}
+                trailing={<NodoSwitcher product="finanzas" />}
+              />
+            </div>
 
             <PortalHeaderActions
               metrics={
-                <>
-                  <button
-                    type="button"
-                    id="dolar-badge"
-                    onClick={() => setDolarModalOpen(true)}
-                    title="Ver cotizaciones del dólar"
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/20 transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    <DollarSign className="h-3 w-3" />
-                    {dolar.loading && !dolar.cotizacion
-                      ? "USD …"
-                      : dolar.cotizacion
-                        ? `USD ${dolar.tipoDolarSeleccionado.toUpperCase()} · $${dolar.cotizacion.venta.toLocaleString("es-AR")}`
-                        : "USD —"}
-                  </button>
-
-                  <DolarCotizacionModal
-                    open={dolarModalOpen}
-                    onClose={() => setDolarModalOpen(false)}
-                    tipoSeleccionado={dolar.tipoDolarSeleccionado}
-                    onSelectTipo={(tipo, cotizacion) => dolar.cambiarTipoDolar(tipo, cotizacion)}
-                    onCotizacionesLoaded={(lista) => dolar.sincronizarCotizaciones(lista)}
-                  />
-                </>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand whitespace-nowrap">
+                  <Wallet className="h-3 w-3" />
+                  Gastos del día · ${totalGastosHoy.toLocaleString("es-AR")}
+                </span>
               }
               notifications={<NotificationBell />}
-              trailing={<NodoSwitcher />}
+              trailing={<NodoSwitcher product="finanzas" />}
             />
           </header>
 

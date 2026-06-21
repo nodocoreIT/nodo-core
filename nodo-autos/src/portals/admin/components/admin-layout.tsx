@@ -240,13 +240,13 @@ export function AdminLayout() {
 
             <PortalHeaderMobileActions
               notifications={<NotificationsBell />}
-              trailing={<NodoSwitcher />}
+              trailing={<NodoSwitcher product="autos" />}
             />
           </div>
 
           <PortalHeaderActions
             notifications={<NotificationsBell />}
-            trailing={<NodoSwitcher />}
+            trailing={<NodoSwitcher product="autos" />}
           />
         </header>
 

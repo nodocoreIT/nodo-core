@@ -4,7 +4,6 @@ import Footer from "@/components/ui/Footer";
 import ContactForm from "@/components/ui/ContactForm";
 import RevealOnScroll from "@/components/ui/RevealOnScroll";
 import EcosystemDiagram from "@/components/EcosystemDiagram";
-import CommandPaletteHint from "@/components/CommandPaletteHint";
 import { NODES, type NodeDef } from "@/lib/nodes";
 import { Activity, Headset, TrendingUp } from "lucide-react";
 
@@ -134,10 +133,6 @@ function HeroSection() {
             interactive
             className="w-full max-w-[560px] aspect-square mx-auto mt-[26px]"
           />
-        </RevealOnScroll>
-
-        <RevealOnScroll delay={300}>
-          <CommandPaletteHint />
         </RevealOnScroll>
 
         {/* TODO VEER SI VUELAN O NO ESTAS LINEAS */}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, Bell, ChevronRight, X, Trash2 } from "lucide-react";
 import { NotificationBellBadge, NotificationBellButton } from "@nodocore/shared-components";
 import { cn } from "../lib/cn";
@@ -29,7 +30,10 @@ export function NotificationsDropdown({
 }: NotificationsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [tab, setTab] = useState<TabId>("pending");
+  const triggerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
+  const [isMobile, setIsMobile] = useState(false);
   const { dismissed, dismissedCount, dismiss, deleteDismissed, filterActive } =
     useNotificationDismissals(storageKey);
 
@@ -37,14 +41,37 @@ export function NotificationsDropdown({
   const count = activeItems.length;
 
   useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 640px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        triggerRef.current && !triggerRef.current.contains(target) &&
+        dropdownRef.current && !dropdownRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setDropdownPos({
+      top: rect.bottom + 8,
+      right: window.innerWidth - rect.right,
+    });
+  }, [isOpen]);
 
   function handleOpenToggle() {
     setIsOpen((prev) => {
@@ -64,7 +91,7 @@ export function NotificationsDropdown({
   }
 
   return (
-    <div className="relative shrink-0" ref={dropdownRef}>
+    <div className="shrink-0" ref={triggerRef}>
       <NotificationBellButton
         onClick={handleOpenToggle}
         aria-label={
@@ -84,10 +111,20 @@ export function NotificationsDropdown({
         )}
       </NotificationBellButton>
 
-      {isOpen ? (
+      {isOpen ? createPortal(
         <div
-          className="absolute right-0 z-[100] mt-2 w-80 overflow-hidden rounded-md border border-border bg-white shadow-xl sm:w-96"
-          style={{ isolation: "isolate" }}
+          ref={dropdownRef}
+          className="overflow-hidden rounded-md border border-border bg-white shadow-xl"
+          style={{
+            position: "fixed",
+            top: dropdownPos.top,
+            ...(isMobile
+              ? { left: 12, right: 12 }
+              : { right: dropdownPos.right, width: 384 }),
+            maxHeight: 440,
+            zIndex: 9998,
+            isolation: "isolate",
+          }}
         >
           <div className="border-b border-border bg-slate-50 px-4 py-3">
             <div className="flex items-center justify-between gap-2">
@@ -166,7 +203,8 @@ export function NotificationsDropdown({
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   );

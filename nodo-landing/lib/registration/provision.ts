@@ -3,11 +3,8 @@ import { getNodeDefaultTheme, isEmptyThemeSettings } from "@nodocore/shared-comp
 import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
 import {
   finanzasThemeAppMetadata,
-  seedAutosClienteTheme,
   seedInmoOrgProfileTheme,
 } from "@/lib/registration/seed-node-theme";
-
-const AUTOS_SCHEMA = "nodo_autos";
 
 function planToTier(plan: string): "starter" | "pro" {
   return plan.toLowerCase().includes("pro") ? "pro" : "starter";
@@ -30,91 +27,59 @@ async function ensureAutosAccess(
   },
 ): Promise<{ clienteId: string } | { error: string }> {
   const { userId, email, clientName, password, plan } = params;
-  const autos = admin.schema(AUTOS_SCHEMA);
   const tier = planToTier(plan);
+  const defaultTheme = getNodeDefaultTheme("Autos");
 
-  const { data: existingUser, error: existingUserErr } = await autos
-    .from("users")
-    .select("cliente_id, role")
-    .eq("id", userId)
-    .maybeSingle();
+  const { data: clienteId, error: rpcErr } = await admin.rpc(
+    "admin_ensure_autos_access",
+    {
+      p_user_id: userId,
+      p_email: email,
+      p_client_name: clientName,
+      p_identificador: autosIdentificador(email, userId),
+      p_default_theme: defaultTheme,
+    },
+  );
 
-  if (existingUserErr) {
-    return { error: "Error al leer usuario autos: " + existingUserErr.message };
-  }
-
-  let clienteId = existingUser?.cliente_id as string | undefined;
-
-  if (!clienteId) {
-    const { data: existingCliente, error: existingClienteErr } = await autos
-      .from("clientes")
-      .select("id")
-      .eq("email_contacto", email)
-      .maybeSingle();
-
-    if (existingClienteErr) {
-      return { error: "Error al leer concesionaria autos: " + existingClienteErr.message };
-    }
-
-    clienteId = existingCliente?.id;
-
-    if (!clienteId) {
-      const { data: cliente, error: clienteErr } = await autos
-        .from("clientes")
-        .insert({
-          nombre: clientName || email,
-          identificador: autosIdentificador(email, userId),
-          telefono: "pendiente",
-          whatsapp_numero: "pendiente",
-          email_contacto: email,
-          theme_settings: getNodeDefaultTheme("Autos"),
-        })
-        .select("id")
-        .single();
-
-      if (clienteErr || !cliente) {
-        return {
-          error: "Error al crear concesionaria autos: " + (clienteErr?.message ?? ""),
-        };
-      }
-
-      clienteId = cliente.id;
-    }
-
-    const { error: userErr } = await autos.from("users").upsert(
-      {
-        id: userId,
-        cliente_id: clienteId,
-        email,
-        name: clientName || email,
-        role: "administrador",
-      },
-      { onConflict: "id" },
-    );
-
-    if (userErr) {
-      return { error: "Error al crear usuario autos: " + userErr.message };
-    }
-  }
-
-  const role = (existingUser?.role as string | undefined) ?? "administrador";
-
-  const { error: authErr } = await admin.auth.admin.updateUserById(userId, {
-    password,
-    app_metadata: { role, cliente_id: clienteId, plan: tier },
-  });
-
-  if (authErr) {
-    return { error: "Error al actualizar credenciales autos: " + authErr.message };
+  if (rpcErr) {
+    return { error: "Error al provisionar autos: " + rpcErr.message };
   }
 
   if (!clienteId) {
     return { error: "No se pudo resolver la concesionaria autos." };
   }
 
-  await seedAutosClienteTheme(admin, clienteId);
+  // Ensure shared org membership so NodoSwitcher can see this nodo.
+  const { data: orgId, error: membershipErr } = await admin.rpc(
+    "admin_ensure_inmo_membership",
+    {
+      p_user_id: userId,
+      p_client_name: clientName || email,
+      p_email: email,
+      p_plan: plan,
+      p_product: "autos",
+    },
+  );
 
-  return { clienteId };
+  if (membershipErr) {
+    return { error: "Error al crear membresía autos: " + membershipErr.message };
+  }
+
+  const { error: authErr } = await admin.auth.admin.updateUserById(userId, {
+    password,
+    app_metadata: {
+      role: "administrador",
+      cliente_id: clienteId,
+      plan: tier,
+      org_id: orgId,
+    },
+  });
+
+  if (authErr) {
+    return { error: "Error al actualizar credenciales autos: " + authErr.message };
+  }
+
+  return { clienteId: clienteId as string };
 }
 
 async function ensureInmoMembership(
