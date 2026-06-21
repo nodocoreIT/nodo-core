@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AdminPortalPage } from "@/portals/admin/admin-portal-page";
 import { AuthCallbackPage } from "@/features/auth/callback/auth-callback-page";
-import { useAuth } from "@/shared/hooks/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 import { redirectToLandingLogin } from "@/shared/lib/auth-redirect";
 import { hideAppSplash } from "@/shared/lib/app-splash";
 
@@ -29,7 +29,7 @@ function SplashAutoHide({ loading }: { loading: boolean }) {
 }
 
 export function AppRouter() {
-  const { session, loading } = useAuth();
+  const { session, isLoading: loading } = useAuth();
 
   useEffect(() => {
     if (loading) return;

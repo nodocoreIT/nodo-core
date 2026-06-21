@@ -1,10 +1,10 @@
 import { Navigate } from "react-router-dom";
-import { useAuth } from "@/shared/hooks/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 import { redirectToLandingLogin } from "@/shared/lib/auth-redirect";
 import { Spinner } from "@/components/ui/spinner";
 
 export function RoleRouter() {
-  const { session, loading } = useAuth();
+  const { session, isLoading: loading } = useAuth();
 
   if (loading) {
     return (

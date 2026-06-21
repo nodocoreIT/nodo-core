@@ -24,6 +24,7 @@ import { cn } from "@/shared/lib/utils";
 import { useDealershipBrand } from "@/shared/hooks/use-dealership-brand";
 import { NotificationsBell } from "@/features/notifications/notifications-bell";
 import { SettingsDialog } from "@nodocore/nodo-modules/settings";
+import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { AutosSettingsModuleProvider } from "@/shared/lib/autos-settings-module";
 
 interface NavItem {
@@ -237,10 +238,16 @@ export function AdminLayout() {
               </div>
             </div>
 
-            <PortalHeaderMobileActions notifications={<NotificationsBell />} />
+            <PortalHeaderMobileActions
+              notifications={<NotificationsBell />}
+              trailing={<NodoSwitcher />}
+            />
           </div>
 
-          <PortalHeaderActions notifications={<NotificationsBell />} />
+          <PortalHeaderActions
+            notifications={<NotificationsBell />}
+            trailing={<NodoSwitcher />}
+          />
         </header>
 
         {/* Content */}

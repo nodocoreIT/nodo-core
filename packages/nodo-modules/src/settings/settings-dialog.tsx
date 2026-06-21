@@ -715,11 +715,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[800px] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden bg-white data-[state=open]:animate-none data-[state=closed]:animate-none">
-        {isInviting && (
+        {(isInviting || savingPerms || deletingUser) && (
           <div className="absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-white/40">
             <div className="flex flex-col items-center gap-3 bg-white rounded-xl px-8 py-6 shadow-xl border border-border">
               <Loader2 className="h-8 w-8 animate-spin text-brand" />
-              <span className="text-sm font-semibold text-navy">Invitando usuario...</span>
+              <span className="text-sm font-semibold text-navy">
+                {isInviting ? "Invitando usuario..." : deletingUser ? "Eliminando usuario..." : "Guardando cambios..."}
+              </span>
             </div>
           </div>
         )}

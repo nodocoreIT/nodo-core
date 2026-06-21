@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSupabase } from "@nodocore/shared-components";
 import type { OrgEntry } from "./types";
 
@@ -7,6 +7,9 @@ export function useMyOrgs() {
   const [orgs, setOrgs] = useState<OrgEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,7 +34,14 @@ export function useMyOrgs() {
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, [supabase, refreshKey]);
 
-  return { orgs, loading, error };
+  // Re-fetch when the org changes.
+  useEffect(() => {
+    const handler = () => refresh();
+    window.addEventListener("nodo:org-switched", handler);
+    return () => window.removeEventListener("nodo:org-switched", handler);
+  }, [refresh]);
+
+  return { orgs, loading, error, refresh };
 }

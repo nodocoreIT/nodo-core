@@ -6,8 +6,12 @@ import { useMyOrgs } from "./use-my-orgs";
 import type { OrgEntry } from "./types";
 
 const ROLE_LABELS: Record<string, string> = {
+  super_admin: "Super Admin",
   admin: "Admin",
   agent: "Empleado",
+  seller: "Vendedor",
+  guest: "Invitado",
+  member: "Miembro",
   owner: "Propietario",
   tenant: "Inquilino",
 };
@@ -48,7 +52,14 @@ export function NodoSwitcher() {
   // Hide when user belongs to only one org (or still loading).
   if (loading || orgs.length <= 1) return null;
 
-  const currentOrg = orgs.find((o) => o.org_id === currentOrgId) ?? orgs[0];
+  // Own orgs (super_admin) first, then the rest.
+  const sorted = [...orgs].sort((a, b) => {
+    const aOwn = a.role === "super_admin" ? 0 : 1;
+    const bOwn = b.role === "super_admin" ? 0 : 1;
+    return aOwn - bOwn;
+  });
+
+  const currentOrg = sorted.find((o) => o.org_id === currentOrgId) ?? sorted[0];
 
   async function handleSwitch(org: OrgEntry) {
     if (org.org_id === currentOrgId || switching) return;
@@ -79,7 +90,13 @@ export function NodoSwitcher() {
 
       // Refresh session so the JWT reflects the new org.
       await supabase.auth.refreshSession();
-      window.location.reload();
+      setCurrentOrgId(org.org_id);
+      // Notify the app to invalidate cached data instead of doing a full reload.
+      window.dispatchEvent(new CustomEvent("nodo:org-switched"));
+      // Small delay so the overlay stays visible while React re-renders.
+      await new Promise((r) => setTimeout(r, 600));
+      setSwitching(false);
+      setSwitchingTo(null);
     } catch (err) {
       setSwitchError(err instanceof Error ? err.message : "No se pudo cambiar de organización");
       setSwitching(false);
@@ -222,7 +239,7 @@ export function NodoSwitcher() {
             </div>
           )}
 
-          {orgs.map((org) => {
+          {sorted.map((org) => {
             const isCurrent = org.org_id === currentOrgId;
             return (
               <button

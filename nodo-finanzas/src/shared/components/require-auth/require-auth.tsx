@@ -1,4 +1,4 @@
-import { useAuth } from "@/shared/hooks/use-auth";
+import { useAuth } from "@nodocore/shared-components";
 import { redirectToLandingLogin } from "@/shared/lib/auth-redirect";
 import { Spinner } from "@/components/ui/spinner";
 import type { ReactNode } from "react";
@@ -8,7 +8,7 @@ interface RequireAuthProps {
 }
 
 export function RequireAuth({ children }: RequireAuthProps) {
-  const { session, loading } = useAuth();
+  const { session, isLoading: loading } = useAuth();
 
   if (loading) {
     return (
