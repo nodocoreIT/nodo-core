@@ -19,7 +19,9 @@ export function useCreateProperty() {
       const { data, error } = await supabase
         .schema("nodo_inmo")
         .from("properties")
-        .insert({ ...input, org_id: orgId });
+        .insert({ ...input, org_id: orgId })
+        .select()
+        .single();
 
       if (error) throw error;
       return data;
