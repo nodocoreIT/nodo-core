@@ -26,7 +26,6 @@ import {
   Button,
   GlobalSearchInput,
   PortalHeaderActions,
-  PortalHeaderMobileActions,
   useSearchStore,
   SidebarNavGroup,
   SidebarNavAccordionProvider,
@@ -513,6 +512,9 @@ function AdminLayoutShell({
 
         {/* Bottom: configuración + user — always visible */}
         <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] p-3">
+          <div className="mb-3 md:hidden">
+            <PlanBadge variant="sidebar" />
+          </div>
           <div className="flex items-center gap-3 px-1 py-1">
             <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
               {initials(displayName)}
@@ -552,36 +554,40 @@ function AdminLayoutShell({
       {/* ── Main area ── */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar — stacked on mobile, single line on desktop */}
-        <header className="flex flex-col sm:flex-row min-h-20 items-center gap-3 sm:gap-4 border-b border-border bg-[#EEF3F8] px-4 sm:px-6 py-3 shadow-sm flex-shrink-0">
-          {/* Row 1 / Left Section */}
-          <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto sm:min-w-0 sm:flex-1">
-            <div className="flex items-center gap-3 min-w-0">
+        <header className="flex flex-col gap-3 border-b border-border bg-[#EEF3F8] px-4 py-3 shadow-sm flex-shrink-0 sm:flex-row sm:items-center sm:gap-4 sm:px-6 sm:min-h-20">
+          {/* Mobile: title row + actions row (evita solapamiento) */}
+          <div className="flex w-full min-w-0 flex-col gap-2 md:hidden">
+            <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
-                className="block md:hidden text-navy hover:text-brand"
+                className="shrink-0 text-navy hover:text-brand"
                 onClick={() => setMobileMenuOpen(true)}
                 aria-label="Abrir menú"
               >
                 <Menu className="h-6 w-6" />
               </button>
-              <div className="min-w-0">
-                <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate2">
                   Nodo Inmo · Gestión
                 </p>
-                <h1 className="truncate text-base sm:text-xl font-bold text-navy">{title}</h1>
+                <h1 className="truncate text-base font-bold text-navy">{title}</h1>
               </div>
+              <IPCBadge />
             </div>
+            <div className="flex items-center justify-end gap-1.5">
+              <NotificationsBell />
+              <NodoSwitcher product="inmo" />
+            </div>
+          </div>
 
-            <PortalHeaderMobileActions
-              metrics={
-                <>
-                  <IPCBadge />
-                  <PlanBadge />
-                </>
-              }
-              notifications={<NotificationsBell />}
-              trailing={<NodoSwitcher product="inmo" />}
-            />
+          {/* Desktop / tablet: title + actions */}
+          <div className="hidden min-w-0 flex-1 items-center gap-3 md:flex">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate2">
+                Nodo Inmo · Gestión
+              </p>
+              <h1 className="truncate text-xl font-bold text-navy">{title}</h1>
+            </div>
           </div>
 
           <PortalHeaderActions
@@ -601,8 +607,8 @@ function AdminLayoutShell({
           />
         </header>
 
-        {/* Content area */}
-        <main className="flex-1 overflow-auto p-6">
+        {/* Content area — extra bottom padding on mobile for the feedback nodo FAB */}
+        <main className="flex-1 overflow-auto p-4 pb-24 sm:p-6 sm:pb-6">
           <Outlet />
         </main>
       </div>

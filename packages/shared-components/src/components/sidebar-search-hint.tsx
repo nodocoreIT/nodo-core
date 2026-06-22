@@ -17,7 +17,7 @@ export function SidebarSearchHint({ onClick, className }: SidebarSearchHintProps
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "mt-3 flex w-full items-center gap-2 rounded-sm border border-[var(--color-sidebar-border)] px-3 py-2 text-left text-[11px] font-medium text-[var(--color-sidebar-text)] opacity-70 transition-colors",
+        "mt-3 hidden w-full items-center gap-2 rounded-sm border border-[var(--color-sidebar-border)] px-3 py-2 text-left text-[11px] font-medium text-[var(--color-sidebar-text)] opacity-70 transition-colors md:flex",
         onClick && "cursor-pointer hover:border-brand/40 hover:bg-brand/5 hover:opacity-100",
         className,
       )}

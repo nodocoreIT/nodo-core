@@ -30,7 +30,7 @@ export function DashboardActionCard({
   extra,
 }: DashboardActionCardProps) {
   return (
-    <div className="flex h-full flex-col rounded-md border border-border bg-card px-5 py-4 shadow-sm">
+    <div className="flex h-full flex-col rounded-md border border-border bg-card px-4 py-3.5 shadow-sm sm:px-5 sm:py-4">
       {badge ? (
         <p className="text-2xs font-bold uppercase tracking-wide text-slate2">
           {badge}

@@ -24,7 +24,7 @@ export function PortalHeaderMobileActions({
 >) {
   return (
     <div
-      className={cn("flex shrink-0 items-center gap-1.5 sm:hidden", className)}
+      className={cn("flex max-w-full items-center justify-end gap-1.5 overflow-x-auto md:hidden", className)}
     >
       {metrics}
       {notifications}
