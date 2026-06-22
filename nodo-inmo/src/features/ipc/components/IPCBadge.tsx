@@ -14,7 +14,7 @@ export function IPCBadge() {
   if (isLoading) return null;
 
   return (
-    <div className="flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1 text-[11px] font-semibold shadow-sm">
+    <div className="flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold shadow-sm sm:gap-1.5 sm:px-3">
       <span className="font-bold uppercase tracking-wide text-slate2">IPC</span>
       {ipc ? (
         <>
@@ -22,7 +22,7 @@ export function IPCBadge() {
             {ipc.value > 0 ? "+" : ""}
             {ipc.value.toFixed(1)}%
           </span>
-          <span className="text-slate2/70">{formatPeriod(ipc.period)}</span>
+          <span className="hidden min-[420px]:inline text-slate2/70">{formatPeriod(ipc.period)}</span>
         </>
       ) : (
         <span className="text-slate2/70">—</span>

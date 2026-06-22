@@ -172,7 +172,7 @@ export function FeedbackFAB() {
   return (
     <>
       <div
-        className="fixed bottom-6 right-6 z-40 touch-none flex items-center justify-center"
+        className="fixed z-40 flex touch-none items-center justify-center max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:right-4 sm:bottom-6 sm:right-6"
         style={{
           transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
         }}
@@ -184,7 +184,7 @@ export function FeedbackFAB() {
             e.stopPropagation();
             setIsDismissed(true);
           }}
-          className="absolute -top-1.5 -right-1.5 z-50 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-white shadow-md hover:bg-rose-700 active:scale-90"
+          className="absolute -right-1 -top-1 z-50 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-white shadow-md hover:bg-rose-700 active:scale-90 sm:-right-1.5 sm:-top-1.5"
           title="Ocultar sugerencia"
         >
           <span className="text-sm font-bold leading-none">×</span>
@@ -199,20 +199,21 @@ export function FeedbackFAB() {
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
           className={cn(
-            "flex h-14 items-center justify-center rounded-full text-white shadow-lg transition-all duration-300 hover:brightness-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#111E2F]",
-            isExpanded ? "w-auto gap-3 px-6" : "w-14 gap-0 px-0",
-            isDragging ? "cursor-grabbing" : "cursor-grab"
+            "flex h-12 w-12 items-center justify-center rounded-full text-white shadow-lg transition-all duration-300 hover:brightness-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#111E2F] sm:h-14",
+            isExpanded ? "sm:w-auto sm:gap-3 sm:px-6" : "sm:gap-0 sm:px-0",
+            isExpanded ? "max-sm:w-12 max-sm:gap-0 max-sm:px-0" : "",
+            isDragging ? "cursor-grabbing" : "cursor-grab",
           )}
           style={{ backgroundColor: "#111E2F" }}
         >
           <img
             src={`${normalizedBaseUrl}brand/nodo-mark-white.png`}
             alt="Nodo"
-            className="h-8 w-8 shrink-0 select-none pointer-events-none"
+            className="h-7 w-7 shrink-0 select-none pointer-events-none sm:h-8 sm:w-8"
           />
           <span
             className={cn(
-              "overflow-hidden whitespace-nowrap font-display text-sm font-semibold tracking-wide transition-all duration-300 ease-in-out select-none pointer-events-none",
+              "overflow-hidden whitespace-nowrap font-display text-sm font-semibold tracking-wide transition-all duration-300 ease-in-out select-none pointer-events-none max-sm:hidden",
               isExpanded ? "max-w-xs opacity-100 pr-1" : "max-w-0 opacity-0",
             )}
           >

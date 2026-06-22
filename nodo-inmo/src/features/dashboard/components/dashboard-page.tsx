@@ -71,16 +71,16 @@ export function DashboardPage() {
   return (
     <div className="space-y-5">
       {/* Greeting */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-bold uppercase tracking-wide text-navy">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="font-display text-xl font-bold uppercase tracking-wide text-navy sm:text-2xl">
             Hola, {greetingName(user)}
           </h1>
           <p className="mt-1 text-sm text-slate2">Hoy es {todayLabel()}</p>
         </div>
         <Link
           to="/admin/agenda"
-          className="inline-flex items-center gap-2 rounded-pill border border-border bg-card px-4 py-2 text-xs font-semibold text-navy shadow-sm hover:bg-mist"
+          className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-pill border border-border bg-card px-4 py-2.5 text-xs font-semibold text-navy shadow-sm hover:bg-mist sm:w-auto"
         >
           <Calendar className="h-4 w-4 text-brand" />
           Ir a agenda
@@ -88,7 +88,7 @@ export function DashboardPage() {
       </div>
 
       {/* Action cubes */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
         <DashboardActionCard
           badge="Pendientes"
           title="Rendiciones"
