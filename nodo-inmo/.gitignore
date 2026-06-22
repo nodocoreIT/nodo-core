@@ -36,3 +36,6 @@ supabase/.branches/
 # Local agent tooling
 .atl/
 .claude/settings.local.json
+
+# Tenant backups (may contain PII)
+/backups/

@@ -400,3 +400,5 @@ Copy **nodo-autos** or **nodo-inmo** as template; always use the nodo's dedicate
 ---
 
 Full scaffold checklist: `.atl/skills/nodo-scaffold/SKILL.md` (section **9. Shared nodo modules**).
+
+Registration signup (nombre + email only, no password on signup): `.atl/skills/nodo-registration/SKILL.md`.

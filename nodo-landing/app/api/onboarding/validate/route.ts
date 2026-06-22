@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requiresIdentityVerification } from "@/lib/registration/node-config";
+import { loadOnboardingPlanCatalog } from "@/lib/onboarding/plan-catalog";
+import {
+  getNodeRegistrationConfig,
+  requiresIdentityVerification,
+} from "@/lib/registration/node-config";
+import { NODES, getNodeMailLabelByCode } from "@/lib/nodes";
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -40,6 +45,9 @@ export async function GET(request: NextRequest) {
   const clientsRow = unit.clients as { email: string | null; name: string | null } | { email: string | null; name: string | null }[] | null;
   const client = Array.isArray(clientsRow) ? clientsRow[0] : clientsRow;
   const nameParts = (client?.name ?? "").trim().split(/\s+/);
+  const nodeDef = NODES.find((node) => node.code === unit.unit_code);
+  const registrationCfg = getNodeRegistrationConfig(unit.unit_code);
+  const planCatalog = await loadOnboardingPlanCatalog(unit.unit_code);
 
   return NextResponse.json({
     ok: true,
@@ -47,7 +55,11 @@ export async function GET(request: NextRequest) {
     firstName: nameParts[0] ?? "",
     lastName: nameParts.slice(1).join(" ") ?? "",
     unitCode: unit.unit_code,
+    nodeSlug: registrationCfg?.slug ?? nodeDef?.slug ?? "",
+    nodeCode: nodeDef?.code ?? unit.unit_code,
+    nodeLabel: getNodeMailLabelByCode(unit.unit_code),
     plan: unit.plan,
+    plans: planCatalog.plans,
     identityVerificationRequired: requiresIdentityVerification(unit.unit_code, unit.plan),
   });
 }

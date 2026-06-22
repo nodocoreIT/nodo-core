@@ -1,6 +1,10 @@
 import { createNodoAuthClient } from "@nodocore/shared-components/lib/create-nodo-auth-client";
 import { normalizeNodeSlug } from "@/lib/nodes";
-import { getNodoAuthCode, getNodoPublicAuthConfig } from "@/lib/supabase/nodo-auth-config";
+import {
+  getNodoAuthCode,
+  getNodoPublicAuthConfig,
+  getNodoPublicAuthConfigError,
+} from "@/lib/supabase/nodo-auth-config";
 
 const nodeClients = new Map<string, ReturnType<typeof createNodoAuthClient>>();
 
@@ -13,6 +17,11 @@ export function createNodeBrowserClient(nodeSlug: string) {
   const storageSlug = authCode?.toLowerCase() ?? normalizeNodeSlug(nodeSlug) ?? "unknown";
 
   const cfg = authCode ? getNodoPublicAuthConfig(authCode) : null;
+  if (authCode && !cfg) {
+    const hint = getNodoPublicAuthConfigError(authCode);
+    throw new Error(hint ?? "Missing Supabase public env vars for nodo login.");
+  }
+
   const url = cfg?.url ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = cfg?.anonKey ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) {

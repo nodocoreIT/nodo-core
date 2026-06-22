@@ -2,10 +2,14 @@
 
 import { useState, useEffect, Suspense, type ChangeEvent } from "react";
 import { useSearchParams } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import NeuralNodesBackground from "@/components/NeuralNodesBackground";
+import { OnboardingNodeHeader } from "@/components/onboarding/OnboardingNodeHeader";
+import { OnboardingPlanSelector } from "@/components/onboarding/OnboardingPlanSelector";
 import { DocumentNumberInput } from "@nodocore/shared-components";
+import { applyLoginAccent, getNodeAccentBySlug } from "@/lib/node-accents";
+import { getNodeBySlug } from "@/lib/nodes";
+import type { OnboardingPlanOption } from "@/lib/onboarding/plan-catalog";
 
 const inputClass =
   "mt-1 w-full rounded-lg px-3 py-2.5 text-sm bg-white border border-slate-200 text-navy placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand/25 focus:border-brand transition-shadow";
@@ -22,7 +26,7 @@ function formatCardExpiryMmAa(raw: string): string {
 }
 
 const fileInputClass =
-  "mt-1 w-full rounded-lg bg-white px-3 py-2 text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-brand file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white";
+  "mt-1 w-full rounded-lg bg-white px-3 py-2 text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-200 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-navy";
 
 function OnboardingForm() {
   const searchParams = useSearchParams();
@@ -35,7 +39,10 @@ function OnboardingForm() {
   const [city, setCity] = useState("");
   const [province, setProvince] = useState("");
   const [phone, setPhone] = useState("");
-  const [planChoice, setPlanChoice] = useState<"starter" | "pro" | "demo">("starter");
+  const [planChoice, setPlanChoice] = useState("");
+  const [nodeSlug, setNodeSlug] = useState("");
+  const [nodeCode, setNodeCode] = useState("");
+  const [plans, setPlans] = useState<OnboardingPlanOption[]>([]);
   const [cardHolder, setCardHolder] = useState("");
   const [cardLastFour, setCardLastFour] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
@@ -53,6 +60,14 @@ function OnboardingForm() {
   const [submitted, setSubmitted] = useState(false);
   const [validating, setValidating] = useState(true);
 
+  const nodeDef = nodeSlug ? getNodeBySlug(nodeSlug) : undefined;
+  const accent = getNodeAccentBySlug(nodeSlug || "inmo");
+
+  useEffect(() => {
+    if (!nodeSlug) return;
+    return applyLoginAccent(accent);
+  }, [nodeSlug, accent]);
+
   useEffect(() => {
     if (!token) {
       setError("Enlace de onboarding inválido.");
@@ -68,7 +83,18 @@ function OnboardingForm() {
           setEmail(data.email ?? "");
           setFirstName(data.firstName ?? "");
           setLastName(data.lastName ?? "");
+          setNodeSlug(data.nodeSlug ?? "");
+          setNodeCode(data.nodeCode ?? "");
+          setPlans(Array.isArray(data.plans) ? data.plans : []);
           setIdentityVerificationRequired(Boolean(data.identityVerificationRequired));
+
+          const catalogPlans: OnboardingPlanOption[] = Array.isArray(data.plans) ? data.plans : [];
+          const initialPlan =
+            catalogPlans.find((plan) => plan.code === data.plan)?.code ??
+            catalogPlans[0]?.code ??
+            data.plan ??
+            "starter";
+          setPlanChoice(initialPlan);
         }
         setValidating(false);
       })
@@ -190,13 +216,14 @@ function OnboardingForm() {
         }}
       >
         <div className="text-center mb-8">
-          <Image
-            src="/logos/logo compuesto.png"
-            alt="NODO Core"
-            height={30}
-            width={140}
-            className="mx-auto mb-4 h-[30px] w-auto"
-          />
+          {nodeCode && nodeSlug ? (
+            <OnboardingNodeHeader
+              nodeCode={nodeCode}
+              wordmarkSlug={nodeSlug}
+              Icon={nodeDef?.Icon}
+              accent={accent}
+            />
+          ) : null}
           {submitted ? (
             <>
               <h1 className="text-2xl font-semibold text-white">Solicitud enviada</h1>
@@ -238,25 +265,14 @@ function OnboardingForm() {
                 <span className={labelClass}>Email</span>
                 <input required type="email" value={email} readOnly className={inputReadOnlyClass} />
               </label>
-              <fieldset>
+              <fieldset className="lg:col-span-1">
                 <span className={labelClass}>Plan</span>
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {(["starter", "pro", "demo"] as const).map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setPlanChoice(p)}
-                      className="rounded-lg px-3 py-2 text-sm border font-medium transition-colors"
-                      style={{
-                        borderColor: planChoice === p ? "#DA5A0E" : "rgba(255,255,255,.2)",
-                        background: planChoice === p ? "rgba(218,90,14,.25)" : "rgba(255,255,255,.06)",
-                        color: planChoice === p ? "#fff" : "rgba(234,240,247,.75)",
-                      }}
-                    >
-                      {p === "starter" ? "Starter" : p === "pro" ? "Pro" : "Demo"}
-                    </button>
-                  ))}
-                </div>
+                <OnboardingPlanSelector
+                  plans={plans}
+                  value={planChoice}
+                  onChange={setPlanChoice}
+                  accent={accent}
+                />
               </fieldset>
             </div>
 
@@ -276,9 +292,18 @@ function OnboardingForm() {
             </div>
 
             {identityVerificationRequired && (
-              <div className="rounded-xl border border-brand/30 bg-brand/5 p-4 md:p-5 space-y-4">
+              <div
+                className="rounded-xl border p-4 md:p-5 space-y-4"
+                style={{
+                  borderColor: `rgba(${accent.rgb}, 0.3)`,
+                  background: `rgba(${accent.rgb}, 0.08)`,
+                }}
+              >
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#F0A877" }}>
+                  <p
+                    className="text-xs font-semibold uppercase tracking-wide"
+                    style={{ color: accent.brand300 }}
+                  >
                     Verificación de identidad
                   </p>
                   <p className="text-xs mt-1" style={{ color: "rgba(234,240,247,.55)" }}>
@@ -356,7 +381,7 @@ function OnboardingForm() {
                 )}
                 <label className="block">
                   <span className={labelClass}>Foto de tarjeta (opcional)</span>
-                  <input type="file" accept="image/*,.pdf" onChange={(e) => setCardPhoto(e.target.files?.[0] ?? null)} className={`${fileInputClass} file:bg-slate-200! file:text-navy!`} />
+                  <input type="file" accept="image/*,.pdf" onChange={(e) => setCardPhoto(e.target.files?.[0] ?? null)} className={fileInputClass} />
                 </label>
               </div>
 
@@ -391,7 +416,12 @@ function OnboardingForm() {
               <p className="text-sm text-red-300 bg-red-950/40 border border-red-400/30 rounded-lg px-4 py-2.5">{error}</p>
             )}
 
-            <button type="submit" disabled={submitDisabled} className="w-full rounded-lg py-3.5 text-sm font-semibold text-white disabled:opacity-50 hover:opacity-95 transition-opacity" style={{ background: "#DA5A0E" }}>
+            <button
+              type="submit"
+              disabled={submitDisabled || !planChoice}
+              className="w-full rounded-lg py-3.5 text-sm font-semibold text-white disabled:opacity-50 hover:opacity-95 transition-opacity"
+              style={{ background: accent.brand }}
+            >
               {loading ? "Enviando…" : "Confirmar y solicitar habilitación"}
             </button>
             {identityVerificationRequired && !identityVerified && (

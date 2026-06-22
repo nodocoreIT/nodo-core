@@ -3,14 +3,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NODES } from "@/lib/nodes";
 import type { ClientUnitStatus } from "@/lib/registration/types";
 import { requirePanelTeamMember } from "@/lib/panel/panel-api-auth";
+import { syncNodeEmailAccessForClient } from "@/lib/registration/client-unit-auth";
+import { setNodoAuthSuspendedForUnit } from "@/lib/registration/nodo-access-suspend";
 
-const ALLOWED: ClientUnitStatus[] = [
-  "pending_review",
-  "pending_onboarding",
-  "onboarding",
-  "activo",
-  "pausado",
-];
+const ALLOWED: ClientUnitStatus[] = ["activo", "pausado"];
 
 export async function POST(request: NextRequest) {
   const auth = await requirePanelTeamMember();
@@ -27,7 +23,7 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
   const { data: unit, error: unitErr } = await admin
     .from("client_units")
-    .select("id, unit_code, status, provision_user_id")
+    .select("id, unit_code, status, provision_user_id, access_user, client_id")
     .eq("id", clientUnitId)
     .single();
 
@@ -35,35 +31,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unidad no encontrada." }, { status: 404 });
   }
 
-  await admin.from("client_units").update({ status }).eq("id", clientUnitId);
+  if (!ALLOWED.includes(unit.status as ClientUnitStatus)) {
+    return NextResponse.json(
+      { error: "Este estado solo lo puede cambiar el cliente al activar su cuenta." },
+      { status: 400 },
+    );
+  }
 
-  await admin
-    .from("node_email_access")
-    .update({ status })
-    .eq("client_unit_id", clientUnitId);
+  const prev = unit.status;
+  const needsSuspend = status === "pausado" && prev !== "pausado";
+  const needsReactivate = status === "activo" && prev === "pausado";
 
   const nodeDef = NODES.find((n) => n.code === unit.unit_code);
-  if (nodeDef?.provisionable && unit.provision_user_id) {
-    const prev = unit.status;
-    const needsSuspend = status === "pausado" && prev !== "pausado";
-    const needsReactivate = status === "activo" && prev === "pausado";
-
-    if (needsSuspend || needsReactivate) {
-      const origin = request.nextUrl.origin;
-      await fetch(`${origin}/api/nodo-suspend`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          cookie: request.headers.get("cookie") ?? "",
-        },
-        body: JSON.stringify({
-          nodo_code: unit.unit_code,
-          user_id: unit.provision_user_id,
-          action: needsSuspend ? "suspend" : "reactivate",
-        }),
-      });
+  if (nodeDef?.provisionable && (needsSuspend || needsReactivate)) {
+    const suspendResult = await setNodoAuthSuspendedForUnit(
+      unit.unit_code,
+      unit,
+      needsSuspend ? "suspend" : "reactivate",
+    );
+    if (!suspendResult.ok) {
+      return NextResponse.json({ error: suspendResult.error }, { status: 400 });
+    }
+    if (suspendResult.userId && !unit.provision_user_id) {
+      await admin
+        .from("client_units")
+        .update({ provision_user_id: suspendResult.userId })
+        .eq("id", clientUnitId);
     }
   }
+
+  await admin.from("client_units").update({ status }).eq("id", clientUnitId);
+  await syncNodeEmailAccessForClient(admin, unit.client_id);
 
   return NextResponse.json({ ok: true, status });
 }

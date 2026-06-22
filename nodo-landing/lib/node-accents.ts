@@ -1,4 +1,6 @@
 /** Per-module accent colors (landing + login). Default Nodo orange stays in globals.css. */
+import { NODES } from "@/lib/nodes";
+
 export const AUTOS_ACCENT = {
   brand: "#D12D3C",
   brand600: "#B02535",
@@ -70,12 +72,23 @@ export function getNodeAccentBySlug(slug: string): NodeAccent {
   const key = slug.trim().toLowerCase();
   if (key === "autos" || key === "automotores") return AUTOS_ACCENT;
   if (key === "finanzas") return FINANZAS_ACCENT;
-  if (key === "clinica" || key === "salud" || key === "clinica-virtual") return CLINICA_ACCENT;
+  if (key === "clinica" || key === "salud" || key === "clinica-virtual" || key === "clínica") return CLINICA_ACCENT;
   if (key === "obra") return OBRA_ACCENT;
   if (key === "contable") return CONTABLE_ACCENT;
   if (key === "ecommerce") return ECOMMERCE_ACCENT;
   if (key === "inmo") return DEFAULT_ACCENT;
   return DEFAULT_ACCENT;
+}
+
+/** Resolve dashboard `unit_code` (e.g. Inmo, Autos, Clínica) to module branding. */
+export function getNodeAccentByCode(unitCode: string): NodeAccent {
+  const normalized = unitCode.trim().toLowerCase();
+  const node = NODES.find(
+    (n) =>
+      n.code.toLowerCase() === normalized ||
+      n.slug.toLowerCase() === normalized,
+  );
+  return getNodeAccentBySlug(node?.slug ?? normalized);
 }
 
 export function getLoginAccent(nodeParam: string): NodeAccent {
