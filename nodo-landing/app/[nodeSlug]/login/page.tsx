@@ -26,6 +26,7 @@ import {
   submitInmoRegistration,
 } from "@/app/actions";
 import { submitNodeRegistration } from "@/app/actions/registration";
+import { resolvePublicOrigin } from "@/lib/auth/public-origin";
 import {
   DEFAULT_ACCENT,
   getLoginAccent,
@@ -315,8 +316,8 @@ function LoginForm() {
 
   const registrationOrigin =
     typeof window !== "undefined"
-      ? (process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? window.location.origin)
-      : "http://localhost:3000";
+      ? resolvePublicOrigin(window.location.origin)
+      : resolvePublicOrigin();
 
   const urlError = searchParams.get("error");
   const authErrorCode = searchParams.get("auth_error");

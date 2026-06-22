@@ -23,7 +23,7 @@ import {
 } from "@/lib/mail";
 import { submitNodeRegistration } from "@/app/actions/registration";
 import { getNodeLoginPath, getNodeMailLabel } from "@/lib/nodes";
-import { resolveRegistrationOrigin } from "@/lib/registration/origin";
+import { resolvePublicOriginFromRequest, isLocalOrigin } from "@/lib/auth/public-origin";
 
 export type ContactFormState = {
   status: "idle" | "success" | "error";
@@ -141,7 +141,14 @@ export async function requestPasswordReset(
     const admin = nodoAdmin ?? createAdminClient();
     const nodeLabel = getNodeMailLabel(nodeSlug);
     const loginPath = loginPathOverride?.trim() || getNodeLoginPath(nodeSlug);
-    const baseOrigin = resolveRegistrationOrigin(origin);
+    const baseOrigin = await resolvePublicOriginFromRequest(origin);
+
+    if (isLocalOrigin(baseOrigin) && process.env.NODE_ENV === "production") {
+      console.error(
+        "[requestPasswordReset] Production reset link would use localhost. Set NEXT_PUBLIC_APP_URL on Vercel and Supabase Site URL to https://www.nodocore.com.ar",
+        { nodeSlug, clientOrigin: origin, baseOrigin },
+      );
+    }
 
     const loginReturn = `${loginPath}?mode=reset-password`;
     const project = nodoAuthProjectParam(authCode);

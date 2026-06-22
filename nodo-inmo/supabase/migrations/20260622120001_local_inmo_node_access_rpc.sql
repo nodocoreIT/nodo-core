@@ -1,3 +1,6 @@
+-- DEPRECATED: this migration replaced the full cross-nodo RPC with an Inmo-only stub.
+-- Fixed by 20260623000002_restore_user_has_node_access.sql — do not copy this body elsewhere.
+
 -- Inmo auth project: landing login calls public.user_has_node_access after sign-in.
 -- When Inmo uses its own Supabase project (not landing's nodo_core tables), check org membership.
 

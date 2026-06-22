@@ -68,6 +68,8 @@ const schema = z.object({
 
 export type ContractFormValues = z.infer<typeof schema>;
 
+const SELECT_IN_DIALOG_CLASS = "z-[200]";
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function toStr(v: number | string | null | undefined): string {
@@ -139,8 +141,19 @@ export function ContractFormDialog({
   isPending = false,
 }: ContractFormDialogProps) {
   const isEdit = !!contract;
-  const { data: properties = [] } = useProperties();
-  const { data: tenants = [] } = useContacts("tenant");
+  const {
+    data: properties = [],
+    isLoading: propertiesLoading,
+    isFetching: propertiesFetching,
+    isError: propertiesError,
+  } = useProperties();
+  const {
+    data: tenants = [],
+    isLoading: tenantsLoading,
+    isFetching: tenantsFetching,
+    isError: tenantsError,
+  } = useContacts("tenant");
+  const { data: owners = [] } = useContacts("owner");
   const { data: guarantors = [] } = useContacts("guarantor");
   const propertyChangedRef = useRef(false);
 
@@ -190,8 +203,16 @@ export function ContractFormDialog({
   );
   const ownerDisplayName =
     selectedProperty?.owner?.name ??
+    owners.find((o) => o.id === selectedProperty?.owner_id)?.name ??
     contract?.property?.owner?.name ??
     "";
+  const rentProperties = useMemo(
+    () => properties.filter((p) => p.operation === "rent"),
+    [properties],
+  );
+  const propertiesPending =
+    propertiesLoading || (propertiesFetching && properties.length === 0);
+  const tenantsPending = tenantsLoading || (tenantsFetching && tenants.length === 0);
   const prevCurrencyRef = useRef(currency);
   useEffect(() => {
     if (prevCurrencyRef.current !== currency) {
@@ -266,6 +287,15 @@ export function ContractFormDialog({
             onSubmit={form.handleSubmit(handleSubmit as any)}
             className="flex flex-col gap-4"
           >
+            {(propertiesError || tenantsError) && (
+              <p
+                role="alert"
+                className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                No se pudieron cargar propiedades o contactos. Recargá la página e intentá de nuevo.
+              </p>
+            )}
+
             {/* Property */}
             <FormField
               control={form.control as any}
@@ -285,16 +315,38 @@ export function ContractFormDialog({
                         <SelectValue placeholder="Seleccioná" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
-                      {properties.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.owner?.name
-                            ? `${p.address} — ${p.owner.name}`
-                            : p.address}
+                    <SelectContent className={SELECT_IN_DIALOG_CLASS}>
+                      {propertiesPending ? (
+                        <SelectItem value="__loading" disabled>
+                          Cargando propiedades…
                         </SelectItem>
-                      ))}
+                      ) : properties.length === 0 ? (
+                        <SelectItem value="__empty" disabled>
+                          No hay propiedades cargadas
+                        </SelectItem>
+                      ) : rentProperties.length === 0 ? (
+                        <SelectItem value="__empty" disabled>
+                          No hay propiedades en alquiler
+                        </SelectItem>
+                      ) : (
+                        rentProperties.map((p) => {
+                          const ownerName =
+                            p.owner?.name ??
+                            owners.find((o) => o.id === p.owner_id)?.name;
+                          return (
+                            <SelectItem key={p.id} value={p.id}>
+                              {ownerName ? `${p.address} — ${ownerName}` : p.address}
+                            </SelectItem>
+                          );
+                        })
+                      )}
                     </SelectContent>
                   </Select>
+                  {!propertiesPending && properties.length > 0 && rentProperties.length === 0 && (
+                    <p className="text-xs text-slate2">
+                      Solo podés contratar propiedades con operación &quot;Alquiler&quot;.
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -315,6 +367,11 @@ export function ContractFormDialog({
                   }
                 />
               </FormControl>
+              {propertyId && !ownerDisplayName && !tenantsPending && (
+                <p className="text-xs text-slate2">
+                  Asigná un propietario en la ficha de la propiedad (Propiedades → editar).
+                </p>
+              )}
             </FormItem>
 
             {/* Tenant */}
@@ -330,14 +387,29 @@ export function ContractFormDialog({
                         <SelectValue placeholder="Seleccioná" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
-                      {tenants.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name}
+                    <SelectContent className={SELECT_IN_DIALOG_CLASS}>
+                      {tenantsPending ? (
+                        <SelectItem value="__loading" disabled>
+                          Cargando inquilinos…
                         </SelectItem>
-                      ))}
+                      ) : tenants.length === 0 ? (
+                        <SelectItem value="__empty" disabled>
+                          No hay inquilinos cargados
+                        </SelectItem>
+                      ) : (
+                        tenants.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
+                  {!tenantsPending && tenants.length === 0 && (
+                    <p className="text-xs text-slate2">
+                      Creá inquilinos en el menú Inquilinos antes de armar el contrato.
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -420,7 +492,7 @@ export function ContractFormDialog({
                           <SelectValue placeholder="ARS" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent className={SELECT_IN_DIALOG_CLASS}>
                         <SelectItem value="ARS">ARS</SelectItem>
                         <SelectItem value="USD">USD</SelectItem>
                       </SelectContent>
@@ -504,7 +576,7 @@ export function ContractFormDialog({
                           <SelectValue placeholder="IPC" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent className={SELECT_IN_DIALOG_CLASS}>
                         <SelectItem value="IPC">IPC</SelectItem>
                         <SelectItem value="ICL">ICL</SelectItem>
                         <SelectItem value="fixed">Fijo</SelectItem>
@@ -551,7 +623,7 @@ export function ContractFormDialog({
                           <SelectValue placeholder="Inquilino" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent className={SELECT_IN_DIALOG_CLASS}>
                         <SelectItem value="tenant">Inquilino</SelectItem>
                         <SelectItem value="owner">Propietario</SelectItem>
                       </SelectContent>
@@ -598,7 +670,7 @@ export function ContractFormDialog({
                           <SelectValue placeholder="Borrador" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent className={SELECT_IN_DIALOG_CLASS}>
                         <SelectItem value="draft">Borrador</SelectItem>
                         <SelectItem value="active">Activo</SelectItem>
                         <SelectItem value="terminated">Rescindido</SelectItem>
@@ -627,7 +699,7 @@ export function ContractFormDialog({
                             <SelectValue placeholder="Habitacional" />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>
+                        <SelectContent className={SELECT_IN_DIALOG_CLASS}>
                           <SelectItem value="habitacional">Habitacional</SelectItem>
                           <SelectItem value="comercial">Comercial</SelectItem>
                         </SelectContent>

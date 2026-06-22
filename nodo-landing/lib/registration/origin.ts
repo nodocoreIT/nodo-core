@@ -1,15 +1,17 @@
-/** Public base URL for links in emails (verification, password reset, etc.). */
+import {
+  resolvePublicOrigin,
+  resolvePublicOriginFromRequest,
+} from "@/lib/auth/public-origin";
+
+export {
+  configuredPublicOrigin,
+  isLocalOrigin,
+  resolvePublicOrigin,
+  resolvePublicOriginFromRequest,
+  SUPABASE_AUTH_REDIRECT_URLS,
+} from "@/lib/auth/public-origin";
+
+/** @deprecated Use resolvePublicOrigin — kept for existing imports. */
 export function resolveRegistrationOrigin(clientOrigin?: string): string {
-  const configured = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
-  if (configured) return configured;
-
-  if (
-    clientOrigin &&
-    !clientOrigin.includes("localhost") &&
-    !clientOrigin.includes("127.0.0.1")
-  ) {
-    return clientOrigin.replace(/\/$/, "");
-  }
-
-  return (clientOrigin ?? "http://localhost:3000").replace(/\/$/, "");
+  return resolvePublicOrigin(clientOrigin);
 }

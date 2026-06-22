@@ -8,6 +8,7 @@ import { DEFAULT_ACCENT } from "@/lib/node-accents";
 import { getLoginPanelDetails } from "@/lib/login-panel";
 import { createClient } from "@/lib/supabase/client";
 import { INVALID_LOGIN_MESSAGE } from "@nodocore/shared-components";
+import { resolvePublicOrigin } from "@/lib/auth/public-origin";
 
 export default function LoginPage() {
   return (
@@ -91,7 +92,7 @@ function AdminLoginForm() {
     setLoading(true);
     const supabase = createClient();
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/login?mode=reset-password`,
+      redirectTo: `${resolvePublicOrigin(window.location.origin)}/login?mode=reset-password`,
     });
 
     setLoading(false);

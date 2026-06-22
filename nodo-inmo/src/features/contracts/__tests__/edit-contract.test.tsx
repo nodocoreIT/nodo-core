@@ -13,25 +13,32 @@ vi.mock("@/shared/lib/supabase", () => ({
 }));
 
 vi.mock("@/features/properties/hooks/use-properties", () => ({
+  PROPERTIES_QUERY_KEY: ["nodo_inmo", "properties"],
   useProperties: () => ({
     data: [
       {
         id: "prop-1",
         address: "Lavalle 100",
+        operation: "rent",
         commission_rate: null,
         owner: { id: "owner-1", name: "Propietario A", commission_rate: 8 },
       },
       {
         id: "prop-2",
         address: "Mitre 200",
+        operation: "rent",
         commission_rate: 12,
         owner: { id: "owner-1", name: "Propietario A", commission_rate: 8 },
       },
     ],
+    isLoading: false,
+    isFetching: false,
+    isError: false,
   }),
 }));
 
 vi.mock("@/features/contacts/hooks/use-contacts", () => ({
+  CONTACTS_QUERY_KEY: ["nodo_inmo", "contacts"],
   useContacts: (role?: string) => ({
     data:
       role === "tenant"
@@ -41,7 +48,12 @@ vi.mock("@/features/contacts/hooks/use-contacts", () => ({
               { id: "guar-1", name: "Ana García" },
               { id: "guar-2", name: "Luis Díaz" },
             ]
-          : [],
+          : role === "owner"
+            ? [{ id: "owner-1", name: "Propietario A" }]
+            : [],
+    isLoading: false,
+    isFetching: false,
+    isError: false,
   }),
 }));
 
@@ -98,6 +110,18 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
+function selectByOptionValue(optionValue: string) {
+  const match = screen.getAllByRole("combobox").find((element) =>
+    Array.from((element as HTMLSelectElement).options).some(
+      (option) => option.value === optionValue,
+    ),
+  );
+  if (!match) {
+    throw new Error(`No combobox found with option value "${optionValue}"`);
+  }
+  return match as HTMLSelectElement;
+}
+
 describe("ContractFormDialog — edit mode", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -109,7 +133,7 @@ describe("ContractFormDialog — edit mode", () => {
     expect(screen.getByText(/editar contrato/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/alquiler/i)).toHaveValue("$ 250.000");
     expect(screen.getByLabelText(/^propietario$/i)).toHaveValue("Propietario A");
-    expect(screen.getByLabelText(/administraci[oó]n inmobiliaria/i)).toHaveValue("8");
+    expect(screen.getByLabelText(/adm\.\s*inmobiliaria/i)).toHaveValue("8");
     expect(screen.getByLabelText(/ana garcía/i)).toBeChecked();
     expect(screen.getByLabelText(/luis díaz/i)).not.toBeChecked();
   });
@@ -170,11 +194,11 @@ describe("ContractFormDialog — edit mode", () => {
       { wrapper },
     );
 
-    const propertySelect = screen.getAllByRole("combobox")[0];
+    const propertySelect = selectByOptionValue("prop-2");
     await userEvent.selectOptions(propertySelect, "prop-2");
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/administraci[oó]n inmobiliaria/i)).toHaveValue("12");
+      expect(screen.getByLabelText(/adm\.\s*inmobiliaria/i)).toHaveValue("12");
     });
   });
 });
