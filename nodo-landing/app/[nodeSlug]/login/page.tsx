@@ -16,6 +16,8 @@ import {
   AUTH_ERROR_CREDENTIALS,
   mustSetPassword,
   fetchMustSetPassword,
+  mapAuthPasswordError,
+  isSamePasswordAuthError,
 } from "@nodocore/shared-components";
 import { createNodeBrowserClient } from "@/lib/supabase/nodo-browser";
 import { getNodeBySlug, getNodeMailLabel, getChildNodes, needsModulePicker } from "@/lib/nodes";
@@ -468,7 +470,7 @@ function LoginForm() {
     });
     const json = await res.json();
     if (!res.ok) {
-      setGeneralError(json.error ?? "No se pudo actualizar la contraseña.");
+      setGeneralError(mapAuthPasswordError(json.error ?? "No se pudo actualizar la contraseña."));
       setLoading(false);
       return;
     }
@@ -793,7 +795,21 @@ function LoginForm() {
       password: newPassword,
     });
 
-    if (error) return error.message;
+    if (error) {
+      if (isSamePasswordAuthError(error.message)) {
+        // Recovery session is valid; password already matches — no change needed.
+        await authSupabase.auth.signOut({ scope: "local" });
+        setSuccessModal({
+          open: true,
+          type: "reset_success",
+          message:
+            "Tu contraseña ya era esa. Podés iniciar sesión con la misma clave.",
+        });
+        setAuthMode("login");
+        return null;
+      }
+      return mapAuthPasswordError(error.message);
+    }
 
     await authSupabase.auth.signOut({ scope: "local" });
     setSuccessModal({

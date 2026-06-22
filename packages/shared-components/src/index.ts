@@ -16,6 +16,7 @@ export {
   AUTH_ERROR_CREDENTIALS,
   nodeLoginUrlWithAuthError,
 } from "./lib/verify-node-access";
+export { mapAuthPasswordError, isSamePasswordAuthError } from "./lib/auth-password-errors";
 export {
   createNodoAuthClient,
   nodoAuthStorageKey,
