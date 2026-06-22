@@ -130,22 +130,61 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
         days: [
           ...prev.days,
           { dayOfWeek, startTime: "09:00", endTime: "13:00" },
-        ].sort((a, b) => a.dayOfWeek - b.dayOfWeek),
+        ].sort(
+          (a, b) =>
+            a.dayOfWeek - b.dayOfWeek ||
+            a.startTime.localeCompare(b.startTime),
+        ),
       };
     });
   };
 
-  const updateDayTime = (
+  const blocksForDay = (dayOfWeek: number) =>
+    availability.days.filter((d) => d.dayOfWeek === dayOfWeek);
+
+  const updateBlockTime = (
     dayOfWeek: number,
+    blockIndex: number,
     field: "startTime" | "endTime",
-    value: string
+    value: string,
   ) => {
+    setAvailability((prev) => {
+      let idx = -1;
+      return {
+        ...prev,
+        days: prev.days.map((d) => {
+          if (d.dayOfWeek !== dayOfWeek) return d;
+          idx += 1;
+          if (idx !== blockIndex) return d;
+          return { ...d, [field]: value };
+        }),
+      };
+    });
+  };
+
+  const addBlockForDay = (dayOfWeek: number) => {
     setAvailability((prev) => ({
       ...prev,
-      days: prev.days.map((d) =>
-        d.dayOfWeek === dayOfWeek ? { ...d, [field]: value } : d
+      days: [
+        ...prev.days,
+        { dayOfWeek, startTime: "16:00", endTime: "19:00" },
+      ].sort(
+        (a, b) =>
+          a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime),
       ),
     }));
+  };
+
+  const removeBlockForDay = (dayOfWeek: number, blockIndex: number) => {
+    setAvailability((prev) => {
+      let idx = -1;
+      const next = prev.days.filter((d) => {
+        if (d.dayOfWeek !== dayOfWeek) return true;
+        idx += 1;
+        return idx !== blockIndex;
+      });
+      return { ...prev, days: next };
+    });
   };
 
   const handleSave = async () => {
@@ -166,8 +205,8 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
       });
       hydrateSettings(themeSettings);
       toast.success("Configuración guardada");
-    } catch {
-      toast.error("Error al guardar");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al guardar");
     } finally {
       setSaving(false);
     }
@@ -243,7 +282,7 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
               <Label className="text-xs">Días que atiendo</Label>
               {ALL_DAYS.map((dow) => {
                 const active = availability.days.some((d) => d.dayOfWeek === dow);
-                const day = availability.days.find((d) => d.dayOfWeek === dow);
+                const blocks = blocksForDay(dow);
                 return (
                   <div
                     key={dow}
@@ -260,24 +299,63 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
                       />
                       <span className="text-sm font-medium">{dayLabel(dow)}</span>
                     </div>
-                    {active && day && (
-                      <div className="grid grid-cols-2 gap-2 pl-6">
-                        <Input
-                          type="time"
-                          value={day.startTime}
-                          onChange={(e) =>
-                            updateDayTime(dow, "startTime", e.target.value)
-                          }
-                          className="h-8 text-sm"
-                        />
-                        <Input
-                          type="time"
-                          value={day.endTime}
-                          onChange={(e) =>
-                            updateDayTime(dow, "endTime", e.target.value)
-                          }
-                          className="h-8 text-sm"
-                        />
+                    {active && (
+                      <div className="space-y-2 pl-6">
+                        {blocks.map((block, blockIndex) => (
+                          <div
+                            key={`${dow}-${blockIndex}`}
+                            className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center"
+                          >
+                            <Input
+                              type="time"
+                              value={block.startTime}
+                              onChange={(e) =>
+                                updateBlockTime(
+                                  dow,
+                                  blockIndex,
+                                  "startTime",
+                                  e.target.value,
+                                )
+                              }
+                              className="h-8 text-sm"
+                            />
+                            <Input
+                              type="time"
+                              value={block.endTime}
+                              onChange={(e) =>
+                                updateBlockTime(
+                                  dow,
+                                  blockIndex,
+                                  "endTime",
+                                  e.target.value,
+                                )
+                              }
+                              className="h-8 text-sm"
+                            />
+                            {blocks.length > 1 ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-xs text-red-600"
+                                onClick={() => removeBlockForDay(dow, blockIndex)}
+                              >
+                                Quitar
+                              </Button>
+                            ) : (
+                              <span className="w-14" />
+                            )}
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => addBlockForDay(dow)}
+                        >
+                          + Otra franja en el día
+                        </Button>
                       </div>
                     )}
                   </div>

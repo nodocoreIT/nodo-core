@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
       id: newId("rec"),
       patientId,
       doctorId,
+      appointmentId: appointmentId || undefined,
       title:
         title?.trim() ||
         `Informe clínico — ${new Date().toLocaleDateString("es-AR")} · ${doctor.fullName}`,

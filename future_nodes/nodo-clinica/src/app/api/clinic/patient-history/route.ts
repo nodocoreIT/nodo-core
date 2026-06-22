@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readDb } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
+import { buildPatientTimeline } from "@/lib/clinic/patient-timeline";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -64,8 +65,33 @@ export async function GET(request: NextRequest) {
       content: r.content,
       recordType: r.recordType,
       createdAt: r.createdAt,
+      appointmentId: r.appointmentId,
       doctorName: db.doctors.find((d) => d.id === r.doctorId)?.fullName,
     }));
 
-  return NextResponse.json({ appointments, clinicalRecords });
+  const timeline = buildPatientTimeline(appointments, clinicalRecords);
+
+  const patient = db.patients.find((p) => p.id === patientId);
+  let healthProfile = undefined;
+  if (session?.role === "patient" && session.userId === patientId) {
+    healthProfile = patient?.healthProfile;
+  } else if (session?.role === "doctor") {
+    const doctorId = searchParams.get("doctorId") ?? session.userId;
+    const consented = db.appointments.some(
+      (a) =>
+        a.patientId === patientId &&
+        a.doctorId === doctorId &&
+        a.shareHealthProfile,
+    );
+    if (consented) {
+      healthProfile = patient?.healthProfile;
+    }
+  }
+
+  return NextResponse.json({
+    appointments,
+    clinicalRecords,
+    timeline,
+    healthProfile: healthProfile ?? null,
+  });
 }

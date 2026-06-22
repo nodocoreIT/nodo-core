@@ -60,6 +60,20 @@ export interface LocalDoctor {
   createdAt: string;
 }
 
+export interface PatientHealthProfile {
+  birthDate?: string;
+  sex?: "F" | "M" | "O" | "";
+  heightCm?: number;
+  weightKg?: number;
+  bloodType?: string;
+  allergies?: string;
+  chronicConditions?: string;
+  medications?: string;
+  emergencyContact?: string;
+  notes?: string;
+  updatedAt?: string;
+}
+
 export interface LocalPatient {
   id: string;
   fullName: string;
@@ -67,6 +81,7 @@ export interface LocalPatient {
   password: string;
   phone?: string;
   profilePhotoData?: string;
+  healthProfile?: PatientHealthProfile;
   createdAt: string;
 }
 
@@ -86,6 +101,8 @@ export interface LocalAppointment {
   mercadopagoPreferenceId?: string;
   mercadopagoPaymentId?: string;
   intakeReason?: string;
+  /** Paciente autorizó compartir ficha de salud con este médico en este turno */
+  shareHealthProfile?: boolean;
   reminderSentAt?: string;
   confirmationEmailSentAt?: string;
   createdAt: string;
@@ -106,6 +123,7 @@ export interface LocalClinicalRecord {
   id: string;
   patientId: string;
   doctorId: string;
+  appointmentId?: string;
   title: string;
   content: string;
   recordType: string;
@@ -225,7 +243,13 @@ async function loadDb(): Promise<ClinicDatabase> {
     return normalized;
   }
 
-  return db;
+  const before =
+    db.patients.length + db.doctors.length;
+  const normalized = normalizeDb(db);
+  if (normalized.patients.length + normalized.doctors.length > before) {
+    await persistDb(normalized);
+  }
+  return normalized;
 }
 
 async function ensureDb(): Promise<ClinicDatabase> {
@@ -237,7 +261,83 @@ function normalizeDb(db: ClinicDatabase): ClinicDatabase {
   if (!db.doctorPresence) db.doctorPresence = {};
   if (!db.nodoChatReadAt) db.nodoChatReadAt = {};
   if (!db.doctorTasks) db.doctorTasks = [];
+  ensureExtraDemoDoctors(db);
+  ensureDemoPatients(db);
   return db;
+}
+
+function ensureDemoPatients(db: ClinicDatabase) {
+  const now = new Date().toISOString();
+  const extras = [
+    {
+      id: "pat-demo-1",
+      fullName: "Paciente 1",
+      email: "paciente1@nodo.demo",
+    },
+    {
+      id: "pat-demo-2",
+      fullName: "Paciente 2",
+      email: "paciente2@nodo.demo",
+    },
+  ];
+  for (const extra of extras) {
+    if (db.patients.some((p) => p.email === extra.email)) continue;
+    db.patients.push({
+      ...extra,
+      password: "Probando1",
+      createdAt: now,
+    });
+  }
+}
+
+function ensureExtraDemoDoctors(db: ClinicDatabase) {
+  const now = new Date().toISOString();
+  const extras = [
+    {
+      id: "doc-demo-3",
+      fullName: "Dra. Demo 3",
+      email: "doc.demo3@nodo.demo",
+      specialty: "Gastroenterología",
+      licenseNumber: "MN 10003",
+    },
+    {
+      id: "doc-demo-4",
+      fullName: "Lic. Demo 4",
+      email: "doc.demo4@nodo.demo",
+      specialty: "Psicología",
+      licenseNumber: "MN 10004",
+    },
+  ];
+
+  for (const extra of extras) {
+    if (db.doctors.some((d) => d.email === extra.email)) continue;
+    db.doctors.push({
+      ...extra,
+      password: "Probando1",
+      subscriptionStatus: "active",
+      subscriptionPlan: "profesional",
+      availability: {
+        slotDurationMinutes: 30,
+        days: [
+          { dayOfWeek: 1, startTime: "09:00", endTime: "13:00" },
+          { dayOfWeek: 3, startTime: "09:00", endTime: "13:00" },
+          { dayOfWeek: 5, startTime: "09:00", endTime: "12:00" },
+        ],
+      },
+      signatureText: `${extra.fullName} — ${extra.licenseNumber}`,
+      bio: `Consultorio demo Nodo Salud — ${extra.fullName}.`,
+      payment: {
+        currency: "ARS",
+        consultationFee: 35000,
+        requirePaymentBeforeBooking: true,
+        alias: "nodo.demo",
+        paymentInstructions:
+          "Transferí el honorario y subí el comprobante en la sala de espera para validar tu turno.",
+      },
+      reminderSettings: { enabled: false, minutesBefore: 1440 },
+      createdAt: now,
+    });
+  }
 }
 
 export const ONLINE_THRESHOLD_MS = 90_000;
@@ -246,11 +346,13 @@ export async function readDb(): Promise<ClinicDatabase> {
   return ensureDb();
 }
 
-export async function writeDb(updater: (db: ClinicDatabase) => void): Promise<ClinicDatabase> {
+export async function writeDb(
+  updater: (db: ClinicDatabase) => void | Promise<void>,
+): Promise<ClinicDatabase> {
   let saved: ClinicDatabase | null = null;
   writeQueue = writeQueue.then(async () => {
     const db = await loadDb();
-    updater(db);
+    await updater(db);
     if (!db.meta) {
       db.meta = { seedVersion: CLINIC_SEED_VERSION };
     }
@@ -305,7 +407,13 @@ export function publicDoctor(doctor: LocalDoctor) {
   };
 }
 
-export function publicPatient(patient: LocalPatient) {
-  const { password: _, ...rest } = patient;
-  return rest;
+export function publicPatient(
+  patient: LocalPatient,
+  options?: { includeHealth?: boolean },
+) {
+  const { password: _, healthProfile, ...rest } = patient;
+  return {
+    ...rest,
+    ...(options?.includeHealth && healthProfile ? { healthProfile } : {}),
+  };
 }

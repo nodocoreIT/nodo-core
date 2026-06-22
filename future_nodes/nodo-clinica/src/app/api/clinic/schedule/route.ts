@@ -154,9 +154,12 @@ export async function PUT(request: NextRequest) {
     themeSettings?: import("@/lib/clinic/theme-settings").DoctorThemeSettings;
   };
 
-  await writeDb((db) => {
-    const doctor = db.doctors.find((d) => d.id === session.userId);
-    if (!doctor) return;
+  try {
+    await writeDb((db) => {
+      const doctor = db.doctors.find((d) => d.id === session.userId);
+      if (!doctor) {
+        throw new Error("Médico no encontrado");
+      }
     if (availability) {
       doctor.availability = normalizeAvailability({
         ...availability,
@@ -189,7 +192,12 @@ export async function PUT(request: NextRequest) {
     if (themeSettings !== undefined) {
       doctor.themeSettings = mergeThemeSettings(themeSettings);
     }
-  });
+    });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Error al guardar configuración";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 
   return NextResponse.json({ ok: true });
 }

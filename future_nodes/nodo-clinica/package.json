@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0 -p 3000",
-    "dev:local": "next dev -H 0.0.0.0 -p 3000",
+    "dev": "next dev -H 0.0.0.0 -p 3002",
+    "dev:local": "next dev -H 0.0.0.0 -p 3002",
     "dev:sync": "powershell -ExecutionPolicy Bypass -File scripts/dev-with-sync.ps1",
     "sync:hourly": "powershell -ExecutionPolicy Bypass -File scripts/git-sync-hourly.ps1",
     "build": "next build",

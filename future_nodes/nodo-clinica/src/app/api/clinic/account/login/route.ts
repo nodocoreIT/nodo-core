@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       fullName: patient.fullName,
     };
     return jsonWithSession(
-      { user: publicPatient(patient), role: "patient", session },
+      { user: publicPatient(patient, { includeHealth: true }), role: "patient", session },
       session
     );
   }

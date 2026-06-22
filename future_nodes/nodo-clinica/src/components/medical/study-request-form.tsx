@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { FlaskConical, Search, Download, Check } from "lucide-react";
 import { MEDICAL_EXAMS } from "@/lib/constants";
 import { generateStudyOrderPdf, downloadPdf } from "@/lib/pdf/generator";
+import { clinicApi } from "@/lib/clinic/client-api";
 import { toast } from "sonner";
 
 interface StudyRequestFormProps {
@@ -20,6 +21,7 @@ interface StudyRequestFormProps {
   doctorName: string;
   doctorSpecialty?: string;
   doctorLicense?: string;
+  onSaved?: () => void;
 }
 
 export function StudyRequestForm({
@@ -30,6 +32,7 @@ export function StudyRequestForm({
   doctorName,
   doctorSpecialty,
   doctorLicense,
+  onSaved,
 }: StudyRequestFormProps) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
@@ -73,19 +76,16 @@ export function StudyRequestForm({
 
       downloadPdf(doc, `orden-estudios-${patientName.replace(/\s/g, "-")}.pdf`);
 
-      await fetch("/api/study-orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          appointmentId,
-          doctorId,
-          patientId,
-          studies: selected,
-          notes,
-        }),
+      await clinicApi.saveStudyOrder({
+        appointmentId,
+        doctorId,
+        patientId,
+        studies: selected,
+        notes,
       });
 
-      toast.success("Orden de estudios generada");
+      toast.success("Orden guardada en historial clínico del paciente");
+      onSaved?.();
     } catch {
       toast.error("Error al generar la orden");
     } finally {

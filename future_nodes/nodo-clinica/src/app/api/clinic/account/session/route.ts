@@ -27,6 +27,6 @@ export async function GET(request: NextRequest) {
   if (!patient) return Response.json({ session: null });
   return Response.json({
     session,
-    user: publicPatient(patient),
+    user: publicPatient(patient, { includeHealth: true }),
   });
 }

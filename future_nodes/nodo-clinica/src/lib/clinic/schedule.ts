@@ -193,6 +193,39 @@ export function getScheduleBlocksForDate(
   );
 }
 
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+/** True if the appointment starts on the doctor's grid for that day. */
+export function appointmentMatchesScheduleGrid(
+  scheduledAtIso: string,
+  availability: DoctorAvailability,
+): boolean {
+  const normalized = normalizeAvailability(availability);
+  const dateKey = localDateKeyFromIso(scheduledAtIso);
+  if ((normalized.blockedDates ?? []).includes(dateKey)) return false;
+
+  const date = new Date(scheduledAtIso);
+  const blocks = getScheduleBlocksForDate(normalized, date);
+  if (blocks.length === 0) return false;
+
+  const aptMinutes = date.getHours() * 60 + date.getMinutes();
+  const duration = normalized.slotDurationMinutes;
+
+  return blocks.some((block) => {
+    const startMin = timeToMinutes(block.startTime);
+    const endMin = timeToMinutes(block.endTime);
+    if (aptMinutes < startMin || aptMinutes >= endMin) return false;
+    return (aptMinutes - startMin) % duration === 0;
+  });
+}
+
+export function slotKeyFromIso(iso: string): string {
+  return new Date(iso).toISOString().slice(0, 16);
+}
+
 export function formatDateKeyLabel(dateKey: string): string {
   const d = parseLocalDate(dateKey);
   return format(d, "EEEE d 'de' MMMM", { locale: es });

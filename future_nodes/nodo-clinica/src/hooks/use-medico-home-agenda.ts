@@ -10,6 +10,7 @@ import {
   getScheduleBlocksForDate,
   localDateKeyFromDate,
   localDateKeyFromIso,
+  appointmentMatchesScheduleGrid,
   type DoctorAvailability,
 } from "@/lib/clinic/schedule";
 import { mapAppointmentStatusToLifecycle } from "@/types";
@@ -53,7 +54,7 @@ export function useMedicoHomeAgenda(doctorId: string) {
     try {
       const [schedule, upcoming, tasksRes] = await Promise.all([
         clinicApi.getDoctorSchedule(doctorId),
-        clinicApi.getDoctorQueue(doctorId),
+        clinicApi.getDoctorAppointments(doctorId, "upcoming"),
         clinicApi.getDoctorTasks(todayKey).catch(() => ({ tasks: [] })),
       ]);
 
@@ -73,7 +74,9 @@ export function useMedicoHomeAgenda(doctorId: string) {
       setNextDayKey(nextKey);
 
       const rows = (upcoming as AppointmentRow[]).filter(
-        (a) => a.status !== "cancelled",
+        (a) =>
+          a.status !== "cancelled" &&
+          appointmentMatchesScheduleGrid(a.scheduledAt, avail),
       );
 
       setTodayAppts(
@@ -117,25 +120,35 @@ export function useMedicoHomeAgenda(doctorId: string) {
   }, [todayAppts]);
 
   const todayTasks = useMemo((): TodayTask[] => {
-    const items: TodayTask[] = [];
+    type SortableTask = TodayTask & { sortKey: string };
+
+    const items: SortableTask[] = [];
 
     for (const block of todayBlocks) {
       items.push({
         id: `block-${block.startTime}`,
         label: `Franja de atención ${block.startTime} — ${block.endTime}`,
         done: false,
+        sortKey: block.startTime,
       });
     }
 
-    for (const apt of todayAppts) {
+    const sortedAppts = [...todayAppts].sort(
+      (a, b) =>
+        new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime(),
+    );
+
+    for (const apt of sortedAppts) {
       const lifecycle = mapAppointmentStatusToLifecycle(
         apt.status as "scheduled",
       );
+      const time = format(new Date(apt.scheduledAt), "HH:mm");
       items.push({
         id: apt.id,
         label: `Consulta — ${apt.patient?.fullName ?? "Paciente"}`,
-        time: format(new Date(apt.scheduledAt), "HH:mm"),
+        time,
         done: lifecycle === "finalizada",
+        sortKey: time,
       });
     }
 
@@ -144,10 +157,13 @@ export function useMedicoHomeAgenda(doctorId: string) {
         id: task.id,
         label: task.title,
         done: task.done,
+        sortKey: "99:99",
       });
     }
 
-    return items;
+    items.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+    return items.map(({ sortKey: _sortKey, ...task }) => task);
   }, [todayAppts, todayBlocks, manualTasks]);
 
   return {

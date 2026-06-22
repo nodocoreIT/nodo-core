@@ -14,9 +14,12 @@ import { PrescriptionForm } from "@/components/medical/prescription-form";
 import { StudyRequestForm } from "@/components/medical/study-request-form";
 import { SoapSummaryPanel } from "@/components/medical/soap-summary-panel";
 import { DoctorOfficeSidebar } from "@/components/dashboard/doctor-office-sidebar";
+import { DoctorPendingPaymentsPanel } from "@/components/dashboard/doctor-pending-payments-panel";
 import { PatientPreviewPanel } from "@/components/dashboard/patient-preview-panel";
 import { PatientSearchHeader } from "@/components/dashboard/patient-search-header";
 import { MedicalReportPanel } from "@/components/medical/medical-report-panel";
+import { ClinicalAlertsBanner } from "@/components/medical/clinical-alerts-banner";
+import type { PatientHealthProfile } from "@/lib/clinic/local-db";
 import { useConsultationStore } from "@/store/consultation-store";
 import { useSpeechTranscription } from "@/hooks/use-speech-transcription";
 import { createClient } from "@/lib/supabase/client";
@@ -119,6 +122,8 @@ export function DoctorDashboard({
     patientPhone?: string;
   } | null>(null);
   const [consultationToolsTab, setConsultationToolsTab] = useState("prescription");
+  const [activeHealthProfile, setActiveHealthProfile] =
+    useState<PatientHealthProfile | null>(null);
   const { queue } = useConsultationStore();
 
   const transcriptionEnabled = useConsultationStore(
@@ -288,6 +293,15 @@ export function DoctorDashboard({
       updatePatientStatus(appointmentId, "en_consulta");
       loadClinicalHistory(apt.patient_id);
 
+      const history = await clinicApi.getPatientHistory(apt.patient_id, doctorId);
+      setActiveHealthProfile(history.healthProfile ?? null);
+      if (history.healthProfile?.allergies?.trim()) {
+        toast.warning(
+          `Alergias registradas: ${history.healthProfile.allergies}`,
+          { duration: 10000 },
+        );
+      }
+
       const notes = await clinicApi.getNotes(appointmentId);
       if (notes?.content) {
         useConsultationStore.getState().setClinicalNotes(notes.content);
@@ -386,9 +400,15 @@ export function DoctorDashboard({
   const finishConsultation = useCallback(
     async (appointmentId: string) => {
       if (dataSource === "local") {
-        await clinicApi.updateAppointmentStatus(appointmentId, "completed");
+        const { transcriptionText, clinicalNotes } =
+          useConsultationStore.getState();
+        await clinicApi.updateAppointmentStatus(appointmentId, "completed", {
+          transcription: transcriptionText,
+          clinicalNotes,
+        });
         updatePatientStatus(appointmentId, "finalizada");
-        toast.success("Consulta finalizada");
+        setActiveHealthProfile(null);
+        toast.success("Consulta finalizada — evolución y SOAP guardados en historial");
         loadQueue();
         return;
       }
@@ -678,6 +698,14 @@ export function DoctorDashboard({
       )}
 
       <div className={`grid grid-cols-12 gap-4 ${embedded ? "" : "p-4 max-w-[1600px] mx-auto"}`}>
+        {dataSource === "local" && (
+          <div className="col-span-12">
+            <DoctorPendingPaymentsPanel
+              doctorId={doctorId}
+              onConfirmed={() => loadQueue()}
+            />
+          </div>
+        )}
         {/* Cola de pacientes */}
         <div className="col-span-12 lg:col-span-3 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px]">
           <PatientQueue
@@ -701,9 +729,13 @@ export function DoctorDashboard({
         </div>
 
         {/* Centro: ficha del paciente / video consulta */}
-        <div className="col-span-12 lg:col-span-5 space-y-4 min-h-[500px]">
+        <div className="col-span-12 lg:col-span-6 space-y-4 min-h-[500px]">
           {hasActiveSession() && activeAppointment ? (
             <>
+              <ClinicalAlertsBanner
+                healthProfile={activeHealthProfile}
+                patientName={patientProfile?.profile?.full_name || "Paciente"}
+              />
               <JitsiMeet
                 roomName={activeAppointment.jitsi_room_id}
                 displayName={doctorName}
@@ -765,6 +797,9 @@ export function DoctorDashboard({
                     doctorSpecialty={doctorSpecialty}
                     doctorLicense={doctorLicense}
                     patientEmail={patientProfile?.profile?.email}
+                    onSaved={() =>
+                      loadClinicalHistory(activeAppointment.patient_id)
+                    }
                   />
                 </TabsContent>
                 <TabsContent value="studies">
@@ -778,6 +813,9 @@ export function DoctorDashboard({
                     doctorName={doctorName}
                     doctorSpecialty={doctorSpecialty}
                     doctorLicense={doctorLicense}
+                    onSaved={() =>
+                      loadClinicalHistory(activeAppointment.patient_id)
+                    }
                   />
                 </TabsContent>
                 <TabsContent value="soap">
@@ -849,6 +887,7 @@ export function DoctorDashboard({
             ) : (
               <PatientPreviewPanel
                 patient={previewPatient}
+                doctorId={doctorId}
                 onStartConsultation={(id) => {
                   if (id) startConsultation(id);
                 }}
@@ -877,7 +916,7 @@ export function DoctorDashboard({
         </div>
 
         {/* Derecha: Mi consultorio + calendario */}
-        <div className="col-span-12 lg:col-span-4 min-h-[500px]">
+        <div className="col-span-12 lg:col-span-3 min-h-[500px]">
           {dataSource === "local" ? (
             <DoctorOfficeSidebar
               queue={queue}

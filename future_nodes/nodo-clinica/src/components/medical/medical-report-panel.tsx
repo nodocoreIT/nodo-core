@@ -20,6 +20,10 @@ import { useConsultationStore } from "@/store/consultation-store";
 import { useSpeechTranscription } from "@/hooks/use-speech-transcription";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { toast } from "sonner";
+import {
+  downloadPdf,
+  generateClinicalReportPdf,
+} from "@/lib/pdf/generator";
 
 interface MedicalReportPanelProps {
   appointmentId?: string;
@@ -56,12 +60,31 @@ export function MedicalReportPanel({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [interimDictation, setInterimDictation] = useState("");
   const [prefilled, setPrefilled] = useState(false);
+  const [signatureText, setSignatureText] = useState("");
+  const [signatureImageData, setSignatureImageData] = useState("");
 
-  useSpeechTranscription({
+  useEffect(() => {
+    clinicApi
+      .getDoctorSchedule(doctorId)
+      .then((data) => {
+        if (data.signatureText) setSignatureText(data.signatureText);
+        if (data.signatureImageData) setSignatureImageData(data.signatureImageData);
+      })
+      .catch(() => undefined);
+  }, [doctorId]);
+
+  const { isSupported: speechSupported } = useSpeechTranscription({
     enabled: isRecording,
     onSegment: (seg) =>
       setDictation((prev) => (prev ? `${prev}\n${seg.text}` : seg.text)),
+    onInterim: setInterimDictation,
+    onError: (msg) => {
+      toast.error(msg);
+      setIsRecording(false);
+      setInterimDictation("");
+    },
   });
 
   useEffect(() => {
@@ -126,13 +149,21 @@ export function MedicalReportPanel({
 
   const handleDownload = () => {
     if (!report) return;
-    const blob = new Blob([report], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `informe-${patientName.replace(/\s+/g, "-").toLowerCase()}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const doc = generateClinicalReportPdf({
+      doctor: {
+        full_name: doctorName,
+        specialty: doctorSpecialty,
+        license_number: doctorLicense,
+      },
+      patientName,
+      reportMarkdown: report,
+      signatureText: signatureText || `Dr/a. ${doctorName}`,
+      signatureImageData,
+    });
+    downloadPdf(
+      doc,
+      `informe-${patientName.replace(/\s+/g, "-").toLowerCase()}.pdf`,
+    );
   };
 
   const handleSendEmail = () => {
@@ -161,8 +192,15 @@ export function MedicalReportPanel({
   const inner = (
     <div className="space-y-3">
       <Textarea
-        value={dictation}
-        onChange={(e) => setDictation(e.target.value)}
+        value={
+          interimDictation
+            ? `${dictation}${dictation && !dictation.endsWith("\n") ? " " : ""}${interimDictation}`
+            : dictation
+        }
+        onChange={(e) => {
+          setInterimDictation("");
+          setDictation(e.target.value);
+        }}
         placeholder="Dictá o escribí: motivo de consulta, hallazgos, diagnóstico, plan de tratamiento..."
         className={`text-sm ${compact ? "min-h-[90px]" : "min-h-[120px]"}`}
       />
@@ -170,7 +208,15 @@ export function MedicalReportPanel({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setIsRecording(!isRecording)}
+          disabled={!speechSupported}
+          onClick={() => {
+            if (!speechSupported) {
+              toast.error("Usá Chrome o Edge en escritorio para dictar por voz.");
+              return;
+            }
+            setIsRecording(!isRecording);
+            if (isRecording) setInterimDictation("");
+          }}
           className={isRecording ? "border-red-300 text-red-600 bg-red-50" : ""}
         >
           {isRecording ? (
@@ -204,7 +250,12 @@ export function MedicalReportPanel({
       {isRecording && (
         <p className="text-xs text-red-600 flex items-center gap-1">
           <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-          Escuchando… hablá con naturalidad como en una consulta
+          Escuchando… hablá con naturalidad. Requiere micrófono e internet.
+        </p>
+      )}
+      {!speechSupported && (
+        <p className="text-xs text-amber-700">
+          Dictado por voz: usá Chrome o Edge. En Firefox/Safari escribí o pegá el texto.
         </p>
       )}
 
@@ -250,7 +301,7 @@ export function MedicalReportPanel({
               disabled={!report.trim()}
             >
               <Download className="h-4 w-4 mr-1" />
-              Descargar
+              PDF firmado
             </Button>
             <Button
               variant="outline"

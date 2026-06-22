@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 /data/clinic.json
 /data/uploads/
+
+# notas locales de desarrollo
+/falta

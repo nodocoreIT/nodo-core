@@ -65,7 +65,20 @@ export function WaitingRoom({
   const [meta, setMeta] = useState<WaitingMeta | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string | undefined>();
   const [confirmingPayment, setConfirmingPayment] = useState(false);
+  const [validatingReceipt, setValidatingReceipt] = useState(false);
   const [paymentAck, setPaymentAck] = useState(false);
+  const [strictPaymentValidation, setStrictPaymentValidation] = useState(false);
+  const [receiptValidation, setReceiptValidation] = useState<{
+    valid: boolean;
+    confidence: number;
+    reasons: string[];
+    checks?: {
+      amount: { pass: boolean; detail: string };
+      recipient: { pass: boolean; detail: string };
+      schedule: { pass: boolean; detail: string };
+      receiptType: { pass: boolean; detail: string };
+    };
+  } | null>(null);
   const [intakeReason, setIntakeReason] = useState("");
   const [videoEnded, setVideoEnded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -112,6 +125,7 @@ export function WaitingRoom({
 
         setPaymentStatus(apt.paymentStatus);
         setIntakeReason(apt.intakeReason ?? "");
+        setStrictPaymentValidation(!!data.strictPaymentValidation);
 
         if (
           apt.status === "scheduled" &&
@@ -502,7 +516,7 @@ export function WaitingRoom({
             <CardHeader>
               <CardTitle className="text-lg">Confirmar pago del turno</CardTitle>
               <p className="text-sm text-slate-500">
-                Dr/a. {doctorName} — transferí el honorario para activar tu reserva
+                Dr/a. {doctorName} — transferí el honorario y subí el comprobante
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -510,6 +524,126 @@ export function WaitingRoom({
                 doctorName={doctorName}
                 payment={meta?.doctorPayment}
               />
+
+              <div className="rounded-lg border border-dashed border-amber-200 bg-amber-50/40 p-3">
+                <p className="text-xs font-medium text-amber-900 mb-2">
+                  Subí el comprobante de transferencia
+                </p>
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  className="text-xs w-full"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const doc = await clinicApi.uploadDocument(
+                        file,
+                        accessToken,
+                      );
+                      setUploadedFiles((prev) => [
+                        ...prev,
+                        {
+                          id: doc.id,
+                          name: doc.fileName,
+                          uploadedAt: doc.uploadedAt,
+                          downloadUrl: doc.downloadUrl,
+                        },
+                      ]);
+                      toast.success("Comprobante subido");
+                    } catch (err) {
+                      toast.error(
+                        err instanceof Error ? err.message : "Error al subir",
+                      );
+                    }
+                  }}
+                />
+                {uploadedFiles.length > 0 && (
+                  <Button
+                    className="w-full mt-3 bg-violet-700 hover:bg-violet-800"
+                    disabled={validatingReceipt}
+                    onClick={async () => {
+                      const receipt = uploadedFiles.find((f) => f.id);
+                      if (!receipt?.id) return;
+                      setValidatingReceipt(true);
+                      try {
+                        const result = await clinicApi.validatePaymentReceipt(
+                          accessToken,
+                          receipt.id,
+                        );
+                        setReceiptValidation(result);
+                        if (result.valid) {
+                          setPaymentStatus("confirmed");
+                          toast.success("Pago validado. Turno activado.");
+                          await loadAppointment();
+                        } else {
+                          toast.error(
+                            result.reasons[0] ||
+                              "No se pudo validar el comprobante",
+                          );
+                        }
+                      } catch (err) {
+                        toast.error(
+                          err instanceof Error
+                            ? err.message
+                            : "Error al validar",
+                        );
+                      } finally {
+                        setValidatingReceipt(false);
+                      }
+                    }}
+                  >
+                    {validatingReceipt ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Validar comprobante automáticamente"
+                    )}
+                  </Button>
+                )}
+              </div>
+
+              {receiptValidation && (
+                <div
+                  className={`rounded-lg border p-3 text-xs space-y-2 ${
+                    receiptValidation.valid
+                      ? "border-emerald-200 bg-emerald-50"
+                      : "border-red-200 bg-red-50"
+                  }`}
+                >
+                  <p className="font-medium">
+                    {receiptValidation.valid
+                      ? "Comprobante aprobado"
+                      : "Comprobante no aprobado"}
+                    {receiptValidation.confidence > 0 &&
+                      ` · confianza ${receiptValidation.confidence}%`}
+                  </p>
+                  {receiptValidation.checks && (
+                    <ul className="space-y-1">
+                      {Object.entries(receiptValidation.checks).map(
+                        ([key, check]) => (
+                          <li
+                            key={key}
+                            className={
+                              check.pass ? "text-emerald-800" : "text-red-800"
+                            }
+                          >
+                            {check.pass ? "✓" : "✗"} {check.detail}
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                  )}
+                  {!receiptValidation.valid && strictPaymentValidation && (
+                    <p className="text-red-800">
+                      Pedile al médico que confirme el pago si el comprobante es
+                      correcto.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {!strictPaymentValidation ? (
+                <>
               <label className="flex items-start gap-2 rounded-md border border-slate-200 p-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -529,9 +663,16 @@ export function WaitingRoom({
                 {confirmingPayment ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  "Confirmar pago y activar turno"
+                  "Confirmar pago manualmente"
                 )}
               </Button>
+                </>
+              ) : (
+                <p className="text-xs text-slate-500 text-center">
+                  En producción el turno se activa solo con validación automática
+                  del comprobante o confirmación del médico.
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
