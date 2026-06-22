@@ -30,6 +30,7 @@ export function SearchInput({
       <input
         type="search"
         role="searchbox"
+        data-global-search-input
         aria-label={placeholder}
         placeholder={placeholder}
         value={value}

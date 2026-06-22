@@ -62,6 +62,14 @@ export {
 export { usePasswordRecoveryBootstrap, isRecoveryHash } from "./hooks/use-password-recovery-bootstrap";
 export { useFixedDocumentTitle } from "./hooks/use-fixed-document-title";
 export { PlanGate, type PlanTier } from "./components/plan-gate";
+export {
+  SidebarNavAccordionProvider,
+  SIDEBAR_COLLAPSE_THRESHOLD,
+  useSidebarNavAccordion,
+  type SidebarNavAccordionProviderProps,
+} from "./components/sidebar-nav-accordion";
+export { SidebarNavGroup, type SidebarNavGroupProps } from "./components/sidebar-nav-group";
+export { SidebarSearchHint, type SidebarSearchHintProps } from "./components/sidebar-search-hint";
 export { RequireAuth } from "./components/require-auth";
 
 // ─── UI primitives ───────────────────────────────────────────────────────────
@@ -161,3 +169,4 @@ export {
 } from "./hooks/use-theme-settings";
 export { useUIStore } from "./hooks/use-ui-store";
 export { useSearchStore } from "./hooks/use-search-store";
+export { useGlobalSearchHotkey } from "./hooks/use-global-search-hotkey";

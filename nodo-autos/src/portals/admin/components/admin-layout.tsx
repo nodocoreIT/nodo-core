@@ -20,6 +20,7 @@ import {
   Button,
   PortalHeaderActions,
   PortalHeaderMobileActions,
+  SidebarNavGroup,
   useAuth,
   useFixedDocumentTitle,
 } from "@nodocore/shared-components";

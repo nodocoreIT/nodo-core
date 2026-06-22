@@ -22,9 +22,13 @@ import {
 import {
   Button,
   cn,
+  SidebarNavAccordionProvider,
+  SidebarNavGroup,
+  SidebarSearchHint,
 } from "@nodocore/shared-components";
 import { createClient } from "@/lib/supabase/client";
 import { SettingsDialog } from "@nodocore/nodo-modules/settings";
+import { useCommandPalette } from "@/components/CommandPaletteProvider";
 import { PanelBrandMark } from "./PanelBrandMark";
 
 type NavItem = {
@@ -60,13 +64,13 @@ const ECOSYSTEM_ITEMS: NavItem[] = [
   { label: "Informes", href: "/panel/informes", icon: BarChart3, enabled: true },
 ];
 
-function NavSection({
-  title,
+const SIDEBAR_ITEM_COUNT = PLATFORM_ITEMS.length + ECOSYSTEM_ITEMS.length;
+
+function NavLinks({
   items,
   pathname,
   onNavigate,
 }: {
-  title: string;
   items: NavItem[];
   pathname: string;
   onNavigate?: () => void;
@@ -75,50 +79,39 @@ function NavSection({
     return pathname === href || pathname.startsWith(href + "/");
   }
 
-  return (
-    <div className="mb-4">
-      <p
-        className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-[var(--color-sidebar-text)] opacity-60"
+  return items.map((item) => {
+    const active = isActive(item.href);
+    const Icon = item.icon;
+
+    if (item.enabled === false) {
+      return (
+        <div
+          key={item.href}
+          className="flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium text-[var(--color-sidebar-text)] opacity-40"
+        >
+          <Icon className="h-4 w-4 flex-shrink-0" />
+          <span className="flex-1">{item.label}</span>
+        </div>
+      );
+    }
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={onNavigate}
+        className={cn(
+          "flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors",
+          active
+            ? "bg-brand text-[var(--color-primary-foreground)]"
+            : "text-[var(--color-sidebar-text)] hover:bg-brand/10 hover:text-brand",
+        )}
       >
-        {title}
-      </p>
-      <div className="flex flex-col gap-1">
-        {items.map((item) => {
-          const active = isActive(item.href);
-          const Icon = item.icon;
-
-          if (item.enabled === false) {
-            return (
-              <div
-                key={item.href}
-                className="flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium text-[var(--color-sidebar-text)] opacity-40"
-              >
-                <Icon className="h-4 w-4 flex-shrink-0" />
-                <span className="flex-1">{item.label}</span>
-              </div>
-            );
-          }
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors",
-                active
-                  ? "bg-brand text-[var(--color-primary-foreground)]"
-                  : "text-[var(--color-sidebar-text)] hover:bg-brand/10 hover:text-brand",
-              )}
-            >
-              <Icon className="h-4 w-4 flex-shrink-0" />
-              <span className="flex-1 truncate">{item.label}</span>
-            </Link>
-          );
-        })}
-      </div>
-    </div>
-  );
+        <Icon className="h-4 w-4 flex-shrink-0" />
+        <span className="flex-1 truncate">{item.label}</span>
+      </Link>
+    );
+  });
 }
 
 export default function Sidebar({
@@ -133,6 +126,14 @@ export default function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { open: openCommandPalette } = useCommandPalette();
+
+  const platformActive = PLATFORM_ITEMS.some(
+    (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
+  );
+  const ecosystemActive = ECOSYSTEM_ITEMS.some(
+    (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
+  );
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -162,23 +163,38 @@ export default function Sidebar({
           </button>
         </div>
 
-        <nav
-          className="flex-1 overflow-y-auto px-3 py-2"
-          aria-label="Navegación principal"
-        >
-          <NavSection
-            title="Plataforma"
-            items={PLATFORM_ITEMS}
-            pathname={pathname}
-            onNavigate={onMobileClose}
-          />
-          <NavSection
-            title="Ecosistema"
-            items={ECOSYSTEM_ITEMS}
-            pathname={pathname}
-            onNavigate={onMobileClose}
-          />
-        </nav>
+        <SidebarNavAccordionProvider itemCount={SIDEBAR_ITEM_COUNT}>
+          <nav
+            className="flex-1 overflow-y-auto px-3 py-2"
+            aria-label="Navegación principal"
+          >
+            <SidebarNavGroup
+              groupId="plataforma"
+              label="Plataforma"
+              isActive={platformActive}
+            >
+              <NavLinks
+                items={PLATFORM_ITEMS}
+                pathname={pathname}
+                onNavigate={onMobileClose}
+              />
+            </SidebarNavGroup>
+
+            <SidebarNavGroup
+              groupId="ecosistema"
+              label="Ecosistema"
+              isActive={ecosystemActive}
+            >
+              <NavLinks
+                items={ECOSYSTEM_ITEMS}
+                pathname={pathname}
+                onNavigate={onMobileClose}
+              />
+            </SidebarNavGroup>
+
+            <SidebarSearchHint onClick={openCommandPalette} />
+          </nav>
+        </SidebarNavAccordionProvider>
 
         <div className="px-3 pb-3">
           <a
