@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Loader2, Mail, UserPlus, Image as ImageIcon, BrainCircuit, CheckCircle2, AlertTriangle, Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Mail, UserPlus, Image as ImageIcon, BrainCircuit, CheckCircle2, AlertTriangle, Eye, EyeOff, Pencil, Trash2, Lock } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -475,6 +475,27 @@ interface SettingsDialogProps {
   initialTab?: SettingsTabId;
 }
 
+function hasProPlan(plan: string | null | undefined): boolean {
+  if (plan == null) return true;
+  return plan === "pro";
+}
+
+function AiProGate() {
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 py-16 px-8 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+        <Lock className="h-5 w-5 text-slate-400" />
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-slate-700">Solo disponible en versión Pro</p>
+        <p className="mt-1 text-xs text-slate-400">
+          Contactá a NodoCore para actualizar tu plan y habilitar integraciones con IA.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 const ALL_SETTINGS_TABS: { id: SettingsTabId; label: string }[] = [
   { id: "profile", label: "Mi Perfil" },
   { id: "company", label: "Datos de Empresa" },
@@ -507,7 +528,8 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
     setAiKeySaved(true);
     setTimeout(() => setAiKeySaved(false), 2500);
   };
-  const { role: authRole, user: authUser } = useAuth();
+  const { role: authRole, user: authUser, plan } = useAuth();
+  const aiUnlocked = hasProPlan(plan);
   const effectiveRole = module.sessionRole ?? authRole;
   const isSuperAdmin = !!module.superAdminRole && effectiveRole === module.superAdminRole;
   const hasAdminAccess = effectiveRole === module.adminRole || isSuperAdmin;
@@ -738,20 +760,24 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
             aria-label="Secciones de configuración"
             className="hidden sm:flex sm:w-52 md:w-56 flex-shrink-0 flex-col border-r border-border bg-slate-50 overflow-y-auto"
           >
-            {settingsTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors border-l-2 ${
-                  activeTab === tab.id
-                    ? "border-brand bg-brand/5 text-brand"
-                    : "border-transparent text-slate2 hover:bg-white hover:text-navy"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            {settingsTabs.map((tab) => {
+              const tabLocked = tab.id === "ai" && !aiUnlocked;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors border-l-2 flex items-center justify-between gap-2 ${
+                    activeTab === tab.id
+                      ? "border-brand bg-brand/5 text-brand"
+                      : "border-transparent text-slate2 hover:bg-white hover:text-navy"
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  {tabLocked && <Lock className="h-3 w-3 shrink-0 opacity-50" aria-hidden />}
+                </button>
+              );
+            })}
           </nav>
 
         <div className="flex flex-1 min-h-0 flex-col min-w-0 bg-white">
@@ -1231,7 +1257,9 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
           )}
 
           {/* TAB 4: Integraciones / IA */}
-          {activeTab === "ai" && (
+          {activeTab === "ai" && !aiUnlocked && <AiProGate />}
+
+          {activeTab === "ai" && aiUnlocked && (
             <div className="space-y-6">
               <div>
                 <h3 className="text-base font-bold text-navy mb-1 flex items-center gap-2">
