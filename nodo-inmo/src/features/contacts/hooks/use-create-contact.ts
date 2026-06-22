@@ -19,7 +19,9 @@ export function useCreateContact() {
       const { data, error } = await supabase
         .schema("nodo_inmo")
         .from("contacts")
-        .insert({ ...input, org_id: orgId });
+        .insert({ ...input, org_id: orgId })
+        .select()
+        .single();
 
       if (error) throw error;
       return data;
