@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Calendar,
@@ -22,6 +22,9 @@ import { Button } from "@/components/ui/button";
 import {
   PortalHeaderActions,
   PortalHeaderMobileActions,
+  SidebarCommandPaletteHint,
+  AdminCommandPaletteProvider,
+  type AdminCommandPaletteItem,
   useFixedDocumentTitle,
   useAuth,
 } from "@nodocore/shared-components";
@@ -72,6 +75,7 @@ function initials(value: string): string {
 
 export function AdminLayout() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTabId | undefined>();
@@ -111,7 +115,48 @@ export function AdminLayout() {
     await signOut();
   }
 
+  const commandItems = useMemo((): AdminCommandPaletteItem[] => {
+    const items = NAV_ITEMS.map((item) => ({
+      id: item.to,
+      label: item.label,
+      href: item.to,
+      group: "Secciones",
+      keywords: [item.label],
+    }));
+
+    items.push(
+      {
+        id: "/admin/nodo-id",
+        label: "Nodo ID",
+        href: "/admin/nodo-id",
+        group: "Plan Pro",
+        keywords: ["nodo id", "pro"],
+      },
+      {
+        id: "/admin/bot-integraciones",
+        label: "Bot e Integraciones",
+        href: "/admin/bot-integraciones",
+        group: "Plan Pro",
+        keywords: ["bot", "integraciones", "pro"],
+      },
+    );
+
+    return items;
+  }, []);
+
+  const handleCommandSelect = useCallback(
+    (item: AdminCommandPaletteItem) => {
+      navigate(item.href);
+      setMobileMenuOpen(false);
+    },
+    [navigate],
+  );
+
   return (
+    <AdminCommandPaletteProvider
+      items={commandItems}
+      onSelectItem={(item) => handleCommandSelect(item)}
+    >
     <FinanzasSettingsModuleProvider>
       <div className="flex h-screen overflow-hidden bg-paper">
         {/* Mobile overlay */}
@@ -210,6 +255,8 @@ export function AdminLayout() {
                 </NavLink>
               </div>
             </div>
+
+            <SidebarCommandPaletteHint className="mx-0 border-navy-700" />
           </nav>
 
           {/* Bottom: user + settings + logout */}
@@ -305,5 +352,6 @@ export function AdminLayout() {
         />
       </div>
     </FinanzasSettingsModuleProvider>
+    </AdminCommandPaletteProvider>
   );
 }
