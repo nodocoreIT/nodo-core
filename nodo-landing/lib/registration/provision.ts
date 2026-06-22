@@ -67,6 +67,7 @@ async function ensureAutosAccess(
 
   const { error: authErr } = await admin.auth.admin.updateUserById(userId, {
     password,
+    ban_duration: "none",
     app_metadata: {
       role: "administrador",
       cliente_id: clienteId,
@@ -308,7 +309,7 @@ export async function provisionNodoAccess(params: {
         };
       }
 
-      await admin.auth.admin.updateUserById(userId, { password });
+      await admin.auth.admin.updateUserById(userId, { password, ban_duration: "none" });
       return { ok: true, existing: true, user_id: userId };
     }
     return { ok: false, error: msg };
@@ -389,6 +390,7 @@ export async function provisionNodoAccessPendingPassword(params: {
   if (admin) {
     await admin.auth.admin.updateUserById(result.user_id, {
       app_metadata: { must_set_password: true, plan: planToTier(params.plan) },
+      ban_duration: "none",
     });
   }
 

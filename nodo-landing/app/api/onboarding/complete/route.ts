@@ -120,8 +120,7 @@ export async function POST(request: NextRequest) {
 
   const fullName = `${firstName} ${lastName}`.trim();
   const cfg = getNodeRegistrationConfig(unitRow.unit_code);
-  const planLabel =
-    planChoice === "demo" ? "demo" : planChoice === "pro" ? "pro" : "starter";
+  const planLabel = planChoice.trim().toLowerCase() || "starter";
 
   let identityStatus: "approved" | "declined" | "review" | "error" | "skipped" = "skipped";
   if (nodeRequiresIdentity && isIdentityVerificationEnabled()) {

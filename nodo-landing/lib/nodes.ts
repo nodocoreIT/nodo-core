@@ -314,6 +314,21 @@ export function normalizeNodeSlug(nodeSlug: string): string {
   return slug;
 }
 
+/** Branding for emails (NODO | …), distinct from marketing `label` on NodeDef. */
+const NODE_MAIL_LABEL_BY_CODE: Record<string, string> = {
+  Autos: "NODO | Autos",
+  Inmo: "NODO | Inmo",
+  Finanzas: "NODO | Finanzas",
+  Salud: "NODO | Salud",
+  Clínica: "NODO | Clínica Virtual",
+};
+
+export function getNodeMailLabelByCode(unitCode: string): string {
+  if (NODE_MAIL_LABEL_BY_CODE[unitCode]) return NODE_MAIL_LABEL_BY_CODE[unitCode];
+  const node = NODES.find((n) => n.code === unitCode);
+  return node?.label ?? unitCode;
+}
+
 /** Label shown in emails and UI for a login route slug. */
 export function getNodeMailLabel(nodeSlug: string): string {
   const raw = nodeSlug.trim().toLowerCase();
@@ -321,7 +336,9 @@ export function getNodeMailLabel(nodeSlug: string): string {
     return "NODO | Clínica Virtual";
   }
   const slug = normalizeNodeSlug(nodeSlug);
-  return getNodeBySlug(slug)?.label ?? "NODO Core";
+  const node = getNodeBySlug(slug);
+  if (node) return getNodeMailLabelByCode(node.code);
+  return "NODO Core";
 }
 
 export function getNodeLoginPath(nodeSlug: string): string {

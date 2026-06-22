@@ -466,6 +466,64 @@ export async function sendInmoStaffAddedEmail(args: {
   return sendStaffAddedEmail({ ...args, nodeLabel: "NODO | Inmo" });
 }
 
+export async function sendAutosVerificationEmail({
+  nombre,
+  email,
+  token,
+  origin,
+}: {
+  nombre: string;
+  email: string;
+  token: string;
+  origin: string;
+}): Promise<void> {
+  if (!isMailConfigured()) {
+    throw new Error(
+      "SMTP no configurado: faltan ZOHO_SMTP_USER y/o ZOHO_SMTP_PASSWORD.",
+    );
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: HOST,
+    port: PORT,
+    secure: PORT === 465,
+    auth: { user: USER, pass: PASS },
+  });
+
+  const verificationUrl = `${origin}/api/verify-registration?token=${token}`;
+  const nodeLabel = "NODO | Autos";
+  const brandColor = "#D12D3C";
+
+  await transporter.sendMail({
+    from: `"NODO Autos" <${USER}>`,
+    to: email,
+    subject: `Verificá tu registro en ${nodeLabel}`,
+    text: `Hola ${nombre},\n\nGracias por registrarte en ${nodeLabel}. Para activar tu cuenta de concesionaria y acceder al panel de gestión, hacé clic en el siguiente enlace:\n\n${verificationUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO Autos`,
+    attachments: registrationLogoAttachments(),
+    html: `
+      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;background-color:#F5F8FC;">
+        <div style="text-align:center;margin-bottom:20px;">
+          <img src="cid:nodologo" alt="NODO Autos" style="height:32px;display:inline-block;"/>
+        </div>
+        <h2 style="color:#1B2A41;margin-top:0;font-size:20px;text-align:center;">Verificá tu registro</h2>
+        <p style="color:#647890;font-size:15px;line-height:1.5;">
+          Hola <strong>${nombre}</strong>,<br/><br/>
+          Completá tu solicitud de registro en <strong>${nodeLabel}</strong> haciendo clic en el botón de abajo:
+        </p>
+        <div style="margin:24px 0;text-align:center;">
+          <a href="${verificationUrl}" style="background-color:${brandColor};color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;font-size:15px;">
+            Verificar mi cuenta
+          </a>
+        </div>
+        <p style="color:#9DACBE;font-size:12px;line-height:1.4;">
+          Si el botón no funciona, podés copiar y pegar este enlace en tu navegador:<br/>
+          <a href="${verificationUrl}" style="color:${brandColor};">${verificationUrl}</a>
+        </p>
+      </div>
+    `,
+  });
+}
+
 export async function sendInmoVerificationEmail({
   nombre,
   email,
@@ -612,6 +670,52 @@ export async function sendAccountEnabledEmail({
             Configurar contraseña e ingresar
           </a>
         </div>
+      </div>
+    `,
+  });
+}
+
+export async function sendClientNodoInviteEmail({
+  nombre,
+  email,
+  nodeLabel,
+  activationUrl,
+}: {
+  nombre: string;
+  email: string;
+  nodeLabel: string;
+  activationUrl: string;
+}): Promise<void> {
+  const transporter = createTransporter();
+
+  await transporter.sendMail({
+    from: `"NODO Core · Invitación" <${USER}>`,
+    to: email,
+    subject: `Te invitaron a ${nodeLabel} — activá tu cuenta`,
+    text: `Hola ${nombre},\n\nTe invitaron a usar ${nodeLabel}. Completá tu registro y elegí tu contraseña con este enlace:\n\n${activationUrl}\n\nEl enlace expira en 72 horas.\n\nSaludos,\nNODO Core`,
+    attachments: [
+      {
+        filename: "logo_compuesto.png",
+        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
+        cid: "nodologo",
+      },
+    ],
+    html: `
+      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;background:#F5F8FC;">
+        <div style="text-align:center;margin-bottom:20px;">
+          <img src="cid:nodologo" alt="NODO Core" style="height:32px;display:inline-block;"/>
+        </div>
+        <h2 style="color:#DA5A0E;margin-top:0;font-size:20px;text-align:center;">Te invitaron a ${nodeLabel}</h2>
+        <p style="color:#647890;font-size:15px;line-height:1.5;">
+          Hola <strong>${nombre}</strong>,<br/><br/>
+          Desde NODO Core te dieron acceso a <strong>${nodeLabel}</strong>. Completá tu perfil y definí tu contraseña para empezar:
+        </p>
+        <div style="margin:24px 0;text-align:center;">
+          <a href="${activationUrl}" style="background-color:#DA5A0E;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;font-size:15px;">
+            Activar mi cuenta
+          </a>
+        </div>
+        <p style="color:#9DACBE;font-size:12px;">Este enlace expira en 72 horas.</p>
       </div>
     `,
   });

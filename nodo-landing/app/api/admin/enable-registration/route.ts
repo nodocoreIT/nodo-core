@@ -1,12 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getNodeRegistrationConfig } from "@/lib/registration/node-config";
-import { getLoginHrefForNode } from "@/lib/nodes";
+import { getLoginHrefForNode, getNodeMailLabelByCode } from "@/lib/nodes";
 import {
   provisionNodoAccessPendingPassword,
   createLandingAuthPendingPassword,
 } from "@/lib/registration/provision";
 import { sendAccountEnabledEmail, isMailConfigured } from "@/lib/mail";
+import { setNodoAuthSuspendedForUnit } from "@/lib/registration/nodo-access-suspend";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -127,6 +128,17 @@ export async function POST(request: Request) {
     .update({ status: "activo" })
     .eq("client_unit_id", clientUnitId);
 
+  if (cfg?.provisionable && provisionUserId) {
+    const reactivate = await setNodoAuthSuspendedForUnit(
+      unit.unit_code,
+      { provision_user_id: provisionUserId, access_user: email },
+      "reactivate",
+    );
+    if (!reactivate.ok) {
+      console.error("[enable-registration] reactivate auth:", reactivate.error);
+    }
+  }
+
   const origin = new URL(request.url).origin;
   const loginPath = getLoginHrefForNode(cfg?.slug ?? "inmo");
   const loginUrl = `${origin}${loginPath}?mode=first-access`;
@@ -135,7 +147,7 @@ export async function POST(request: Request) {
     await sendAccountEnabledEmail({
       nombre: fullName,
       email,
-      nodeLabel: cfg?.label ?? unit.unit_code,
+      nodeLabel: getNodeMailLabelByCode(unit.unit_code),
       loginUrl,
     });
   }

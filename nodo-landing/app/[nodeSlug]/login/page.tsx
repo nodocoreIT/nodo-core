@@ -7,7 +7,7 @@ import LoginBrandPanel from "@/components/LoginBrandPanel";
 import { LoginFormNodeHeader } from "@/components/LoginFormNodeHeader";
 import { LoginNodeLockup } from "@/components/LoginNodeLockup";
 import { getLoginPanelDetails } from "@/lib/login-panel";
-import { Layers } from "lucide-react";
+import { Layers, Loader2 } from "lucide-react";
 import {
   PasswordResetPanel,
   usePasswordRecoveryBootstrap,
@@ -35,6 +35,14 @@ import {
   applyLoginAccent,
   type NodeAccent,
 } from "@/lib/node-accents";
+
+function mapAuthLoginError(message: string | undefined): string {
+  const msg = (message ?? "").toLowerCase();
+  if (msg.includes("banned") || msg.includes("user is banned") || msg.includes("user_banned")) {
+    return "Tu acceso está pausado. Contactate con NODO Core para reactivarlo.";
+  }
+  return message ?? INVALID_LOGIN_MESSAGE;
+}
 
 function redirectToFinanzasAuth(accessToken: string, refreshToken: string) {
   try {
@@ -184,6 +192,22 @@ function NodeTransitionOverlay({
           40%            { transform: translateY(-6px); opacity: 1; }
         }
       `}</style>
+    </div>
+  );
+}
+
+function SubmissionOverlay({ message }: { message: string }) {
+  return (
+    <div
+      className="fixed inset-0 z-[9998] flex items-center justify-center bg-navy-900/45 backdrop-blur-[2px]"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div className="flex flex-col items-center gap-4 rounded-2xl border border-mist bg-white px-10 py-8 shadow-2xl">
+        <Loader2 className="h-10 w-10 animate-spin text-brand" aria-hidden />
+        <p className="text-[15px] font-semibold text-navy">{message}</p>
+      </div>
     </div>
   );
 }
@@ -508,8 +532,7 @@ function LoginForm() {
     }
     const needsPassword =
       authMode === "login" ||
-      (authMode === "register" && isClinicaNode && registerRole === "paciente") ||
-      (authMode === "register" && isFinanzasNode);
+      (authMode === "register" && isClinicaNode && registerRole === "paciente");
 
     if (needsPassword) {
       if (authMode === "login" && password.trim().length < 4) {
@@ -537,7 +560,7 @@ function LoginForm() {
       });
 
       if (error) {
-        setGeneralError(INVALID_LOGIN_MESSAGE);
+        setGeneralError(mapAuthLoginError(error.message));
         setLoading(false);
         return;
       }
@@ -593,7 +616,6 @@ function LoginForm() {
           email,
           plan,
           origin: originUrl,
-          password: isFinanzasNode ? password.trim() : undefined,
         });
 
         if (result.status === "error") {
@@ -759,36 +781,39 @@ function LoginForm() {
     }
 
     const supabase = authSupabase;
+
+    if (json.session?.access_token && json.session?.refresh_token) {
+      const { data: sessData, error: sessErr } = await supabase.auth.setSession({
+        access_token: json.session.access_token,
+        refresh_token: json.session.refresh_token,
+      });
+      if (!sessErr && sessData.session) {
+        setLoading(false);
+        redirectAfterSession(sessData.session);
+        return;
+      }
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password: password.trim(),
     });
 
     if (error || !data.session) {
-      setSuccessModal({
-        open: true,
-        type: "paciente",
-        message: "Contraseña configurada. Ya podés iniciar sesión.",
-      });
+      setGeneralError(
+        mapAuthLoginError(error?.message) ||
+          json.login_error ||
+          "Tu contraseña quedó guardada. Iniciá sesión con tu email y la contraseña que elegiste.",
+      );
       setAuthMode("login");
+      setPassword("");
+      setConfirmPassword("");
       setLoading(false);
       return;
     }
 
-    // Reuse login redirect logic
-    const { access_token, refresh_token } = data.session;
     setLoading(false);
-    if (isInmoNode) {
-      window.location.href = `/inmo/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
-    } else if (isClinicaNode) {
-      window.location.href = `/clinica/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
-    } else if (isAutosNode) {
-      window.location.href = `/autos/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
-    } else if (isFinanzasNode) {
-      redirectToFinanzasAuth(access_token, refresh_token);
-    } else {
-      router.push("/panel");
-    }
+    redirectAfterSession(data.session);
   }
 
   async function handleResetPassword(newPassword: string): Promise<string | null> {
@@ -889,6 +914,14 @@ function LoginForm() {
           Icon={transitionTarget.Icon}
           accent={loginAccent}
         />
+      )}
+
+      {loading && authMode === "register" && (
+        <SubmissionOverlay message="Enviando solicitud…" />
+      )}
+
+      {resendLoading && (
+        <SubmissionOverlay message="Reenviando correo de verificación…" />
       )}
 
       {/* Back button */}
@@ -1526,40 +1559,8 @@ function LoginForm() {
                         )}
                       </div>
 
-                      {isFinanzasNode && (
-                        <>
-                          <div className="mb-3">
-                            <label
-                              htmlFor={`${simpleRegisterContent.idPrefix}-password`}
-                              className="block text-[13px] font-semibold text-navy mb-1.5"
-                            >
-                              Contraseña
-                            </label>
-                            <input
-                              id={`${simpleRegisterContent.idPrefix}-password`}
-                              type="password"
-                              placeholder="Ingresé contraseña…"
-                              value={password}
-                              onChange={(e) => {
-                                setPassword(e.target.value);
-                                setPasswordError("");
-                              }}
-                              className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
-                              autoComplete="new-password"
-                            />
-                            {passwordError && (
-                              <p className="text-[12.5px] text-[#C0392B] mt-1.5">
-                                {passwordError}
-                              </p>
-                            )}
-                          </div>
-                        </>
-                      )}
-
                       <p className="text-slate2 text-[12px] mb-4 text-center">
-                        {isFinanzasNode
-                          ? "Te enviaremos un correo para verificar tu email y activar tu cuenta."
-                          : "Te enviaremos un correo para verificar tu email. La contraseña la configurás después de la habilitación."}
+                        Te enviaremos un correo para verificar tu email. La contraseña la configurás después de la habilitación.
                       </p>
 
                       {generalError && (

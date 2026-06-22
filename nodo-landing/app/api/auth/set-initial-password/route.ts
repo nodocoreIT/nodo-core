@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getNodeRegistrationConfig, unitCodeFromSlug, normalizeUnitCode } from "@/lib/registration/node-config";
 import { updateNodoUserPassword } from "@/lib/registration/provision";
 import { authAdminForUnitCode, resolveAuthUserForUnit, setAuthUserPassword } from "@/lib/registration/client-unit-auth";
+import { ensureNodoAuthActive } from "@/lib/registration/nodo-access-suspend";
+import { getNodoPublicAuthConfig } from "@/lib/supabase/nodo-auth-config";
 
 async function findClientUnit(
   admin: ReturnType<typeof createAdminClient>,
@@ -112,6 +115,14 @@ export async function POST(request: NextRequest) {
     await updateNodoUserPassword(unit.unit_code, unit.provision_user_id, password);
   }
 
+  const authUserId = authUser?.userId ?? unit.provision_user_id;
+  if (authUserId && cfg?.provisionable) {
+    const reactivate = await ensureNodoAuthActive(unit.unit_code, authUserId);
+    if (!reactivate.ok) {
+      console.error("[set-initial-password] reactivate auth:", reactivate.error);
+    }
+  }
+
   await admin
     .from("client_units")
     .update({
@@ -121,5 +132,30 @@ export async function POST(request: NextRequest) {
     })
     .eq("id", unit.id);
 
-  return NextResponse.json({ ok: true, nodeSlug: cfg?.slug ?? nodeSlug });
+  let session: { access_token: string; refresh_token: string } | undefined;
+  const authCfg = getNodoPublicAuthConfig(unit.unit_code);
+  if (authCfg) {
+    const anonClient = createClient(authCfg.url, authCfg.anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: signInData, error: signInErr } = await anonClient.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (signInData.session) {
+      session = {
+        access_token: signInData.session.access_token,
+        refresh_token: signInData.session.refresh_token,
+      };
+    } else if (signInErr) {
+      console.error("[set-initial-password] signIn failed:", signInErr.message);
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    nodeSlug: cfg?.slug ?? nodeSlug,
+    session,
+    login_error: session ? undefined : "No se pudo iniciar sesión automáticamente. Probá ingresar con tu email y contraseña.",
+  });
 }

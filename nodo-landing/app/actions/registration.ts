@@ -13,6 +13,7 @@ import {
   sendPatientVerificationEmail,
   sendInmoVerificationEmail,
   sendFinanzasVerificationEmail,
+  sendAutosVerificationEmail,
   sendAdminNewRegistrationEmail,
 } from "@/lib/mail";
 import { resolvePublicOriginFromRequest } from "@/lib/auth/public-origin";
@@ -33,12 +34,16 @@ async function sendVerificationEmail(
     await sendPatientVerificationEmail(payload);
     return;
   }
-  if (planLower === "inmo" || unitCode === "Inmo") {
+  if (unitCode === "Inmo" || planLower === "inmo") {
     await sendInmoVerificationEmail(payload);
     return;
   }
-  if (planLower === "finanzas" || unitCode === "Finanzas") {
+  if (unitCode === "Finanzas" || planLower === "finanzas") {
     await sendFinanzasVerificationEmail(payload);
+    return;
+  }
+  if (unitCode === "Autos" || planLower === "autos") {
+    await sendAutosVerificationEmail(payload);
     return;
   }
   await sendRegistrationVerificationEmail({
@@ -80,6 +85,7 @@ export async function submitNodeRegistration(
   }
 
   const selfService = isSelfServicePlan(unitCode, plan);
+  // Legacy: only paciente (clínica) may still collect password at signup for immediate provision.
   if (selfService && !input.password) {
     return { status: "error", message: "La contraseña es obligatoria." };
   }

@@ -122,3 +122,71 @@ console.log(JSON.parse(Buffer.from(payload, 'base64url').toString()));
 ```
 
 Look for `app_metadata.org_id` and `app_metadata.role` in the output.
+
+---
+
+## org-backup.ts
+
+Export and restore **all operational data** for one Nodo Inmo tenant (identified by admin email). Use this before purging or deleting a customer's data so you can repopulate the same org later.
+
+Includes:
+
+- Every `nodo_inmo.*` table with `org_id` (properties, contracts, payments, caja, agenda, documentos, etc.)
+- Shared tenant rows: `organizations`, `org_members`, `nodo_id`, `user_profiles`, `feedback` (if present)
+- Storage buckets: `org-branding`, `org-documents`, `property-expense-receipts`, `property-photos`
+
+Does **not** export `auth.users` passwords. The auth user must still exist (or be recreated) before restore.
+
+### Required env vars
+
+Same as bootstrap-admin: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`.
+
+### 1. Export (before deleting)
+
+```bash
+cd nodo-inmo
+
+SUPABASE_URL=https://<ref>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service_role> \
+DATABASE_URL='postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres' \
+npx tsx scripts/org-backup.ts export \
+  --email juanmendia@gmail.com \
+  --output ./backups/juanmendia-$(date +%Y-%m-%d)
+```
+
+Optional: `--org-id <uuid>` if the user belongs to more than one inmo org. `--skip-storage` for DB-only backup.
+
+### 2. Purge / delete (your step)
+
+After export, you can purge operational data with the dashboard or:
+
+```sql
+select nodo_inmo.purge_org_operational_data('<org_id>'::uuid);
+```
+
+### 3. Restore
+
+```bash
+SUPABASE_URL=https://<ref>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service_role> \
+DATABASE_URL='postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres' \
+npx tsx scripts/org-backup.ts restore \
+  --input ./backups/juanmendia-2026-06-22
+```
+
+By default restore **purges** the target org first, then re-inserts rows and re-uploads Storage files. Flags:
+
+| Flag | Effect |
+|------|--------|
+| `--no-purge` | Skip delete; use only if tables are already empty |
+| `--skip-storage` | DB rows only |
+| `--org-id <uuid>` | Restore into a different org than the backup source |
+| `--force` | Upsert `shared.organizations` even if org was fully removed |
+
+### Inspect backup
+
+```bash
+npx tsx scripts/org-backup.ts info --input ./backups/juanmendia-2026-06-22
+```
+
+Backups land in `nodo-inmo/backups/` (gitignored). **Do not commit** — they contain customer PII.

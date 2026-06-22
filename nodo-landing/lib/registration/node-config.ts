@@ -30,9 +30,7 @@ export const NODE_REGISTRATION_CONFIG: Record<string, NodeRegistrationConfig> =
         selfServicePlans:
           n.code === "Salud" || n.code === "Clínica"
             ? ["paciente"]
-            : n.code === "Finanzas"
-              ? ["finanzas"]
-              : [],
+            : [],
         productKey: n.slug,
         accessUrl: `/${n.slug}`,
       },
