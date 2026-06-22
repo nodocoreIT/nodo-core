@@ -2,5 +2,6 @@
 export const LANDING_LOGIN_URL = "/nodo-finanzas/login";
 
 export function redirectToLandingLogin(): void {
-  window.location.replace(LANDING_LOGIN_URL);
+  const suffix = `${window.location.search}${window.location.hash}`;
+  window.location.replace(`${LANDING_LOGIN_URL}${suffix}`);
 }

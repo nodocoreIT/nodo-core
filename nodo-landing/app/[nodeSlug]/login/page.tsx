@@ -278,6 +278,7 @@ function LoginForm() {
   useEffect(() => {
     if (recoveryBootstrapping) return;
     if (modeParam === "register") setAuthMode("register");
+    else if (modeParam === "first-access") setAuthMode("first-access");
     else if (modeParam === "login") setAuthMode("login");
     else if (modeParam === "forgot") setAuthMode("forgot");
   }, [modeParam, recoveryBootstrapping, setAuthMode]);

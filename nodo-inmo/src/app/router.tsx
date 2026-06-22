@@ -8,7 +8,8 @@ import { OwnerPortalPage } from "@/portals/owner/owner-portal-page";
 import { TenantPortalPage } from "@/portals/tenant/tenant-portal-page";
 
 function LoginRedirect() {
-  window.location.replace("/nodo-inmo/login");
+  const suffix = `${window.location.search}${window.location.hash}`;
+  window.location.replace(`/nodo-inmo/login${suffix}`);
   return null;
 }
 

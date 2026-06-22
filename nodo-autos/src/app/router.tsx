@@ -6,7 +6,8 @@ import { AdminPortalPage } from "@/portals/admin/admin-portal-page";
 import { PublicVehiclePage } from "@/features/public-vehicle/public-vehicle-page";
 
 function LoginRedirect() {
-  window.location.replace("/nodo-autos/login");
+  const suffix = `${window.location.search}${window.location.hash}`;
+  window.location.replace(`/nodo-autos/login${suffix}`);
   return null;
 }
 

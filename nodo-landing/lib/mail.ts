@@ -596,21 +596,22 @@ export async function sendAccountEnabledEmail({
     to: email,
     subject: `Tu acceso a ${nodeLabel} fue habilitado`,
     text: `Hola ${nombre},\n\nTu cuenta en ${nodeLabel} fue habilitada. Configurá tu contraseña en el primer acceso:\n\n${loginUrl}\n\nSaludos,\nNODO Core`,
-    attachments: [
-      {
-        filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
-        cid: "nodologo",
-      },
-    ],
+    attachments: registrationLogoAttachments(),
     html: `
-      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;">
-        <h2 style="color:#DA5A0E;">¡Tu cuenta fue habilitada!</h2>
-        <p style="color:#647890;">Hola <strong>${nombre}</strong>, tu acceso a <strong>${nodeLabel}</strong> está listo.</p>
-        <p style="color:#647890;">Configurá tu contraseña en el primer acceso:</p>
-        <a href="${loginUrl}" style="display:inline-block;margin-top:12px;background:#DA5A0E;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">
-          Configurar contraseña e ingresar
-        </a>
+      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;background:#F5F8FC;">
+        <div style="text-align:center;margin-bottom:20px;">
+          <img src="cid:nodologo" alt="NODO Core" style="height:32px;display:inline-block;"/>
+        </div>
+        <h2 style="color:#DA5A0E;margin-top:0;font-size:20px;text-align:center;">¡Tu cuenta fue habilitada!</h2>
+        <p style="color:#647890;font-size:15px;line-height:1.5;">
+          Hola <strong>${nombre}</strong>, tu acceso a <strong>${nodeLabel}</strong> está listo.
+        </p>
+        <p style="color:#647890;font-size:15px;line-height:1.5;">Configurá tu contraseña en el primer acceso:</p>
+        <div style="margin:24px 0;text-align:center;">
+          <a href="${loginUrl}" style="display:inline-block;background:#DA5A0E;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">
+            Configurar contraseña e ingresar
+          </a>
+        </div>
       </div>
     `,
   });
