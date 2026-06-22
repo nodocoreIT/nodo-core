@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Session } from "@supabase/supabase-js";
+import { mapAuthPasswordError } from "./auth-password-errors";
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
@@ -95,7 +96,10 @@ export async function completeForcedPassword(params: {
 
   const json = (await res.json().catch(() => ({}))) as { error?: string };
   if (!res.ok) {
-    return { ok: false, error: json.error ?? "No se pudo actualizar la contraseña." };
+    return {
+      ok: false,
+      error: mapAuthPasswordError(json.error ?? "No se pudo actualizar la contraseña."),
+    };
   }
 
   await supabase.auth.refreshSession();

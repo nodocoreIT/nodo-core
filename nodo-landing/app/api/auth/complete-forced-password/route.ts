@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { setAuthUserPassword } from "@/lib/registration/client-unit-auth";
+import { mapAuthPasswordError, isSamePasswordAuthError } from "@nodocore/shared-components";
 
 async function resolveAuthenticatedUserId(request: NextRequest): Promise<string | null> {
   const bearer = request.headers.get("authorization");
@@ -59,7 +60,19 @@ export async function POST(request: NextRequest) {
   });
 
   if (!updated.ok) {
-    return NextResponse.json({ error: updated.error }, { status: 400 });
+    if (isSamePasswordAuthError(updated.error)) {
+      const { error: metaErr } = await admin.auth.admin.updateUserById(userId, {
+        app_metadata: {
+          ...(authUser.user.app_metadata ?? {}),
+          must_set_password: false,
+        },
+      });
+      if (metaErr) {
+        return NextResponse.json({ error: mapAuthPasswordError(metaErr.message) }, { status: 400 });
+      }
+    } else {
+      return NextResponse.json({ error: mapAuthPasswordError(updated.error) }, { status: 400 });
+    }
   }
 
   const email = authUser.user.email?.toLowerCase();
