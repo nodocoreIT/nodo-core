@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -28,6 +28,9 @@ import {
   PortalHeaderActions,
   PortalHeaderMobileActions,
   useSearchStore,
+  SidebarNavGroup,
+  SidebarNavAccordionProvider,
+  SidebarSearchHint,
   useFixedDocumentTitle,
 } from "@nodocore/shared-components";
 import { BrandMark } from "@/shared/components/brand-mark";
@@ -63,18 +66,35 @@ interface NavItem {
   proOnly?: boolean;
 }
 
-const NAV_ITEMS: NavItem[] = [
+type NavEntry = NavItem | { group: string; items: NavItem[] };
+
+const NAV_ENTRIES: NavEntry[] = [
   { to: "/admin/dashboard", label: "Inicio", icon: LayoutDashboard },
-  { to: "/admin/properties", label: "Propiedades", icon: Home },
-  { to: "/admin/owners", label: "Propietarios", icon: UserCheck },
-  { to: "/admin/tenants", label: "Inquilinos", icon: Users },
-  { to: "/admin/contracts", label: "Contratos", icon: FileText },
-  { to: "/admin/payments", label: "Pagos", icon: CreditCard },
-  { to: "/admin/caja", label: "Caja", icon: Wallet, adminOnly: true },
-  { to: "/admin/rendiciones", label: "Rendiciones", icon: HandCoins, adminOnly: true },
-  { to: "/admin/ganancias", label: "Ganancias", icon: LineChart, adminOnly: true },
-  { to: "/admin/documentos", label: "Documentos", icon: FolderOpen },
-  { to: "/admin/agenda", label: "Agenda y Tareas", icon: Calendar },
+  {
+    group: "Gestión Inmobiliaria",
+    items: [
+      { to: "/admin/properties", label: "Propiedades", icon: Home },
+      { to: "/admin/owners", label: "Propietarios", icon: UserCheck },
+      { to: "/admin/tenants", label: "Inquilinos", icon: Users },
+      { to: "/admin/contracts", label: "Contratos", icon: FileText },
+    ],
+  },
+  {
+    group: "Finanzas",
+    items: [
+      { to: "/admin/payments", label: "Pagos", icon: CreditCard },
+      { to: "/admin/caja", label: "Caja", icon: Wallet, adminOnly: true },
+      { to: "/admin/rendiciones", label: "Rendiciones", icon: HandCoins, adminOnly: true },
+      { to: "/admin/ganancias", label: "Ganancias", icon: LineChart, adminOnly: true },
+    ],
+  },
+  {
+    group: "Herramientas",
+    items: [
+      { to: "/admin/documentos", label: "Documentos", icon: FolderOpen },
+      { to: "/admin/agenda", label: "Agenda y Tareas", icon: Calendar },
+    ],
+  },
 ];
 
 const PRO_NAV_ITEMS: NavItem[] = [
@@ -121,6 +141,22 @@ const ROUTE_TITLES: Record<string, string> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function focusGlobalSearch() {
+  const input = document.querySelector<HTMLInputElement>(
+    "[data-global-search-input]",
+  );
+  input?.focus();
+  input?.select();
+}
+
+function groupIdFromLabel(label: string) {
+  return label
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "-");
+}
+
 function initials(value: string): string {
   const base = value.trim();
   if (!base) return "?";
@@ -166,14 +202,11 @@ export function AdminLayout() {
 
   const hasFullAccess = role === "admin" || role === "super_admin";
 
-  const visibleNav = NAV_ITEMS.filter((item) => {
-    // Admins and super_admins always see every section.
+  const isItemVisible = (item: NavItem) => {
     if (hasFullAccess) return true;
-    // Explicit per-user permissions override everything, including adminOnly.
     if (userId && userPermissions?.[userId]) {
       return userPermissions[userId].includes(item.to);
     }
-    // Without explicit permissions, adminOnly sections are hidden for non-admins.
     if (item.adminOnly) return false;
     if (role === "agent") {
       return INMO_DEFAULT_EMPLOYEE_SECTIONS.includes(
@@ -184,7 +217,7 @@ export function AdminLayout() {
       return rolePermissions[displayRole].includes(item.to);
     }
     return true;
-  });
+  };
 
   const placeholder = SEARCH_PLACEHOLDERS[pathname]
     ? (isMobile ? "Buscar..." : SEARCH_PLACEHOLDERS[pathname])
@@ -193,6 +226,18 @@ export function AdminLayout() {
   const fullName = (user?.user_metadata?.full_name as string | undefined) ?? "";
   const email = user?.email ?? "";
   const displayName = fullName || email;
+
+  const sidebarItemCount = useMemo(() => {
+    let count = 0;
+    for (const entry of NAV_ENTRIES) {
+      if ("group" in entry) {
+        count += entry.items.filter(isItemVisible).length;
+      } else if (isItemVisible(entry)) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [role, userId, userPermissions, rolePermissions, displayRole, hasFullAccess]);
 
   useFixedDocumentTitle("Nodo | Inmo");
 
@@ -228,13 +273,47 @@ export function AdminLayout() {
         </div>
 
         {/* Nav — scrollable middle section */}
+        <SidebarNavAccordionProvider itemCount={sidebarItemCount}>
         <nav
           className="flex-1 overflow-y-auto px-3 py-4"
           aria-label="Navegación principal"
         >
           <div className="flex flex-col gap-1">
-            {visibleNav.map(({ to, label, icon: Icon, proOnly: proOnlyFlag }) => {
-              const locked = (proOnlyFlag ?? isProOnlyAdminRoute(to)) && plan !== "pro";
+            {NAV_ENTRIES.map((entry) => {
+              if ("group" in entry) {
+                const items = entry.items.filter(isItemVisible);
+                if (items.length === 0) return null;
+                const groupActive = items.some((i) => pathname.startsWith(i.to));
+                const groupId = groupIdFromLabel(entry.group);
+                return (
+                  <SidebarNavGroup key={entry.group} groupId={groupId} label={entry.group} isActive={groupActive}>
+                    {items.map(({ to, label, icon: Icon, proOnly: proOnlyFlag }) => {
+                      const locked = (proOnlyFlag ?? isProOnlyAdminRoute(to)) && plan !== "pro";
+                      return (
+                        <NavLink
+                          key={to}
+                          to={to}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={({ isActive }) =>
+                            cn(
+                              "flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors",
+                              isActive
+                                ? "bg-brand text-[var(--color-primary-foreground)]"
+                                : "text-[var(--color-sidebar-text)] hover:bg-brand/10 hover:text-brand",
+                            )
+                          }
+                        >
+                          <Icon className="h-4 w-4 flex-shrink-0" />
+                          <span className="flex-1">{label}</span>
+                          {locked && <Lock className="h-3 w-3 opacity-50 flex-shrink-0" />}
+                        </NavLink>
+                      );
+                    })}
+                  </SidebarNavGroup>
+                );
+              }
+              if (!isItemVisible(entry)) return null;
+              const { to, label, icon: Icon } = entry;
               return (
                 <NavLink
                   key={to}
@@ -250,17 +329,18 @@ export function AdminLayout() {
                   }
                 >
                   <Icon className="h-4 w-4 flex-shrink-0" />
-                  <span className="flex-1">{label}</span>
-                  {locked && <Lock className="h-3 w-3 opacity-50 flex-shrink-0" />}
+                  <span>{label}</span>
                 </NavLink>
               );
             })}
 
-            {/* Pro features */}
-            <div className="mt-3 pt-3 flex flex-col gap-1">
+            {/* Plan Pro — always visible, outside collapsible accordion */}
+            <div className="mt-3 flex flex-col gap-1 border-t border-brand/20 pt-3">
               <div className="mb-1 flex items-center gap-2 px-3">
                 <div className="h-px flex-1 bg-brand/40" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-brand">Plan Pro</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-brand">
+                  Plan Pro
+                </span>
                 <div className="h-px flex-1 bg-brand/40" />
               </div>
               {PRO_NAV_ITEMS.map(({ to, label, icon: Icon }) => (
@@ -279,12 +359,17 @@ export function AdminLayout() {
                 >
                   <Icon className="h-4 w-4 flex-shrink-0" />
                   <span className="flex-1">{label}</span>
-                  {plan !== "pro" && <Lock className="h-3 w-3 opacity-50 flex-shrink-0" />}
+                  {plan !== "pro" && (
+                    <Lock className="h-3 w-3 flex-shrink-0 opacity-50" />
+                  )}
                 </NavLink>
               ))}
             </div>
           </div>
+
+          <SidebarSearchHint onClick={focusGlobalSearch} />
         </nav>
+        </SidebarNavAccordionProvider>
 
         {/* Bottom: configuración + user — always visible */}
         <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] p-3">
