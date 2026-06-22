@@ -15,7 +15,7 @@ import {
   sendFinanzasVerificationEmail,
   sendAdminNewRegistrationEmail,
 } from "@/lib/mail";
-import { resolveRegistrationOrigin } from "@/lib/registration/origin";
+import { resolvePublicOriginFromRequest } from "@/lib/auth/public-origin";
 import {
   duplicateRegistrationMessage,
   isEmailRegisteredForNode,
@@ -127,7 +127,7 @@ export async function submitNodeRegistration(
       };
     }
 
-    const emailOrigin = resolveRegistrationOrigin(origin);
+    const emailOrigin = await resolvePublicOriginFromRequest(origin);
     let mailSent = false;
 
     if (isMailConfigured()) {
@@ -240,7 +240,7 @@ export async function resendVerificationEmail(params: {
       return { status: "error", message: "El envío de correos no está configurado." };
     }
 
-    const emailOrigin = resolveRegistrationOrigin(params.origin);
+    const emailOrigin = await resolvePublicOriginFromRequest(params.origin);
     await sendVerificationEmail(unitCode, pending.plan, {
       nombre: pending.full_name,
       email,

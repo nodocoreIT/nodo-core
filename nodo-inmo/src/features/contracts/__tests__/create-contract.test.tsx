@@ -66,26 +66,37 @@ vi.mock("@nodocore/shared-components", async (importOriginal) => {
 
 // Property + contact option sources
 vi.mock("@/features/properties/hooks/use-properties", () => ({
+  PROPERTIES_QUERY_KEY: ["nodo_inmo", "properties"],
   useProperties: () => ({
     data: [
       {
         id: "prop-1",
         address: "Lavalle 100",
+        operation: "rent",
         commission_rate: null,
         owner: { id: "owner-1", name: "Propietario Test", commission_rate: 8 },
       },
     ],
+    isLoading: false,
+    isFetching: false,
+    isError: false,
   }),
 }));
 
 vi.mock("@/features/contacts/hooks/use-contacts", () => ({
+  CONTACTS_QUERY_KEY: ["nodo_inmo", "contacts"],
   useContacts: (role?: string) => ({
     data:
       role === "tenant"
         ? [{ id: "tenant-1", name: "Juan Pérez" }]
         : role === "guarantor"
           ? [{ id: "guar-1", name: "Ana García" }]
-          : [],
+          : role === "owner"
+            ? [{ id: "owner-1", name: "Propietario Test" }]
+            : [],
+    isLoading: false,
+    isFetching: false,
+    isError: false,
   }),
 }));
 
@@ -169,7 +180,7 @@ describe("CreateContractDialog", () => {
     await userEvent.selectOptions(selects[0], "prop-1");
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/administraci[oó]n inmobiliaria/i)).toHaveValue("8");
+      expect(screen.getByLabelText(/adm\.\s*inmobiliaria/i)).toHaveValue("8");
     });
   });
 
