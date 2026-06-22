@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Car,
@@ -20,6 +20,9 @@ import {
   Button,
   PortalHeaderActions,
   PortalHeaderMobileActions,
+  SidebarCommandPaletteHint,
+  AdminCommandPaletteProvider,
+  type AdminCommandPaletteItem,
   useAuth,
   useFixedDocumentTitle,
 } from "@nodocore/shared-components";
@@ -69,6 +72,7 @@ function initials(value: string): string {
 export function AdminLayout() {
   const { user, plan, signOut } = useAuth();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const { name: dealershipName, logoUrl } = useDealershipBrand();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -115,7 +119,48 @@ export function AdminLayout() {
   // Suppress unused variable warning — isMobile used for potential future responsive changes
   void isMobile;
 
+  const commandItems = useMemo((): AdminCommandPaletteItem[] => {
+    const items = NAV_ITEMS.map((item) => ({
+      id: item.to,
+      label: item.label,
+      href: item.to,
+      group: "Secciones",
+      keywords: [item.label],
+    }));
+
+    items.push(
+      {
+        id: "/admin/nodo-id",
+        label: "Nodo ID",
+        href: "/admin/nodo-id",
+        group: "Plan Pro",
+        keywords: ["nodo id", "pro"],
+      },
+      {
+        id: "/admin/bot-integraciones",
+        label: "Bot e Integraciones",
+        href: "/admin/bot-integraciones",
+        group: "Plan Pro",
+        keywords: ["bot", "integraciones", "pro"],
+      },
+    );
+
+    return items;
+  }, []);
+
+  const handleCommandSelect = useCallback(
+    (item: AdminCommandPaletteItem) => {
+      navigate(item.href);
+      setMobileMenuOpen(false);
+    },
+    [navigate],
+  );
+
   return (
+    <AdminCommandPaletteProvider
+      items={commandItems}
+      onSelectItem={(item) => handleCommandSelect(item)}
+    >
     <AutosSettingsModuleProvider>
     <div className="flex h-screen overflow-hidden bg-paper">
       {/* Mobile overlay */}
@@ -222,6 +267,8 @@ export function AdminLayout() {
               </NavLink>
             </div>
           </div>
+
+          <SidebarCommandPaletteHint className="mx-0 border-navy-700" />
         </nav>
 
         {/* User + logout */}
@@ -311,5 +358,6 @@ export function AdminLayout() {
       />
     </div>
     </AutosSettingsModuleProvider>
+    </AdminCommandPaletteProvider>
   );
 }

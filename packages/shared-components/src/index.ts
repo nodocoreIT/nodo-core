@@ -70,6 +70,21 @@ export {
 } from "./components/sidebar-nav-accordion";
 export { SidebarNavGroup, type SidebarNavGroupProps } from "./components/sidebar-nav-group";
 export { SidebarSearchHint, type SidebarSearchHintProps } from "./components/sidebar-search-hint";
+export {
+  SidebarCommandPaletteHint,
+} from "./components/sidebar-command-palette-hint";
+export {
+  AdminCommandPalette,
+  type AdminCommandPaletteItem,
+  type AdminCommandPaletteListSearch,
+  type AdminCommandPaletteProps,
+} from "./components/admin-command-palette";
+export {
+  AdminCommandPaletteProvider,
+  useAdminCommandPalette,
+  type AdminCommandPaletteProviderProps,
+} from "./providers/admin-command-palette-provider";
+export { filterAdminCommandItems } from "./lib/filter-admin-command-items";
 export { RequireAuth } from "./components/require-auth";
 
 // ─── UI primitives ───────────────────────────────────────────────────────────

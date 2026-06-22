@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Home,
@@ -30,7 +30,9 @@ import {
   useSearchStore,
   SidebarNavGroup,
   SidebarNavAccordionProvider,
-  SidebarSearchHint,
+  SidebarCommandPaletteHint,
+  AdminCommandPaletteProvider,
+  type AdminCommandPaletteItem,
   useFixedDocumentTitle,
 } from "@nodocore/shared-components";
 import { BrandMark } from "@/shared/components/brand-mark";
@@ -171,7 +173,9 @@ export function AdminLayout() {
   const { user, role, plan, signOut } = useAuth();
   const { data: profile } = useOrgProfile();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const resetSearch = useSearchStore((s) => s.reset);
+  const setSearchQuery = useSearchStore((s) => s.setQuery);
   const [profileOpen, setProfileOpen] = useState(false);
   const [agencyProfileOpen, setAgencyProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -228,7 +232,7 @@ export function AdminLayout() {
   const displayName = fullName || email;
 
   const sidebarItemCount = useMemo(() => {
-    let count = 0;
+    let count = PRO_NAV_ITEMS.length;
     for (const entry of NAV_ENTRIES) {
       if ("group" in entry) {
         count += entry.items.filter(isItemVisible).length;
@@ -241,6 +245,146 @@ export function AdminLayout() {
 
   useFixedDocumentTitle("Nodo | Inmo");
 
+  const commandItems = useMemo((): AdminCommandPaletteItem[] => {
+    const items: AdminCommandPaletteItem[] = [];
+
+    for (const entry of NAV_ENTRIES) {
+      if ("group" in entry) {
+        for (const item of entry.items.filter(isItemVisible)) {
+          items.push({
+            id: item.to,
+            label: item.label,
+            href: item.to,
+            group: entry.group,
+            keywords: [entry.group, item.label],
+          });
+        }
+        continue;
+      }
+
+      if (!isItemVisible(entry)) continue;
+      items.push({
+        id: entry.to,
+        label: entry.label,
+        href: entry.to,
+        group: "Secciones",
+      });
+    }
+
+    for (const item of PRO_NAV_ITEMS) {
+      items.push({
+        id: item.to,
+        label: item.label,
+        href: item.to,
+        group: "Plan Pro",
+        keywords: [item.label, "pro"],
+      });
+    }
+
+    return items;
+  }, [role, userId, userPermissions, rolePermissions, displayRole, hasFullAccess, plan]);
+
+  const listSearch = SEARCH_PLACEHOLDERS[pathname]
+    ? { label: ROUTE_TITLES[pathname] ?? "esta sección" }
+    : undefined;
+
+  const handleCommandSelect = useCallback(
+    (item: AdminCommandPaletteItem, query: string) => {
+      const trimmed = query.trim();
+      if (trimmed) setSearchQuery(trimmed);
+      else resetSearch();
+      navigate(item.href);
+      setMobileMenuOpen(false);
+    },
+    [navigate, resetSearch, setSearchQuery],
+  );
+
+  const handleFilterCurrentList = useCallback(
+    (query: string) => {
+      setSearchQuery(query);
+      focusGlobalSearch();
+    },
+    [setSearchQuery],
+  );
+
+  return (
+    <AdminCommandPaletteProvider
+      items={commandItems}
+      onSelectItem={handleCommandSelect}
+      listSearch={listSearch}
+      onFilterCurrentList={listSearch ? handleFilterCurrentList : undefined}
+    >
+      <AdminLayoutShell
+        plan={plan}
+        signOut={signOut}
+        pathname={pathname}
+        placeholder={placeholder}
+        title={title}
+        fullName={fullName}
+        email={email}
+        displayName={displayName}
+        sidebarItemCount={sidebarItemCount}
+        isItemVisible={isItemVisible}
+        profileOpen={profileOpen}
+        setProfileOpen={setProfileOpen}
+        agencyProfileOpen={agencyProfileOpen}
+        setAgencyProfileOpen={setAgencyProfileOpen}
+        settingsOpen={settingsOpen}
+        setSettingsOpen={setSettingsOpen}
+        settingsInitialTab={settingsInitialTab}
+        setSettingsInitialTab={setSettingsInitialTab}
+        mobileMenuOpen={mobileMenuOpen}
+        setMobileMenuOpen={setMobileMenuOpen}
+      />
+    </AdminCommandPaletteProvider>
+  );
+}
+
+interface AdminLayoutShellProps {
+  plan: ReturnType<typeof useAuth>["plan"];
+  signOut: ReturnType<typeof useAuth>["signOut"];
+  pathname: string;
+  placeholder: string | undefined;
+  title: string;
+  fullName: string;
+  email: string;
+  displayName: string;
+  sidebarItemCount: number;
+  isItemVisible: (item: NavItem) => boolean;
+  profileOpen: boolean;
+  setProfileOpen: (open: boolean) => void;
+  agencyProfileOpen: boolean;
+  setAgencyProfileOpen: (open: boolean) => void;
+  settingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
+  settingsInitialTab: SettingsTabId | undefined;
+  setSettingsInitialTab: (tab: SettingsTabId | undefined) => void;
+  mobileMenuOpen: boolean;
+  setMobileMenuOpen: (open: boolean) => void;
+}
+
+function AdminLayoutShell({
+  plan,
+  signOut,
+  pathname,
+  placeholder,
+  title,
+  fullName,
+  email,
+  displayName,
+  sidebarItemCount,
+  isItemVisible,
+  profileOpen,
+  setProfileOpen,
+  agencyProfileOpen,
+  setAgencyProfileOpen,
+  settingsOpen,
+  setSettingsOpen,
+  settingsInitialTab,
+  setSettingsInitialTab,
+  mobileMenuOpen,
+  setMobileMenuOpen,
+}: AdminLayoutShellProps) {
   return (
     <InmoSettingsModuleProvider>
     <div className="flex h-[100dvh] overflow-hidden bg-paper">
@@ -334,15 +478,11 @@ export function AdminLayout() {
               );
             })}
 
-            {/* Plan Pro — always visible, outside collapsible accordion */}
-            <div className="mt-3 flex flex-col gap-1 border-t border-brand/20 pt-3">
-              <div className="mb-1 flex items-center gap-2 px-3">
-                <div className="h-px flex-1 bg-brand/40" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-brand">
-                  Plan Pro
-                </span>
-                <div className="h-px flex-1 bg-brand/40" />
-              </div>
+            <SidebarNavGroup
+              groupId="plan-pro"
+              label="Plan Pro"
+              isActive={PRO_NAV_ITEMS.some((item) => pathname.startsWith(item.to))}
+            >
               {PRO_NAV_ITEMS.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
@@ -364,10 +504,10 @@ export function AdminLayout() {
                   )}
                 </NavLink>
               ))}
-            </div>
+            </SidebarNavGroup>
           </div>
 
-          <SidebarSearchHint onClick={focusGlobalSearch} />
+          <SidebarCommandPaletteHint />
         </nav>
         </SidebarNavAccordionProvider>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useSidebarNavAccordion } from "./sidebar-nav-accordion";
@@ -21,16 +21,30 @@ export function SidebarNavGroup({
   children,
 }: SidebarNavGroupProps) {
   const accordion = useSidebarNavAccordion();
+  const revealGroup = accordion?.revealGroup;
+  const clearManualCollapse = accordion?.clearManualCollapse;
   const collapsible = accordion?.collapsible ?? false;
   const open = collapsible
     ? accordion?.openGroupId === groupId
     : true;
 
+  const prevActiveRef = useRef(false);
+
+  // Expand when navigating into this section (e.g. Ctrl+K). Manual collapse is
+  // tracked on the accordion provider so remounts cannot force it open again.
   useEffect(() => {
-    if (isActive && collapsible) {
-      accordion?.openGroup(groupId);
+    if (!isActive) {
+      prevActiveRef.current = false;
+      clearManualCollapse?.(groupId);
+      return;
     }
-  }, [isActive, collapsible, groupId, accordion]);
+
+    const becameActive = isActive && !prevActiveRef.current;
+    prevActiveRef.current = isActive;
+    if (becameActive && collapsible) {
+      revealGroup?.(groupId);
+    }
+  }, [isActive, collapsible, groupId, revealGroup, clearManualCollapse]);
 
   if (!collapsible) {
     return (
