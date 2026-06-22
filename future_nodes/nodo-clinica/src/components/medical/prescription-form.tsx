@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Pill, Plus, Trash2, Download, Mail } from "lucide-react";
+import { Pill, Plus, Trash2, Download, Mail, Search } from "lucide-react";
 import { toast } from "sonner";
 import type { Medication } from "@/types";
 import {
@@ -13,6 +13,8 @@ import {
   downloadPdf,
   pdfToBase64,
 } from "@/lib/pdf/generator";
+import { clinicApi } from "@/lib/clinic/client-api";
+import type { MedicationCatalogEntry } from "@/lib/clinic/medication-catalog";
 
 interface PrescriptionFormProps {
   appointmentId: string;
@@ -23,6 +25,7 @@ interface PrescriptionFormProps {
   doctorSpecialty?: string;
   doctorLicense?: string;
   patientEmail?: string;
+  onSaved?: () => void;
 }
 
 const emptyMedication = (): Medication => ({
@@ -33,6 +36,73 @@ const emptyMedication = (): Medication => ({
   instructions: "",
 });
 
+function MedicationNameField({
+  value,
+  onChange,
+  onPick,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onPick: (entry: MedicationCatalogEntry) => void;
+}) {
+  const [suggestions, setSuggestions] = useState<MedicationCatalogEntry[]>([]);
+  const [open, setOpen] = useState(false);
+
+  const search = useCallback(async (q: string) => {
+    if (q.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    try {
+      const data = await clinicApi.searchMedications(q);
+      setSuggestions(data.results);
+      setOpen(data.results.length > 0);
+    } catch {
+      setSuggestions([]);
+    }
+  }, []);
+
+  return (
+    <div className="relative">
+      <Label className="text-xs">Nombre (Vademécum local)</Label>
+      <div className="relative">
+        <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-slate-400" />
+        <Input
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            void search(e.target.value);
+          }}
+          onFocus={() => value.length >= 2 && void search(value)}
+          onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+          placeholder="Buscar medicamento…"
+          className="h-8 text-sm pl-8"
+        />
+      </div>
+      {open && suggestions.length > 0 && (
+        <ul className="absolute z-20 mt-1 w-full max-h-40 overflow-y-auto rounded-md border bg-white shadow-lg text-sm">
+          {suggestions.map((s) => (
+            <li key={s.id}>
+              <button
+                type="button"
+                className="w-full text-left px-2 py-1.5 hover:bg-blue-50"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onPick(s);
+                  setOpen(false);
+                }}
+              >
+                <span className="font-medium">{s.name}</span>
+                <span className="text-xs text-slate-500 ml-1">({s.activeIngredient})</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function PrescriptionForm({
   appointmentId,
   doctorId,
@@ -42,19 +112,43 @@ export function PrescriptionForm({
   doctorSpecialty,
   doctorLicense,
   patientEmail,
+  onSaved,
 }: PrescriptionFormProps) {
-  const [medications, setMedications] = useState<Medication[]>([
-    emptyMedication(),
-  ]);
+  const [medications, setMedications] = useState<Medication[]>([emptyMedication()]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [signatureText, setSignatureText] = useState("");
+  const [signatureImageData, setSignatureImageData] = useState("");
+
+  useEffect(() => {
+    clinicApi.getDoctorSchedule(doctorId).then((data) => {
+      if (data.signatureText) setSignatureText(data.signatureText);
+      if (data.signatureImageData) setSignatureImageData(data.signatureImageData);
+    }).catch(() => undefined);
+  }, []);
 
   const updateMedication = (
     index: number,
     field: keyof Medication,
-    value: string
+    value: string,
   ) => {
     setMedications((prev) =>
-      prev.map((med, i) => (i === index ? { ...med, [field]: value } : med))
+      prev.map((med, i) => (i === index ? { ...med, [field]: value } : med)),
+    );
+  };
+
+  const applyCatalogEntry = (index: number, entry: MedicationCatalogEntry) => {
+    setMedications((prev) =>
+      prev.map((med, i) =>
+        i === index
+          ? {
+              ...med,
+              name: entry.name,
+              dosage: entry.defaultDosage,
+              frequency: entry.defaultFrequency,
+              duration: entry.defaultDuration,
+            }
+          : med,
+      ),
     );
   };
 
@@ -81,19 +175,17 @@ export function PrescriptionForm({
         },
         patientName,
         medications,
+        signatureText: signatureText || `Dr/a. ${doctorName}`,
+        signatureImageData,
       });
 
       downloadPdf(doc, `receta-${patientName.replace(/\s/g, "-")}.pdf`);
 
-      await fetch("/api/prescriptions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          appointmentId,
-          doctorId,
-          patientId,
-          medications,
-        }),
+      await clinicApi.savePrescription({
+        appointmentId,
+        doctorId,
+        patientId,
+        medications,
       });
 
       if (sendEmail && patientEmail) {
@@ -107,12 +199,13 @@ export function PrescriptionForm({
             pdfBase64: pdfToBase64(doc),
           }),
         });
-        toast.success("Receta enviada por email al paciente");
+        toast.success("Receta guardada en historial y enviada por email");
       } else {
-        toast.success("Receta generada correctamente");
+        toast.success("Receta guardada en historial clínico del paciente");
       }
-    } catch {
-      toast.error("Error al generar la receta");
+      onSaved?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al generar la receta");
     } finally {
       setIsGenerating(false);
     }
@@ -147,13 +240,11 @@ export function PrescriptionForm({
                 </Button>
               )}
             </div>
-            <div>
-              <Label className="text-xs">Nombre</Label>
-              <Input
+            <div className="col-span-2">
+              <MedicationNameField
                 value={med.name}
-                onChange={(e) => updateMedication(index, "name", e.target.value)}
-                placeholder="Ej: Ibuprofeno 600mg"
-                className="h-8 text-sm"
+                onChange={(v) => updateMedication(index, "name", v)}
+                onPick={(entry) => applyCatalogEntry(index, entry)}
               />
             </div>
             <div>
@@ -187,7 +278,7 @@ export function PrescriptionForm({
                 className="h-8 text-sm"
               />
             </div>
-            <div className="col-span-2">
+            <div>
               <Label className="text-xs">Indicaciones</Label>
               <Input
                 value={med.instructions || ""}
@@ -211,6 +302,12 @@ export function PrescriptionForm({
           Agregar medicamento
         </Button>
 
+        {!signatureText && (
+          <p className="text-xs text-amber-700">
+            Configurá tu firma en Consultorio → Perfil para que aparezca en el PDF.
+          </p>
+        )}
+
         <div className="flex gap-2">
           <Button
             onClick={() => handleGenerate(false)}
@@ -219,7 +316,7 @@ export function PrescriptionForm({
             size="sm"
           >
             <Download className="h-4 w-4 mr-1" />
-            Descargar PDF
+            PDF + historial
           </Button>
           {patientEmail && (
             <Button

@@ -22,7 +22,10 @@ export async function GET(request: NextRequest) {
     const records = db.clinicalRecords.filter((r) => r.patientId === patientId);
 
     return NextResponse.json({
-      ...publicPatient(patient),
+      ...publicPatient(patient, {
+        includeHealth:
+          session?.role === "patient" && session.userId === patientId,
+      }),
       stats: {
         appointments: appointments.length,
         documents: documents.length,
@@ -92,13 +95,23 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const { profilePhotoData } = await request.json();
+  const body = await request.json();
+  const { profilePhotoData, healthProfile } = body as {
+    profilePhotoData?: string;
+    healthProfile?: import("@/lib/clinic/local-db").PatientHealthProfile;
+  };
 
   await writeDb((db) => {
     const patient = db.patients.find((p) => p.id === session.userId);
     if (!patient) return;
     if (profilePhotoData !== undefined) {
       patient.profilePhotoData = profilePhotoData;
+    }
+    if (healthProfile !== undefined) {
+      patient.healthProfile = {
+        ...healthProfile,
+        updatedAt: new Date().toISOString(),
+      };
     }
   });
 
@@ -108,5 +121,5 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Paciente no encontrado" }, { status: 404 });
   }
 
-  return NextResponse.json(publicPatient(patient));
+  return NextResponse.json(publicPatient(patient, { includeHealth: true }));
 }

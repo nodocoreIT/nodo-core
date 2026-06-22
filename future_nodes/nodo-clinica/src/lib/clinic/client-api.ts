@@ -35,41 +35,62 @@ function authHeaders(): HeadersInit {
   };
 }
 
-const fetchOpts: RequestInit = {
-  credentials: "include",
-  headers: authHeaders(),
-};
+function clinicFetchOpts(): RequestInit {
+  return {
+    credentials: "include",
+    headers: authHeaders(),
+  };
+}
+
+function parseJsonResponse(res: Response) {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(
+      `El servidor no respondió JSON (HTTP ${res.status}). Reiniciá npm run dev en future_nodes/nodo-clinica.`,
+    );
+  }
+  return res.json();
+}
 
 export const clinicApi = {
   async getSession() {
-    const res = await fetch("/api/clinic/auth/session", {
+    const res = await fetch("/api/clinic/account/session", {
       credentials: "include",
       headers: authHeaders(),
     });
-    return res.json();
+    return parseJsonResponse(res);
   },
 
   async login(email: string, password: string, role: "doctor" | "patient") {
-    const res = await fetch("/api/clinic/auth/login", {
+    const res = await fetch("/api/clinic/account/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ email, password, role }),
     });
-    const data = await res.json();
+    const data = await parseJsonResponse(res);
     if (!res.ok) throw new Error(data.error || "Error de login");
-    if (data.session) saveClientSession(data.session);
+    if (data.session) {
+      saveClientSession(data.session);
+    } else if (data.user?.id && data.role) {
+      saveClientSession({
+        userId: data.user.id,
+        role: data.role,
+        email: data.user.email,
+        fullName: data.user.fullName,
+      });
+    }
     return data;
   },
 
   async register(payload: Record<string, unknown>) {
-    const res = await fetch("/api/clinic/auth/register", {
+    const res = await fetch("/api/clinic/account/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await parseJsonResponse(res);
     if (!res.ok) throw new Error(data.error || "Error de registro");
     if (data.session) saveClientSession(data.session);
     return data;
@@ -77,28 +98,51 @@ export const clinicApi = {
 
   async logout() {
     clearClientSession();
-    await fetch("/api/clinic/auth/session", {
+    await fetch("/api/clinic/account/session", {
       method: "POST",
       credentials: "include",
     });
   },
 
   async getDoctors() {
-    const res = await fetch("/api/clinic/doctors", fetchOpts);
-    return res.json();
+    const res = await fetch("/api/clinic/doctors", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(
+        (data as { error?: string }).error || "Error al cargar médicos",
+      );
+    }
+    return data;
   },
 
   async bookAppointment(payload: {
     doctorId: string;
     scheduledAt?: string;
-    confirmPayment?: boolean;
     paymentMethod?: "transfer" | "mercadopago";
+    shareHealthProfile?: boolean;
+    receipt?: {
+      fileName: string;
+      mimeType: string;
+      dataBase64: string;
+    };
+    intakeReason?: string;
+    studyFiles?: Array<{
+      fileName: string;
+      mimeType: string;
+      dataBase64: string;
+    }>;
   }) {
     const {
       doctorId,
       scheduledAt,
-      confirmPayment = false,
       paymentMethod = "transfer",
+      shareHealthProfile = false,
+      receipt,
+      intakeReason,
+      studyFiles,
     } = payload;
     const res = await fetch("/api/clinic/appointments", {
       method: "POST",
@@ -107,12 +151,25 @@ export const clinicApi = {
       body: JSON.stringify({
         doctorId,
         scheduledAt,
-        confirmPayment,
         paymentMethod,
+        shareHealthProfile,
+        receipt,
+        intakeReason,
+        studyFiles,
       }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al reservar");
+    if (!res.ok) {
+      const err = new Error(data.error || "Error al reservar") as Error & {
+        checks?: unknown;
+        reasons?: string[];
+        valid?: boolean;
+        confidence?: number;
+      };
+      err.checks = data.checks;
+      err.reasons = data.reasons;
+      throw err;
+    }
     return data as {
       waitingRoomUrl: string;
       checkoutUrl?: string;
@@ -194,25 +251,60 @@ export const clinicApi = {
   async getPatientAppointments(patientId: string) {
     const res = await fetch(
       `/api/clinic/appointments?patientId=${patientId}`,
-      fetchOpts
+      clinicFetchOpts()
     );
     return res.json();
   },
 
-  async getDoctorQueue(doctorId: string) {
+  async getDoctorAppointments(
+    doctorId: string,
+    scope: "today" | "upcoming" | "active" = "today",
+  ) {
     const res = await fetch(
-      `/api/clinic/appointments?doctorId=${doctorId}&scope=upcoming`,
-      fetchOpts
+      `/api/clinic/appointments?doctorId=${doctorId}&scope=${scope}`,
+      clinicFetchOpts(),
     );
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al cargar cola");
+    if (!res.ok) throw new Error(data.error || "Error al cargar turnos");
+    return data;
+  },
+
+  async getDoctorQueue(doctorId: string) {
+    return this.getDoctorAppointments(doctorId, "today");
+  },
+
+  async getPendingPaymentAppointments(doctorId: string) {
+    const res = await fetch(
+      `/api/clinic/appointments?doctorId=${doctorId}&scope=pending_payment`,
+      clinicFetchOpts(),
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar pagos pendientes");
+    return data as Array<{
+      id: string;
+      scheduledAt: string;
+      patient?: { fullName: string; email?: string };
+      documentCount?: number;
+      documents?: Array<{ id: string; fileName: string; downloadUrl: string }>;
+    }>;
+  },
+
+  async doctorConfirmPayment(appointmentId: string) {
+    const res = await fetch("/api/clinic/appointments", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      credentials: "include",
+      body: JSON.stringify({ appointmentId, action: "doctorConfirmPayment" }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al confirmar pago");
     return data;
   },
 
   async getAppointmentByToken(token: string) {
     const res = await fetch(
       `/api/clinic/appointments?token=${token}`,
-      fetchOpts
+      clinicFetchOpts()
     );
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Turno no encontrado");
@@ -221,13 +313,19 @@ export const clinicApi = {
 
   async updateAppointmentStatus(
     appointmentId: string,
-    status: AppointmentStatus
+    status: AppointmentStatus,
+    extras?: { transcription?: string; clinicalNotes?: string },
   ) {
     const res = await fetch("/api/clinic/appointments", {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       credentials: "include",
-      body: JSON.stringify({ appointmentId, status }),
+      body: JSON.stringify({
+        appointmentId,
+        status,
+        transcription: extras?.transcription,
+        clinicalNotes: extras?.clinicalNotes,
+      }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al actualizar turno");
@@ -249,7 +347,7 @@ export const clinicApi = {
   async getClinicalRecords(patientId: string) {
     const res = await fetch(
       `/api/clinic/clinical-records?patientId=${patientId}`,
-      fetchOpts
+      clinicFetchOpts()
     );
     return res.json();
   },
@@ -270,7 +368,7 @@ export const clinicApi = {
   async getNotes(appointmentId: string) {
     const res = await fetch(
       `/api/clinic/notes?appointmentId=${appointmentId}`,
-      fetchOpts
+      clinicFetchOpts()
     );
     return res.json();
   },
@@ -278,7 +376,7 @@ export const clinicApi = {
   async getAvailableDates(doctorId: string) {
     const res = await fetch(
       `/api/clinic/schedule?doctorId=${doctorId}`,
-      fetchOpts
+      clinicFetchOpts()
     );
     return res.json();
   },
@@ -286,14 +384,18 @@ export const clinicApi = {
   async getSlots(doctorId: string, date: string) {
     const res = await fetch(
       `/api/clinic/schedule?doctorId=${doctorId}&date=${date}`,
-      fetchOpts
+      clinicFetchOpts()
     );
     return res.json();
   },
 
   async getDoctorSchedule(doctorId: string) {
-    const res = await fetch(`/api/clinic/schedule?own=true`, fetchOpts);
-    return res.json();
+    const res = await fetch(`/api/clinic/schedule?own=true`, clinicFetchOpts());
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Error al cargar agenda");
+    }
+    return data;
   },
 
   async saveDoctorOffice(payload: {
@@ -314,8 +416,13 @@ export const clinicApi = {
       credentials: "include",
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error("Error al guardar consultorio");
-    return res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(
+        (data as { error?: string }).error || "Error al guardar consultorio",
+      );
+    }
+    return data;
   },
 
   /** @deprecated use saveDoctorOffice */
@@ -350,16 +457,22 @@ export const clinicApi = {
     if (params.patientId) q.set("patientId", params.patientId);
     if (params.appointmentId) q.set("appointmentId", params.appointmentId);
     if (params.token) q.set("token", params.token);
-    const res = await fetch(`/api/clinic/documents?${q}`, fetchOpts);
+    const res = await fetch(`/api/clinic/documents?${q}`, clinicFetchOpts());
     return res.json();
   },
 
-  async getPatientHistory(patientId: string) {
+  async getPatientHistory(patientId: string, doctorId?: string) {
+    const params = new URLSearchParams({ patientId });
+    if (doctorId) params.set("doctorId", doctorId);
     const res = await fetch(
-      `/api/clinic/patient-history?patientId=${patientId}`,
-      fetchOpts
+      `/api/clinic/patient-history?${params}`,
+      clinicFetchOpts()
     );
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Error al cargar historial");
+    }
+    return data;
   },
 
   async generateClinicalReport(payload: {
@@ -396,19 +509,83 @@ export const clinicApi = {
       credentials: "include",
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await parseJsonResponse(res);
     if (!res.ok) throw new Error(data.error || "Error al guardar informe");
+    return data;
+  },
+
+  async searchMedications(query: string) {
+    const res = await fetch(
+      `/api/clinic/medications/search?q=${encodeURIComponent(query)}`,
+      clinicFetchOpts(),
+    );
+    return parseJsonResponse(res) as Promise<{
+      results: Array<{
+        id: string;
+        name: string;
+        activeIngredient: string;
+        defaultDosage: string;
+        defaultFrequency: string;
+        defaultDuration: string;
+        category: string;
+      }>;
+      source: string;
+      hint?: string;
+    }>;
+  },
+
+  async savePrescription(payload: {
+    appointmentId: string;
+    doctorId: string;
+    patientId: string;
+    medications: Array<{
+      name: string;
+      dosage: string;
+      frequency: string;
+      duration: string;
+      instructions?: string;
+    }>;
+  }) {
+    const res = await fetch("/api/clinic/prescriptions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "Error al guardar receta");
+    return data;
+  },
+
+  async saveStudyOrder(payload: {
+    appointmentId: string;
+    doctorId: string;
+    patientId: string;
+    studies: string[];
+    notes?: string;
+  }) {
+    const res = await fetch("/api/clinic/study-orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "Error al guardar orden");
     return data;
   },
 
   async searchPatients(doctorId: string, q = "") {
     const params = new URLSearchParams({ doctorId });
     if (q) params.set("q", q);
-    const res = await fetch(`/api/clinic/patients?${params}`, fetchOpts);
+    const res = await fetch(`/api/clinic/patients?${params}`, clinicFetchOpts());
     return res.json();
   },
 
-  async updatePatientProfile(payload: { profilePhotoData?: string }) {
+  async updatePatientProfile(payload: {
+    profilePhotoData?: string;
+    healthProfile?: import("@/lib/clinic/local-db").PatientHealthProfile;
+  }) {
     const res = await fetch("/api/clinic/patients", {
       method: "PUT",
       headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -420,9 +597,33 @@ export const clinicApi = {
     return data;
   },
 
+  async validatePaymentReceipt(accessToken: string, documentId: string) {
+    const res = await fetch("/api/clinic/payment-receipt/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      credentials: "include",
+      body: JSON.stringify({ accessToken, documentId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al validar comprobante");
+    return data as {
+      valid: boolean;
+      confidence: number;
+      reasons: string[];
+      strictMode?: boolean;
+      checks?: {
+        amount: { pass: boolean; detail: string };
+        recipient: { pass: boolean; detail: string };
+        date: { pass: boolean; detail: string };
+        schedule: { pass: boolean; detail: string };
+        receiptType: { pass: boolean; detail: string };
+      };
+    };
+  },
+
   async getInterconsultMessages(peerId: string | null = null) {
     const params = peerId ? `?peerId=${encodeURIComponent(peerId)}` : "";
-    const res = await fetch(`/api/clinic/interconsult/messages${params}`, fetchOpts);
+    const res = await fetch(`/api/clinic/interconsult/messages${params}`, clinicFetchOpts());
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al cargar mensajes");
     return data as {
@@ -450,7 +651,7 @@ export const clinicApi = {
   },
 
   async getInterconsultPresence() {
-    const res = await fetch("/api/clinic/interconsult/presence", fetchOpts);
+    const res = await fetch("/api/clinic/interconsult/presence", clinicFetchOpts());
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al cargar presencia");
     return data as {
@@ -474,7 +675,7 @@ export const clinicApi = {
 
   async searchNodoChatDirectory(q = "") {
     const params = q ? `?q=${encodeURIComponent(q)}` : "";
-    const res = await fetch(`/api/clinic/interconsult/directory${params}`, fetchOpts);
+    const res = await fetch(`/api/clinic/interconsult/directory${params}`, clinicFetchOpts());
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al buscar contactos");
     return data as {
@@ -492,7 +693,7 @@ export const clinicApi = {
   },
 
   async getNodoChatUnread() {
-    const res = await fetch("/api/clinic/interconsult/unread", fetchOpts);
+    const res = await fetch("/api/clinic/interconsult/unread", clinicFetchOpts());
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al cargar notificaciones");
     return data as {
@@ -521,7 +722,7 @@ export const clinicApi = {
 
   async getDoctorTasks(due?: string) {
     const params = due ? `?due=${encodeURIComponent(due)}` : "";
-    const res = await fetch(`/api/clinic/tasks${params}`, fetchOpts);
+    const res = await fetch(`/api/clinic/tasks${params}`, clinicFetchOpts());
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al cargar tareas");
     return data as {

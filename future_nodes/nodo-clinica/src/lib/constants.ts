@@ -23,6 +23,16 @@ export const MEDICAL_EXAMS = [
   { id: "colonoscopia", name: "Colonoscopía", category: "Gastroenterología" },
   { id: "mamografia", name: "Mamografía bilateral", category: "Imagenología" },
   { id: "densitometria", name: "Densitometría ósea", category: "Imagenología" },
+  { id: "eco-doppler", name: "Eco-Doppler carotídeo", category: "Imagenología" },
+  { id: "rx-rodilla", name: "Radiografía de rodilla", category: "Imagenología" },
+  { id: "vit-d", name: "Vitamina D (25-OH)", category: "Laboratorio" },
+  { id: "hba1c", name: "Hemoglobina glicosilada (HbA1c)", category: "Laboratorio" },
+  { id: "psa", name: "PSA total", category: "Laboratorio" },
+  { id: "test-embarazo", name: "Beta-HCG (test embarazo)", category: "Laboratorio" },
+  { id: "electroencefalograma", name: "Electroencefalograma", category: "Neurología" },
+  { id: "potenciales-evocados", name: "Potenciales evocados", category: "Neurología" },
+  { id: "consulta-cardio", name: "Consulta cardiología", category: "Interconsulta" },
+  { id: "consulta-digestivo", name: "Consulta gastroenterología", category: "Interconsulta" },
 ] as const;
 
 export const LIFECYCLE_LABELS = {

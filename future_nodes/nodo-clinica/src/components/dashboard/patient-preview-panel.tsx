@@ -19,18 +19,21 @@ import {
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { ClinicalAlertsBanner } from "@/components/medical/clinical-alerts-banner";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { LIFECYCLE_COLORS, LIFECYCLE_LABELS } from "@/lib/constants";
 import type { PatientLifecycleStatus, QueuePatient } from "@/types";
 
 interface PatientPreviewPanelProps {
   patient: QueuePatient | null;
+  doctorId?: string;
   onStartConsultation?: (appointmentId: string) => void;
   onGenerateReport?: (patient: QueuePatient) => void;
 }
 
 export function PatientPreviewPanel({
   patient,
+  doctorId,
   onStartConsultation,
   onGenerateReport,
 }: PatientPreviewPanelProps) {
@@ -51,6 +54,7 @@ export function PatientPreviewPanel({
       createdAt: string;
       doctorName?: string;
     }>;
+    healthProfile?: import("@/lib/clinic/local-db").PatientHealthProfile | null;
   } | null>(null);
 
   useEffect(() => {
@@ -58,12 +62,36 @@ export function PatientPreviewPanel({
       setHistory(null);
       return;
     }
+
+    let cancelled = false;
+    const { patientId, appointmentId } = patient;
+
+    setHistory(null);
     setLoading(true);
+
     clinicApi
-      .getPatientHistory(patient.patientId)
-      .then(setHistory)
-      .finally(() => setLoading(false));
-  }, [patient?.patientId, patient?.appointmentId]);
+      .getPatientHistory(patientId, doctorId)
+      .then((data) => {
+        if (cancelled) return;
+        if (!data?.appointments || !Array.isArray(data.clinicalRecords)) {
+          setHistory({ appointments: [], clinicalRecords: [], healthProfile: null });
+          return;
+        }
+        setHistory(data);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHistory({ appointments: [], clinicalRecords: [] });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [patient?.patientId, patient?.appointmentId, doctorId]);
 
   if (!patient) {
     return (
@@ -80,9 +108,10 @@ export function PatientPreviewPanel({
     );
   }
 
-  const todayDocs =
-    history?.appointments.find((a) => a.id === patient.appointmentId)
-      ?.documents ?? [];
+  const currentAppointment = history?.appointments?.find(
+    (a) => a.id === patient.appointmentId,
+  );
+  const todayDocs = currentAppointment?.documents ?? [];
 
   return (
     <Card className="border-slate-200 h-full shadow-sm">
@@ -137,6 +166,26 @@ export function PatientPreviewPanel({
             <p className="text-xs text-slate-700 whitespace-pre-wrap line-clamp-4">
               {patient.intakeReason}
             </p>
+          </div>
+        )}
+        {history?.healthProfile && (
+          <div className="mb-3 space-y-2">
+            <ClinicalAlertsBanner
+              healthProfile={history.healthProfile}
+              patientName={patient.patientName}
+              compact
+            />
+            {(history.healthProfile.heightCm || history.healthProfile.weightKg) && (
+              <p className="text-[11px] text-slate-600 px-1">
+                {history.healthProfile.heightCm &&
+                  `Altura: ${history.healthProfile.heightCm} cm`}
+                {history.healthProfile.heightCm &&
+                  history.healthProfile.weightKg &&
+                  " · "}
+                {history.healthProfile.weightKg &&
+                  `Peso: ${history.healthProfile.weightKg} kg`}
+              </p>
+            )}
           </div>
         )}
         <div className="flex flex-wrap gap-2 mb-3">
@@ -239,36 +288,32 @@ export function PatientPreviewPanel({
               )}
             </TabsContent>
             <TabsContent value="files" className="mt-3">
-              {!history?.appointments.some((a) => a.documents.length > 0) ? (
+              {todayDocs.length === 0 ? (
                 <p className="text-xs text-slate-400 text-center py-6">
-                  Sin archivos en consultas anteriores
+                  Sin archivos para este turno
                 </p>
               ) : (
                 <ScrollArea className="h-[220px] pr-2">
                   <div className="space-y-2">
-                    {history.appointments.flatMap((apt) =>
-                      apt.documents.map((doc) => (
-                        <a
-                          key={doc.id}
-                          href={doc.downloadUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 hover:bg-slate-50"
-                        >
-                          <FileText className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-xs text-slate-700 truncate">
-                              {doc.fileName}
-                            </p>
-                            <p className="text-[10px] text-slate-400">
-                              {format(new Date(apt.scheduledAt), "dd MMM yyyy", {
-                                locale: es,
-                              })}
-                            </p>
-                          </div>
-                        </a>
-                      ))
-                    )}
+                    {todayDocs.map((doc) => (
+                      <a
+                        key={doc.id}
+                        href={doc.downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 hover:bg-slate-50"
+                      >
+                        <FileText className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs text-slate-700 truncate">
+                            {doc.fileName}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            Turno actual
+                          </p>
+                        </div>
+                      </a>
+                    ))}
                   </div>
                 </ScrollArea>
               )}

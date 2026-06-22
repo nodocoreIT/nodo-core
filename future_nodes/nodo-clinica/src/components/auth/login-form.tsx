@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Loader2, Eye, EyeOff } from "lucide-react";
@@ -35,6 +35,18 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
     licenseNumber: "",
   });
 
+  useEffect(() => {
+    if (unified) return;
+    clinicApi.getSession().then(({ session }) => {
+      if (!session) return;
+      if (session.role === "doctor" && isDoctor) {
+        window.location.replace("/medico/dashboard");
+      } else if (session.role === "patient" && !isDoctor) {
+        window.location.replace("/paciente");
+      }
+    });
+  }, [isDoctor, unified]);
+
   const inputBase =
     "w-full text-[15px] py-[11px] px-[14px] rounded-md bg-white border transition-all duration-150 outline-none";
   const inputNormal = "border-mist text-ink";
@@ -57,7 +69,7 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
         defaultRole,
       );
       toast.success(`Bienvenido/a, ${data.user.fullName}`);
-      window.location.href = isDoctor ? "/medico/dashboard" : "/paciente";
+      window.location.replace(isDoctor ? "/medico/dashboard" : "/paciente");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al ingresar";
       setGeneralError(msg);

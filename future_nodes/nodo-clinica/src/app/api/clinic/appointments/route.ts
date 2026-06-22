@@ -14,8 +14,11 @@ import {
   getUpcomingWorkingDateKeys,
   localDateKeyFromDate,
   localDateKeyFromIso,
+  appointmentMatchesScheduleGrid,
+  slotKeyFromIso,
 } from "@/lib/clinic/schedule";
 import { doctorRequiresPayment, doctorUsesMercadoPago, isPaymentConfirmed } from "@/lib/clinic/payment";
+import { isStrictPaymentValidation } from "@/lib/clinic/payment-validation";
 import { sendAppointmentConfirmationEmail } from "@/lib/email/resend";
 import { formatReminderLabel } from "@/lib/email/reminder-label";
 import { buildCheckoutForAppointment } from "@/lib/mercadopago/checkout";
@@ -23,6 +26,36 @@ import { appBaseUrl } from "@/lib/clinic/appointment-payment";
 import type { PaymentStatus } from "@/lib/clinic/local-db";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { appendConsultationArtifacts } from "@/lib/clinic/finalize-appointment";
+import { validatePaymentReceipt } from "@/lib/ai/payment-receipt";
+import { attachDocumentToAppointment } from "@/lib/clinic/appointment-documents";
+
+const APPOINTMENT_STATUS_PRIORITY: Record<string, number> = {
+  in_consultation: 0,
+  waiting: 1,
+  scheduled: 2,
+  completed: 3,
+};
+
+function dedupeDoctorAppointments<
+  T extends { patientId: string; scheduledAt: string; status: string },
+>(appointments: T[]): T[] {
+  const bySlot = new Map<string, T>();
+  for (const apt of appointments) {
+    const key = `${apt.patientId}-${slotKeyFromIso(apt.scheduledAt)}`;
+    const existing = bySlot.get(key);
+    if (!existing) {
+      bySlot.set(key, apt);
+      continue;
+    }
+    const aptPriority = APPOINTMENT_STATUS_PRIORITY[apt.status] ?? 9;
+    const existingPriority = APPOINTMENT_STATUS_PRIORITY[existing.status] ?? 9;
+    if (aptPriority < existingPriority) {
+      bySlot.set(key, apt);
+    }
+  }
+  return Array.from(bySlot.values());
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -55,6 +88,7 @@ export async function GET(request: NextRequest) {
       doctor: doctor ? publicDoctorSummary(doctor) : undefined,
       queuePosition: ahead + 1,
       totalWaiting: waiting,
+      strictPaymentValidation: isStrictPaymentValidation(),
       documents: db.documents
         .filter((d) => d.appointmentId === apt.id)
         .map((d) => ({
@@ -80,6 +114,37 @@ export async function GET(request: NextRequest) {
 
   if (doctorId) {
     const scope = searchParams.get("scope") ?? "upcoming";
+
+    if (scope === "pending_payment") {
+      const pending = db.appointments
+        .filter(
+          (a) =>
+            a.doctorId === doctorId &&
+            a.paymentStatus === "pending" &&
+            a.status !== "cancelled",
+        )
+        .sort(
+          (a, b) =>
+            new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime(),
+        )
+        .map((apt) => {
+          const patient = db.patients.find((p) => p.id === apt.patientId);
+          const docs = db.documents.filter((d) => d.appointmentId === apt.id);
+          return {
+            ...apt,
+            patient: patient ? publicPatient(patient) : undefined,
+            documentCount: docs.length,
+            documents: docs.map((d) => ({
+              id: d.id,
+              fileName: d.fileName,
+              uploadedAt: d.uploadedAt,
+              downloadUrl: `/api/clinic/documents?id=${d.id}&download=1`,
+            })),
+          };
+        });
+      return NextResponse.json(pending);
+    }
+
     const doctor = db.doctors.find((d) => d.id === doctorId);
     const availability = doctor?.availability ?? DEFAULT_AVAILABILITY;
 
@@ -93,12 +158,16 @@ export async function GET(request: NextRequest) {
       allowedDates = new Set(getUpcomingWorkingDateKeys(availability, 3));
     }
 
-    const appointments = db.appointments
+    const filtered = db.appointments
       .filter((a) => {
         if (a.doctorId !== doctorId) return false;
         if (a.status === "cancelled") return false;
         const dateKey = localDateKeyFromIso(a.scheduledAt);
         if (!allowedDates.has(dateKey)) return false;
+        const availability = doctor?.availability ?? DEFAULT_AVAILABILITY;
+        if (!appointmentMatchesScheduleGrid(a.scheduledAt, availability)) {
+          return false;
+        }
         if (scope === "active") {
           return (
             ["scheduled", "waiting", "in_consultation"].includes(a.status) &&
@@ -109,11 +178,22 @@ export async function GET(request: NextRequest) {
           return isPaymentConfirmed(a);
         }
         return true;
+      });
+
+    const appointments = dedupeDoctorAppointments(filtered)
+      .sort((a, b) => {
+        const timeDiff =
+          new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
+        if (timeDiff !== 0) return timeDiff;
+        const statusOrder = (s: string) => {
+          if (s === "in_consultation") return 0;
+          if (s === "waiting") return 1;
+          if (s === "scheduled") return 2;
+          if (s === "completed") return 3;
+          return 4;
+        };
+        return statusOrder(a.status) - statusOrder(b.status);
       })
-      .sort(
-        (a, b) =>
-          new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
-      )
       .map((apt) => {
         const patient = db.patients.find((p) => p.id === apt.patientId);
         const aptDocs = db.documents.filter((d) => d.appointmentId === apt.id);
@@ -148,7 +228,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Debe iniciar sesión como paciente" }, { status: 401 });
   }
 
-  const { doctorId, scheduledAt, confirmPayment, paymentMethod } =
+  const { doctorId, scheduledAt, paymentMethod, shareHealthProfile, receipt, intakeReason, studyFiles } =
     await request.json();
   if (!doctorId) {
     return NextResponse.json({ error: "Médico requerido" }, { status: 400 });
@@ -175,18 +255,83 @@ export async function POST(request: NextRequest) {
   const usesMercadoPago =
     paymentMethod === "mercadopago" && doctorUsesMercadoPago(doctor);
 
-  if (requiresPayment && !usesMercadoPago && !confirmPayment) {
+  const when = scheduledAt ? new Date(scheduledAt) : null;
+  if (!when || Number.isNaN(when.getTime())) {
     return NextResponse.json(
-      {
-        error: "Debe confirmar la transferencia antes de reservar el turno",
-        requiresPayment: true,
-        payment: publicDoctor(doctor).payment,
-      },
-      { status: 402 }
+      { error: "Horario de turno inválido" },
+      { status: 400 },
     );
   }
 
-  const when = scheduledAt ? new Date(scheduledAt) : new Date();
+  const availability = doctor.availability ?? DEFAULT_AVAILABILITY;
+  let validatedReceipt:
+    | { fileName?: string; mimeType?: string; dataBase64?: string }
+    | undefined;
+
+  if (requiresPayment && !usesMercadoPago) {
+    const receiptPayload = receipt as
+      | { fileName?: string; mimeType?: string; dataBase64?: string }
+      | undefined;
+    if (!receiptPayload?.dataBase64?.trim()) {
+      return NextResponse.json(
+        {
+          error:
+            "Subí el comprobante de transferencia para confirmar el turno",
+          requiresReceipt: true,
+        },
+        { status: 402 },
+      );
+    }
+
+    const fee = doctor.payment?.consultationFee ?? 0;
+    const validation = await validatePaymentReceipt({
+      imageBase64: receiptPayload.dataBase64,
+      mimeType: receiptPayload.mimeType || "image/jpeg",
+      fileName: receiptPayload.fileName,
+      doctorName: doctor.fullName,
+      doctorAlias: doctor.payment?.alias,
+      doctorCbu: doctor.payment?.cbu,
+      expectedAmount: fee,
+      currency: doctor.payment?.currency ?? "ARS",
+      appointmentDateIso: when.toISOString(),
+      slotDurationMinutes: availability.slotDurationMinutes,
+    });
+
+    if (!validation.valid) {
+      return NextResponse.json(
+        {
+          error:
+            "El comprobante no cumple los requisitos. Revisá monto, destinatario y horario del turno.",
+          ...validation,
+        },
+        { status: 402 },
+      );
+    }
+
+    validatedReceipt = receiptPayload;
+  }
+
+  if (!appointmentMatchesScheduleGrid(when.toISOString(), availability)) {
+    return NextResponse.json(
+      { error: "El horario elegido está fuera de la agenda del médico" },
+      { status: 400 },
+    );
+  }
+
+  const slotKey = slotKeyFromIso(when.toISOString());
+  const slotTaken = db.appointments.some(
+    (a) =>
+      a.doctorId === doctorId &&
+      slotKeyFromIso(a.scheduledAt) === slotKey &&
+      a.status !== "cancelled",
+  );
+  if (slotTaken) {
+    return NextResponse.json(
+      { error: "Ese horario ya está reservado" },
+      { status: 409 },
+    );
+  }
+
   const whenDateKey = localDateKeyFromIso(when.toISOString());
   const queueToday = db.appointments.filter(
     (a) =>
@@ -217,6 +362,8 @@ export async function POST(request: NextRequest) {
     paymentStatus,
     paymentProvider: usesMercadoPago ? ("mercadopago" as const) : ("transfer" as const),
     paymentConfirmedAt: paymentStatus === "confirmed" ? now : undefined,
+    shareHealthProfile: !!shareHealthProfile,
+    intakeReason: intakeReason ? String(intakeReason).slice(0, 4000) : undefined,
     createdAt: now,
     updatedAt: now,
   };
@@ -224,6 +371,44 @@ export async function POST(request: NextRequest) {
   await writeDb((d) => {
     d.appointments.push(apt);
   });
+
+  if (validatedReceipt?.dataBase64) {
+    try {
+      const buffer = Buffer.from(
+        validatedReceipt.dataBase64.replace(/^data:[^;]+;base64,/, ""),
+        "base64",
+      );
+      await attachDocumentToAppointment(
+        apt.id,
+        session.userId,
+        validatedReceipt.fileName || "comprobante.jpg",
+        validatedReceipt.mimeType || "image/jpeg",
+        buffer,
+      );
+    } catch (err) {
+      console.error("[appointments] receipt attach failed", err);
+    }
+  }
+
+  const studies = Array.isArray(studyFiles) ? studyFiles : [];
+  for (const study of studies) {
+    if (!study?.dataBase64) continue;
+    try {
+      const buffer = Buffer.from(
+        String(study.dataBase64).replace(/^data:[^;]+;base64,/, ""),
+        "base64",
+      );
+      await attachDocumentToAppointment(
+        apt.id,
+        session.userId,
+        study.fileName || "estudio.pdf",
+        study.mimeType || "application/pdf",
+        buffer,
+      );
+    } catch (err) {
+      console.error("[appointments] study attach failed", err);
+    }
+  }
 
   const baseUrl = appBaseUrl();
   const waitingRoomUrl = `/paciente/sala/${apt.accessToken}`;
@@ -290,8 +475,16 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   const body = await request.json();
-  const { appointmentId, status, accessToken, doctorId, action, intakeReason } =
-    body;
+  const {
+    appointmentId,
+    status,
+    accessToken,
+    doctorId,
+    action,
+    intakeReason,
+    transcription,
+    clinicalNotes,
+  } = body;
 
   if (action === "saveIntake" && accessToken) {
     const db = await readDb();
@@ -324,6 +517,40 @@ export async function PATCH(request: NextRequest) {
     }
     if (apt.paymentStatus === "confirmed" || apt.paymentStatus === "waived") {
       return NextResponse.json(apt);
+    }
+    if (session?.role === "patient" && isStrictPaymentValidation()) {
+      return NextResponse.json(
+        {
+          error:
+            "En producción debés validar el comprobante con IA o pedir al médico que confirme el pago.",
+        },
+        { status: 403 },
+      );
+    }
+    const now = new Date().toISOString();
+    await writeDb((d) => {
+      const target = d.appointments.find((a) => a.id === apt!.id);
+      if (!target) return;
+      target.paymentStatus = "confirmed";
+      target.paymentConfirmedAt = now;
+      target.updatedAt = now;
+    });
+    const updated = (await readDb()).appointments.find((a) => a.id === apt!.id);
+    return NextResponse.json(updated);
+  }
+
+  if (action === "doctorConfirmPayment" && appointmentId) {
+    const session = await getSessionFromRequest(request);
+    if (session?.role !== "doctor") {
+      return NextResponse.json({ error: "Solo el médico puede confirmar" }, { status: 403 });
+    }
+    const db = await readDb();
+    const apt = db.appointments.find((a) => a.id === appointmentId);
+    if (!apt) {
+      return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
+    }
+    if (apt.doctorId !== session.userId) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
     const now = new Date().toISOString();
     await writeDb((d) => {
@@ -360,7 +587,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
   }
 
-  await writeDb((d) => {
+  await writeDb(async (d) => {
     const target = d.appointments.find((a) => a.id === apt!.id);
     if (!target) return;
     if (status) {
@@ -368,24 +595,24 @@ export async function PATCH(request: NextRequest) {
       target.updatedAt = new Date().toISOString();
 
       if (status === "completed") {
-        const note = d.clinicalNotes[target.id];
-        const already = d.clinicalRecords.some(
-          (r) =>
-            r.patientId === target.patientId &&
-            r.title.includes(target.scheduledAt.slice(0, 10))
-        );
-        if (note?.content && !already) {
-          const doctor = d.doctors.find((doc) => doc.id === target.doctorId);
-          d.clinicalRecords.push({
-            id: newId("rec"),
-            patientId: target.patientId,
+        if (clinicalNotes?.trim() && d.clinicalNotes[target.id]) {
+          d.clinicalNotes[target.id] = {
+            ...d.clinicalNotes[target.id],
+            content: clinicalNotes.trim(),
+            updatedAt: new Date().toISOString(),
+          };
+        } else if (clinicalNotes?.trim()) {
+          d.clinicalNotes[target.id] = {
+            appointmentId: target.id,
             doctorId: target.doctorId,
-            title: `Consulta — ${new Date(target.scheduledAt).toLocaleDateString("es-AR")}${doctor ? ` · ${doctor.fullName}` : ""}`,
-            content: note.content,
-            recordType: "consultation",
-            createdAt: new Date().toISOString(),
-          });
+            content: clinicalNotes.trim(),
+            updatedAt: new Date().toISOString(),
+          };
         }
+        await appendConsultationArtifacts(d, target.id, {
+          transcription,
+          clinicalNotes,
+        });
       }
     }
   });
