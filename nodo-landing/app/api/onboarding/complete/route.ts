@@ -22,7 +22,6 @@ export async function POST(request: NextRequest) {
   const province = String(formData.get("province") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const planChoice = String(formData.get("planChoice") ?? "starter").trim();
-  const demoDays = formData.get("demoDays") ? Number(formData.get("demoDays")) : null;
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const cardHolder = String(formData.get("cardHolder") ?? "").trim();
   const cardLastFour = String(formData.get("cardLastFour") ?? "").trim();
@@ -122,11 +121,7 @@ export async function POST(request: NextRequest) {
   const fullName = `${firstName} ${lastName}`.trim();
   const cfg = getNodeRegistrationConfig(unitRow.unit_code);
   const planLabel =
-    planChoice === "demo"
-      ? `demo-${demoDays ?? 14}d`
-      : planChoice === "pro"
-        ? "pro"
-        : "starter";
+    planChoice === "demo" ? "demo" : planChoice === "pro" ? "pro" : "starter";
 
   let identityStatus: "approved" | "declined" | "review" | "error" | "skipped" = "skipped";
   if (nodeRequiresIdentity && isIdentityVerificationEnabled()) {
@@ -181,7 +176,7 @@ export async function POST(request: NextRequest) {
     province,
     phone,
     plan_choice: planChoice,
-    demo_days: planChoice === "demo" ? demoDays ?? 14 : null,
+    demo_days: null,
     username: email,
     document_number: documentNumber || null,
     gender: null,

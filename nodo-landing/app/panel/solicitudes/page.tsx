@@ -177,7 +177,7 @@ export default function SolicitudesPage() {
 
   function planLabel(profile: OnboardingProfile | null, unitPlan: string | null) {
     if (profile?.plan_choice === "demo") {
-      return `Demo ${profile.demo_days ?? 14} días`;
+      return profile.demo_days ? `Demo · ${profile.demo_days} días` : "Plan Demo";
     }
     if (profile?.plan_choice) {
       return profile.plan_choice === "pro" ? "Plan Pro" : "Plan Starter";

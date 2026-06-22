@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getNodeRegistrationConfig } from "@/lib/registration/node-config";
+import { getLoginHrefForNode } from "@/lib/nodes";
 import {
   provisionNodoAccessPendingPassword,
   createLandingAuthPendingPassword,
@@ -127,7 +128,8 @@ export async function POST(request: Request) {
     .eq("client_unit_id", clientUnitId);
 
   const origin = new URL(request.url).origin;
-  const loginUrl = `${origin}/${cfg?.slug ?? "login"}/login?mode=first-access`;
+  const loginPath = getLoginHrefForNode(cfg?.slug ?? "inmo");
+  const loginUrl = `${origin}${loginPath}?mode=first-access`;
 
   if (isMailConfigured()) {
     await sendAccountEnabledEmail({

@@ -43,7 +43,6 @@ export interface OnboardingPayload {
   province: string;
   phone: string;
   planChoice: PlanChoice;
-  demoDays?: number;
   username: string;
   password: string;
 }

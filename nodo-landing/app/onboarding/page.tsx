@@ -15,6 +15,12 @@ const inputReadOnlyClass =
 
 const labelClass = "text-xs font-medium text-slate-300";
 
+function formatCardExpiryMmAa(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
+
 const fileInputClass =
   "mt-1 w-full rounded-lg bg-white px-3 py-2 text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-brand file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white";
 
@@ -30,7 +36,6 @@ function OnboardingForm() {
   const [province, setProvince] = useState("");
   const [phone, setPhone] = useState("");
   const [planChoice, setPlanChoice] = useState<"starter" | "pro" | "demo">("starter");
-  const [demoDays, setDemoDays] = useState("14");
   const [cardHolder, setCardHolder] = useState("");
   const [cardLastFour, setCardLastFour] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
@@ -137,7 +142,6 @@ function OnboardingForm() {
     formData.append("planChoice", planChoice);
     if (documentNumber) formData.append("documentNumber", documentNumber);
     if (identityVerificationRequired) formData.append("identityVerified", "true");
-    if (planChoice === "demo") formData.append("demoDays", demoDays);
     formData.append("cardHolder", cardHolder);
     formData.append("cardLastFour", cardLastFour);
     formData.append("cardExpiry", cardExpiry);
@@ -253,9 +257,6 @@ function OnboardingForm() {
                     </button>
                   ))}
                 </div>
-                {planChoice === "demo" && (
-                  <input type="number" min={7} max={90} value={demoDays} onChange={(e) => setDemoDays(e.target.value)} className={`${inputClass} mt-2`} placeholder="Días de demo" />
-                )}
               </fieldset>
             </div>
 
@@ -372,7 +373,15 @@ function OnboardingForm() {
                   </label>
                   <label className="block">
                     <span className={labelClass}>Vencimiento (MM/AA)</span>
-                    <input required placeholder="12/28" value={cardExpiry} onChange={(e) => setCardExpiry(e.target.value)} className={inputClass} />
+                    <input
+                      required
+                      placeholder="12/28"
+                      inputMode="numeric"
+                      maxLength={5}
+                      value={cardExpiry}
+                      onChange={(e) => setCardExpiry(formatCardExpiryMmAa(e.target.value))}
+                      className={inputClass}
+                    />
                   </label>
                 </div>
               </div>
