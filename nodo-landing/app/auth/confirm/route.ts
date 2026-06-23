@@ -58,6 +58,13 @@ export async function GET(request: NextRequest) {
       if (error || !data.session) {
         return fail("El enlace expiró o ya fue usado. Solicitá uno nuevo.");
       }
+      // Recovery: redirect to the branded login page (next) so the user sees
+      // the full PasswordResetPanel UI instead of the bare SPA callback form.
+      if (type === "recovery") {
+        return NextResponse.redirect(
+          redirectUrlWithSessionHash(request.url, next, data.session, { type }),
+        );
+      }
       if (spaCallback) {
         return NextResponse.redirect(
           redirectUrlWithSessionHash(request.url, spaCallback, data.session, { type }),
