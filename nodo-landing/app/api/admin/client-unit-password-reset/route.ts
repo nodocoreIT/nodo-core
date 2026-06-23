@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  authAdminForUnitCode,
-  ensureAuthUserForUnit,
-  generateTemporaryPassword,
-  syncNodeEmailAccessForClient,
-} from "@/lib/registration/client-unit-auth";
 import { requirePanelTeamMember } from "@/lib/panel/panel-api-auth";
+import { sendRecoveryEmail } from "@/lib/auth/send-recovery-email";
 
 export async function POST(request: NextRequest) {
   const auth = await requirePanelTeamMember();
@@ -22,7 +17,7 @@ export async function POST(request: NextRequest) {
   const landingAdmin = createAdminClient();
   const { data: unit, error: unitErr } = await landingAdmin
     .from("client_units")
-    .select("id, unit_code, access_user, provision_user_id, plan, client_id, clients(name)")
+    .select("id, unit_code, access_user")
     .eq("id", clientUnitId)
     .single();
 
@@ -34,45 +29,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "El nodo no tiene email de acceso cargado." }, { status: 400 });
   }
 
-  const authAdmin = authAdminForUnitCode(unit.unit_code);
-  if (!authAdmin) {
-    return NextResponse.json({ error: `El nodo "${unit.unit_code}" no está configurado.` }, { status: 400 });
-  }
+  const origin = request.headers.get("origin") ?? request.nextUrl.origin;
 
-  const temporaryPassword = generateTemporaryPassword();
-  const clientName =
-    (unit.clients as { name?: string } | null)?.name ?? unit.access_user;
-
-  const ensured = await ensureAuthUserForUnit(authAdmin, {
-    unit,
-    password: temporaryPassword,
-    mustSetPassword: true,
-    unitCode: unit.unit_code,
-    clientName,
-    plan: unit.plan ?? undefined,
+  const result = await sendRecoveryEmail({
+    email: unit.access_user.trim(),
+    nodeSlug: unit.unit_code,
+    origin,
   });
 
-  if (!ensured.ok) {
-    return NextResponse.json({ error: ensured.error }, { status: 400 });
+  if (result.status === "error") {
+    return NextResponse.json({ error: result.message }, { status: 400 });
   }
 
-  await landingAdmin
-    .from("client_units")
-    .update({
-      access_password: temporaryPassword,
-      password_set_at: null,
-      provision_user_id: ensured.userId,
-      provisioned_at: new Date().toISOString(),
-    })
-    .eq("id", clientUnitId);
-
-  if (unit.client_id) {
-    await syncNodeEmailAccessForClient(landingAdmin, unit.client_id);
-  }
-
-  return NextResponse.json({
-    ok: true,
-    password: temporaryPassword,
-    user_id: ensured.userId,
-  });
+  return NextResponse.json({ ok: true });
 }

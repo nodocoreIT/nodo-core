@@ -12,6 +12,7 @@ import {
   PasswordResetPanel,
   usePasswordRecoveryBootstrap,
   enforceNodeAccess,
+  mapAuthLoginError,
   INVALID_LOGIN_MESSAGE,
   AUTH_ERROR_CREDENTIALS,
   mustSetPassword,
@@ -35,14 +36,6 @@ import {
   applyLoginAccent,
   type NodeAccent,
 } from "@/lib/node-accents";
-
-function mapAuthLoginError(message: string | undefined): string {
-  const msg = (message ?? "").toLowerCase();
-  if (msg.includes("banned") || msg.includes("user is banned") || msg.includes("user_banned")) {
-    return "Tu acceso está pausado. Contactate con NODO Core para reactivarlo.";
-  }
-  return message ?? INVALID_LOGIN_MESSAGE;
-}
 
 function redirectToFinanzasAuth(accessToken: string, refreshToken: string) {
   try {

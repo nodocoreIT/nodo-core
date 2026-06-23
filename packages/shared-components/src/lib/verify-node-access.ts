@@ -7,6 +7,18 @@ export const INVALID_LOGIN_MESSAGE =
 /** @deprecated Use INVALID_LOGIN_MESSAGE — kept for imports that referenced the old name. */
 export const ACCESS_DENIED_MESSAGE = INVALID_LOGIN_MESSAGE;
 
+const BANNED_MESSAGE =
+  "Tu acceso fue pausado. Contactate con NODO Core para reactivarlo.";
+
+/** Maps Supabase auth login errors to user-friendly Spanish messages. */
+export function mapAuthLoginError(message: string | undefined): string {
+  const msg = (message ?? "").toLowerCase();
+  if (msg.includes("banned") || msg.includes("user_banned") || msg.includes("user is banned")) {
+    return BANNED_MESSAGE;
+  }
+  return INVALID_LOGIN_MESSAGE;
+}
+
 /**
  * Returns true when the signed-in user is registered for the given node (unit_code).
  * Uses RPC `user_has_node_access` on the shared Supabase project.

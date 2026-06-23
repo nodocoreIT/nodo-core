@@ -15,6 +15,7 @@ export {
   ACCESS_DENIED_MESSAGE,
   AUTH_ERROR_CREDENTIALS,
   nodeLoginUrlWithAuthError,
+  mapAuthLoginError,
 } from "./lib/verify-node-access";
 export { mapAuthPasswordError, isSamePasswordAuthError } from "./lib/auth-password-errors";
 export {
