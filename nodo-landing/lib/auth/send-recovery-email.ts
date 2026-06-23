@@ -90,7 +90,8 @@ export async function sendRecoveryEmail(params: {
       }
     }
 
-    if (error || !data?.properties?.action_link) {
+    const hashedToken = data?.properties?.hashed_token;
+    if (error || !hashedToken) {
       console.error("Generate recovery link error:", error);
       return {
         status: "error",
@@ -98,17 +99,26 @@ export async function sendRecoveryEmail(params: {
       };
     }
 
+    // Build our own URL that goes directly to /auth/confirm on our domain.
+    // This avoids relying on Supabase's redirect_to allowlist — the user
+    // always arrives at our server first, which verifies the token and
+    // redirects to the SPA auth callback with the session in the hash.
+    const confirmParams = new URLSearchParams({
+      token_hash: hashedToken,
+      type: "recovery",
+      ...(project ? { project } : {}),
+      next: loginReturn,
+    });
+    const recoveryUrl = `${baseOrigin}/auth/confirm?${confirmParams.toString()}`;
+
     if (isMailConfigured()) {
       await sendPasswordResetEmail({
         email: email.trim(),
-        recoveryUrl: data.properties.action_link,
+        recoveryUrl,
         nodeLabel,
       });
     } else {
-      console.warn(
-        "Mail not configured. Recovery action link would be: ",
-        data.properties.action_link,
-      );
+      console.warn("Mail not configured. Recovery link:", recoveryUrl);
     }
 
     return {
