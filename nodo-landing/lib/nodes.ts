@@ -347,5 +347,5 @@ export function getNodeLoginPath(nodeSlug: string): string {
   if (raw === "clinica") return "/clinica/login";
   if (raw.startsWith("nodo-")) return `/${raw}/login`;
   const slug = normalizeNodeSlug(nodeSlug);
-  return `/${slug}/login`;
+  return `/nodo-${slug}/login`;
 }
