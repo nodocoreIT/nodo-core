@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { setAuthUserPassword } from "@/lib/registration/client-unit-auth";
-import { mapAuthPasswordError, isSamePasswordAuthError } from "@nodocore/shared-components";
+import { mapAuthPasswordError, isSamePasswordAuthError } from "@nodocore/shared-components/lib/auth-password-errors";
 
 async function resolveAuthenticatedUserId(request: NextRequest): Promise<string | null> {
   const bearer = request.headers.get("authorization");
