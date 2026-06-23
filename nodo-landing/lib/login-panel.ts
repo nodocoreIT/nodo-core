@@ -34,7 +34,7 @@ export function getLoginPanelDetails(nodeParam: string): LoginPanelDetails {
   if (nodeParam === "nodo-autos" || nodeParam === "autos") {
     return {
       activeNodeSlug: "autos",
-      nodeCode: "Automotores",
+      nodeCode: "Autos",
       description:
         "Panel de gestión de stock para concesionarias y agencias: inventario, clientes, publicaciones y contratos de venta digitales.",
     };
