@@ -231,7 +231,7 @@ export const NODES: NodeDef[] = [
   {
     code: "Autos",
     slug: "autos",
-    label: "Nodo Automotores",
+    label: "Nodo Autos",
     parentSlug: "it",
     description:
       "Panel de gestión de stock para concesionarias y agencias de autos: inventario, clientes, publicaciones y contratos de venta.",
