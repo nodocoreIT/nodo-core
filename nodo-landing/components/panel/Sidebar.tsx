@@ -22,8 +22,6 @@ import {
 import {
   Button,
   cn,
-  SidebarNavAccordionProvider,
-  SidebarNavGroup,
   SidebarSearchHint,
 } from "@nodocore/shared-components";
 import { createClient } from "@/lib/supabase/client";
@@ -64,7 +62,6 @@ const ECOSYSTEM_ITEMS: NavItem[] = [
   { label: "Informes", href: "/panel/informes", icon: BarChart3, enabled: true },
 ];
 
-const SIDEBAR_ITEM_COUNT = PLATFORM_ITEMS.length + ECOSYSTEM_ITEMS.length;
 
 function NavLinks({
   items,
@@ -128,13 +125,6 @@ export default function Sidebar({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { open: openCommandPalette } = useCommandPalette();
 
-  const platformActive = PLATFORM_ITEMS.some(
-    (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
-  );
-  const ecosystemActive = ECOSYSTEM_ITEMS.some(
-    (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
-  );
-
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut({ scope: "local" });
@@ -163,38 +153,26 @@ export default function Sidebar({
           </button>
         </div>
 
-        <SidebarNavAccordionProvider itemCount={SIDEBAR_ITEM_COUNT}>
-          <nav
-            className="flex-1 overflow-y-auto px-3 py-2"
-            aria-label="Navegación principal"
-          >
-            <SidebarNavGroup
-              groupId="plataforma"
-              label="Plataforma"
-              isActive={platformActive}
-            >
-              <NavLinks
-                items={PLATFORM_ITEMS}
-                pathname={pathname}
-                onNavigate={onMobileClose}
-              />
-            </SidebarNavGroup>
+        <nav
+          className="flex-1 space-y-1 overflow-y-auto px-3 py-2"
+          aria-label="Navegación principal"
+        >
+          <NavLinks
+            items={PLATFORM_ITEMS}
+            pathname={pathname}
+            onNavigate={onMobileClose}
+          />
 
-            <SidebarNavGroup
-              groupId="ecosistema"
-              label="Ecosistema"
-              isActive={ecosystemActive}
-            >
-              <NavLinks
-                items={ECOSYSTEM_ITEMS}
-                pathname={pathname}
-                onNavigate={onMobileClose}
-              />
-            </SidebarNavGroup>
+          <div className="my-2 border-t border-[var(--color-sidebar-border)]" />
 
-            <SidebarSearchHint onClick={openCommandPalette} />
-          </nav>
-        </SidebarNavAccordionProvider>
+          <NavLinks
+            items={ECOSYSTEM_ITEMS}
+            pathname={pathname}
+            onNavigate={onMobileClose}
+          />
+
+          <SidebarSearchHint onClick={openCommandPalette} />
+        </nav>
 
         <div className="px-3 pb-3">
           <a

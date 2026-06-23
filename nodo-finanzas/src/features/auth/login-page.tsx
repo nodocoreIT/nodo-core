@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DollarSign } from 'lucide-react';
 import { supabase } from '@/shared/lib/supabase';
-import { enforceNodeAccess, INVALID_LOGIN_MESSAGE, mustSetPassword } from '@nodocore/shared-components';
+import { enforceNodeAccess, mapAuthLoginError, mustSetPassword } from '@nodocore/shared-components';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -78,7 +78,7 @@ export function LoginPage() {
     if (mode === 'login') {
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) {
-        setError(INVALID_LOGIN_MESSAGE);
+        setError(mapAuthLoginError(authError.message));
       } else {
         const access = await enforceNodeAccess(supabase, 'Finanzas');
         if (!access.ok) {

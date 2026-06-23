@@ -7,7 +7,7 @@ import {
   useAuth,
   useSupabase,
   enforceNodeAccess,
-  INVALID_LOGIN_MESSAGE,
+  mapAuthLoginError,
   fetchMustSetPassword,
   RequiredPasswordForm,
 } from "@nodocore/shared-components";
@@ -42,12 +42,7 @@ export function LoginPage() {
     const { error: authError } = await signInWithPassword({ email, password });
 
     if (authError) {
-      const msg = authError.message.toLowerCase();
-      if (msg.includes("banned") || msg.includes("user is banned")) {
-        setError("Tu acceso está pausado. Contactate con NODO para reactivarlo.");
-      } else {
-        setError(INVALID_LOGIN_MESSAGE);
-      }
+      setError(mapAuthLoginError(authError.message));
       setLoading(false);
       return;
     }

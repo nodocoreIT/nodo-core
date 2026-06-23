@@ -19,10 +19,12 @@ function readDismissed(storageKey: string): DismissedNotification[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (entry): entry is DismissedNotification =>
-        typeof entry?.id === "string" && typeof entry?.title === "string",
-    );
+    return parsed
+      .filter(
+        (entry): entry is DismissedNotification =>
+          typeof entry?.id === "string" && typeof entry?.title === "string",
+      )
+      .sort((a, b) => (b.dismissedAt ?? "").localeCompare(a.dismissedAt ?? ""));
   } catch {
     return [];
   }
@@ -90,6 +92,7 @@ export function useNotificationDismissals(storageKey: string) {
         dismissedAt: new Date().toISOString(),
       };
       const next = [...dismissed.filter((d) => d.id !== notification.id), record];
+      next.sort((a, b) => b.dismissedAt.localeCompare(a.dismissedAt));
       persist(next);
     },
     [dismissed, persist],

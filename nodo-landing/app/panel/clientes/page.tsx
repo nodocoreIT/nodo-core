@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Fragment } from "react";
 import { createPortal } from "react-dom";
-import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, RotateCcw, Database, AlertTriangle, Loader2 } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, Mail, Database, AlertTriangle, Loader2 } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
 import { NODES, unitHasClientAccessCredentials, type NodeDef } from "@/lib/nodes";
@@ -798,11 +798,11 @@ export default function ClientesPage() {
   async function resetUnitPassword(unit: FormUnit) {
     const savedUnitIds = new Set((editingClient ? unitsByClient.get(editingClient.id) : [])?.map((u) => u.id) ?? []);
     if (!editingClient || !savedUnitIds.has(unit.key)) {
-      setError("Primero guardá el cliente para poder blanquear el acceso.");
+      setError("Primero guardá el cliente para poder enviar el email de recuperación.");
       return;
     }
     if (!unit.access_user.trim()) {
-      setError("El nodo necesita un email de acceso para blanquear la contraseña.");
+      setError("El nodo necesita un email de acceso para enviar la recuperación.");
       return;
     }
 
@@ -817,17 +817,12 @@ export default function ClientesPage() {
     setResettingUnitKey(null);
 
     if (!res.ok || !json.ok) {
-      setError(json.error ?? "No se pudo blanquear la contraseña.");
+      setError(json.error ?? "No se pudo enviar el email de recuperación.");
       return;
     }
 
-    updateFormUnit(unit.key, {
-      access_password: json.password,
-      provision_user_id: json.user_id ?? unit.provision_user_id,
-    });
-    copy(json.password);
     setNoticeMessage(
-      "Contraseña blanqueada. El usuario deberá definir una clave nueva al ingresar.",
+      `Se envió un email de recuperación de contraseña a ${unit.access_user}.`,
     );
   }
 
@@ -1465,12 +1460,12 @@ export default function ClientesPage() {
           </div>
         )}
 
-        {/* Saving full-screen overlay — blocks all interaction while saving */}
-        {showForm && saving && (
+        {/* Full-screen overlay — blocks all interaction while processing */}
+        {showForm && (saving || resettingUnitKey || purgingUnitKey) && (
           <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)", background: "rgba(18,30,47,.30)" }}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, background: "white", borderRadius: 16, padding: "28px 36px", boxShadow: "0 16px 48px rgba(18,30,47,.22)" }}>
               <Loader2 size={34} style={{ color: "var(--color-brand)", animation: "spin 1s linear infinite" }} />
-              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-navy)", fontFamily: "var(--font-sans)" }}>Guardando...</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-navy)", fontFamily: "var(--font-sans)" }}>{resettingUnitKey ? "Enviando email de recuperación..." : purgingUnitKey ? "Eliminando datos del nodo..." : "Guardando..."}</span>
             </div>
           </div>
         )}
@@ -1752,7 +1747,7 @@ export default function ClientesPage() {
                               Acceso del cliente
                             </p>
                             <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--color-slate2)", lineHeight: 1.45 }}>
-                              La contraseña real definida por el usuario no se puede consultar. Desde acá podés definir una temporal o blanquear el acceso.
+                              Podés enviar un email de recuperación de contraseña al cliente desde acá.
                             </p>
                           </div>
                           {activeFormUnit.provisioned_at && (
@@ -1761,71 +1756,22 @@ export default function ClientesPage() {
                             </span>
                           )}
                         </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
-                          <div>
-                            <label style={labelStyle}>Usuario (email)</label>
-                            <input type="text" value={activeFormUnit.access_user} onChange={(e) => updateFormUnit(activeFormUnit.key, { access_user: e.target.value })} style={inputStyle} autoComplete="off" />
+                        <div>
+                          <label style={labelStyle}>Usuario (email)</label>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <input type="text" value={activeFormUnit.access_user} onChange={(e) => updateFormUnit(activeFormUnit.key, { access_user: e.target.value })} style={{ ...inputStyle, flex: 1 }} autoComplete="off" />
+                            {editingClient && unitHasClientAccessCredentials(activeFormUnit.access_user) && (
+                              <button
+                                type="button"
+                                onClick={() => resetUnitPassword(activeFormUnit)}
+                                disabled={resettingUnitKey === activeFormUnit.key}
+                                style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--color-navy)", color: "white", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, fontWeight: 700, cursor: resettingUnitKey === activeFormUnit.key ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", opacity: resettingUnitKey === activeFormUnit.key ? 0.65 : 1, flexShrink: 0, whiteSpace: "nowrap" }}
+                              >
+                                <Mail size={13} />
+                                {resettingUnitKey === activeFormUnit.key ? "Enviando..." : "Recuperar contraseña"}
+                              </button>
+                            )}
                           </div>
-                          <div>
-                            <label style={labelStyle}>Contraseña temporal / inicial</label>
-                            <input type="text" value={activeFormUnit.access_password} onChange={(e) => updateFormUnit(activeFormUnit.key, { access_password: e.target.value })} style={inputStyle} autoComplete="off" />
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 12 }}>
-                          {(() => {
-                            const nodeDef = NODES.find((n) => n.code === activeFormUnit.unit_code);
-                            if (!unitHasClientAccessCredentials(activeFormUnit.access_user)) {
-                              return (
-                                <p style={{ margin: 0, fontSize: 11.5, color: "var(--color-slate2)" }}>
-                                  Completá el email de acceso para gestionar credenciales en cualquier nodo.
-                                </p>
-                              );
-                            }
-                            if (!activeFormUnit.access_password.trim()) {
-                              return (
-                                <p style={{ margin: 0, fontSize: 11.5, color: "#B5630C", fontWeight: 600 }}>
-                                  Definí una contraseña temporal o usá Blanquear para forzar cambio al ingresar.
-                                </p>
-                              );
-                            }
-                            if (activeFormUnit.status !== "activo" && activeFormUnit.status !== "onboarding") {
-                              return (
-                                <p style={{ margin: 0, fontSize: 11.5, color: "var(--color-slate2)" }}>
-                                  El acceso se sincroniza cuando el estado está activo u onboarding.
-                                </p>
-                              );
-                            }
-                            if (nodeDef?.provisionable && activeFormUnit.provisioned_at) {
-                              return (
-                                <p style={{ margin: 0, fontSize: 11.5, color: "#1F8A5B", fontWeight: 600 }}>
-                                  ✓ Acceso ya creado en {nodeDef.label}
-                                </p>
-                              );
-                            }
-                            if (nodeDef?.provisionable) {
-                              return (
-                                <p style={{ margin: 0, fontSize: 11.5, color: "#2A6FDB", fontWeight: 500 }}>
-                                  Al guardar se creará o actualizará el acceso en {nodeDef.label}.
-                                </p>
-                              );
-                            }
-                            return (
-                              <p style={{ margin: 0, fontSize: 11.5, color: "#2A6FDB", fontWeight: 500 }}>
-                                Al guardar se actualiza la contraseña en Auth para {nodeDef?.label ?? activeFormUnit.unit_code}.
-                              </p>
-                            );
-                          })()}
-                          {editingClient && unitHasClientAccessCredentials(activeFormUnit.access_user) && (
-                            <button
-                              type="button"
-                              onClick={() => resetUnitPassword(activeFormUnit)}
-                              disabled={resettingUnitKey === activeFormUnit.key}
-                              style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--color-navy)", color: "white", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, fontWeight: 700, cursor: resettingUnitKey === activeFormUnit.key ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", opacity: resettingUnitKey === activeFormUnit.key ? 0.65 : 1, flexShrink: 0 }}
-                            >
-                              <RotateCcw size={13} />
-                              {resettingUnitKey === activeFormUnit.key ? "Blanqueando..." : "Blanquear contraseña"}
-                            </button>
-                          )}
                         </div>
                       </div>
                       )}
