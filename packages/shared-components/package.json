@@ -24,6 +24,12 @@
       "import": "./dist/lib/create-nodo-auth-client.js",
       "default": "./dist/lib/create-nodo-auth-client.js"
     },
+    "./lib/auth-password-errors": {
+      "types": "./dist/lib/auth-password-errors.d.ts",
+      "development": "./src/lib/auth-password-errors.ts",
+      "import": "./dist/lib/auth-password-errors.js",
+      "default": "./dist/lib/auth-password-errors.js"
+    },
     "./styles/base.css": "./src/styles/base.css",
     "./styles/interactive.css": "./src/styles/interactive.css"
   },
