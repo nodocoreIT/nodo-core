@@ -461,6 +461,7 @@ export type Database = {
           email: string | null
           legal_name: string | null
           logo_path: string | null
+          meta_settings: Json | null
           pdf_logo_path: string | null
           org_id: string
           phone: string | null
@@ -475,6 +476,7 @@ export type Database = {
           email?: string | null
           legal_name?: string | null
           logo_path?: string | null
+          meta_settings?: Json | null
           pdf_logo_path?: string | null
           org_id: string
           phone?: string | null
@@ -489,6 +491,7 @@ export type Database = {
           email?: string | null
           legal_name?: string | null
           logo_path?: string | null
+          meta_settings?: Json | null
           pdf_logo_path?: string | null
           org_id?: string
           phone?: string | null
@@ -700,6 +703,7 @@ export type Database = {
           created_at: string
           currency: string
           description: string | null
+          facebook_post_id: string | null
           has_bbq: boolean
           has_elevator: boolean
           has_garage: boolean
@@ -708,6 +712,7 @@ export type Database = {
           has_parking: boolean
           has_pool: boolean
           id: string
+          instagram_post_id: string | null
           inventory_description: string | null
           localidad: string | null
           main_photo: string | null
@@ -732,6 +737,7 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          facebook_post_id?: string | null
           has_bbq?: boolean
           has_elevator?: boolean
           has_garage?: boolean
@@ -740,6 +746,7 @@ export type Database = {
           has_parking?: boolean
           has_pool?: boolean
           id?: string
+          instagram_post_id?: string | null
           inventory_description?: string | null
           localidad?: string | null
           main_photo?: string | null
@@ -764,6 +771,7 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          facebook_post_id?: string | null
           has_bbq?: boolean
           has_elevator?: boolean
           has_garage?: boolean
@@ -772,6 +780,7 @@ export type Database = {
           has_parking?: boolean
           has_pool?: boolean
           id?: string
+          instagram_post_id?: string | null
           inventory_description?: string | null
           localidad?: string | null
           main_photo?: string | null
