@@ -113,7 +113,64 @@ function AdminLoginForm() {
       </Link>
 
       <div className="min-h-screen grid grid-cols-1 login-split">
+<<<<<<< Updated upstream
         <LoginBrandPanel accent={DEFAULT_ACCENT} {...getLoginPanelDetails("")} />
+=======
+        {/* Brand panel (left) */}
+        <aside className="login-brand-panel relative overflow-hidden bg-navy-900 text-white px-12 py-10 flex-col min-h-screen hidden">
+          <div
+            aria-hidden
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(70% 50% at 30% 30%, rgba(218,90,14,.20), transparent 70%)",
+            }}
+          />
+
+          <div className="relative z-[1] shrink-0">
+            <Image
+              src="/logos/logo compuesto estrella az letra blancazzz.png"
+              alt="Nodo Core"
+              width={140}
+              height={30}
+              style={{ height: "30px", width: "auto" }}
+            />
+          </div>
+
+          <div className="relative z-[1] login-brand-diagram">
+            <EcosystemDiagram
+              dark
+              interactive
+              isLoginPage
+              className="w-[min(480px,96%)] aspect-square mx-auto"
+            />
+          </div>
+
+          <div className="relative z-[1] shrink-0 login-brand-copy">
+            <h2
+              className="font-display font-extrabold text-white max-w-[14em]"
+              style={{ fontSize: "clamp(26px,2.6vw,34px)", lineHeight: 1.15 }}
+            >
+              El núcleo de gestión de su ecosistema.
+            </h2>
+
+            <p
+              className="text-[14.5px] leading-relaxed mt-4 max-w-[32em]"
+              style={{ color: "rgba(234,240,247,.7)" }}
+            >
+              Panel de administración para gestionar clientes, unidades de
+              negocio y el roadmap del Core.
+            </p>
+
+            <p
+              className="mt-8 text-[13px]"
+              style={{ color: "rgba(234,240,247,.5)" }}
+            >
+              © 2026 Nodo Core · Transparencia tecnológica
+            </p>
+          </div>
+        </aside>
+>>>>>>> Stashed changes
 
         {/* Form panel (right) */}
         <main className="flex items-center justify-center p-8 bg-paper min-h-screen">
