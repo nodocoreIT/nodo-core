@@ -281,6 +281,8 @@ function LoginForm() {
   const [generalError, setGeneralError] = useState("");
   const [loading, setLoading] = useState(false);
   const [needsNewPassword, setNeedsNewPassword] = useState(false);
+  const [inviterName, setInviterName] = useState<string | undefined>();
+  const [inviteRole, setInviteRole] = useState<string | undefined>();
 
   const {
     authMode,
@@ -306,6 +308,32 @@ function LoginForm() {
     if (roleParam === "medico") setRegisterRole("medico");
     else if (roleParam === "paciente") setRegisterRole("paciente");
   }, [roleParam]);
+
+  // Activate-invite mode: bootstrap session from magic link hash tokens
+  useEffect(() => {
+    if (modeParam !== "activate-invite") return;
+    setInviterName(searchParams.get("inviter") ?? undefined);
+    setInviteRole(searchParams.get("role") ?? undefined);
+
+    // Only auto-bootstrap when hash tokens are present (new user invite flow)
+    const hash = window.location.hash.substring(1);
+    const hashParams = new URLSearchParams(hash);
+    if (!hashParams.get("access_token")) return;
+
+    let mounted = true;
+    const { data: { subscription } } = authSupabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        setNeedsNewPassword(true);
+      }
+    });
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [transitionTarget, setTransitionTarget] = useState<{
     label: string;
@@ -1131,13 +1159,17 @@ function LoginForm() {
             ) : needsNewPassword ? (
               <form onSubmit={handleForcedPasswordSubmit} noValidate>
                 <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
-                  ◎ Nueva contraseña
+                  {modeParam === "activate-invite" ? "◎ Activar tu cuenta" : "◎ Nueva contraseña"}
                 </span>
                 <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
-                  Definí tu nueva contraseña
+                  {modeParam === "activate-invite" ? "Activá tu acceso" : "Definí tu nueva contraseña"}
                 </h1>
                 <p className="text-slate2 text-[14.5px] mb-6">
-                  Tu acceso fue blanqueado o requiere una clave nueva. Elegí una contraseña y repetila para continuar.
+                  {modeParam === "activate-invite"
+                    ? (inviterName
+                        ? `${inviteRole ? `Ingresá tu contraseña para acceder como ${inviteRole}` : "Ingresá tu contraseña para continuar"} — te invitó ${inviterName}.`
+                        : "Te invitaron a participar. Elegí tu contraseña para continuar.")
+                    : "Tu acceso fue blanqueado o requiere una clave nueva. Elegí una contraseña y repetila para continuar."}
                 </p>
 
                 <div className="mb-4">
@@ -1183,7 +1215,7 @@ function LoginForm() {
                   disabled={loading}
                   className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  {loading ? "Guardando…" : "Continuar"}
+                  {loading ? "Guardando…" : modeParam === "activate-invite" ? "Activar mi cuenta" : "Continuar"}
                 </button>
               </form>
             ) : authMode === "login" ? (

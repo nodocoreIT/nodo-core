@@ -69,8 +69,8 @@ export const useStaffStore = create<StaffStore>((set, get) => ({
         ? window.location.origin
         : "");
     const redirectTo = landingOrigin
-      ? `${landingOrigin}/inmo/auth/callback`
-      : `${window.location.origin}/inmo/auth/callback`;
+      ? `${landingOrigin}/nodo-inmo/login`
+      : `${window.location.origin}/nodo-inmo/login`;
 
     // Resolve the caller's display name to include in the invitation email.
     const { data: { user: callerUser } } = await supabase.auth.getUser();

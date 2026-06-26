@@ -79,8 +79,8 @@ export const useAutosStaffStore = create<AutosStaffStore>((set, get) => ({
         : "");
 
     const redirectTo = landingOrigin
-      ? `${landingOrigin}/autos/auth/callback`
-      : `${window.location.origin}/autos/auth/callback`;
+      ? `${landingOrigin}/nodo-autos/login`
+      : `${window.location.origin}/nodo-autos/login`;
 
     const {
       data: { user: callerUser },

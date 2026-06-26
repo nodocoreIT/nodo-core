@@ -70,13 +70,16 @@ Deno.serve(async (req) => {
       user.email ||
       "Un administrador";
 
-    // Build invite params to embed in the callback URL so the landing page can
+    // Build invite params to embed in the login URL so the landing page can
     // show personalized copy ("Activá tu acceso como Vendedor — te invitó Ramiro").
     const inviteParams = new URLSearchParams({
-      mode: "invite",
+      mode: "activate-invite",
       inviter: inviterName,
       role: memberRole,
     }).toString();
+
+    // Login URL with invite context — used as redirectTo so Supabase appends tokens as hash
+    const loginUrlWithParams = `${authCallbackUrl}?${inviteParams}`;
 
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -105,15 +108,12 @@ Deno.serve(async (req) => {
         },
       });
 
-      // Send to callback with invite context params
-      const inviteCallbackUrl = `${authCallbackUrl}?${inviteParams}`;
-
       const mail = await sendInmoStaffNotifyEmail(redirectTo, {
         kind: "invite",
         email: normalizedEmail,
         name: displayName,
         orgName,
-        actionUrl: inviteCallbackUrl,
+        actionUrl: loginUrlWithParams,
         inviterName,
         nodeLabel: nodeLabel ?? "NODO | Inmo",
       });
@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
         email: normalizedEmail,
         options: {
           data: { full_name: displayName },
-          redirectTo: authCallbackUrl,
+          redirectTo: loginUrlWithParams,
         },
       });
 
@@ -146,9 +146,8 @@ Deno.serve(async (req) => {
     }
 
     const userId = linkData.user.id;
-    const magicLink = linkData.properties?.action_link ?? authCallbackUrl;
-    // Append invite context params to the magic link so Supabase forwards them to redirectTo
-    const actionUrl = `${magicLink}&${inviteParams}`;
+    // Params are already embedded in loginUrlWithParams (the redirectTo) — Supabase appends tokens as hash
+    const actionUrl = linkData.properties?.action_link ?? loginUrlWithParams;
 
     // Set must_set_password flag so user must complete password setup
     await adminClient.auth.admin.updateUserById(userId, {
