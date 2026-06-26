@@ -69,7 +69,7 @@ export default function Page() {
                   boxShadow: `0 8px 24px -8px rgba(${CLINICA_ACCENT.rgb},.45)`,
                 }}
               >
-                Entrar a Clínica
+                Ingresar al portal
               </Link>
             </div>
           </div>
@@ -148,53 +148,10 @@ export default function Page() {
         >
           <div className="w-[min(1200px,92vw)] mx-auto">
             <p className="text-center text-[13px] font-bold uppercase tracking-[.16em] text-teal-400 mb-3">
-              Módulos disponibles
+              Módulos en desarrollo
             </p>
-            <h2
-              className="font-display font-extrabold text-white text-center mb-10"
-              style={{ fontSize: "clamp(24px,3vw,40px)" }}
-            >
-              Submódulos de NODO | Salud
-            </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[800px] mx-auto">
-              {/* Clínica Virtual — DISPONIBLE */}
-              <div
-                className="rounded-2xl p-7 flex flex-col gap-4 transition-all duration-300 hover:-translate-y-1"
-                style={{
-                  background: "linear-gradient(135deg, var(--color-navy-700), var(--color-navy))",
-                  border: `1px solid rgba(${CLINICA_ACCENT.rgb}, 0.25)`,
-                  boxShadow: `0 10px 30px -15px rgba(${CLINICA_ACCENT.rgb}, 0.15)`,
-                }}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-teal-600/15 text-teal-400 flex-shrink-0">
-                    <Stethoscope className="h-6 w-6" strokeWidth={1.75} />
-                  </div>
-                  <span className="mt-0.5 inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    Disponible
-                  </span>
-                </div>
-                <div>
-                  <h3
-                    className="font-display font-bold text-white mb-1"
-                    style={{ fontSize: 18 }}
-                  >
-                    Nodo Clínica
-                  </h3>
-                  <p style={{ fontSize: 14, color: "rgba(234,240,247,.65)", lineHeight: 1.6 }}>
-                    Portal médico completo con videoconsultas, agenda, recetas digitales e
-                    informes SOAP con IA.
-                  </p>
-                </div>
-                <Link
-                  href="/nodo-clinica/login"
-                  className="mt-auto text-[13px] font-semibold text-teal-400 hover:text-teal-300 transition-colors"
-                >
-                  Acceder al módulo →
-                </Link>
-              </div>
-
+            <div className="max-w-[400px] mx-auto">
               {/* Proveedores de Salud — PRÓXIMAMENTE */}
               <div
                 className="rounded-2xl p-7 flex flex-col gap-4"
