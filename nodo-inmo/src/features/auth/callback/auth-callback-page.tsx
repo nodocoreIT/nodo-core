@@ -10,7 +10,11 @@ import {
   fetchMustSetPassword,
   INVALID_LOGIN_MESSAGE,
   RequiredPasswordForm,
+  Card,
+  CardContent,
+  CardHeader,
 } from "@nodocore/shared-components";
+import { BrandMark } from "@/shared/components/brand-mark";
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -86,13 +90,20 @@ export function AuthCallbackPage() {
   if (needsPassword && ready) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-paper px-4">
-        <RequiredPasswordForm
-          supabase={supabase}
-          title="Definí tu nueva contraseña"
-          description="Tu acceso fue blanqueado. Elegí una contraseña nueva y repetila para continuar."
-          submitLabel="Continuar"
-          onSuccess={() => navigate("/", { replace: true })}
-        />
+        <Card className="w-full max-w-sm shadow-md">
+          <CardHeader className="items-center pb-2">
+            <BrandMark className="text-2xl" iconClassName="h-9 w-9" />
+          </CardHeader>
+          <CardContent>
+            <RequiredPasswordForm
+              supabase={supabase}
+              title="Activá tu acceso"
+              description="Te invitaron a participar de Nodo Inmo. Elegí tu contraseña para continuar."
+              submitLabel="Activar mi cuenta"
+              onSuccess={() => navigate("/", { replace: true })}
+            />
+          </CardContent>
+        </Card>
       </div>
     );
   }
