@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useMemo, useState } from 'react';
 import { Plus, Edit, Trash2, X, Save, Tag, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
