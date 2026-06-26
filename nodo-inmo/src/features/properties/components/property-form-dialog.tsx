@@ -59,10 +59,8 @@ const schema = z.object({
   address: z.string().min(1, "Dirección requerida"),
   localidad: z.string().optional(),
   provincia: z.string().optional(),
-  operation: z.enum(["rent", "sale"], { error: "Seleccioná una operación" }),
-  property_type: z.enum(["apartment", "house", "commercial", "land", "other"], {
-    error: "Seleccioná un tipo",
-  }),
+  operation: z.enum(["rent", "sale"]),
+  property_type: z.enum(["apartment", "house", "commercial", "land", "other"]),
   status: z.enum(["available", "reserved", "rented", "sold", "inactive", "negotiation"]),
   currency: z.enum(["ARS", "USD"]),
   sale_price: z.string().optional(),
