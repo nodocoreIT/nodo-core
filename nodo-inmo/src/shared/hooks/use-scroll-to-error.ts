@@ -8,21 +8,27 @@ import type { FieldValues, UseFormReturn } from "react-hook-form";
 export function useScrollToError<T extends FieldValues>(form: UseFormReturn<T>) {
   useEffect(() => {
     const errors = form.formState.errors;
-    const errorKeys = Object.keys(errors);
-
-    if (errorKeys.length === 0) return;
-
-    const firstErrorKey = errorKeys[0];
-    form.setFocus(firstErrorKey as any);
+    if (Object.keys(errors).length === 0) return;
 
     setTimeout(() => {
-      // Native inputs expose [name]; custom components (Select, etc.) get aria-invalid
-      const el =
-        (document.querySelector(`[name="${firstErrorKey}"]`) as HTMLElement | null) ??
-        (document.querySelector('[aria-invalid="true"]') as HTMLElement | null);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      // FormMessage renders <p id="*-form-item-message"> only when there is an error.
+      // Querying by ID suffix finds the first one in DOM order, which works for
+      // both native inputs and custom components like Radix Select.
+      const firstErrorMsg = document.querySelector(
+        '[id$="-form-item-message"]',
+      ) as HTMLElement | null;
+
+      if (firstErrorMsg) {
+        firstErrorMsg.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
       }
-    }, 50);
+
+      // Fallback: native inputs with a name attribute
+      const firstKey = Object.keys(errors)[0];
+      const input = document.querySelector(
+        `[name="${firstKey}"]`,
+      ) as HTMLElement | null;
+      input?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
   }, [Object.keys(form.formState.errors).join(","), form]);
 }
