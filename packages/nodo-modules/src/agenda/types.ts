@@ -1,5 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 
+export type AiProvider = "gemini" | "openai" | "anthropic";
+
 export type TaskPriority = "alta" | "media" | "baja";
 export type TaskStatus = "pendiente" | "en_progreso" | "completada" | "cancelada";
 
@@ -62,6 +64,8 @@ export interface AgendaModuleConfig {
   /** Base path for deep links, e.g. /admin/agenda */
   agendaBasePath: string;
   entityLabel?: string;
-  /** Optional Gemini API key — enables voice-to-task dictation */
-  geminiApiKey?: string | null;
+  /** Active AI provider */
+  aiProvider?: AiProvider;
+  /** Active provider's API key — enables voice-to-task dictation */
+  aiApiKey?: string | null;
 }

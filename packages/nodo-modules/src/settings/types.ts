@@ -41,8 +41,13 @@ export interface ThemeSettings {
   brandText: string;
 }
 
+export type AiProvider = "gemini" | "openai" | "anthropic";
+
 export interface AiSettings {
+  provider: AiProvider;
   geminiApiKey: string;
+  openaiApiKey: string;
+  anthropicApiKey: string;
 }
 
 export interface AlertSettings {

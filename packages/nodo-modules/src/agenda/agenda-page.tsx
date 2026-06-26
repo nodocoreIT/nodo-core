@@ -73,7 +73,8 @@ export function AgendaPage() {
     deleteTask,
     isSaving,
     entityLabel,
-    geminiApiKey,
+    aiApiKey,
+    aiProvider,
   } = useAgendaModule();
 
   const todayStr = getTodayString();
@@ -490,7 +491,7 @@ export function AgendaPage() {
               {`Tareas organizadas de ${pageEntityLabel}`}
             </h2>
             <div className="flex items-center gap-2">
-              <VoiceTaskButton apiKey={geminiApiKey} onExtracted={handleVoiceExtracted} />
+              <VoiceTaskButton apiKey={aiApiKey} provider={aiProvider} onExtracted={handleVoiceExtracted} />
               <Button onClick={handleOpenCreateDialog} className="gap-2 text-xs">
                 <Plus className="h-4 w-4" />
                 Nueva Tarea

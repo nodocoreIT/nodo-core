@@ -1,9 +1,21 @@
+import type { AiProvider } from "./types";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface GeminiResponse {
   candidates?: Array<{
     content?: { parts?: Array<{ text?: string }> };
   }>;
+  error?: { message: string };
+}
+
+interface OpenAIResponse {
+  choices?: Array<{ message?: { content?: string } }>;
+  error?: { message: string };
+}
+
+interface AnthropicResponse {
+  content?: Array<{ text?: string }>;
   error?: { message: string };
 }
 
@@ -18,7 +30,7 @@ export interface ExtractedTask {
 
 // ── Prompt ────────────────────────────────────────────────────────────────────
 
-function buildPrompt(today: string): string {
+function buildSystemPrompt(today: string): string {
   return `Sos un asistente de gestión de tareas para una empresa argentina.
 La fecha de hoy es ${today}.
 Extraé los datos de la tarea del texto dictado y devolvé SOLO un objeto JSON válido (sin markdown, sin backticks) con estas claves cuando puedas inferirlas:
@@ -31,7 +43,52 @@ Extraé los datos de la tarea del texto dictado y devolvé SOLO un objeto JSON v
 Omití las claves que no puedas inferir. No devuelvas absolutamente nada más que el JSON puro.`;
 }
 
-// ── API call ──────────────────────────────────────────────────────────────────
+// ── Parse helper ──────────────────────────────────────────────────────────────
+
+function parseExtractedTask(raw: string): ExtractedTask {
+  const cleaned = raw
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/, "")
+    .trim();
+
+  const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+
+  const result: ExtractedTask = {};
+
+  if (typeof parsed.title === "string" && parsed.title.trim()) {
+    result.title = parsed.title.trim();
+  }
+  if (typeof parsed.description === "string" && parsed.description.trim()) {
+    result.description = parsed.description.trim();
+  }
+  if (
+    parsed.priority === "alta" ||
+    parsed.priority === "media" ||
+    parsed.priority === "baja"
+  ) {
+    result.priority = parsed.priority;
+  }
+  if (typeof parsed.due_date === "string") {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (dateRegex.test(parsed.due_date)) {
+      const d = new Date(`${parsed.due_date}T00:00:00`);
+      if (!Number.isNaN(d.getTime())) {
+        result.due_date = parsed.due_date;
+      }
+    }
+  }
+  if (typeof parsed.assigned_to === "string" && parsed.assigned_to.trim()) {
+    result.assigned_to = parsed.assigned_to.trim();
+  }
+  if (typeof parsed.category === "string" && parsed.category.trim()) {
+    result.category = parsed.category.trim();
+  }
+
+  return result;
+}
+
+// ── API calls ─────────────────────────────────────────────────────────────────
 
 async function callGemini(apiKey: string, transcript: string): Promise<ExtractedTask> {
   const today = new Date().toISOString().split("T")[0];
@@ -41,7 +98,7 @@ async function callGemini(apiKey: string, transcript: string): Promise<Extracted
     contents: [
       {
         parts: [
-          { text: buildPrompt(today) },
+          { text: buildSystemPrompt(today) },
           { text: `Texto dictado: "${transcript}"` },
         ],
       },
@@ -66,55 +123,86 @@ async function callGemini(apiKey: string, transcript: string): Promise<Extracted
   }
 
   const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  return parseExtractedTask(raw);
+}
 
-  // Strip any accidental markdown fences
-  const cleaned = raw
-    .trim()
-    .replace(/^```(?:json)?/i, "")
-    .replace(/```$/, "")
-    .trim();
+async function callOpenAI(apiKey: string, transcript: string): Promise<ExtractedTask> {
+  const today = new Date().toISOString().split("T")[0];
 
-  const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: buildSystemPrompt(today) },
+        { role: "user", content: `Texto dictado: "${transcript}"` },
+      ],
+      temperature: 0.1,
+      max_tokens: 512,
+    }),
+  });
 
-  // Validate and map to ExtractedTask
-  const result: ExtractedTask = {};
+  const data: OpenAIResponse = await res.json();
 
-  if (typeof parsed.title === "string" && parsed.title.trim()) {
-    result.title = parsed.title.trim();
-  }
-  if (typeof parsed.description === "string" && parsed.description.trim()) {
-    result.description = parsed.description.trim();
-  }
-  if (
-    parsed.priority === "alta" ||
-    parsed.priority === "media" ||
-    parsed.priority === "baja"
-  ) {
-    result.priority = parsed.priority;
-  }
-  if (typeof parsed.due_date === "string") {
-    // Validate YYYY-MM-DD format and actual date
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (dateRegex.test(parsed.due_date)) {
-      const d = new Date(`${parsed.due_date}T00:00:00`);
-      if (!Number.isNaN(d.getTime())) {
-        result.due_date = parsed.due_date;
-      }
-    }
-  }
-  if (typeof parsed.assigned_to === "string" && parsed.assigned_to.trim()) {
-    result.assigned_to = parsed.assigned_to.trim();
-  }
-  if (typeof parsed.category === "string" && parsed.category.trim()) {
-    result.category = parsed.category.trim();
+  if (!res.ok) {
+    const msg = data.error?.message ?? `HTTP ${res.status}`;
+    throw new Error(`OpenAI API error: ${msg}`);
   }
 
-  return result;
+  const raw = data.choices?.[0]?.message?.content ?? "";
+  return parseExtractedTask(raw);
+}
+
+async function callAnthropic(apiKey: string, transcript: string): Promise<ExtractedTask> {
+  const today = new Date().toISOString().split("T")[0];
+  const systemPrompt = buildSystemPrompt(today);
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 512,
+      messages: [
+        {
+          role: "user",
+          content: `${systemPrompt}\n\nTexto dictado: "${transcript}"`,
+        },
+      ],
+    }),
+  });
+
+  const data: AnthropicResponse = await res.json();
+
+  if (!res.ok) {
+    const msg = data.error?.message ?? `HTTP ${res.status}`;
+    throw new Error(`Anthropic API error: ${msg}`);
+  }
+
+  const raw = data.content?.[0]?.text ?? "";
+  return parseExtractedTask(raw);
+}
+
+async function callAI(provider: AiProvider, apiKey: string, transcript: string): Promise<ExtractedTask> {
+  if (provider === "openai") return callOpenAI(apiKey, transcript);
+  if (provider === "anthropic") return callAnthropic(apiKey, transcript);
+  return callGemini(apiKey, transcript);
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-export function useExtractTaskFromVoice(apiKey: string | null | undefined) {
+export function useExtractTaskFromVoice(
+  apiKey: string | null | undefined,
+  provider: AiProvider = "gemini",
+) {
   const extract = async (transcript: string): Promise<ExtractedTask> => {
     if (!apiKey) {
       throw new Error("NO_API_KEY");
@@ -122,7 +210,7 @@ export function useExtractTaskFromVoice(apiKey: string | null | undefined) {
     if (!transcript.trim()) {
       throw new Error("EMPTY_TRANSCRIPT");
     }
-    return callGemini(apiKey, transcript);
+    return callAI(provider, apiKey, transcript);
   };
 
   return { extract, hasApiKey: !!apiKey };
