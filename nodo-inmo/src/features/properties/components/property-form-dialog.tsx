@@ -60,8 +60,8 @@ const schema = z.object({
   address: z.string().min(1, "Dirección requerida"),
   localidad: z.string().optional(),
   provincia: z.string().optional(),
-  operation: z.enum(["rent", "sale"], { required_error: "Seleccioná una operación" }),
-  property_type: z.enum(["apartment", "house", "commercial", "land", "other"], { required_error: "Seleccioná un tipo de propiedad" }),
+  operation: z.string().min(1, "Seleccioná una operación"),
+  property_type: z.string().min(1, "Seleccioná un tipo de propiedad"),
   status: z.enum(["available", "reserved", "rented", "sold", "inactive", "negotiation"]),
   currency: z.enum(["ARS", "USD"]),
   sale_price: z.string().optional(),
@@ -222,11 +222,11 @@ export function PropertyFormDialog({
       localidad: property?.localidad ?? "",
       provincia: property?.provincia ?? "",
       operation:
-        (property?.operation as any) ?? voiceDefaults?.operation ?? undefined,
+        (property?.operation as any) ?? voiceDefaults?.operation ?? "",
       property_type:
         (property?.property_type as any) ??
         voiceDefaults?.property_type ??
-        undefined,
+        "",
       status: (property?.status as any) ?? voiceDefaults?.status ?? "available",
       currency: (property?.currency as any) ?? voiceDefaults?.currency ?? "ARS",
       sale_price:
