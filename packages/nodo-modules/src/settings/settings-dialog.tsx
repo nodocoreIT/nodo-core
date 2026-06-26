@@ -33,7 +33,7 @@ import { z } from "zod";
 import { useSettingsModule } from "./context";
 import { AgencyProfileForm } from "./agency-profile-form";
 import { BankAccountsSection } from "./bank-accounts-section";
-import type { SettingsTabId, StaffUser } from "./types";
+import type { SettingsTabId, StaffUser, AiProvider } from "./types";
 
 const profileSchema = z
   .object({
@@ -521,12 +521,84 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
     }
   }, [open, initialTab]);
   const { aiSettings, setAiSettings } = { aiSettings: module.aiSettings, setAiSettings: module.setAiSettings };
-  const [apiKeyInput, setApiKeyInput] = useState(aiSettings.geminiApiKey);
+  const [selectedProvider, setSelectedProvider] = useState<AiProvider>(aiSettings.provider ?? "gemini");
+  const [apiKeyInput, setApiKeyInput] = useState(() => {
+    if (aiSettings.provider === "openai") return aiSettings.openaiApiKey ?? "";
+    if (aiSettings.provider === "anthropic") return aiSettings.anthropicApiKey ?? "";
+    return aiSettings.geminiApiKey ?? "";
+  });
   const [showApiKey, setShowApiKey] = useState(false);
   const [aiKeySaved, setAiKeySaved] = useState(false);
 
+  // Sync input when provider selection changes
+  const handleProviderSelect = (p: AiProvider) => {
+    setSelectedProvider(p);
+    setAiKeySaved(false);
+    if (p === "openai") setApiKeyInput(aiSettings.openaiApiKey ?? "");
+    else if (p === "anthropic") setApiKeyInput(aiSettings.anthropicApiKey ?? "");
+    else setApiKeyInput(aiSettings.geminiApiKey ?? "");
+  };
+
+  const PROVIDERS: Array<{
+    id: AiProvider;
+    name: string;
+    description: string;
+    placeholder: string;
+    helpUrl: string;
+    helpLabel: string;
+    keyField: "geminiApiKey" | "openaiApiKey" | "anthropicApiKey";
+    logo: React.ReactNode;
+  }> = [
+    {
+      id: "gemini",
+      name: "Google Gemini",
+      description: "Gemini 1.5 Flash",
+      placeholder: "AIza...",
+      helpUrl: "https://aistudio.google.com/app/apikey",
+      helpLabel: "Obtené tu API key en Google AI Studio",
+      keyField: "geminiApiKey",
+      logo: (
+        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 text-[11px] font-black text-white">
+          G
+        </div>
+      ),
+    },
+    {
+      id: "openai",
+      name: "OpenAI",
+      description: "GPT-4o mini",
+      placeholder: "sk-...",
+      helpUrl: "https://platform.openai.com/api-keys",
+      helpLabel: "Obtené tu API key en OpenAI Platform",
+      keyField: "openaiApiKey",
+      logo: (
+        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-black text-[9px] font-black text-white">
+          AI
+        </div>
+      ),
+    },
+    {
+      id: "anthropic",
+      name: "Anthropic",
+      description: "Claude Haiku",
+      placeholder: "sk-ant-...",
+      helpUrl: "https://console.anthropic.com/settings/keys",
+      helpLabel: "Obtené tu API key en Anthropic Console",
+      keyField: "anthropicApiKey",
+      logo: (
+        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#D97706] text-[11px] font-black text-white">
+          A
+        </div>
+      ),
+    },
+  ];
+
+  const activeProviderMeta = PROVIDERS.find((p) => p.id === selectedProvider) ?? PROVIDERS[0];
+  const activeStoredKey = aiSettings[activeProviderMeta.keyField] ?? "";
+  const isActiveKeySet = !!activeStoredKey;
+
   const handleSaveApiKey = () => {
-    setAiSettings({ geminiApiKey: apiKeyInput.trim() });
+    setAiSettings({ provider: selectedProvider, [activeProviderMeta.keyField]: apiKeyInput.trim() });
     setAiKeySaved(true);
     setTimeout(() => setAiKeySaved(false), 2500);
   };
@@ -1269,17 +1341,43 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
                   Inteligencia Artificial
                 </h3>
                 <p className="text-xs text-slate2">
-                  Configurá tu API key personal de Google Gemini para habilitar
-                  funciones de IA como el dictado de propiedades por voz.
+                  Elegí tu proveedor de IA y configurá tu API key personal para habilitar
+                  funciones como el dictado de propiedades por voz.
                   La clave se guarda localmente en tu navegador y nunca se
                   envía a ningún servidor externo de Nodo.
                 </p>
               </div>
 
               <div className="border-t border-border pt-6 space-y-4">
+                <Label className="text-sm font-bold text-navy">Proveedor de IA</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {PROVIDERS.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => handleProviderSelect(p.id)}
+                      className={`flex flex-row items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all text-left ${
+                        selectedProvider === p.id
+                          ? "border-brand bg-brand/5"
+                          : "border-border bg-card hover:bg-paper"
+                      }`}
+                    >
+                      {p.logo}
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-navy leading-tight truncate">{p.name}</p>
+                        <p className="text-[10px] text-slate2 leading-tight">{p.description}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-bold text-navy">Gemini API Key</Label>
-                  {aiSettings.geminiApiKey ? (
+                  <Label className="text-sm font-bold text-navy">
+                    API Key — {activeProviderMeta.name}
+                  </Label>
+                  {isActiveKeySet ? (
                     <span className="flex items-center gap-1 text-xs text-green-600 font-semibold">
                       <CheckCircle2 className="h-3.5 w-3.5" />
                       Configurada
@@ -1294,9 +1392,9 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
 
                 <div className="relative">
                   <Input
-                    id="gemini-api-key"
+                    id="ai-api-key"
                     type={showApiKey ? "text" : "password"}
-                    placeholder="AIza..."
+                    placeholder={activeProviderMeta.placeholder}
                     value={apiKeyInput}
                     onChange={(e) => setApiKeyInput(e.target.value)}
                     className="pr-10 font-mono text-sm"
@@ -1317,34 +1415,33 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
                 </div>
 
                 <p className="text-[11px] text-slate2 leading-relaxed">
-                  Obtenés tu clave gratis en{" "}
                   <a
-                    href="https://aistudio.google.com/app/apikey"
+                    href={activeProviderMeta.helpUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-brand underline hover:no-underline font-semibold"
                   >
-                    Google AI Studio
+                    {activeProviderMeta.helpLabel}
                   </a>
-                  . El tier gratuito soporta hasta 1.500 requests/día con
-                  Gemini 1.5 Flash.
                 </p>
 
-                <Button
-                  onClick={handleSaveApiKey}
-                  size="sm"
-                  disabled={apiKeyInput === aiSettings.geminiApiKey}
-                  className="gap-2"
-                >
-                  {aiKeySaved ? (
-                    <>
-                      <CheckCircle2 className="h-4 w-4" />
-                      Guardada
-                    </>
-                  ) : (
-                    "Guardar API key"
-                  )}
-                </Button>
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={handleSaveApiKey}
+                    size="sm"
+                    disabled={apiKeyInput === activeStoredKey}
+                    className="gap-2"
+                  >
+                    {aiKeySaved ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" />
+                        Guardada
+                      </>
+                    ) : (
+                      "Guardar API key"
+                    )}
+                  </Button>
+                </div>
               </div>
 
               <div className="border-t border-border pt-6">
