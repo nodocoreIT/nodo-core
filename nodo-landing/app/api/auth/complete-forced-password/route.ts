@@ -37,9 +37,12 @@ async function resolveAuthenticatedUser(
         return { userId: nd.user.id, admin: nodoAdmin };
       }
     }
+
+    // Bearer token was present but no project recognized it — fail securely
+    return null;
   }
 
-  // Cookie fallback (landing session only)
+  // Cookie fallback (only when NO Bearer token was supplied)
   const supabase = await createClient();
   const {
     data: { user },
@@ -77,13 +80,6 @@ export async function POST(request: NextRequest) {
   const { data: authUser } = await ownerAdmin.auth.admin.getUserById(userId);
   if (!authUser.user) {
     return NextResponse.json({ error: "Usuario no encontrado." }, { status: 404 });
-  }
-
-  if (authUser.user.app_metadata?.must_set_password !== true) {
-    return NextResponse.json(
-      { error: "Tu cuenta no requiere cambio de contraseña." },
-      { status: 400 },
-    );
   }
 
   const updated = await setAuthUserPassword(ownerAdmin, userId, password, {

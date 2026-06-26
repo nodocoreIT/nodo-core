@@ -9,11 +9,6 @@ import {
 } from "../_shared/inmo-admin.ts";
 import { sendInmoStaffNotifyEmail } from "../_shared/staff-notify.ts";
 import { DISPLAY_TO_DB_ROLE } from "../_shared/org-member-roles.ts";
-import {
-  inmoAuthCallbackUrl,
-  inmoLoginUrl,
-  resolvePublicLandingOrigin,
-} from "../_shared/landing-url.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -65,13 +60,8 @@ Deno.serve(async (req) => {
     const displayName = name?.trim() || normalizedEmail.split("@")[0];
     const dbRole = DISPLAY_TO_DB_ROLE[memberRole] ?? "agent";
     const orgName = await getOrgName(sql, orgId);
-    const landingOrigin = resolvePublicLandingOrigin(redirectTo);
-    const authCallbackUrl = landingOrigin
-      ? inmoAuthCallbackUrl(landingOrigin)
-      : redirectTo;
-    const loginUrl = landingOrigin
-      ? inmoLoginUrl(landingOrigin)
-      : `${new URL(redirectTo).origin}/inmo/login`;
+    // Use the caller-provided redirectTo directly — it already points to the correct nodo callback
+    const authCallbackUrl = redirectTo;
 
     // Inviter display name: from request body, or fall back to JWT metadata.
     const inviterName =
@@ -108,9 +98,7 @@ Deno.serve(async (req) => {
       });
 
       // Send to callback with mode=invite so user can set/update password before login
-      const inviteCallbackUrl = landingOrigin
-        ? `${inmoAuthCallbackUrl(landingOrigin)}?mode=invite`
-        : `${new URL(redirectTo).origin}/inmo/auth/callback?mode=invite`;
+      const inviteCallbackUrl = `${authCallbackUrl}?mode=invite`;
 
       const mail = await sendInmoStaffNotifyEmail(redirectTo, {
         kind: "invite",

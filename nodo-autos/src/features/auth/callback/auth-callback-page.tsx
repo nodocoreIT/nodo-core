@@ -10,7 +10,11 @@ import {
   fetchMustSetPassword,
   INVALID_LOGIN_MESSAGE,
   RequiredPasswordForm,
+  Card,
+  CardContent,
+  CardHeader,
 } from "@nodocore/shared-components";
+import { BrandMark } from "@/shared/components/brand-mark";
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -24,6 +28,8 @@ export function AuthCallbackPage() {
     const access_token = params.get("access_token");
     const refresh_token = params.get("refresh_token");
     const type = params.get("type");
+
+    const mode = new URLSearchParams(window.location.search).get("mode");
 
     const settle = async () => {
       if (access_token && refresh_token) {
@@ -46,6 +52,7 @@ export function AuthCallbackPage() {
 
       const mustReset =
         type === "invite" ||
+        mode === "invite" ||
         type === "recovery" ||
         (await fetchMustSetPassword(supabase));
 
@@ -84,10 +91,20 @@ export function AuthCallbackPage() {
   if (needsPassword && ready) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-paper px-4">
-        <RequiredPasswordForm
-          supabase={supabase}
-          onSuccess={() => navigate("/", { replace: true })}
-        />
+        <Card className="w-full max-w-sm shadow-md">
+          <CardHeader className="items-center pb-2">
+            <BrandMark className="text-2xl" iconClassName="h-9 w-9" />
+          </CardHeader>
+          <CardContent>
+            <RequiredPasswordForm
+              supabase={supabase}
+              title="Activá tu acceso"
+              description="Te invitaron a participar de Nodo Autos. Elegí tu contraseña para continuar."
+              submitLabel="Activar mi cuenta"
+              onSuccess={() => navigate("/", { replace: true })}
+            />
+          </CardContent>
+        </Card>
       </div>
     );
   }
