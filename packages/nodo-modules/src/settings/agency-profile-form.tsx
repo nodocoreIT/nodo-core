@@ -42,6 +42,7 @@ export function AgencyProfileForm({ onSuccess }: AgencyProfileFormProps) {
   const { role: authRole } = useAuth();
   const {
     adminRole,
+    superAdminRole,
     sessionRole,
     profile,
     upsertProfile,
@@ -70,7 +71,8 @@ export function AgencyProfileForm({ onSuccess }: AgencyProfileFormProps) {
     },
   });
 
-  if (role !== adminRole) {
+  const hasAccess = role === adminRole || (!!superAdminRole && role === superAdminRole);
+  if (!hasAccess) {
     return null;
   }
 
