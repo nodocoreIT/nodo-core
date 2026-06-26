@@ -143,7 +143,8 @@ Deno.serve(async (req) => {
     }
 
     const userId = linkData.user.id;
-    const actionUrl = linkData.properties?.action_link ?? authCallbackUrl;
+    const magicLink = linkData.properties?.action_link ?? authCallbackUrl;
+    const actionUrl = `${magicLink}?mode=invite`;
 
     // Create invitation record for the new user (invitee_user_id is already set
     // because generateLink provisions the auth.users row immediately).
