@@ -22,6 +22,7 @@ import {
 import { formatMoney } from "@/features/contracts/lib/contract-labels";
 
 const EMPTY_FORM: BankAccountInput & { initial_balance_input: string } = {
+  kind: "BANCO",
   bank_name: "",
   alias: "",
   cbu: "",
@@ -31,6 +32,7 @@ const EMPTY_FORM: BankAccountInput & { initial_balance_input: string } = {
 
 function accountToForm(account: CashAccount): typeof EMPTY_FORM {
   return {
+    kind: account.kind,
     bank_name: account.bank_name ?? account.label,
     alias: account.alias ?? "",
     cbu: account.cbu ?? "",
@@ -81,16 +83,17 @@ export function BankAccountsSection() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.bank_name.trim() || !form.cbu.trim()) return;
+    if (form.kind === "BANCO" && (!form.bank_name.trim() || !form.cbu?.trim())) return;
 
     const initialBalance = form.initial_balance_input
       ? parseCurrencyInput(form.initial_balance_input) ?? 0
       : 0;
 
     const payload: BankAccountInput = {
-      bank_name: form.bank_name.trim(),
+      kind: form.kind,
+      bank_name: form.kind === "BANCO" ? form.bank_name.trim() : "Efectivo",
       alias: form.alias?.trim(),
-      cbu: form.cbu.trim(),
+      cbu: form.cbu?.trim(),
       currency: form.currency,
       initial_balance: isEdit ? undefined : initialBalance,
     };
@@ -107,9 +110,9 @@ export function BankAccountsSection() {
     <div className="border-t border-border pt-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-base font-bold text-navy">Cuentas bancarias</h3>
+          <h3 className="text-base font-bold text-navy">Cuentas</h3>
           <p className="text-xs text-slate2">
-            Usadas en cobros, movimientos de caja y liquidaciones.
+            Cuentas bancarias y cajas de efectivo para cobros, movimientos y liquidaciones.
           </p>
         </div>
         {!showForm && (
@@ -126,33 +129,21 @@ export function BankAccountsSection() {
           className="mb-4 grid grid-cols-1 gap-4 rounded-md border border-border bg-paper p-4 sm:grid-cols-2"
         >
           <div className="space-y-1">
-            <Label htmlFor="bank-name">Banco</Label>
-            <Input
-              id="bank-name"
-              placeholder="Ej. Banco Galicia"
-              value={form.bank_name}
-              onChange={(e) => setForm({ ...form, bank_name: e.target.value })}
-              required
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="bank-alias">Alias</Label>
-            <Input
-              id="bank-alias"
-              placeholder="Ej. NODO.INMO"
-              value={form.alias}
-              onChange={(e) => setForm({ ...form, alias: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="bank-cbu">CBU/CVU</Label>
-            <Input
-              id="bank-cbu"
-              placeholder="22 dígitos"
-              value={form.cbu}
-              onChange={(e) => setForm({ ...form, cbu: e.target.value })}
-              required
-            />
+            <Label>Tipo de cuenta</Label>
+            <Select
+              value={form.kind}
+              onValueChange={(v) =>
+                setForm({ ...form, kind: v as "BANCO" | "EFECTIVO" })
+              }
+            >
+              <SelectTrigger aria-label="Tipo de cuenta">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="BANCO">Cuenta bancaria</SelectItem>
+                <SelectItem value="EFECTIVO">Efectivo</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <Label>Moneda</Label>
@@ -181,6 +172,39 @@ export function BankAccountsSection() {
               </SelectContent>
             </Select>
           </div>
+          {form.kind === "BANCO" && (
+            <>
+              <div className="space-y-1">
+                <Label htmlFor="bank-name">Banco</Label>
+                <Input
+                  id="bank-name"
+                  placeholder="Ej. Banco Galicia"
+                  value={form.bank_name}
+                  onChange={(e) => setForm({ ...form, bank_name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="bank-alias">Alias</Label>
+                <Input
+                  id="bank-alias"
+                  placeholder="Ej. NODO.INMO"
+                  value={form.alias}
+                  onChange={(e) => setForm({ ...form, alias: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label htmlFor="bank-cbu">CBU/CVU</Label>
+                <Input
+                  id="bank-cbu"
+                  placeholder="22 dígitos"
+                  value={form.cbu}
+                  onChange={(e) => setForm({ ...form, cbu: e.target.value })}
+                  required
+                />
+              </div>
+            </>
+          )}
           {!isEdit && (
             <div className="space-y-1 sm:col-span-2">
               <Label htmlFor="bank-initial">Monto inicial (opcional)</Label>
@@ -228,18 +252,27 @@ export function BankAccountsSection() {
           >
             <div className="space-y-1">
               <p className="text-sm font-bold text-navy">
-                {account.bank_name ?? account.label}
+                {account.kind === "EFECTIVO"
+                  ? `Efectivo (${account.currency === "USD" ? "Dólares" : "Pesos"})`
+                  : (account.bank_name ?? account.label)}
               </p>
               <p className="text-xs text-slate2">
+                <strong>Tipo:</strong>{" "}
+                {account.kind === "EFECTIVO" ? "Efectivo" : "Cuenta bancaria"}
+                {" · "}
                 <strong>Moneda:</strong>{" "}
                 {account.currency === "USD" ? "Dólares (US$)" : "Pesos ($)"}
               </p>
-              <p className="text-xs text-slate2">
-                <strong>Alias:</strong> {account.alias || "—"}
-              </p>
-              <p className="font-mono text-xs text-slate2">
-                <strong>CBU:</strong> {account.cbu || "—"}
-              </p>
+              {account.kind === "BANCO" && (
+                <>
+                  <p className="text-xs text-slate2">
+                    <strong>Alias:</strong> {account.alias || "—"}
+                  </p>
+                  <p className="font-mono text-xs text-slate2">
+                    <strong>CBU:</strong> {account.cbu || "—"}
+                  </p>
+                </>
+              )}
               {(account.initial_balance ?? 0) > 0 && (
                 <p className="text-xs text-green-700">
                   <strong>Saldo inicial:</strong>{" "}

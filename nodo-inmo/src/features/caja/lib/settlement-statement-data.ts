@@ -15,12 +15,20 @@ import type { OrgProfileRow } from "@/features/agency-profile/hooks/use-org-prof
 // `SettlementBreakdown` already has: gross, commission_rate, commission,
 // owner_share, deductions, deduction_total, net.
 // The sealed JSONB also carries: currency, version, sealed_at, settlement_group, cobro_count.
+export interface CobroDetail {
+  period: string;
+  period_label: string;
+  amount: number;
+  expenses_amount: number;
+}
+
 export interface SealedBreakdown extends SettlementBreakdown {
   currency: string;
   version?: number;
   sealed_at?: string;
   settlement_group?: string;
   cobro_count?: number;
+  cobros_detail?: CobroDetail[];
 }
 
 export interface StatementData {
