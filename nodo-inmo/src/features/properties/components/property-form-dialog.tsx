@@ -70,6 +70,7 @@ const schema = z.object({
   rooms: z.string().optional(),
   bathrooms: z.string().optional(),
   description: z.string().optional(),
+  instagram_url: z.string().url("URL inválida").optional().or(z.literal("")),
   inventory_description: z.string().optional(),
   owner_id: z.string().optional(),
   commission_rate: z.string().optional(),
@@ -177,6 +178,7 @@ function buildPayload(values: PropertyFormValues, photos?: string[]) {
     rooms: toNumberOrNull(values.rooms),
     bathrooms: toNumberOrNull(values.bathrooms),
     description: values.description || null,
+    instagram_url: values.instagram_url || null,
     inventory_description: values.inventory_description || null,
     owner_id: values.owner_id || null,
     commission_rate: toNumberOrNull(values.commission_rate),
@@ -235,6 +237,7 @@ export function PropertyFormDialog({
       rooms: toStringOrEmpty(property?.rooms) || voiceDefaults?.rooms || "",
       bathrooms: toStringOrEmpty(property?.bathrooms),
       description: property?.description ?? voiceDefaults?.description ?? "",
+      instagram_url: (property as any)?.instagram_url ?? "",
       inventory_description: property?.inventory_description ?? "",
       owner_id: property?.owner_id ?? "",
       commission_rate: toStringOrEmpty(property?.commission_rate),
@@ -629,6 +632,27 @@ export function PropertyFormDialog({
                       aria-label="Descripción"
                       placeholder="Descripción de la propiedad…"
                       rows={3}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Instagram URL */}
+            <FormField
+              control={form.control as any}
+              name="instagram_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="instagram-input">Publicación de Instagram</FormLabel>
+                  <FormControl>
+                    <Input
+                      id="instagram-input"
+                      aria-label="Publicación de Instagram"
+                      type="url"
+                      placeholder="https://www.instagram.com/p/..."
                       {...field}
                     />
                   </FormControl>
