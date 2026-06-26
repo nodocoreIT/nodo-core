@@ -32,6 +32,8 @@ import {
 } from "@nodocore/shared-components";
 import { useAgendaModule } from "./context";
 import type { AgendaLinkField, TaskRow } from "./types";
+import { VoiceTaskButton } from "./voice-task-button";
+import type { ExtractedTask } from "./use-extract-task-from-voice";
 import { cn } from "../lib/cn";
 
 const DEFAULT_ENTITY_LABEL = "Agencia";
@@ -71,6 +73,7 @@ export function AgendaPage() {
     deleteTask,
     isSaving,
     entityLabel,
+    geminiApiKey,
   } = useAgendaModule();
 
   const todayStr = getTodayString();
@@ -126,6 +129,19 @@ export function AgendaPage() {
     setFormPriority("media");
     setFormDueDate(selectedDateStr);
     setFormAssignedTo("");
+    resetLinkValues();
+    setDialogOpen(true);
+    clearTaskParam();
+  };
+
+  const handleVoiceExtracted = (values: ExtractedTask) => {
+    setEditingTask(null);
+    setFormTitle(values.title ?? "");
+    setFormDescription(values.description ?? "");
+    setFormCategory(values.category ?? categories[0]?.value ?? "general");
+    setFormPriority(values.priority ?? "media");
+    setFormDueDate(values.due_date ?? selectedDateStr);
+    setFormAssignedTo(values.assigned_to ?? "");
     resetLinkValues();
     setDialogOpen(true);
     clearTaskParam();
@@ -473,10 +489,13 @@ export function AgendaPage() {
             <h2 className="text-base font-bold text-navy">
               {`Tareas organizadas de ${pageEntityLabel}`}
             </h2>
-            <Button onClick={handleOpenCreateDialog} className="gap-2 text-xs">
-              <Plus className="h-4 w-4" />
-              Nueva Tarea
-            </Button>
+            <div className="flex items-center gap-2">
+              <VoiceTaskButton apiKey={geminiApiKey} onExtracted={handleVoiceExtracted} />
+              <Button onClick={handleOpenCreateDialog} className="gap-2 text-xs">
+                <Plus className="h-4 w-4" />
+                Nueva Tarea
+              </Button>
+            </div>
           </div>
 
           {isLoading ? (
