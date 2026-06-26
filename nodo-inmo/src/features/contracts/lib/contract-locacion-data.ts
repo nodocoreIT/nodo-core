@@ -22,6 +22,7 @@ export interface ContractParty {
   name: string;
   dni: string;     // "" when null → renderer prints "—"
   address: string;
+  phone?: string | null;
 }
 
 export interface ContractDocumentData {
@@ -170,7 +171,7 @@ export function buildContractDocumentData(input: {
     rooms: prop?.rooms != null ? String(prop.rooms) : "",
     sqm,
     inventoryDescription: prop?.inventory_description ?? "",
-    petsAllowed: prop?.pets_allowed ?? false,
+    petsAllowed: (prop as any)?.pets_allowed ?? false,
 
     // Plazo
     startDate: formatDate(contract.start_date),
@@ -197,7 +198,7 @@ export function buildContractDocumentData(input: {
     signingDate: formatDate(contract.signing_date),
 
     // Payment terms
-    paymentDueDay: contract.payment_due_day ?? 10,
-    dailyInterestRate: (contract as any).daily_interest_rate ?? 0,
+    paymentDueDay: (contract as any)?.payment_due_day ?? 10,
+    dailyInterestRate: (contract as any)?.daily_interest_rate ?? 0,
   };
 }
