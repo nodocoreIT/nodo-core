@@ -43,6 +43,7 @@ export interface ContractDocumentData {
   rooms: string;                   // "" when null
   sqm: string;                     // "120.00" or ""
   inventoryDescription: string;    // "" when null
+  petsAllowed: boolean;
   // Plazo
   startDate: string;               // dd/mm/yyyy
   endDate: string;                 // dd/mm/yyyy
@@ -166,6 +167,7 @@ export function buildContractDocumentData(input: {
     rooms: prop?.rooms != null ? String(prop.rooms) : "",
     sqm,
     inventoryDescription: prop?.inventory_description ?? "",
+    petsAllowed: prop?.pets_allowed ?? false,
 
     // Plazo
     startDate: formatDate(contract.start_date),
