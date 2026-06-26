@@ -36,15 +36,28 @@ const PANEL_MANAGED_NAV = [
 
 const AI_STORAGE_KEY = "nodo-panel-ai-settings";
 
+const DEFAULT_AI_SETTINGS = {
+  provider: "gemini" as const,
+  geminiApiKey: "",
+  openaiApiKey: "",
+  anthropicApiKey: "",
+};
+
 function readAiSettings() {
-  if (typeof window === "undefined") return { geminiApiKey: "" };
+  if (typeof window === "undefined") return { ...DEFAULT_AI_SETTINGS };
   try {
     const raw = localStorage.getItem(AI_STORAGE_KEY);
-    if (raw) return { geminiApiKey: JSON.parse(raw).geminiApiKey ?? "" };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (!parsed.provider) parsed.provider = "gemini";
+      if (!parsed.openaiApiKey) parsed.openaiApiKey = "";
+      if (!parsed.anthropicApiKey) parsed.anthropicApiKey = "";
+      return { ...DEFAULT_AI_SETTINGS, ...parsed };
+    }
   } catch {
     // ignore
   }
-  return { geminiApiKey: "" };
+  return { ...DEFAULT_AI_SETTINGS };
 }
 
 export function PanelSettingsModuleProvider({ children }: { children: ReactNode }) {
@@ -52,7 +65,7 @@ export function PanelSettingsModuleProvider({ children }: { children: ReactNode 
   const staff = usePanelStaff();
   const [sessionRole, setSessionRole] = useState<string | null>(null);
   const [themeSettings, setThemeState] = useState<ThemeSettings>(PANEL_DEFAULT_THEME);
-  const [aiSettings, setAiState] = useState({ geminiApiKey: "" });
+  const [aiSettings, setAiState] = useState(DEFAULT_AI_SETTINGS);
   const [logoSignedUrl, setLogoSignedUrl] = useState<string | null>(null);
   const [pdfLogoSignedUrl, setPdfLogoSignedUrl] = useState<string | null>(null);
   const [isUpsertingProfile, setIsUpsertingProfile] = useState(false);
@@ -107,7 +120,7 @@ export function PanelSettingsModuleProvider({ children }: { children: ReactNode 
     applyPanelThemeToDocument(PANEL_DEFAULT_THEME);
   }, []);
 
-  const setAiSettings = useCallback((next: Partial<{ geminiApiKey: string }>) => {
+  const setAiSettings = useCallback((next: Partial<typeof DEFAULT_AI_SETTINGS>) => {
     setAiState((prev) => {
       const merged = { ...prev, ...next };
       try {
