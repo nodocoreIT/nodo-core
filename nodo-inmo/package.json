@@ -33,7 +33,7 @@
     "react-hook-form": "^7.77.0",
     "react-router-dom": "^7.6.1",
     "tailwind-merge": "^3.3.0",
-    "zod": "^3.25.0",
+    "zod": "^4.4.3",
     "zustand": "^5.0.5"
   },
   "devDependencies": {
