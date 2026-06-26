@@ -1,11 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
-import { Plus, Pencil, Archive, FileText, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, Loader2 } from "lucide-react";
+import { Plus, Pencil, Archive, FileText, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle } from "lucide-react";
 import { PaginationControls } from "@nodocore/shared-components";
 import { Button } from "@nodocore/shared-components";
 import { useContracts } from "@/features/contracts/hooks/use-contracts";
 import type { ContractWithRelations } from "@/features/contracts/hooks/use-contracts";
 import { useArchiveContract } from "@/features/contracts/hooks/use-archive-contract";
-import { useSendWhatsApp } from "@/features/contracts/hooks/use-send-whatsapp";
 import { useUpdateContract } from "@/features/contracts/hooks/use-update-contract";
 import { ContractFormDialog } from "./contract-form-dialog";
 import { useSearchStore } from "@nodocore/shared-components";
@@ -57,8 +56,6 @@ export function ContractsList() {
     useState<ContractWithRelations | null>(null);
   const archiveContract = useArchiveContract();
   const updateContract = useUpdateContract();
-  const { sendFromContract, loadingId } = useSendWhatsApp();
-  const [whatsappResult, setWhatsappResult] = useState<{ id: string; ok: boolean; msg: string } | null>(null);
   const [page, setPage] = useState(0);
   const [sortConfig, setSortConfig] = useState<{
     key: "tenant" | "property" | "start_date" | "end_date" | null;
@@ -321,33 +318,11 @@ export function ContractsList() {
                           variant="ghost"
                           size="sm"
                           aria-label="Avisar aumento por WhatsApp"
-                          title={
-                            contract.tenant?.phone
-                              ? "Enviar aviso de aumento por WhatsApp"
-                              : "Sin teléfono registrado"
-                          }
-                          disabled={!contract.tenant?.phone || loadingId === contract.id}
-                          className={
-                            whatsappResult?.id === contract.id
-                              ? whatsappResult.ok
-                                ? "text-green-600"
-                                : "text-red-500"
-                              : "text-green-700 hover:text-green-800 hover:bg-green-50"
-                          }
-                          onClick={async () => {
-                            const result = await sendFromContract(contract);
-                            setWhatsappResult({
-                              id: contract.id,
-                              ok: result.success,
-                              msg: result.error ?? "Mensaje enviado",
-                            });
-                            setTimeout(() => setWhatsappResult(null), 4000);
-                          }}
+                          title="Funcionalidad en desarrollo"
+                          disabled
+                          className="text-slate-400 cursor-not-allowed"
                         >
-                          {loadingId === contract.id
-                            ? <Loader2 className="h-4 w-4 animate-spin" />
-                            : <MessageCircle className="h-4 w-4" />
-                          }
+                          <MessageCircle className="h-4 w-4" />
                           <span className="sr-only">Enviar aviso WhatsApp</span>
                         </Button>
                       )}

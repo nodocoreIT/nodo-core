@@ -25,7 +25,7 @@ export function useContacts(role?: ContactRole, options?: UseContactsOptions) {
       const base = supabase
         .schema("nodo_inmo")
         .from("contacts")
-        .select("*");
+        .select("id,org_id,name,dni,phone,email,address,commission_rate,can_view_rentals,can_view_construction,can_view_sales,portal_user_id,roles,created_at,updated_at");
 
       const query = role
         ? base.contains("roles", [role])
