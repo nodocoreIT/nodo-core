@@ -343,8 +343,8 @@ export async function sendStaffInviteEmail({
     text: `Hola ${name},\n\n${inviterName ? `${inviterName} te` : "Te"} invitó a unirte al equipo de ${orgName} en ${nodeLabel}. Hacé clic en el siguiente enlace para aceptar la invitación:\n\n${inviteUrl}\n\nSi no esperabas esta invitación, podés ignorar este correo.\n\nSaludos,\nEl equipo de ${nodeLabel}`,
     attachments: [
       {
-        filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuesto_50.png"),
+        filename: "logo_compuestoa.png",
+        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
         cid: "nodologo",
       },
     ],
