@@ -7,7 +7,7 @@ import LoginBrandPanel from "@/components/LoginBrandPanel";
 import { LoginFormNodeHeader } from "@/components/LoginFormNodeHeader";
 import { LoginNodeLockup } from "@/components/LoginNodeLockup";
 import { getLoginPanelDetails } from "@/lib/login-panel";
-import { Layers, Loader2 } from "lucide-react";
+import { Layers, Loader2, Stethoscope, User } from "lucide-react";
 import {
   PasswordResetPanel,
   usePasswordRecoveryBootstrap,
@@ -51,11 +51,13 @@ function NodeTransitionOverlay({
   code,
   Icon,
   accent = DEFAULT_ACCENT,
+  wordmarkSlug,
 }: {
   label: string;
   code: string;
   Icon: React.ElementType;
   accent?: NodeAccent;
+  wordmarkSlug?: string;
 }) {
   const [mounted, setMounted] = useState(false);
   const [barWidth, setBarWidth] = useState(0);
@@ -140,7 +142,7 @@ function NodeTransitionOverlay({
           Entrando a
         </p>
         <div className="mt-2 flex justify-center">
-          <LoginNodeLockup nodeCode={code} size="panel" />
+          <LoginNodeLockup nodeCode={code} wordmarkSlug={wordmarkSlug} size="panel" />
         </div>
 
         {/* Dots */}
@@ -309,6 +311,7 @@ function LoginForm() {
     label: string;
     code: string;
     Icon: React.ElementType;
+    wordmarkSlug?: string;
   } | null>(null);
   const [successModal, setSuccessModal] = useState<{
     open: boolean;
@@ -331,6 +334,12 @@ function LoginForm() {
   const childModules = getChildNodes(cleanSlug);
   const showModulePicker =
     needsModulePicker(nodeParam) &&
+    authMode === "login" &&
+    !recoveryBootstrapping;
+
+  const showPortalPicker =
+    isClinicaNode &&
+    !searchParams.get("role") &&
     authMode === "login" &&
     !recoveryBootstrapping;
 
@@ -408,6 +417,7 @@ function LoginForm() {
     let tLabel = "Core";
     let tCode = "Core";
     let TIcon: React.ElementType = Layers;
+    let tWordmarkSlug: string | undefined;
 
     if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
       tLabel = matchedNode?.label ?? "Nodo Inmo";
@@ -418,9 +428,10 @@ function LoginForm() {
       nodeParam === "clinica-virtual" ||
       nodeParam === "clinica"
     ) {
-      tLabel = "Clínica Virtualaaaaa";
+      tLabel = "Clínica Virtual";
       tCode = "Clínica";
       TIcon = matchedNode?.Icon ?? Layers;
+      tWordmarkSlug = "clinica";
     } else if (isAutosNode) {
       tLabel = matchedNode?.label ?? "Nodo Automotores";
       tCode = matchedNode?.code ?? "Autos";
@@ -435,6 +446,7 @@ function LoginForm() {
       label: tLabel,
       code: tCode,
       Icon: TIcon,
+      wordmarkSlug: tWordmarkSlug,
     });
 
     const { access_token, refresh_token } = session;
@@ -906,6 +918,7 @@ function LoginForm() {
           code={transitionTarget.code}
           Icon={transitionTarget.Icon}
           accent={loginAccent}
+          wordmarkSlug={transitionTarget.wordmarkSlug}
         />
       )}
 
@@ -940,6 +953,7 @@ function LoginForm() {
             {/* If node is Clinica Virtual or Inmo, show Iniciar / Registrar toggle */}
             {(isClinicaNode || isSimpleRegisterNode) &&
               !showModulePicker &&
+              !showPortalPicker &&
               (authMode === "login" || authMode === "register") && (
                 <div className="flex border-b border-mist mb-6">
                   <button
@@ -971,7 +985,94 @@ function LoginForm() {
                 </div>
               )}
 
-            {recoveryBootstrapping ? (
+            {showPortalPicker ? (
+              <div>
+                <span
+                  className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em]"
+                  style={{ color: loginAccent.brand }}
+                >
+                  ◎ NODO SALUD · CLÍNICA VIRTUAL
+                </span>
+
+                <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
+                  Ingresar al portal
+                </h1>
+                <p className="text-slate2 text-[14.5px] mb-8">
+                  Elegí si sos profesional de la salud o paciente para continuar.
+                </p>
+
+                <div className="flex flex-col gap-4">
+                  <button
+                    type="button"
+                    onClick={() => router.push("/nodo-clinica/login?role=medico")}
+                    className="flex items-start gap-4 rounded-xl border border-mist bg-white p-5 text-left transition-all duration-150 cursor-pointer hover:shadow-md"
+                    style={{
+                      // Using inline style for hover border since Tailwind dynamic color needs CSS var
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = loginAccent.brand;
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "";
+                    }}
+                  >
+                    <span
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-navy-900"
+                    >
+                      <Stethoscope
+                        aria-hidden
+                        className="h-5 w-5"
+                        strokeWidth={1.75}
+                        style={{ color: loginAccent.brand }}
+                      />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-bold text-ink text-[17px]">
+                        Soy Médico
+                      </span>
+                      <span className="mt-1 block text-slate2 text-[13.5px] leading-snug">
+                        Consultorio digital, cola de pacientes, interconsultas entre colegas e informes clínicos.
+                      </span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => router.push("/nodo-clinica/login?role=paciente")}
+                    className="flex items-start gap-4 rounded-xl border border-mist bg-white p-5 text-left transition-all duration-150 cursor-pointer hover:shadow-md"
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = loginAccent.brand;
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "";
+                    }}
+                  >
+                    <span
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-navy-900"
+                    >
+                      <User
+                        aria-hidden
+                        className="h-5 w-5"
+                        strokeWidth={1.75}
+                        style={{ color: loginAccent.brand }}
+                      />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-bold text-ink text-[17px]">
+                        Soy Paciente
+                      </span>
+                      <span className="mt-1 block text-slate2 text-[13.5px] leading-snug">
+                        Reservá turno online, subí estudios y conectate por videollamada con tu médico.
+                      </span>
+                    </span>
+                  </button>
+                </div>
+
+                <p className="text-slate2 text-[13px] text-center mt-6">
+                  Seleccioná un portal para iniciar sesión o registrarte.
+                </p>
+              </div>
+            ) : recoveryBootstrapping ? (
               <div className="text-center py-16">
                 <p className="text-slate2 text-[14.5px] font-medium">
                   Validando enlace de recuperación…
