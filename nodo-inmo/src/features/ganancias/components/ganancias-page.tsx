@@ -83,7 +83,6 @@ export function GananciasPage() {
     { label: "Adm. Alquileres", totals: summary.admAlquileres, color: "border-green-500" },
     { label: "Contratos / Renov.", totals: summary.contratos, color: "border-blue-500" },
     { label: "Ventas Inmob.", totals: summary.ventas, color: "border-amber-500" },
-    { label: "Dirección Obra / Honor.", totals: summary.honorarios, color: "border-slate-400" },
   ];
 
   return (

@@ -216,6 +216,7 @@ export function PropertyFormDialog({
 
   const form = useForm<PropertyFormValues>({
     resolver: zodResolver(schema) as any,
+    mode: "onSubmit",
     defaultValues: {
       address: property?.address ?? voiceDefaults?.address ?? "",
       localidad: property?.localidad ?? "",
