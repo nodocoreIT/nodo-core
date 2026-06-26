@@ -24,15 +24,19 @@ export function useUploadPropertyPhoto() {
 
       const newPhotos = [...currentPhotos, path];
 
-      const { error: updateError } = await supabase
+      const { data, error: updateError } = await supabase
         .schema("nodo_inmo")
         .from("properties")
         .update({
           photos: newPhotos,
           main_photo: newPhotos[0],
         } as never)
-        .eq("id", propertyId);
+        .eq("id", propertyId)
+        .select("id")
+        .single();
+
       if (updateError) throw updateError;
+      if (!data) throw new Error("Photo upload failed: no rows updated. Property may not exist or belong to a different organization.");
 
       return path;
     },
