@@ -21,6 +21,7 @@ function mapRow(row: Record<string, unknown>): BankAccount {
     id: row.id as string,
     label: row.label as string,
     currency: row.currency as "ARS" | "USD",
+    kind: (row.kind as "BANCO" | "EFECTIVO") ?? "BANCO",
     bank_name: (row.bank_name as string | null) ?? null,
     alias: (row.alias as string | null) ?? null,
     cbu: (row.cbu as string | null) ?? null,
@@ -90,7 +91,7 @@ export function useAutosBankAccounts() {
           kind: "BANCO",
           bank_name: input.bank_name.trim(),
           alias: input.alias?.trim() || null,
-          cbu: input.cbu.trim(),
+          cbu: input.cbu?.trim() || null,
           initial_balance: initialBalance,
           sort_order: 99,
         })
@@ -119,7 +120,7 @@ export function useAutosBankAccounts() {
           currency: input.currency,
           bank_name: input.bank_name.trim(),
           alias: input.alias?.trim() || null,
-          cbu: input.cbu.trim(),
+          cbu: input.cbu?.trim() || null,
         })
         .eq("id", id)
         .select()
