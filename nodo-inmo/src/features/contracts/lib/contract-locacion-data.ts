@@ -61,6 +61,9 @@ export interface ContractDocumentData {
   // Firma
   signingCity: string;             // signing_city or "" → "____"
   signingDate: string;             // dd/mm/yyyy or "" → "____"
+  // Payment terms
+  paymentDueDay: number;           // day of month (1-31)
+  dailyInterestRate: number;       // percentage (e.g., 2.5)
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -192,5 +195,9 @@ export function buildContractDocumentData(input: {
     // Firma
     signingCity: contract.signing_city ?? "",
     signingDate: formatDate(contract.signing_date),
+
+    // Payment terms
+    paymentDueDay: contract.payment_due_day ?? 10,
+    dailyInterestRate: (contract as any).daily_interest_rate ?? 0,
   };
 }

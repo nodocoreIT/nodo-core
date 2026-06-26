@@ -215,6 +215,8 @@ export function ContractLocacionDocument(props: ContractDocumentData) {
     expensesPaidByLabel,
     signingCity,
     signingDate,
+    paymentDueDay,
+    dailyInterestRate,
     agencyName: agName,
   } = props;
 
@@ -331,10 +333,10 @@ export function ContractLocacionDocument(props: ContractDocumentData) {
         <View style={styles.clauseSection}>
           <Text style={styles.clauseTitle}>QUINTA: FORMA DE PAGO - MORA</Text>
           <Text style={styles.clauseText}>
-            El alquiler deberá abonarse por mes adelantado entre los días 1 y 10 de cada mes.
+            El alquiler deberá abonarse por mes adelantado hasta el día {paymentDueDay} de cada mes.
             La falta de pago producirá la mora automática sin necesidad de interpelación. Las partes
-            acuerdan un interés moratorio del ________% por día sobre las sumas adeudadas hasta el
-            efectivo pago.
+            acuerdan un interés moratorio del {dailyInterestRate}% por día sobre las sumas adeudadas
+            hasta el efectivo pago.
           </Text>
         </View>
 
