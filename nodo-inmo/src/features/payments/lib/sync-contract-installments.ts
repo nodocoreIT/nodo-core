@@ -18,6 +18,7 @@ export interface SyncInstallmentsContract {
 export async function syncContractInstallments(
   orgId: string,
   contract: SyncInstallmentsContract,
+  fromDate?: string,
 ): Promise<{ inserted: number }> {
   if (contract.status !== "active") return { inserted: 0 };
   if (!contract.start_date || !contract.end_date || !contract.rent_amount) {
@@ -29,6 +30,7 @@ export async function syncContractInstallments(
     end_date: contract.end_date,
     rent_amount: contract.rent_amount,
     currency: contract.currency,
+    from_date: fromDate,
   });
 
   if (drafts.length === 0) return { inserted: 0 };

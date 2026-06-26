@@ -359,6 +359,7 @@ export function PropertiesList() {
               <TableRow>
                 <TableHead className="w-14">Foto</TableHead>
                 <TableHead>Dirección</TableHead>
+                <TableHead>Propietario</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Operación</TableHead>
                 <TableHead>Estado</TableHead>
@@ -385,6 +386,15 @@ export function PropertiesList() {
                   </TableCell>
                   <TableCell className="font-medium">
                     {property.address}
+                  </TableCell>
+                  <TableCell>
+                    {property.owner?.name ? (
+                      <span className="text-sm text-foreground">{property.owner.name}</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-pill bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                        Sin propietario
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {PROPERTY_TYPE_LABELS[property.property_type] ??

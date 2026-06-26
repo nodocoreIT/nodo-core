@@ -64,9 +64,10 @@ export interface TenantProfileRow {
 export type TenantProfileUpdate = Partial<TenantProfileRow>;
 
 export interface BankAccountInput {
+  kind: "BANCO" | "EFECTIVO";
   bank_name: string;
   alias?: string;
-  cbu: string;
+  cbu?: string;
   currency: "ARS" | "USD";
   initial_balance?: number;
 }
@@ -75,6 +76,7 @@ export interface BankAccount {
   id: string;
   label: string;
   currency: "ARS" | "USD";
+  kind: "BANCO" | "EFECTIVO";
   bank_name?: string | null;
   alias?: string | null;
   cbu?: string | null;
