@@ -13,6 +13,7 @@ import { DocumentosPage } from "@/features/documentos/components/documentos-page
 import { PortalPage } from "@/features/portal/components/portal-page";
 import { AgendaPage } from "@/features/agenda/components/agenda-page";
 import { ReclamosAdminPage } from "@/features/reclamos/components/reclamos-admin-page";
+import { RedesSocialesPage } from "@/features/redes-sociales/components/redes-sociales-page";
 import { PlanGate } from "@/shared/components/plan-gate";
 
 export function AdminPortalPage() {
@@ -43,6 +44,7 @@ export function AdminPortalPage() {
         <Route path="portal" element={<PlanGate requiredPlan="pro" fullPage><PortalPage /></PlanGate>} />
         <Route path="nodo-id" element={<PlanGate requiredPlan="pro" fullPage><div /></PlanGate>} />
         <Route path="bot-integraciones" element={<PlanGate requiredPlan="pro" fullPage><div /></PlanGate>} />
+        <Route path="redes-sociales" element={<RedesSocialesPage />} />
       </Route>
     </Routes>
   );
