@@ -21,6 +21,8 @@ export function AuthCallbackPage() {
   const [needsPassword, setNeedsPassword] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inviterName, setInviterName] = useState<string | undefined>();
+  const [inviteRole, setInviteRole] = useState<string | undefined>();
 
   useEffect(() => {
     const hash = window.location.hash.substring(1);
@@ -29,7 +31,10 @@ export function AuthCallbackPage() {
     const refresh_token = params.get("refresh_token");
     const type = params.get("type");
 
-    const mode = new URLSearchParams(window.location.search).get("mode");
+    const searchParams = new URLSearchParams(window.location.search);
+    const mode = searchParams.get("mode");
+    setInviterName(searchParams.get("inviter") ?? undefined);
+    setInviteRole(searchParams.get("role") ?? undefined);
 
     const settle = async () => {
       if (access_token && refresh_token) {
@@ -99,7 +104,11 @@ export function AuthCallbackPage() {
             <RequiredPasswordForm
               supabase={supabase}
               title="Activá tu acceso"
-              description="Te invitaron a participar de Nodo Autos. Elegí tu contraseña para continuar."
+              description={
+                inviterName
+                  ? `${inviteRole ? `Ingresá tu contraseña para acceder como ${inviteRole}` : "Ingresá tu contraseña para continuar"} — te invitó ${inviterName}.`
+                  : "Te invitaron a participar de Nodo Autos. Elegí tu contraseña para continuar."
+              }
               submitLabel="Activar mi cuenta"
               onSuccess={() => navigate("/", { replace: true })}
             />
