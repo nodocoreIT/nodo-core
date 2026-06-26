@@ -4,3 +4,4 @@ packages:
   - 'nodo-inmo'
   - 'nodo-autos'
   - 'nodo-finanzas'
+  - 'nodo-clinica'
