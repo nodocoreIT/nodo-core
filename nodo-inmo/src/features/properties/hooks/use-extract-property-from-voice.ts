@@ -1,4 +1,5 @@
-import { useAiStore } from "@/shared/hooks/use-ai-settings";
+import { useAiStore, getActiveApiKey } from "@/shared/hooks/use-ai-settings";
+import type { AiProvider } from "@/shared/hooks/use-ai-settings";
 import type { PropertyFormValues } from "@/features/properties/components/property-form-dialog";
 import { formatCurrencyInput } from "@/shared/lib/format-money";
 
@@ -8,6 +9,16 @@ interface GeminiResponse {
   candidates?: Array<{
     content?: { parts?: Array<{ text?: string }> };
   }>;
+  error?: { message: string };
+}
+
+interface OpenAIResponse {
+  choices?: Array<{ message?: { content?: string } }>;
+  error?: { message: string };
+}
+
+interface AnthropicResponse {
+  content?: Array<{ text?: string }>;
   error?: { message: string };
 }
 
@@ -28,45 +39,9 @@ Extraé los datos de la propiedad del texto y devolvé SOLO un objeto JSON váli
 - description: string (descripción libre si hubiera)
 Omití las claves que no puedas inferir. No devuelvas absolutamente nada más que el JSON puro.`;
 
-// ── API call ──────────────────────────────────────────────────────────────────
+// ── Parse helper ──────────────────────────────────────────────────────────────
 
-async function callGemini(
-  apiKey: string,
-  transcript: string,
-): Promise<ExtractedValues> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
-
-  const body = {
-    contents: [
-      {
-        parts: [
-          { text: SYSTEM_PROMPT },
-          { text: `Texto dictado: "${transcript}"` },
-        ],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.1,
-      maxOutputTokens: 512,
-    },
-  };
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  const data: GeminiResponse = await res.json();
-
-  if (!res.ok) {
-    const msg = data.error?.message ?? `HTTP ${res.status}`;
-    throw new Error(`Gemini API error: ${msg}`);
-  }
-
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-
-  // Strip any accidental markdown fences
+function parseExtractedValues(raw: string): ExtractedValues {
   const cleaned = raw
     .trim()
     .replace(/^```(?:json)?/i, "")
@@ -75,7 +50,6 @@ async function callGemini(
 
   const parsed = JSON.parse(cleaned) as Record<string, unknown>;
 
-  // Map parsed values to PropertyFormValues shape
   const result: ExtractedValues = {};
 
   if (typeof parsed.address === "string") result.address = parsed.address;
@@ -112,10 +86,128 @@ async function callGemini(
   return result;
 }
 
+// ── API calls ─────────────────────────────────────────────────────────────────
+
+async function callGemini(
+  apiKey: string,
+  transcript: string,
+): Promise<ExtractedValues> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+
+  const body = {
+    contents: [
+      {
+        parts: [
+          { text: SYSTEM_PROMPT },
+          { text: `Texto dictado: "${transcript}"` },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 512,
+    },
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const data: GeminiResponse = await res.json();
+
+  if (!res.ok) {
+    const msg = data.error?.message ?? `HTTP ${res.status}`;
+    throw new Error(`Gemini API error: ${msg}`);
+  }
+
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  return parseExtractedValues(raw);
+}
+
+async function callOpenAI(
+  apiKey: string,
+  transcript: string,
+): Promise<ExtractedValues> {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: `Texto dictado: "${transcript}"` },
+      ],
+      temperature: 0.1,
+      max_tokens: 512,
+    }),
+  });
+
+  const data: OpenAIResponse = await res.json();
+
+  if (!res.ok) {
+    const msg = data.error?.message ?? `HTTP ${res.status}`;
+    throw new Error(`OpenAI API error: ${msg}`);
+  }
+
+  const raw = data.choices?.[0]?.message?.content ?? "";
+  return parseExtractedValues(raw);
+}
+
+async function callAnthropic(
+  apiKey: string,
+  transcript: string,
+): Promise<ExtractedValues> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 512,
+      messages: [
+        {
+          role: "user",
+          content: `${SYSTEM_PROMPT}\n\nTexto dictado: "${transcript}"`,
+        },
+      ],
+    }),
+  });
+
+  const data: AnthropicResponse = await res.json();
+
+  if (!res.ok) {
+    const msg = data.error?.message ?? `HTTP ${res.status}`;
+    throw new Error(`Anthropic API error: ${msg}`);
+  }
+
+  const raw = data.content?.[0]?.text ?? "";
+  return parseExtractedValues(raw);
+}
+
+async function callAI(
+  provider: AiProvider,
+  apiKey: string,
+  transcript: string,
+): Promise<ExtractedValues> {
+  if (provider === "openai") return callOpenAI(apiKey, transcript);
+  if (provider === "anthropic") return callAnthropic(apiKey, transcript);
+  return callGemini(apiKey, transcript);
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useExtractPropertyFromVoice() {
-  const apiKey = useAiStore((s) => s.aiSettings.geminiApiKey);
+  const aiSettings = useAiStore((s) => s.aiSettings);
+  const apiKey = getActiveApiKey(aiSettings);
+  const provider = aiSettings.provider;
 
   const extract = async (transcript: string): Promise<ExtractedValues> => {
     if (!apiKey) {
@@ -124,7 +216,7 @@ export function useExtractPropertyFromVoice() {
     if (!transcript.trim()) {
       throw new Error("EMPTY_TRANSCRIPT");
     }
-    return callGemini(apiKey, transcript);
+    return callAI(provider, apiKey, transcript);
   };
 
   return { extract, hasApiKey: !!apiKey };
