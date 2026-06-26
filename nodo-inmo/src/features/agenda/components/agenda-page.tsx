@@ -7,6 +7,7 @@ import {
   type UpdateTaskInput,
 } from "@nodocore/nodo-modules/agenda";
 import { useAuth } from "@nodocore/shared-components";
+import { useAiStore } from "@/shared/hooks/use-ai-settings";
 import { useProperties } from "@/features/properties/hooks/use-properties";
 import { useContacts } from "@/features/contacts/hooks/use-contacts";
 import { useStaff } from "@/shared/hooks/use-staff";
@@ -15,6 +16,7 @@ import { INMO_TASK_CATEGORIES } from "../agenda-config";
 
 function InmoAgendaInner() {
   const { orgId } = useAuth();
+  const geminiApiKey = useAiStore((s) => s.aiSettings.geminiApiKey);
   const { data: properties = [] } = useProperties();
   const { data: contacts = [] } = useContacts();
   const { users } = useStaff();
@@ -63,6 +65,7 @@ function InmoAgendaInner() {
       ],
       agendaBasePath: "/admin/agenda",
       entityLabel: "la Agencia",
+      geminiApiKey,
       tasks,
       isLoading: isLoading || !orgId,
       createTask: (input: CreateTaskInput) => createMutation.mutateAsync(input),
@@ -78,6 +81,7 @@ function InmoAgendaInner() {
     tasks,
     isLoading,
     orgId,
+    geminiApiKey,
     createMutation,
     updateMutation,
     deleteMutation,

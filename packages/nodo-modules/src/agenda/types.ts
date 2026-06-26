@@ -62,4 +62,6 @@ export interface AgendaModuleConfig {
   /** Base path for deep links, e.g. /admin/agenda */
   agendaBasePath: string;
   entityLabel?: string;
+  /** Optional Gemini API key — enables voice-to-task dictation */
+  geminiApiKey?: string | null;
 }
