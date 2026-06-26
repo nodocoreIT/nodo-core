@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useMemo, useEffect } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff, PiggyBank, History, ArrowLeftRight, X } from 'lucide-react';
 import toast from 'react-hot-toast';

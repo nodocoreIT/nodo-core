@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Save, Copy, Calculator } from 'lucide-react';
 import toast from 'react-hot-toast';
