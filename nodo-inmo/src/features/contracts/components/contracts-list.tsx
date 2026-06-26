@@ -1,11 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
-import { Plus, Pencil, Archive, FileText, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, Loader2 } from "lucide-react";
+import { Plus, Pencil, Archive, FileText, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle } from "lucide-react";
 import { PaginationControls } from "@nodocore/shared-components";
 import { Button } from "@nodocore/shared-components";
 import { useContracts } from "@/features/contracts/hooks/use-contracts";
 import type { ContractWithRelations } from "@/features/contracts/hooks/use-contracts";
 import { useArchiveContract } from "@/features/contracts/hooks/use-archive-contract";
-import { useSendWhatsApp } from "@/features/contracts/hooks/use-send-whatsapp";
 import { useUpdateContract } from "@/features/contracts/hooks/use-update-contract";
 import { ContractFormDialog } from "./contract-form-dialog";
 import { useSearchStore } from "@nodocore/shared-components";
@@ -57,8 +56,6 @@ export function ContractsList() {
     useState<ContractWithRelations | null>(null);
   const archiveContract = useArchiveContract();
   const updateContract = useUpdateContract();
-  const { sendFromContract, loadingId } = useSendWhatsApp();
-  const [whatsappResult, setWhatsappResult] = useState<{ id: string; ok: boolean; msg: string } | null>(null);
   const [page, setPage] = useState(0);
   const [sortConfig, setSortConfig] = useState<{
     key: "tenant" | "property" | "start_date" | "end_date" | null;

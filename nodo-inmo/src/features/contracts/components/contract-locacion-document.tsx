@@ -212,7 +212,6 @@ export function ContractLocacionDocument(props: ContractDocumentData) {
     adjustmentIndexLabel,
     adjustmentPeriodMonths,
     depositAmount,
-    expensesPaidByLabel,
     signingCity,
     signingDate,
     paymentDueDay,

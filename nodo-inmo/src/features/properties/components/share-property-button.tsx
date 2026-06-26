@@ -9,7 +9,7 @@ import {
   formatPrice,
 } from "@/features/properties/lib/property-labels";
 
-function buildShareText(property: PropertyRow, coverPhotoUrl?: string | null): string {
+function buildShareText(property: PropertyRow, coverPhotoUrl: string = ""): string {
   const op = OPERATION_LABELS[property.operation] ?? property.operation;
   const type = PROPERTY_TYPE_LABELS[property.property_type] ?? property.property_type;
   const price = formatPrice(property.sale_price, property.currency);
@@ -32,8 +32,8 @@ function buildShareText(property: PropertyRow, coverPhotoUrl?: string | null): s
 
   // Location
   const location: string[] = [];
-  if ((property as any).localidad) location.push(property.localidad);
-  if ((property as any).provincia) location.push(property.provincia);
+  if ((property as any).localidad) location.push((property as any).localidad);
+  if ((property as any).provincia) location.push((property as any).provincia);
   if (location.length > 0) lines.push(`📍 ${location.join(", ")}`);
 
   // Amenities
@@ -63,7 +63,7 @@ function buildShareText(property: PropertyRow, coverPhotoUrl?: string | null): s
   // Instagram
   if ((property as any).instagram_url) {
     lines.push("");
-    lines.push(`📱 Instagram: ${property.instagram_url}`);
+    lines.push(`📱 Instagram: ${(property as any).instagram_url}`);
   }
 
   return lines.join("\n");
@@ -87,15 +87,15 @@ async function fetchCoverPhotoFile(path: string): Promise<File | null> {
   }
 }
 
-async function fetchCoverPhotoUrl(path: string): Promise<string | null> {
+async function fetchCoverPhotoUrl(path: string): Promise<string> {
   try {
     const { data, error } = await supabase.storage
       .from("property-photos")
       .createSignedUrl(path, 60);
-    if (error || !data) return null;
+    if (error || !data) return "";
     return data.signedUrl;
   } catch {
-    return null;
+    return "";
   }
 }
 
@@ -137,7 +137,7 @@ export function SharePropertyButton({ property }: SharePropertyButtonProps) {
       }
 
       // Desktop: WhatsApp web with text + cover photo URL
-      let coverPhotoUrl: string | null = null;
+      let coverPhotoUrl = "";
       if (coverPath) {
         coverPhotoUrl = await fetchCoverPhotoUrl(coverPath);
       }
