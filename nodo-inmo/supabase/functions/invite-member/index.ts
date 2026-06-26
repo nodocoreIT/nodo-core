@@ -101,11 +101,10 @@ Deno.serve(async (req) => {
         expiresAt,
       });
 
-      // Set must_set_password flag so user must complete password setup
+      // Set must_set_password flag and store display name so the members table shows it correctly
       await adminClient.auth.admin.updateUserById(existingUserId, {
-        app_metadata: {
-          must_set_password: true,
-        },
+        app_metadata: { must_set_password: true },
+        user_metadata: { full_name: displayName },
       });
 
       const mail = await sendInmoStaffNotifyEmail(redirectTo, {
