@@ -5,6 +5,7 @@ import {
   useExtractTaskFromVoice,
   type ExtractedTask,
 } from "./use-extract-task-from-voice";
+import type { AiProvider } from "./types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -12,18 +13,19 @@ type VoiceState = "idle" | "listening" | "extracting" | "error";
 
 interface VoiceTaskButtonProps {
   apiKey: string | null | undefined;
+  provider?: AiProvider;
   onExtracted: (values: ExtractedTask) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function VoiceTaskButton({ apiKey, onExtracted }: VoiceTaskButtonProps) {
+export function VoiceTaskButton({ apiKey, provider = "gemini", onExtracted }: VoiceTaskButtonProps) {
   const [state, setState] = useState<VoiceState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
 
-  const { extract, hasApiKey } = useExtractTaskFromVoice(apiKey);
+  const { extract, hasApiKey } = useExtractTaskFromVoice(apiKey, provider);
 
   const isSupported =
     typeof window !== "undefined" &&
