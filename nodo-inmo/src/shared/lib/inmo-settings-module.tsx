@@ -5,6 +5,7 @@ import {
   type SettingsModuleContextValue,
   DEFAULT_ALERT_SETTINGS,
 } from "@nodocore/nodo-modules/settings";
+import { MetaSettingsForm } from "@/features/redes-sociales/components/meta-settings-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useThemeSettings } from "@/shared/hooks/use-theme-settings";
 import { useAiSettings } from "@/shared/hooks/use-ai-settings";
@@ -129,6 +130,7 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
       },
       saveManualIpc: ipcMutation.mutateAsync,
       isSavingManualIpc: ipcMutation.isPending,
+      metaSettingsContent: <MetaSettingsForm />,
     };
   }, [
     settings,

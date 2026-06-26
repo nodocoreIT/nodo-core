@@ -21,6 +21,7 @@ import {
   AlertCircle,
   Fingerprint,
   Bot,
+  Share2,
 } from "lucide-react";
 import {
   Button,
@@ -78,6 +79,7 @@ const NAV_ENTRIES: NavEntry[] = [
       { to: "/admin/owners", label: "Propietarios", icon: UserCheck },
       { to: "/admin/tenants", label: "Inquilinos", icon: Users },
       { to: "/admin/contracts", label: "Contratos", icon: FileText },
+      { to: "/admin/redes-sociales", label: "Redes Sociales", icon: Share2 },
     ],
   },
   {
@@ -138,6 +140,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/documentos": "Documentos",
   "/admin/agenda": "Agenda y Tareas",
   "/admin/reclamos": "Reclamos",
+  "/admin/redes-sociales": "Redes Sociales",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

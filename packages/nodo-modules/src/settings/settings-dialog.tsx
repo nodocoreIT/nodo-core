@@ -504,6 +504,7 @@ const ALL_SETTINGS_TABS: { id: SettingsTabId; label: string }[] = [
   { id: "ai", label: "Integraciones / IA" },
   { id: "alerts", label: "Alertas" },
   { id: "ipc", label: "Índices" },
+  { id: "redes-sociales", label: "Redes Sociales" },
 ];
 
 export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialogProps) {
@@ -1674,6 +1675,9 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
               </AlertDialog>
             </div>
           )}
+
+          {/* TAB: Redes Sociales */}
+          {activeTab === "redes-sociales" && module.metaSettingsContent}
           </div>
         </div>
       </DialogContent>

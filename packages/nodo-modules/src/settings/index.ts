@@ -14,6 +14,7 @@ export type {
   ThemeSettings,
   AiSettings,
   AlertSettings,
+  MetaSettings,
   TenantProfileRow,
   TenantProfileUpdate,
   BankAccount,

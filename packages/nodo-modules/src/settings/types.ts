@@ -7,7 +7,14 @@ export type SettingsTabId =
   | "users"
   | "ai"
   | "alerts"
-  | "ipc";
+  | "ipc"
+  | "redes-sociales";
+
+export interface MetaSettings {
+  instagram_account_id: string;
+  facebook_page_id: string;
+  access_token: string; // Long-lived Access Token from Meta (Page Access Token for Facebook)
+}
 
 export interface NavSection {
   to: string;
@@ -161,4 +168,6 @@ export interface SettingsModuleContextValue {
 
   saveManualIpc?: (value: number) => Promise<void>;
   isSavingManualIpc?: boolean;
+
+  metaSettingsContent?: ReactNode;
 }

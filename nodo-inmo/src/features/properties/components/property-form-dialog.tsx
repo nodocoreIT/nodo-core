@@ -163,7 +163,7 @@ interface PropertyFormDialogProps {
 }
 
 function buildPayload(values: PropertyFormValues, photos?: string[]) {
-  return {
+  const base = {
     address: values.address,
     localidad: values.localidad || null,
     provincia: values.provincia || null,
@@ -188,9 +188,13 @@ function buildPayload(values: PropertyFormValues, photos?: string[]) {
     has_bbq: values.has_bbq,
     has_elevator: values.has_elevator,
     has_parking: values.has_parking,
-    photos: photos ?? [],
-    main_photo: (photos ?? [])[0] ?? null,
   };
+
+  // In edit mode, photos is undefined — omit photo fields entirely so the DB
+  // retains existing values. In create mode, photos is always provided.
+  if (photos === undefined) return base;
+
+  return { ...base, photos, main_photo: photos[0] ?? null };
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
