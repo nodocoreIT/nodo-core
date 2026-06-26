@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useScrollToError } from "@/shared/hooks/use-scroll-to-error";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
@@ -186,6 +187,9 @@ export function ContractFormDialog({
       signing_date: contract?.signing_date ?? "",
     },
   });
+
+  // Auto-scroll to first error on validation fail
+  useScrollToError(form);
 
   const currency = form.watch("currency") || "ARS";
   const propertyId = form.watch("property_id");

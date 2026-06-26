@@ -25,6 +25,8 @@ export interface GenerateInput {
   currency: string;
   /** Only generate installments through this month (inclusive). Defaults to today. */
   as_of?: Date;
+  /** Skip installments for months before this date (YYYY-MM-DD). The start_date is still used for due_day calculation. */
+  from_date?: string;
 }
 
 function pad(n: number): string {
@@ -39,6 +41,7 @@ export function generateInstallments(input: GenerateInput): InstallmentDraft[] {
   const [sy, sm, sd] = input.start_date.split("-").map(Number);
   const end = new Date(`${input.end_date}T00:00:00Z`);
   const asOfKey = currentMonthKeyFromDate(input.as_of ?? new Date());
+  const fromKey = input.from_date ? input.from_date.slice(0, 7) : null;
 
   const drafts: InstallmentDraft[] = [];
   let year = sy;
@@ -51,6 +54,12 @@ export function generateInstallments(input: GenerateInput): InstallmentDraft[] {
 
     const periodStart = new Date(Date.UTC(year, month - 1, 1));
     if (periodStart >= end) break;
+
+    if (fromKey && periodKey < fromKey) {
+      month += 1;
+      if (month > 12) { month = 1; year += 1; }
+      continue;
+    }
 
     const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
     const dueDay = Math.min(sd, daysInMonth);

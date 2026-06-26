@@ -62,14 +62,19 @@ export function PhotoGallery({ paths, propertyId, orgId }: PhotoGalleryProps) {
 
     let current = [...localPaths];
     for (const file of files) {
-      const newPath = await upload.mutateAsync({
-        propertyId,
-        orgId,
-        file,
-        currentPhotos: current,
-      });
-      current = [...current, newPath];
-      setLocalPaths([...current]); // show each photo as it finishes uploading
+      try {
+        const newPath = await upload.mutateAsync({
+          propertyId,
+          orgId,
+          file,
+          currentPhotos: current,
+        });
+        current = [...current, newPath];
+        setLocalPaths([...current]); // show each photo as it finishes uploading
+      } catch (err) {
+        console.error("Photo upload error:", err);
+        throw err;
+      }
     }
   }
 
@@ -195,6 +200,16 @@ export function PhotoGallery({ paths, propertyId, orgId }: PhotoGalleryProps) {
         </p>
       )}
 
+      {photos.length === 0 && !upload.isPending && (
+        <div className="flex flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed border-mist bg-mist/30 py-12 text-center">
+          <ImagePlus className="h-10 w-10 text-slate2-300" />
+          <div>
+            <p className="text-sm font-medium text-slate2">Sin fotos todavía</p>
+            <p className="text-xs text-slate2-300">Subí imágenes para que se vean en la propiedad</p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {photos.map(({ path, url }, i) => (
           <div
@@ -253,28 +268,23 @@ export function PhotoGallery({ paths, propertyId, orgId }: PhotoGalleryProps) {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={upload.isPending}
-          className="flex h-32 flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-border bg-mist transition-colors hover:bg-mist/70 disabled:cursor-not-allowed disabled:opacity-70"
+          className="flex h-32 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-brand/30 bg-brand/5 transition-all hover:border-brand/50 hover:bg-brand/10 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95"
           aria-label="Agregar foto"
         >
           {upload.isPending ? (
             <>
-              <Loader2 className="h-6 w-6 animate-spin text-slate2" />
-              <span className="text-[11px] text-slate2">Subiendo…</span>
+              <Loader2 className="h-6 w-6 animate-spin text-brand" />
+              <span className="text-xs font-medium text-slate2">Subiendo…</span>
             </>
           ) : (
             <>
-              <ImagePlus className="h-6 w-6 text-slate2" />
-              <span className="text-[11px] text-slate2">Agregar foto</span>
+              <ImagePlus className="h-7 w-7 text-brand" />
+              <span className="text-sm font-semibold text-brand">Seleccionar imágenes</span>
             </>
           )}
         </button>
       </div>
 
-      {photos.length === 0 && !upload.isPending && (
-        <p className="rounded-lg bg-mist py-4 text-center text-sm text-slate2">
-          No hay fotos cargadas todavía
-        </p>
-      )}
 
       <input
         ref={fileInputRef}

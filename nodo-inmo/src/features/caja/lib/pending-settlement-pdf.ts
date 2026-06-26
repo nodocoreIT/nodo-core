@@ -34,7 +34,7 @@ export async function buildPendingStatementData(
   const { data: payments, error: paymentsError } = await supabase
     .schema("nodo_inmo")
     .from("payments")
-    .select("id, amount, expenses_amount, currency, contract_id")
+    .select("id, amount, expenses_amount, currency, contract_id, period")
     .in("id", paymentIds);
 
   if (paymentsError) throw paymentsError;
@@ -89,11 +89,27 @@ export async function buildPendingStatementData(
       ? Math.round((breakdown.commission / breakdown.gross) * 10000) / 100
       : 0;
 
+  const cobros_detail = (payments ?? [])
+    .filter((p) => p.period)
+    .sort((a, b) => a.period.localeCompare(b.period))
+    .map((p) => {
+      const d = new Date(p.period + "T00:00:00Z");
+      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const yyyy = d.getUTCFullYear();
+      return {
+        period: p.period,
+        period_label: `${mm}/${yyyy}`,
+        amount: p.amount,
+        expenses_amount: p.expenses_amount ?? 0,
+      };
+    });
+
   const sealedLike: SealedBreakdown = {
     ...breakdown,
     commission_rate: effectiveRate,
     currency: group.currency,
     cobro_count: batch.length,
+    cobros_detail,
   };
 
   return buildStatementData({

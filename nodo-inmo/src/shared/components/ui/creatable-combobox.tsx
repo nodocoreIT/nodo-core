@@ -33,8 +33,10 @@ export function CreatableCombobox({
 }: CreatableComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [highlightIndex, setHighlightIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const trimmed = search.trim();
   const filtered =
@@ -47,9 +49,17 @@ export function CreatableCombobox({
   );
   const showCreate = !!onCreateOption && trimmed.length > 0 && !exactMatch;
 
+  // Reset highlight when filtered list changes
+  useEffect(() => {
+    setHighlightIndex(-1);
+  }, [search]);
+
+  const totalItems = filtered.length + (showCreate ? 1 : 0);
+
   const close = useCallback(() => {
     setOpen(false);
     setSearch("");
+    setHighlightIndex(-1);
   }, []);
 
   useEffect(() => {
@@ -62,8 +72,18 @@ export function CreatableCombobox({
   }, [open, close]);
 
   useEffect(() => {
-    if (open) setTimeout(() => searchRef.current?.focus(), 0);
+    if (open) {
+      setHighlightIndex(-1);
+      setTimeout(() => searchRef.current?.focus(), 0);
+    }
   }, [open]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (highlightIndex < 0 || !listRef.current) return;
+    const items = listRef.current.querySelectorAll("[role='option'], [data-create-option]");
+    items[highlightIndex]?.scrollIntoView({ block: "nearest" });
+  }, [highlightIndex]);
 
   function handleSelect(option: string) {
     onChange(option);
@@ -112,32 +132,51 @@ export function CreatableCombobox({
               placeholder={searchPlaceholder}
               className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               onKeyDown={(e) => {
-                if (e.key === "Escape") close();
-                if (e.key === "Enter" && showCreate) {
+                if (e.key === "Escape") { close(); return; }
+                if (e.key === "ArrowDown") {
                   e.preventDefault();
-                  void handleCreate();
+                  setHighlightIndex((i) => (i + 1 >= totalItems ? 0 : i + 1));
+                  return;
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setHighlightIndex((i) => (i <= 0 ? totalItems - 1 : i - 1));
+                  return;
+                }
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (highlightIndex >= 0 && highlightIndex < filtered.length) {
+                    handleSelect(filtered[highlightIndex]);
+                  } else if (highlightIndex === filtered.length && showCreate) {
+                    void handleCreate();
+                  } else if (showCreate) {
+                    void handleCreate();
+                  }
+                  return;
                 }
               }}
             />
           </div>
 
-          <div className="max-h-56 overflow-y-auto py-1">
+          <div ref={listRef} className="max-h-56 overflow-y-auto py-1">
             {filtered.length === 0 && !showCreate ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
                 Sin resultados
               </p>
             ) : (
-              filtered.map((option) => (
+              filtered.map((option, idx) => (
                 <button
                   key={option}
                   type="button"
                   role="option"
                   aria-selected={value === option}
                   onClick={() => handleSelect(option)}
+                  onPointerEnter={() => setHighlightIndex(idx)}
                   className={cn(
                     "flex w-full items-center gap-2 px-3 py-2 text-left text-sm",
                     "hover:bg-accent hover:text-accent-foreground",
-                    value === option && "bg-accent/40",
+                    highlightIndex === idx && "bg-accent text-accent-foreground",
+                    value === option && highlightIndex !== idx && "bg-accent/40",
                   )}
                 >
                   <Check
@@ -154,9 +193,14 @@ export function CreatableCombobox({
             {showCreate && (
               <button
                 type="button"
+                data-create-option
                 disabled={isCreating}
                 onClick={() => void handleCreate()}
-                className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-sm font-medium text-brand hover:bg-accent"
+                onPointerEnter={() => setHighlightIndex(filtered.length)}
+                className={cn(
+                  "flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-sm font-medium text-brand hover:bg-accent",
+                  highlightIndex === filtered.length && "bg-accent",
+                )}
               >
                 {isCreating ? (
                   <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
