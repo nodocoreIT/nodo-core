@@ -1,0 +1,184 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+/* TODO: enable when shared-components is linked */
+/* @import "@nodocore/shared-components/styles/interactive.css"; */
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* Nodo brand palette */
+  --color-navy: #1B2A41;
+  --color-navy-700: #233650;
+  --color-navy-900: #121E2F;
+  --color-brand: #DA5A0E;
+  --color-brand-600: #C04E0B;
+  --color-brand-300: #F0A877;
+  --color-paper: #F5F8FC;
+  --color-slate2: #647890;
+  --color-slate2-300: #9DACBE;
+  --color-mist: #DEE7F1;
+  --color-mist-200: #EBF1F7;
+  --color-ink: #16202E;
+  --color-footer: #0D1722;
+
+  --font-display: var(--font-sora), system-ui, sans-serif;
+  --font-sans: var(--font-hanken), system-ui, sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-xl: 32px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(18,30,47,.06), 0 2px 6px rgba(18,30,47,.05);
+  --shadow-md: 0 8px 24px rgba(18,30,47,.08), 0 2px 6px rgba(18,30,47,.04);
+  --shadow-lg: 0 24px 60px rgba(18,30,47,.16), 0 8px 20px rgba(18,30,47,.08);
+
+  /* shadcn bridge */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+}
+
+:root {
+  --background: #F5F8FC;
+  --foreground: #16202E;
+  --card: #ffffff;
+  --card-foreground: #16202E;
+  --popover: #ffffff;
+  --popover-foreground: #16202E;
+  --primary: #DA5A0E;
+  --primary-foreground: #ffffff;
+  --secondary: #EBF1F7;
+  --secondary-foreground: #1B2A41;
+  --muted: #EBF1F7;
+  --muted-foreground: #647890;
+  --accent: #F5F8FC;
+  --accent-foreground: #1B2A41;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #DEE7F1;
+  --input: #DEE7F1;
+  --ring: #DA5A0E;
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 14px;
+  --sidebar: #121E2F;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #DA5A0E;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #da5a0e1a;
+  --sidebar-accent-foreground: #DA5A0E;
+  --sidebar-border: rgba(255,255,255,0.1);
+  --sidebar-ring: #DA5A0E;
+
+  --color-sidebar-bg: #121e2f;
+  --color-sidebar-hover: #121e2fdd;
+  --color-sidebar-border: #121e2f40;
+  --color-sidebar-text: #9dacbe;
+  --color-sidebar-accent: #da5a0e1a;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  line-height: 1.55;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Login split layout */
+@media (min-width: 881px) {
+  .login-split {
+    grid-template-columns: 1.05fr 0.95fr;
+  }
+  .login-brand-panel {
+    display: flex !important;
+  }
+}
+@media (max-width: 880px) {
+  .login-brand-panel {
+    display: none !important;
+  }
+}
+
+.ecosystem-core-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ecosystemCorePulse 2.6s ease-in-out infinite;
+}
+@keyframes ecosystemCorePulse {
+  0%, 100% { transform: scale(1); opacity: 0.1; }
+  12% { transform: scale(1.22); opacity: 0.28; }
+  24% { transform: scale(1.04); opacity: 0.15; }
+  36% { transform: scale(1.14); opacity: 0.22; }
+  50% { transform: scale(1); opacity: 0.1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ecosystem-core-pulse {
+    animation: none;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
