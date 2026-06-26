@@ -321,33 +321,11 @@ export function ContractsList() {
                           variant="ghost"
                           size="sm"
                           aria-label="Avisar aumento por WhatsApp"
-                          title={
-                            contract.tenant?.phone
-                              ? "Enviar aviso de aumento por WhatsApp"
-                              : "Sin teléfono registrado"
-                          }
-                          disabled={!contract.tenant?.phone || loadingId === contract.id}
-                          className={
-                            whatsappResult?.id === contract.id
-                              ? whatsappResult.ok
-                                ? "text-green-600"
-                                : "text-red-500"
-                              : "text-green-700 hover:text-green-800 hover:bg-green-50"
-                          }
-                          onClick={async () => {
-                            const result = await sendFromContract(contract);
-                            setWhatsappResult({
-                              id: contract.id,
-                              ok: result.success,
-                              msg: result.error ?? "Mensaje enviado",
-                            });
-                            setTimeout(() => setWhatsappResult(null), 4000);
-                          }}
+                          title="Funcionalidad en desarrollo"
+                          disabled
+                          className="text-slate-400 cursor-not-allowed"
                         >
-                          {loadingId === contract.id
-                            ? <Loader2 className="h-4 w-4 animate-spin" />
-                            : <MessageCircle className="h-4 w-4" />
-                          }
+                          <MessageCircle className="h-4 w-4" />
                           <span className="sr-only">Enviar aviso WhatsApp</span>
                         </Button>
                       )}
