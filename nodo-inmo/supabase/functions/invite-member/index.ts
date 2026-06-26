@@ -100,6 +100,13 @@ Deno.serve(async (req) => {
         expiresAt,
       });
 
+      // Set must_set_password flag so user must complete password setup
+      await adminClient.auth.admin.updateUserById(existingUserId, {
+        app_metadata: {
+          must_set_password: true,
+        },
+      });
+
       // Send to callback with mode=invite so user can set/update password before login
       const inviteCallbackUrl = landingOrigin
         ? `${inmoAuthCallbackUrl(landingOrigin)}?mode=invite`
@@ -145,6 +152,13 @@ Deno.serve(async (req) => {
     const userId = linkData.user.id;
     const magicLink = linkData.properties?.action_link ?? authCallbackUrl;
     const actionUrl = `${magicLink}?mode=invite`;
+
+    // Set must_set_password flag so user must complete password setup
+    await adminClient.auth.admin.updateUserById(userId, {
+      app_metadata: {
+        must_set_password: true,
+      },
+    });
 
     // Create invitation record for the new user (invitee_user_id is already set
     // because generateLink provisions the auth.users row immediately).
