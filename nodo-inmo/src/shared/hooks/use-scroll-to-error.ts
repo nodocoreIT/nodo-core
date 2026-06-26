@@ -26,3 +26,4 @@ export function useScrollToError<T extends FieldValues>(form: UseFormReturn<T>) 
       }, 50);
     }
   }, [Object.keys(form.formState.errors).join(","), form]);
+}
