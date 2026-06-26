@@ -100,12 +100,17 @@ Deno.serve(async (req) => {
         expiresAt,
       });
 
+      // Send to callback with mode=invite so user can set/update password before login
+      const inviteCallbackUrl = landingOrigin
+        ? `${inmoAuthCallbackUrl(landingOrigin)}?mode=invite`
+        : `${new URL(redirectTo).origin}/inmo/auth/callback?mode=invite`;
+
       const mail = await sendInmoStaffNotifyEmail(redirectTo, {
         kind: "invite",
         email: normalizedEmail,
         name: displayName,
         orgName,
-        actionUrl: loginUrl,
+        actionUrl: inviteCallbackUrl,
         inviterName,
         nodeLabel: nodeLabel ?? "NODO | Inmo",
       });

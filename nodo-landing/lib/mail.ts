@@ -16,7 +16,7 @@ export function isMailConfigured(): boolean {
 }
 
 function registrationLogoAttachments(): nodemailer.SendMailOptions["attachments"] {
-  const logoPath = path.join(process.cwd(), "public/logos/logo compuestoa.png");
+  const logoPath = path.join(process.cwd(), "public/logos/logo compuesto_50.png");
   if (!fs.existsSync(logoPath)) return [];
   return [{ filename: "logo_compuesto.png", path: logoPath, cid: "nodologo" }];
 }
@@ -214,7 +214,7 @@ export async function sendPatientVerificationEmail({
     attachments: [
       {
         filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
+        path: path.join(process.cwd(), "public/logos/logo compuesto_50.png"),
         cid: "nodologo",
       },
     ],
@@ -272,7 +272,7 @@ export async function sendPasswordResetEmail({
     attachments: [
       {
         filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
+        path: path.join(process.cwd(), "public/logos/logo compuesto_50.png"),
         cid: "nodologo",
       },
     ],
@@ -344,7 +344,7 @@ export async function sendStaffInviteEmail({
     attachments: [
       {
         filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
+        path: path.join(process.cwd(), "public/logos/logo compuesto_50.png"),
         cid: "nodologo",
       },
     ],
@@ -427,7 +427,7 @@ export async function sendStaffAddedEmail({
     attachments: [
       {
         filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
+        path: path.join(process.cwd(), "public/logos/logo compuesto_50.png"),
         cid: "nodologo",
       },
     ],
@@ -558,7 +558,7 @@ export async function sendInmoVerificationEmail({
     attachments: [
       {
         filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
+        path: path.join(process.cwd(), "public/logos/logo compuesto_50.png"),
         cid: "nodologo",
       },
     ],
@@ -696,7 +696,7 @@ export async function sendClientNodoInviteEmail({
     attachments: [
       {
         filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
+        path: path.join(process.cwd(), "public/logos/logo compuesto_50.png"),
         cid: "nodologo",
       },
     ],
@@ -742,7 +742,7 @@ export async function sendActivationEmail({
     attachments: [
       {
         filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
+        path: path.join(process.cwd(), "public/logos/logo compuesto_50.png"),
         cid: "nodologo",
       },
     ],

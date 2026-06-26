@@ -24,6 +24,7 @@ export function AuthCallbackPage() {
     const access_token = params.get("access_token");
     const refresh_token = params.get("refresh_token");
     const type = params.get("type");
+    const mode = new URLSearchParams(window.location.search).get("mode");
 
     const settle = async () => {
       if (access_token && refresh_token) {
@@ -46,6 +47,7 @@ export function AuthCallbackPage() {
 
       const mustReset =
         type === "invite" ||
+        mode === "invite" ||
         type === "recovery" ||
         (await fetchMustSetPassword(supabase));
 
