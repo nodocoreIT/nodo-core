@@ -10,20 +10,19 @@ export function useScrollToError<T extends FieldValues>(form: UseFormReturn<T>) 
     const errors = form.formState.errors;
     const errorKeys = Object.keys(errors);
 
-    if (errorKeys.length > 0) {
-      // Always focus the first error field
-      const firstErrorKey = errorKeys[0];
-      form.setFocus(firstErrorKey as any);
+    if (errorKeys.length === 0) return;
 
-      // Scroll to it
-      setTimeout(() => {
-        const input = document.querySelector(
-          `[name="${firstErrorKey}"]`
-        ) as HTMLElement | null;
-        if (input) {
-          input.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }, 50);
-    }
+    const firstErrorKey = errorKeys[0];
+    form.setFocus(firstErrorKey as any);
+
+    setTimeout(() => {
+      // Native inputs expose [name]; custom components (Select, etc.) get aria-invalid
+      const el =
+        (document.querySelector(`[name="${firstErrorKey}"]`) as HTMLElement | null) ??
+        (document.querySelector('[aria-invalid="true"]') as HTMLElement | null);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 50);
   }, [Object.keys(form.formState.errors).join(","), form]);
 }
