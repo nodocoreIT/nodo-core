@@ -256,6 +256,15 @@ export function PropertyFormDialog({
     },
   });
 
+  // Reset form when dialog closes in create mode
+  useEffect(() => {
+    if (!open && !isEdit) {
+      form.reset();
+      setStagedPhotos([]);
+      ownerChangedRef.current = false;
+    }
+  }, [open, isEdit, form]);
+
   // Auto-scroll to first error on validation fail
   useScrollToError(form);
 
