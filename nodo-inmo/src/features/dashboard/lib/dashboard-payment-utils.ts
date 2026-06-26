@@ -32,9 +32,10 @@ export function isOperationalPayment(payment: PaymentWithRelations): boolean {
 
 export function remainingAmount(payment: {
   amount: number;
+  expenses_amount?: number | null;
   paid_amount: number | null;
 }): number {
-  return payment.amount - (payment.paid_amount ?? 0);
+  return payment.amount + (payment.expenses_amount ?? 0) - (payment.paid_amount ?? 0);
 }
 
 export function isPartialPayment(payment: {

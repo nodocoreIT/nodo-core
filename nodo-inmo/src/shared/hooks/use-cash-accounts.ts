@@ -20,9 +20,10 @@ export interface CashAccount {
 const EMPTY_ACCOUNTS: CashAccount[] = [];
 
 export interface BankAccountInput {
+  kind: "BANCO" | "EFECTIVO";
   bank_name: string;
   alias?: string;
-  cbu: string;
+  cbu?: string;
   currency: "ARS" | "USD";
   initial_balance?: number;
 }
@@ -41,7 +42,14 @@ function isSeeded(orgId: string): boolean {
   return localStorage.getItem(seededKey(orgId)) === "1";
 }
 
-export function buildAccountLabel(bankName: string, currency: "ARS" | "USD"): string {
+export function buildAccountLabel(
+  kind: "BANCO" | "EFECTIVO",
+  bankName: string,
+  currency: "ARS" | "USD",
+): string {
+  if (kind === "EFECTIVO") {
+    return `Efectivo (${currency === "ARS" ? "Pesos" : "Dólares"})`;
+  }
   return `${bankName} (${currency === "ARS" ? "Pesos" : "Dólares"})`;
 }
 
@@ -116,6 +124,46 @@ async function createOpeningMovement(
   if (error) throw error;
 }
 
+async function ensureDefaultCashAccounts(
+  orgId: string,
+  existing: Record<string, unknown>[],
+): Promise<Record<string, unknown>[]> {
+  const mapped = existing.map(mapRow);
+  const hasArs = mapped.some((a) => a.kind === "EFECTIVO" && a.currency === "ARS");
+  const hasUsd = mapped.some((a) => a.kind === "EFECTIVO" && a.currency === "USD");
+
+  if (hasArs && hasUsd) return existing;
+
+  const toInsert: Array<Record<string, unknown>> = [];
+  if (!hasArs) {
+    toInsert.push({
+      org_id: orgId,
+      label: "Efectivo (Pesos)",
+      currency: "ARS",
+      kind: "EFECTIVO",
+      sort_order: 0,
+    });
+  }
+  if (!hasUsd) {
+    toInsert.push({
+      org_id: orgId,
+      label: "Efectivo (Dólares)",
+      currency: "USD",
+      kind: "EFECTIVO",
+      sort_order: 1,
+    });
+  }
+
+  const { data: inserted, error } = await supabase
+    .schema("nodo_inmo")
+    .from("cash_accounts")
+    .insert(toInsert)
+    .select();
+
+  if (error) throw error;
+  return [...existing, ...(inserted ?? [])];
+}
+
 /** Fetch bank/cash accounts for the org. */
 export function useCashAccounts() {
   const { orgId } = useAuth();
@@ -135,7 +183,9 @@ export function useCashAccounts() {
         .order("label", { ascending: true });
 
       if (error) throw error;
-      if (data && data.length > 0) return data.map(mapRow);
+
+      const rows = await ensureDefaultCashAccounts(orgId, data ?? []);
+      if (rows.length > 0) return rows.map(mapRow);
 
       if (isSeeded(orgId)) return [];
 
@@ -153,7 +203,7 @@ export function useCashAccounts() {
     mutationFn: async (input: BankAccountInput) => {
       if (!orgId) throw new Error("No org_id");
 
-      const label = buildAccountLabel(input.bank_name.trim(), input.currency);
+      const label = buildAccountLabel(input.kind, input.bank_name.trim(), input.currency);
       const initialBalance = input.initial_balance ?? 0;
 
       const { data, error } = await supabase
@@ -163,10 +213,10 @@ export function useCashAccounts() {
           org_id: orgId,
           label,
           currency: input.currency,
-          kind: "BANCO",
-          bank_name: input.bank_name.trim(),
-          alias: input.alias?.trim() || null,
-          cbu: input.cbu.trim(),
+          kind: input.kind,
+          bank_name: input.kind === "BANCO" ? input.bank_name.trim() : null,
+          alias: input.kind === "BANCO" ? (input.alias?.trim() || null) : null,
+          cbu: input.kind === "BANCO" ? (input.cbu?.trim() || null) : null,
           initial_balance: initialBalance,
           sort_order: 99,
         })
@@ -191,7 +241,7 @@ export function useCashAccounts() {
     }: BankAccountInput & { id: string }) => {
       if (!orgId) throw new Error("No org_id");
 
-      const label = buildAccountLabel(input.bank_name.trim(), input.currency);
+      const label = buildAccountLabel(input.kind, input.bank_name.trim(), input.currency);
 
       const { data, error } = await supabase
         .schema("nodo_inmo")
@@ -199,9 +249,10 @@ export function useCashAccounts() {
         .update({
           label,
           currency: input.currency,
-          bank_name: input.bank_name.trim(),
-          alias: input.alias?.trim() || null,
-          cbu: input.cbu.trim(),
+          kind: input.kind,
+          bank_name: input.kind === "BANCO" ? input.bank_name.trim() : null,
+          alias: input.kind === "BANCO" ? (input.alias?.trim() || null) : null,
+          cbu: input.kind === "BANCO" ? (input.cbu?.trim() || null) : null,
         })
         .eq("id", id)
         .select()

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useScrollToError } from "@/shared/hooks/use-scroll-to-error";
 import { z } from "zod";
 import {
   Loader2,
@@ -247,6 +248,9 @@ export function PropertyFormDialog({
       has_parking: property?.has_parking ?? false,
     },
   });
+
+  // Auto-scroll to first error on validation fail
+  useScrollToError(form);
 
   const currency = form.watch("currency") || "ARS";
   const ownerId = form.watch("owner_id");

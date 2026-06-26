@@ -242,23 +242,39 @@ export function SettlementStatementDocument(props: StatementData) {
 
         {/* ── Breakdown table ─────────────────────────────────────────────── */}
         <View style={styles.table}>
-          {(breakdown.rent_gross ?? breakdown.gross) > 0 ? (
-            <View style={styles.tableRow}>
-              <Text style={styles.cellLabel}>Alquileres cobrados</Text>
-              <Text style={styles.cellAmount}>
-                {fmtAmount(breakdown.rent_gross ?? breakdown.gross, currency)}
-              </Text>
-            </View>
-          ) : null}
+          {/* Per-period detail (version 2+) */}
+          {breakdown.cobros_detail && breakdown.cobros_detail.length > 0 ? (
+            breakdown.cobros_detail.map((cobro, i) => (
+              <View key={i} style={styles.tableRow}>
+                <Text style={styles.cellLabel}>
+                  Cobro {cobro.period_label} — Alquiler{cobro.expenses_amount > 0 ? ` + Expensas` : ""}
+                </Text>
+                <Text style={styles.cellAmount}>
+                  {fmtAmount(cobro.amount + cobro.expenses_amount, currency)}
+                </Text>
+              </View>
+            ))
+          ) : (
+            <>
+              {(breakdown.rent_gross ?? breakdown.gross) > 0 ? (
+                <View style={styles.tableRow}>
+                  <Text style={styles.cellLabel}>Alquileres cobrados</Text>
+                  <Text style={styles.cellAmount}>
+                    {fmtAmount(breakdown.rent_gross ?? breakdown.gross, currency)}
+                  </Text>
+                </View>
+              ) : null}
 
-          {(breakdown.expenses_gross ?? 0) > 0 ? (
-            <View style={styles.tableRow}>
-              <Text style={styles.cellLabel}>Expensas / Otros cobrados</Text>
-              <Text style={styles.cellAmount}>
-                {fmtAmount(breakdown.expenses_gross ?? 0, currency)}
-              </Text>
-            </View>
-          ) : null}
+              {(breakdown.expenses_gross ?? 0) > 0 ? (
+                <View style={styles.tableRow}>
+                  <Text style={styles.cellLabel}>Expensas / Otros cobrados</Text>
+                  <Text style={styles.cellAmount}>
+                    {fmtAmount(breakdown.expenses_gross ?? 0, currency)}
+                  </Text>
+                </View>
+              ) : null}
+            </>
+          )}
 
           {/* Row 1: Gross */}
           <View style={styles.tableRow}>

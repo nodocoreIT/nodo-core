@@ -228,7 +228,7 @@ export function RendicionesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          aria-label={`Finalizar rendición de ${group.owner_name}`}
+                          aria-label={`Rendir a ${group.owner_name}`}
                           disabled={finalizeLoading === rowKey || settleOwner.isPending}
                           className="gap-1 text-green-700 hover:bg-green-50 hover:text-green-800"
                           onClick={() => void handleFinalize(group)}
@@ -238,7 +238,7 @@ export function RendicionesPage() {
                           ) : (
                             <Check className="h-4 w-4" />
                           )}
-                          Finalizar
+                          Rendir
                         </Button>
                       </div>
                     </TableCell>

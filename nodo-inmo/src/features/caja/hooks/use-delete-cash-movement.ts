@@ -13,7 +13,7 @@ export function useDeleteCashMovement() {
   return useMutation({
     mutationFn: async (movement: CashMovementRow) => {
       if (movement.payment_id) {
-        const { error } = await supabase.rpc("annul_payment", {
+        const { error } = await supabase.schema("nodo_inmo").rpc("annul_payment", {
           p_payment_id: movement.payment_id,
         });
         if (error) throw error;
