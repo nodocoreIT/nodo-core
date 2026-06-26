@@ -11,6 +11,9 @@ import {
   INVALID_LOGIN_MESSAGE,
   RequiredPasswordForm,
 } from "@nodocore/shared-components";
+import LoginBrandPanel from "@/components/LoginBrandPanel";
+import { DEFAULT_ACCENT } from "@/lib/node-accents";
+import { getLoginPanelDetails } from "@/lib/login-panel";
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -85,14 +88,19 @@ export function AuthCallbackPage() {
 
   if (needsPassword && ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-paper px-4">
-        <RequiredPasswordForm
-          supabase={supabase}
-          title="Definí tu nueva contraseña"
-          description="Tu acceso fue blanqueado. Elegí una contraseña nueva y repetila para continuar."
-          submitLabel="Continuar"
-          onSuccess={() => navigate("/", { replace: true })}
-        />
+      <div className="min-h-screen grid grid-cols-1 login-split">
+        <LoginBrandPanel accent={DEFAULT_ACCENT} {...getLoginPanelDetails("")} />
+        <main className="flex items-center justify-center p-8 bg-paper min-h-screen">
+          <div className="w-[min(420px,100%)]">
+            <RequiredPasswordForm
+              supabase={supabase}
+              title="Definí tu nueva contraseña"
+              description="Tu acceso fue blanqueado. Elegí una contraseña nueva y repetila para continuar."
+              submitLabel="Continuar"
+              onSuccess={() => navigate("/", { replace: true })}
+            />
+          </div>
+        </main>
       </div>
     );
   }

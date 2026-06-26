@@ -75,7 +75,7 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
         invited:
           "Usuario invitado correctamente. Le enviamos un correo para que realice la activación de su cuenta.",
         existing:
-          "Usuario agregado correctamente. Le enviamos un correo para avisarle que ya puede ingresar.",
+          "Usuario INVITADO correctamente. Le enviamos un correo para avisarle que ya puede ingresar.",
         emailSkipped:
           "El usuario fue agregado, pero no se pudo enviar el correo de notificación.",
       },
