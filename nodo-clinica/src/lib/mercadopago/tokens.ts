@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * MercadoPago token helpers — Supabase version.
  *

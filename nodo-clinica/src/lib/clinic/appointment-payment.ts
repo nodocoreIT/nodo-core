@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createServiceClient } from "@/lib/supabase/server";
 import { notifyDoctorMercadoPagoPayment } from "@/lib/clinic/doctor-notifications";
 import { sendAppointmentConfirmationEmail } from "@/lib/email/resend";

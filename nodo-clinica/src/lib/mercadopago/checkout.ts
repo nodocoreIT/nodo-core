@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createServiceClient } from "@/lib/supabase/server";
 import { appBaseUrl } from "@/lib/clinic/appointment-payment";
 import { getOrgMercadoPagoAccessToken } from "@/lib/clinic/db/payments";

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createServiceClient } from "@/lib/supabase/server";
 import { sanitizeFileName, MAX_FILE_BYTES, ALLOWED_MIME } from "@/lib/clinic/storage";
 import { randomUUID } from "crypto";

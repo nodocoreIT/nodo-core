@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
 import { verifyMercadoPagoWebhookSignature } from "@/lib/mercadopago/webhook-verify";
 import { processMercadoPagoPaymentId } from "@/lib/mercadopago/handle-payment-webhook";

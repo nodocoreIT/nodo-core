@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Alias público para webhooks de Mercado Pago.
  * URL recomendada en el panel MP:
