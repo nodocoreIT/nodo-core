@@ -5,7 +5,7 @@ import type { NextConfig } from "next";
 // Set NODO_INMO_URL in nodo-landing/.env.local for dev,
 // and in Vercel environment variables for production.
 const NODO_INMO_URL = process.env.NODO_INMO_URL ?? "http://localhost:5173";
-const NODO_CLINICA_URL = process.env.NODO_CLINICA_URL ?? "http://localhost:5174";
+const NODO_CLINICA_URL = process.env.NODO_CLINICA_URL ?? "http://localhost:3002";
 const NODO_AUTOS_URL = process.env.NODO_AUTOS_URL ?? "http://localhost:5175";
 const NODO_FINANZAS_URL = process.env.NODO_FINANZAS_URL ?? "http://localhost:5176";
 
@@ -40,6 +40,7 @@ const nextConfig: NextConfig = {
           { source: "/brand/:path*", destination: `${NODO_INMO_URL}/brand/:path*` },
           { source: "/assets/:path*", destination: `${NODO_INMO_URL}/assets/:path*` },
           // ── nodo-clinica ───────────────────────────────────────────────────
+          // Landing lives at /nodo-clinica (Next.js page), app at /clinica (proxy)
           { source: "/clinica", destination: `${NODO_CLINICA_URL}/clinica` },
           { source: "/clinica/:path*", destination: `${NODO_CLINICA_URL}/clinica/:path*` },
           // ── nodo-autos ─────────────────────────────────────────────────────
