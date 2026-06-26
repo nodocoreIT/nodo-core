@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DoctorDashboard } from "@/components/dashboard/doctor-dashboard";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";

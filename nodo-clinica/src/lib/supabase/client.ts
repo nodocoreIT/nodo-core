@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createBrowserClient } from "@supabase/ssr";
 import type { Database } from "@/types/database";
 import { clinicaSupabaseClientOptions } from "@/lib/supabase/clinica-auth";

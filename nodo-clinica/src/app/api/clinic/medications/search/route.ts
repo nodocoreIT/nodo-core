@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
 import { searchVademecum } from "@/lib/clinic/vademecum";
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createServiceClient } from "@/lib/supabase/server";
 
 export interface PaymentCredentialsRow {

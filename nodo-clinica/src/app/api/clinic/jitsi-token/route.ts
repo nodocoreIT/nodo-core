@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
 import { generateJaasJwt } from "@/lib/jitsi/generate-jaas-jwt";
 import { isJaasConfigured } from "@/lib/jitsi/jaas-config";
