@@ -346,7 +346,54 @@ export function ContactFormDialog({
               )}
             />
 
-      
+
+            {/* Owner portal permissions — shown when owner role is active */}
+            {showOwnerFields && (
+              <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+                <p className="text-xs font-medium text-slate2">
+                  Acceso al portal del propietario
+                </p>
+
+                <FormField
+                  control={form.control as any}
+                  name="can_view_rentals"
+                  render={({ field }) => (
+                    <CheckboxField
+                      id="contact-can-view-rentals"
+                      label="Ver alquileres"
+                      checked={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+
+                <FormField
+                  control={form.control as any}
+                  name="can_view_construction"
+                  render={({ field }) => (
+                    <CheckboxField
+                      id="contact-can-view-construction"
+                      label="Ver obra / construcción"
+                      checked={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+
+                <FormField
+                  control={form.control as any}
+                  name="can_view_sales"
+                  render={({ field }) => (
+                    <CheckboxField
+                      id="contact-can-view-sales"
+                      label="Ver ventas"
+                      checked={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+              </div>
+            )}
 
             <DialogFooter className="mt-2">
               <Button

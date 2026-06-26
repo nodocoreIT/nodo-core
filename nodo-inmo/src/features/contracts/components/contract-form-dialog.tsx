@@ -65,6 +65,9 @@ const schema = z.object({
   // Phase C — contract generator metadata
   contract_type: z.enum(["habitacional", "comercial"]),
   signing_date: z.string().optional(),
+  // Payment terms
+  payment_due_day: z.string().min(1, "Día de vencimiento requerido"),
+  daily_interest_rate: z.string().min(0, "Tasa de interés requerida"),
 });
 
 export type ContractFormValues = z.infer<typeof schema>;
@@ -116,6 +119,8 @@ function buildPayload(values: ContractFormValues, guarantorIds: string[]) {
     contract_type: values.contract_type,
     signing_date: values.signing_date || null,
     signing_city: null,
+    payment_due_day: Number(values.payment_due_day),
+    daily_interest_rate: Number(values.daily_interest_rate.replace(",", ".")),
   };
 }
 
@@ -185,6 +190,9 @@ export function ContractFormDialog({
       // Phase C — contract generator metadata
       contract_type: (contract?.contract_type as any) ?? "habitacional",
       signing_date: contract?.signing_date ?? "",
+      // Payment terms
+      payment_due_day: toStr((contract as any)?.payment_due_day) || "10",
+      daily_interest_rate: toStr((contract as any)?.daily_interest_rate) || "0",
     },
   });
 
@@ -731,6 +739,52 @@ export function ContractFormDialog({
                   )}
                 />
               </div>
+            </div>
+
+            {/* Payment Terms */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control as any}
+                name="payment_due_day"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel htmlFor="payment-due-day-input">Día de vencimiento de pago</FormLabel>
+                    <FormControl>
+                      <Input
+                        id="payment-due-day-input"
+                        aria-label="Día de vencimiento de pago"
+                        type="number"
+                        min="1"
+                        max="31"
+                        placeholder="10"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control as any}
+                name="daily_interest_rate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel htmlFor="daily-interest-rate-input">% de interés moratorio diario</FormLabel>
+                    <FormControl>
+                      <Input
+                        id="daily-interest-rate-input"
+                        aria-label="% de interés moratorio diario"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        placeholder="0"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             {/* Guarantors (multi-select via checkboxes) */}

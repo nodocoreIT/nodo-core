@@ -22,6 +22,7 @@ export interface ContractParty {
   name: string;
   dni: string;     // "" when null → renderer prints "—"
   address: string;
+  phone?: string | null;
 }
 
 export interface ContractDocumentData {
@@ -43,6 +44,7 @@ export interface ContractDocumentData {
   rooms: string;                   // "" when null
   sqm: string;                     // "120.00" or ""
   inventoryDescription: string;    // "" when null
+  petsAllowed: boolean;
   // Plazo
   startDate: string;               // dd/mm/yyyy
   endDate: string;                 // dd/mm/yyyy
@@ -60,6 +62,9 @@ export interface ContractDocumentData {
   // Firma
   signingCity: string;             // signing_city or "" → "____"
   signingDate: string;             // dd/mm/yyyy or "" → "____"
+  // Payment terms
+  paymentDueDay: number;           // day of month (1-31)
+  dailyInterestRate: number;       // percentage (e.g., 2.5)
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -166,6 +171,7 @@ export function buildContractDocumentData(input: {
     rooms: prop?.rooms != null ? String(prop.rooms) : "",
     sqm,
     inventoryDescription: prop?.inventory_description ?? "",
+    petsAllowed: (prop as any)?.pets_allowed ?? false,
 
     // Plazo
     startDate: formatDate(contract.start_date),
@@ -190,5 +196,9 @@ export function buildContractDocumentData(input: {
     // Firma
     signingCity: contract.signing_city ?? "",
     signingDate: formatDate(contract.signing_date),
+
+    // Payment terms
+    paymentDueDay: (contract as any)?.payment_due_day ?? 10,
+    dailyInterestRate: (contract as any)?.daily_interest_rate ?? 0,
   };
 }
