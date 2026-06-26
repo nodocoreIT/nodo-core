@@ -70,6 +70,14 @@ Deno.serve(async (req) => {
       user.email ||
       "Un administrador";
 
+    // Build invite params to embed in the callback URL so the landing page can
+    // show personalized copy ("Activá tu acceso como Vendedor — te invitó Ramiro").
+    const inviteParams = new URLSearchParams({
+      mode: "invite",
+      inviter: inviterName,
+      role: memberRole,
+    }).toString();
+
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -97,8 +105,8 @@ Deno.serve(async (req) => {
         },
       });
 
-      // Send to callback with mode=invite so user can set/update password before login
-      const inviteCallbackUrl = `${authCallbackUrl}?mode=invite`;
+      // Send to callback with invite context params
+      const inviteCallbackUrl = `${authCallbackUrl}?${inviteParams}`;
 
       const mail = await sendInmoStaffNotifyEmail(redirectTo, {
         kind: "invite",
@@ -139,7 +147,8 @@ Deno.serve(async (req) => {
 
     const userId = linkData.user.id;
     const magicLink = linkData.properties?.action_link ?? authCallbackUrl;
-    const actionUrl = `${magicLink}?mode=invite`;
+    // Append invite context params to the magic link so Supabase forwards them to redirectTo
+    const actionUrl = `${magicLink}&${inviteParams}`;
 
     // Set must_set_password flag so user must complete password setup
     await adminClient.auth.admin.updateUserById(userId, {
