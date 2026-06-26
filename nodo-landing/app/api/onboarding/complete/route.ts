@@ -6,7 +6,6 @@ import {
 } from "@/lib/registration/node-config";
 import { notifyAdminPendingRegistration } from "@/app/actions/registration";
 import {
-  isIdentityVerificationEnabled,
   isValidArgentineDni,
   normalizeDocumentNumber,
 } from "@/lib/identity-verification";
@@ -26,21 +25,13 @@ export async function POST(request: NextRequest) {
   const cardHolder = String(formData.get("cardHolder") ?? "").trim();
   const cardLastFour = String(formData.get("cardLastFour") ?? "").trim();
   const cardExpiry = String(formData.get("cardExpiry") ?? "").trim();
-  const idPhoto = formData.get("idPhoto") as File | null;
-  const holdingIdPhoto = formData.get("holdingIdPhoto") as File | null;
+  const idPhotoFront = formData.get("idPhotoFront") as File | null;
+  const idPhotoBack = formData.get("idPhotoBack") as File | null;
   const cardPhoto = formData.get("cardPhoto") as File | null;
   const documentNumber = normalizeDocumentNumber(String(formData.get("documentNumber") ?? ""));
-  const identityVerified = String(formData.get("identityVerified") ?? "") === "true";
 
   if (!token || !firstName || !lastName || !phone || !email) {
     return NextResponse.json({ error: "Complete todos los campos obligatorios." }, { status: 400 });
-  }
-
-  if (!cardHolder || !cardLastFour || !cardExpiry) {
-    return NextResponse.json(
-      { error: "Complete los datos de la tarjeta para el débito." },
-      { status: 400 },
-    );
   }
 
   const admin = createAdminClient();
@@ -76,9 +67,9 @@ export async function POST(request: NextRequest) {
   const nodeRequiresIdentity = requiresIdentityVerification(unitRow.unit_code, unitRow.plan);
 
   if (nodeRequiresIdentity) {
-    if (!holdingIdPhoto || holdingIdPhoto.size === 0) {
+    if (!idPhotoFront || idPhotoFront.size === 0) {
       return NextResponse.json(
-        { error: "Subí una foto sosteniendo tu DNI junto a tu rostro." },
+        { error: "Subí una foto del frente de tu DNI." },
         { status: 400 },
       );
     }
@@ -86,53 +77,13 @@ export async function POST(request: NextRequest) {
     if (documentNumber && !isValidArgentineDni(documentNumber)) {
       return NextResponse.json({ error: "Ingresá un DNI válido (7 u 8 dígitos)." }, { status: 400 });
     }
-
-    if (isIdentityVerificationEnabled()) {
-      if (!identityVerified) {
-        return NextResponse.json(
-          { error: "Completá la verificación de identidad antes de enviar." },
-          { status: 400 },
-        );
-      }
-
-      const { data: latestCheck } = await admin
-        .from("identity_verification_checks")
-        .select("status, message")
-        .eq("client_unit_id", unitRow.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!latestCheck || latestCheck.status === "declined" || latestCheck.status === "error") {
-        return NextResponse.json(
-          {
-            error:
-              latestCheck?.message ??
-              "La verificación de identidad no fue aprobada. Volvé a intentarlo.",
-          },
-          { status: 422 },
-        );
-      }
-    }
-  } else if (!idPhoto || idPhoto.size === 0) {
-    return NextResponse.json({ error: "Subí la foto de tu documento de identidad." }, { status: 400 });
+  } else if (!idPhotoFront || idPhotoFront.size === 0) {
+    return NextResponse.json({ error: "Subí la foto del frente de tu documento de identidad." }, { status: 400 });
   }
 
   const fullName = `${firstName} ${lastName}`.trim();
   const cfg = getNodeRegistrationConfig(unitRow.unit_code);
   const planLabel = planChoice.trim().toLowerCase() || "starter";
-
-  let identityStatus: "approved" | "declined" | "review" | "error" | "skipped" = "skipped";
-  if (nodeRequiresIdentity && isIdentityVerificationEnabled()) {
-    const { data: latestCheck } = await admin
-      .from("identity_verification_checks")
-      .select("status")
-      .eq("client_unit_id", unitRow.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    identityStatus = (latestCheck?.status as typeof identityStatus) ?? "skipped";
-  }
 
   async function uploadDoc(file: File, docType: string, suffix: string) {
     const ext = file.name.split(".").pop() ?? "jpg";
@@ -153,10 +104,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    if (nodeRequiresIdentity && holdingIdPhoto) {
-      await uploadDoc(holdingIdPhoto, "id_holding_selfie", Date.now().toString());
-    } else if (idPhoto) {
-      await uploadDoc(idPhoto, "id_photo", Date.now().toString());
+    if (nodeRequiresIdentity && idPhotoFront) {
+      await uploadDoc(idPhotoFront, "id_front", Date.now().toString());
+    } else if (idPhotoFront) {
+      await uploadDoc(idPhotoFront, "id_photo", Date.now().toString());
+    }
+    if (idPhotoBack && idPhotoBack.size > 0) {
+      await uploadDoc(idPhotoBack, "id_back", Date.now().toString());
     }
     if (cardPhoto && cardPhoto.size > 0) {
       await uploadDoc(cardPhoto, "credit_card", Date.now().toString());
@@ -179,9 +133,9 @@ export async function POST(request: NextRequest) {
     username: email,
     document_number: documentNumber || null,
     gender: null,
-    card_holder: cardHolder,
-    card_last_four: cardLastFour,
-    card_expiry: cardExpiry,
+    card_holder: cardHolder || null,
+    card_last_four: cardLastFour || null,
+    card_expiry: cardExpiry || null,
     completed_at: new Date().toISOString(),
   });
 
@@ -223,6 +177,5 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     nodeSlug: cfg?.slug,
-    identityStatus,
   });
 }

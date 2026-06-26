@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, type ChangeEvent } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import NeuralNodesBackground from "@/components/NeuralNodesBackground";
@@ -28,6 +28,59 @@ function formatCardExpiryMmAa(raw: string): string {
 const fileInputClass =
   "mt-1 w-full rounded-lg bg-white px-3 py-2 text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-200 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-navy";
 
+function DniPhotoSlot({
+  label,
+  file,
+  onChange,
+}: {
+  label: "DNI Frente" | "DNI Dorso";
+  file: File | null;
+  onChange: (file: File | null) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div
+      onClick={() => fileInputRef.current?.click()}
+      className="relative w-full border-2 border-dashed border-slate-300 rounded-lg p-6 cursor-pointer hover:border-slate-400 transition-colors aspect-video flex items-center justify-center bg-slate-50"
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,.pdf"
+        hidden
+        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+      />
+
+      {file ? (
+        <img
+          src={URL.createObjectURL(file)}
+          alt={label}
+          className="w-full h-full object-cover rounded"
+        />
+      ) : (
+        <div className="text-center">
+          <svg
+            className="w-12 h-12 mx-auto mb-2 text-slate-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+          <p className="text-xs font-medium text-slate-600">Agregar foto</p>
+          <p className="text-xs text-slate-500 mt-1">{label}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OnboardingForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
@@ -46,15 +99,11 @@ function OnboardingForm() {
   const [cardHolder, setCardHolder] = useState("");
   const [cardLastFour, setCardLastFour] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
-  const [idPhoto, setIdPhoto] = useState<File | null>(null);
-  const [holdingIdPhoto, setHoldingIdPhoto] = useState<File | null>(null);
   const [cardPhoto, setCardPhoto] = useState<File | null>(null);
+  const [idPhotoFront, setIdPhotoFront] = useState<File | null>(null);
+  const [idPhotoBack, setIdPhotoBack] = useState<File | null>(null);
   const [documentNumber, setDocumentNumber] = useState("");
   const [identityVerificationRequired, setIdentityVerificationRequired] = useState(false);
-  const [identityVerified, setIdentityVerified] = useState(false);
-  const [identityMessage, setIdentityMessage] = useState("");
-  const [identityStatus, setIdentityStatus] = useState<"idle" | "approved" | "review" | "declined">("idle");
-  const [verifyingIdentity, setVerifyingIdentity] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -104,57 +153,11 @@ function OnboardingForm() {
       });
   }, [token]);
 
-  function resetIdentityCheck() {
-    setIdentityVerified(false);
-    setIdentityMessage("");
-    setIdentityStatus("idle");
-  }
-
-  async function handleVerifyIdentity() {
-    if (!token) return;
-    if (!holdingIdPhoto || !firstName.trim() || !lastName.trim()) {
-      setError("Completá nombre, apellido y subí la foto con tu DNI junto al rostro.");
-      return;
-    }
-
-    setVerifyingIdentity(true);
-    setError("");
-    setIdentityMessage("");
-
-    const formData = new FormData();
-    formData.append("token", token);
-    formData.append("firstName", firstName);
-    formData.append("lastName", lastName);
-    if (documentNumber) formData.append("documentNumber", documentNumber);
-    formData.append("holdingIdPhoto", holdingIdPhoto);
-
-    const res = await fetch("/api/onboarding/verify-identity", { method: "POST", body: formData });
-    const json = await res.json();
-    setVerifyingIdentity(false);
-
-    if (json.status === "approved" || json.status === "review") {
-      setIdentityVerified(true);
-      setIdentityStatus(json.status);
-      setIdentityMessage(json.message ?? "Verificación registrada.");
-      return;
-    }
-
-    setIdentityVerified(false);
-    setIdentityStatus("declined");
-    setIdentityMessage(json.message ?? json.error ?? "No se pudo verificar la identidad.");
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!token || submitted) return;
     setLoading(true);
     setError("");
-
-    if (identityVerificationRequired && !identityVerified) {
-      setError("Verificá tu identidad antes de enviar la solicitud.");
-      setLoading(false);
-      return;
-    }
 
     const formData = new FormData();
     formData.append("token", token);
@@ -167,14 +170,14 @@ function OnboardingForm() {
     formData.append("phone", phone);
     formData.append("planChoice", planChoice);
     if (documentNumber) formData.append("documentNumber", documentNumber);
-    if (identityVerificationRequired) formData.append("identityVerified", "true");
     formData.append("cardHolder", cardHolder);
     formData.append("cardLastFour", cardLastFour);
     formData.append("cardExpiry", cardExpiry);
-    if (identityVerificationRequired && holdingIdPhoto) {
-      formData.append("holdingIdPhoto", holdingIdPhoto);
-    } else if (idPhoto) {
-      formData.append("idPhoto", idPhoto);
+    if (idPhotoFront) {
+      formData.append("idPhotoFront", idPhotoFront);
+    }
+    if (idPhotoBack) {
+      formData.append("idPhotoBack", idPhotoBack);
     }
     if (cardPhoto) formData.append("cardPhoto", cardPhoto);
 
@@ -191,8 +194,7 @@ function OnboardingForm() {
 
   const submitDisabled =
     loading ||
-    !token ||
-    (identityVerificationRequired && !identityVerified);
+    !token;
 
   if (validating) {
     return (
@@ -304,11 +306,10 @@ function OnboardingForm() {
                     className="text-xs font-semibold uppercase tracking-wide"
                     style={{ color: accent.brand300 }}
                   >
-                    Verificación de identidad
+                    Documento de identidad
                   </p>
                   <p className="text-xs mt-1" style={{ color: "rgba(234,240,247,.55)" }}>
-                    Sacate una foto sosteniendo tu DNI al lado del rostro. Opcionalmente comparamos
-                    automáticamente si la persona coincide con la foto del documento (IA).
+                    Subí una foto clara del frente y dorso de tu DNI.
                   </p>
                 </div>
 
@@ -319,87 +320,64 @@ function OnboardingForm() {
                       className={inputClass}
                       documentType="DNI"
                       value={documentNumber}
-                      onChange={(e) => {
-                        setDocumentNumber(e.target.value);
-                        resetIdentityCheck();
-                      }}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className={labelClass}>Foto con DNI junto al rostro</span>
-                    <input
-                      required
-                      type="file"
-                      accept="image/*"
-                      capture="user"
-                      onChange={(e) => {
-                        setHoldingIdPhoto(e.target.files?.[0] ?? null);
-                        resetIdentityCheck();
-                      }}
-                      className={fileInputClass}
+                      onChange={(e) => setDocumentNumber(e.target.value)}
                     />
                   </label>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleVerifyIdentity}
-                    disabled={verifyingIdentity || !holdingIdPhoto}
-                    className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-                    style={{ background: "#1B2A41" }}
-                  >
-                    {verifyingIdentity ? "Verificando…" : "Verificar identidad"}
-                  </button>
-                  {identityStatus === "approved" && (
-                    <span className="text-xs font-medium text-emerald-300">✓ Coincidencia detectada</span>
-                  )}
-                  {identityStatus === "review" && (
-                    <span className="text-xs font-medium text-amber-300">⚠ Revisión manual</span>
-                  )}
-                  {identityStatus === "declined" && (
-                    <span className="text-xs font-medium text-red-300">✗ No verificada</span>
-                  )}
+                <div className="space-y-3">
+                  <div>
+                    <span className={labelClass}>Frente del DNI *</span>
+                    <DniPhotoSlot label="DNI Frente" file={idPhotoFront} onChange={setIdPhotoFront} />
+                  </div>
+                  <div>
+                    <span className={labelClass}>Dorso del DNI (opcional)</span>
+                    <DniPhotoSlot label="DNI Dorso" file={idPhotoBack} onChange={setIdPhotoBack} />
+                  </div>
                 </div>
-
-                {identityMessage && (
-                  <p className="text-xs rounded-lg px-3 py-2" style={{ color: "rgba(234,240,247,.75)", background: "rgba(255,255,255,.06)" }}>
-                    {identityMessage}
-                  </p>
-                )}
               </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Documentación</p>
                 {!identityVerificationRequired && (
-                  <label className="block">
-                    <span className={labelClass}>Foto del documento (ID)</span>
-                    <input required type="file" accept="image/*,.pdf" onChange={(e) => setIdPhoto(e.target.files?.[0] ?? null)} className={fileInputClass} />
-                  </label>
+                  <>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Documento de identidad</p>
+                    <div className="space-y-3">
+                      <div>
+                        <span className={labelClass}>Frente del DNI *</span>
+                        <DniPhotoSlot label="DNI Frente" file={idPhotoFront} onChange={setIdPhotoFront} />
+                      </div>
+                      <div>
+                        <span className={labelClass}>Dorso del DNI (opcional)</span>
+                        <DniPhotoSlot label="DNI Dorso" file={idPhotoBack} onChange={setIdPhotoBack} />
+                      </div>
+                    </div>
+                  </>
                 )}
-                <label className="block">
-                  <span className={labelClass}>Foto de tarjeta (opcional)</span>
-                  <input type="file" accept="image/*,.pdf" onChange={(e) => setCardPhoto(e.target.files?.[0] ?? null)} className={fileInputClass} />
-                </label>
+
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-300 mb-3">Foto de tarjeta (opcional)</p>
+                  <label className="block">
+                    <input type="file" accept="image/*,.pdf" onChange={(e) => setCardPhoto(e.target.files?.[0] ?? null)} className={fileInputClass} />
+                  </label>
+                </div>
               </div>
 
               <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Tarjeta para débito</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Tarjeta para débito (opcional)</p>
                 <label className="block">
                   <span className={labelClass}>Titular</span>
-                  <input required value={cardHolder} onChange={(e) => setCardHolder(e.target.value)} className={inputClass} />
+                  <input value={cardHolder} onChange={(e) => setCardHolder(e.target.value)} className={inputClass} />
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block">
                     <span className={labelClass}>Últimos 4 dígitos</span>
-                    <input required maxLength={4} value={cardLastFour} onChange={(e) => setCardLastFour(e.target.value.replace(/\D/g, ""))} className={inputClass} />
+                    <input maxLength={4} value={cardLastFour} onChange={(e) => setCardLastFour(e.target.value.replace(/\D/g, ""))} className={inputClass} />
                   </label>
                   <label className="block">
                     <span className={labelClass}>Vencimiento (MM/AA)</span>
                     <input
-                      required
                       placeholder="12/28"
                       inputMode="numeric"
                       maxLength={5}
@@ -424,11 +402,6 @@ function OnboardingForm() {
             >
               {loading ? "Enviando…" : "Confirmar y solicitar habilitación"}
             </button>
-            {identityVerificationRequired && !identityVerified && (
-              <p className="text-center text-xs" style={{ color: "rgba(234,240,247,.45)" }}>
-                Primero verificá tu identidad para habilitar el envío.
-              </p>
-            )}
           </form>
         )}
 
