@@ -1,0 +1,48 @@
+change: nodo-clinica-integration
+status: archived
+artifact_store: hybrid
+delivery_strategy: ask-on-risk
+chain_strategy: stacked-to-main
+execution_mode: interactive
+archived_date: 2026-06-25
+
+phases:
+  explore: done
+  proposal: done
+  spec: done
+  design: done
+  tasks: done
+  apply: done
+  verify: done
+  archive: done
+
+prs:
+  pr1-schema:
+    branch: feat/clinica-migration-003
+    status: merged
+    tasks: [T1.1, T1.2, T1.3, T1.4, T1.5, T1.6, T1.7, T1.8, T1.9]
+  pr2-rls:
+    branch: feat/clinica-migration-004
+    status: merged
+    depends_on: pr1-schema
+    tasks: [T2.1, T2.2, T2.3, T2.4, T2.5, T2.6, T2.7, T2.8]
+  pr3-auth:
+    branch: feat/clinica-supabase-auth
+    status: merged
+    depends_on: pr2-rls
+    tasks: [T3.1, T3.2, T3.3, T3.4, T3.5, T3.6, T3.7, T3.8]
+  pr4-api-batch1:
+    branch: feat/clinica-api-batch1
+    status: merged
+    depends_on: pr3-auth
+    tasks: [T4.1, T4.2, T4.3, T4.4, T4.5, T4.6]
+  pr5-api-batch2:
+    branch: feat/clinica-api-batch2
+    status: merged
+    depends_on: pr4-api-batch1
+    tasks: [T5.1, T5.2, T5.3, T5.4, T5.5]
+  pr6-scaffold:
+    branch: feat/clinica-scaffold
+    status: merged
+    depends_on: pr3-auth
+    tasks: [T6.1, T6.2, T6.3, T6.4, T6.5, T6.6]
