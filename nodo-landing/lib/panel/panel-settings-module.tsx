@@ -5,6 +5,7 @@ import {
   type SettingsModuleContextValue,
   DEFAULT_ALERT_SETTINGS,
   type ThemeSettings,
+  type AiSettings,
 } from "@nodocore/nodo-modules/settings";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -36,8 +37,8 @@ const PANEL_MANAGED_NAV = [
 
 const AI_STORAGE_KEY = "nodo-panel-ai-settings";
 
-const DEFAULT_AI_SETTINGS = {
-  provider: "gemini" as const,
+const DEFAULT_AI_SETTINGS: AiSettings = {
+  provider: "gemini",
   geminiApiKey: "",
   openaiApiKey: "",
   anthropicApiKey: "",
@@ -65,7 +66,7 @@ export function PanelSettingsModuleProvider({ children }: { children: ReactNode 
   const staff = usePanelStaff();
   const [sessionRole, setSessionRole] = useState<string | null>(null);
   const [themeSettings, setThemeState] = useState<ThemeSettings>(PANEL_DEFAULT_THEME);
-  const [aiSettings, setAiState] = useState(DEFAULT_AI_SETTINGS);
+  const [aiSettings, setAiState] = useState<AiSettings>(DEFAULT_AI_SETTINGS);
   const [logoSignedUrl, setLogoSignedUrl] = useState<string | null>(null);
   const [pdfLogoSignedUrl, setPdfLogoSignedUrl] = useState<string | null>(null);
   const [isUpsertingProfile, setIsUpsertingProfile] = useState(false);
@@ -120,7 +121,7 @@ export function PanelSettingsModuleProvider({ children }: { children: ReactNode 
     applyPanelThemeToDocument(PANEL_DEFAULT_THEME);
   }, []);
 
-  const setAiSettings = useCallback((next: Partial<typeof DEFAULT_AI_SETTINGS>) => {
+  const setAiSettings = useCallback((next: Partial<AiSettings>) => {
     setAiState((prev) => {
       const merged = { ...prev, ...next };
       try {
