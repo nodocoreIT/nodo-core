@@ -20,7 +20,7 @@ export function useCreateContact() {
         .schema("nodo_inmo")
         .from("contacts")
         .insert({ ...input, org_id: orgId })
-        .select()
+        .select("id,name,dni,phone,email,address,commission_rate,can_view_rentals,can_view_construction,can_view_sales,roles,created_at,updated_at")
         .single();
 
       if (error) throw error;
