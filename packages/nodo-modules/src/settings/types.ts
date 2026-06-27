@@ -174,5 +174,8 @@ export interface SettingsModuleContextValue {
   saveManualIpc?: (value: number) => Promise<void>;
   isSavingManualIpc?: boolean;
 
+  saveManualIcl?: (value: number) => Promise<void>;
+  isSavingManualIcl?: boolean;
+
   metaSettingsContent?: ReactNode;
 }

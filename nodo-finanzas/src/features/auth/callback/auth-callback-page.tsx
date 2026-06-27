@@ -66,6 +66,15 @@ export function AuthCallbackPage() {
         (await fetchMustSetPassword(supabase));
 
       if (mustReset) {
+        if (type !== "recovery") {
+          // Redirect to landing login for split-layout activation UI
+          hideAppSplash();
+          const qs = new URLSearchParams({ mode: "activate-invite" });
+          if (inviterName) qs.set("inviter", inviterName);
+          if (inviteRole) qs.set("role", inviteRole);
+          window.location.replace(`/nodo-finanzas/login?${qs.toString()}`);
+          return;
+        }
         hideAppSplash();
         setNeedsPassword(true);
         setReady(true);

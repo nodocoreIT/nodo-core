@@ -419,9 +419,64 @@ function IpcSettingsSection() {
 
         <Button onClick={handleSave} disabled={isPending || !ipcValue} className="w-full">
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Guardar IPC Manual
+          Guardar
         </Button>
         {success && <p className="text-xs text-brand font-semibold text-center mt-2">¡IPC guardado con éxito!</p>}
+      </div>
+    </div>
+  );
+}
+
+function IclSettingsSection() {
+  const { saveManualIcl, isSavingManualIcl } = useSettingsModule();
+  const [iclValue, setIclValue] = useState("");
+  const [success, setSuccess] = useState(false);
+  const isPending = isSavingManualIcl ?? false;
+
+  const handleSave = async () => {
+    if (!saveManualIcl) return;
+    const parsed = parseFloat(iclValue);
+    if (isNaN(parsed)) return;
+    try {
+      await saveManualIcl(parsed);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      setIclValue("");
+    } catch (err) {
+      console.error(err);
+      alert("Error al guardar el ICL manual");
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-md border-t border-border pt-6 mt-6">
+      <div>
+        <h3 className="text-base font-bold text-navy">Carga Manual de ICL</h3>
+        <p className="text-xs text-slate2">
+          Si la actualización automática falla o trae un valor incorrecto, podés forzar el valor del mes actual acá.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-bold text-navy">
+            Valor del ICL
+          </Label>
+          <Input
+            type="number"
+            step="0.01"
+            placeholder="Ej: 34.11"
+            value={iclValue}
+            onChange={(e) => setIclValue(e.target.value)}
+          />
+          <p className="text-[10px] text-slate2">Ingresá el valor del índice ICL. Se aplicará para el mes actual.</p>
+        </div>
+
+        <Button onClick={handleSave} disabled={isPending || !iclValue} className="w-full">
+          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Guardar
+        </Button>
+        {success && <p className="text-xs text-brand font-semibold text-center mt-2">¡ICL guardado con éxito!</p>}
       </div>
     </div>
   );
@@ -906,7 +961,12 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
           {activeTab === "alerts" && <AlertsSettingsSection />}
 
           {/* TAB: Indices */}
-          {activeTab === "ipc" && <IpcSettingsSection />}
+          {activeTab === "ipc" && (
+            <>
+              <IpcSettingsSection />
+              <IclSettingsSection />
+            </>
+          )}
 
           {/* TAB 1: Mi Perfil / Empresa */}
           {activeTab === "company" && (

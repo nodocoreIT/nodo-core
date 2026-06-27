@@ -104,7 +104,7 @@ export const useAutosStaffStore = create<AutosStaffStore>((set, get) => ({
       role,
       redirectTo,
       inviterName,
-      nodeLabel: "Autos",
+      nodeLabel: "NODO | Autos",
       products: ["nodo-autos"],
     });
 

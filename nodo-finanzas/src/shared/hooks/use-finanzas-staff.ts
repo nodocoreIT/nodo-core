@@ -78,8 +78,8 @@ export const useFinanzasStaffStore = create<FinanzasStaffStore>((set, get) => ({
         : "");
 
     const redirectTo = landingOrigin
-      ? `${landingOrigin}/finanzas/auth/callback`
-      : `${window.location.origin}/finanzas/auth/callback`;
+      ? `${landingOrigin}/nodo-finanzas/login`
+      : `${window.location.origin}/nodo-finanzas/login`;
 
     const {
       data: { user: callerUser },
@@ -102,7 +102,7 @@ export const useFinanzasStaffStore = create<FinanzasStaffStore>((set, get) => ({
       role,
       redirectTo,
       inviterName,
-      nodeLabel: "Finanzas",
+      nodeLabel: "NODO | Finanzas",
       products: ["nodo-finanzas"],
     });
 
