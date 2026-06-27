@@ -61,6 +61,14 @@ export function AuthCallbackPage() {
         (await fetchMustSetPassword(supabase));
 
       if (mustReset) {
+        if (type !== "recovery") {
+          // Redirect to landing login for split-layout activation UI
+          const qs = new URLSearchParams({ mode: "activate-invite" });
+          if (inviterName) qs.set("inviter", inviterName);
+          if (inviteRole) qs.set("role", inviteRole);
+          window.location.replace(`/nodo-inmo/login?${qs.toString()}`);
+          return;
+        }
         setNeedsPassword(true);
         setReady(true);
         return;

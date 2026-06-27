@@ -54,6 +54,8 @@ import { InmoSettingsModuleProvider } from "@/shared/lib/inmo-settings-module";
 import { FeedbackFAB } from "@/features/feedback/components/feedback-node";
 import { NotificationsBell } from "@/features/dashboard/components/notifications-bell";
 import { IPCBadge } from "@/features/ipc/components/IPCBadge";
+import { ICLBadge } from "@/features/ipc/components/ICLBadge";
+import { IPLBadge } from "@/features/ipc/components/IPLBadge";
 import { PlanBadge } from "@/features/plan/components/plan-badge";
 import { INMO_DEFAULT_EMPLOYEE_SECTIONS } from "@/shared/lib/inmo-staff-nav";
 import { isProOnlyAdminRoute } from "@/shared/lib/pro-features";
@@ -576,6 +578,8 @@ function AdminLayoutShell({
                 <h1 className="truncate text-base font-bold text-navy">{title}</h1>
               </div>
               <IPCBadge />
+              <ICLBadge />
+              <IPLBadge />
             </div>
             <div className="flex items-center justify-end gap-1.5">
               <NotificationsBell />
@@ -602,6 +606,8 @@ function AdminLayoutShell({
             metrics={
               <>
                 <IPCBadge />
+                <ICLBadge />
+                <IPLBadge />
                 <PlanBadge />
               </>
             }

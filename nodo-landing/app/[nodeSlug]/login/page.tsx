@@ -283,6 +283,7 @@ function LoginForm() {
   const [needsNewPassword, setNeedsNewPassword] = useState(false);
   const [inviterName, setInviterName] = useState<string | undefined>();
   const [inviteRole, setInviteRole] = useState<string | undefined>();
+  const [invitedUserEmail, setInvitedUserEmail] = useState<string | undefined>();
 
   const {
     authMode,
@@ -315,23 +316,40 @@ function LoginForm() {
     setInviterName(searchParams.get("inviter") ?? undefined);
     setInviteRole(searchParams.get("role") ?? undefined);
 
-    // Only auto-bootstrap when hash tokens are present (new user invite flow)
     const hash = window.location.hash.substring(1);
     const hashParams = new URLSearchParams(hash);
-    if (!hashParams.get("access_token")) return;
 
-    let mounted = true;
-    const { data: { subscription } } = authSupabase.auth.onAuthStateChange((event, session) => {
-      if (!mounted) return;
-      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session) {
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    if (hashParams.get("access_token")) {
+      // Hash tokens present: bootstrap session via onAuthStateChange
+      let mounted = true;
+      const { data: { subscription } } = authSupabase.auth.onAuthStateChange((event, session) => {
+        if (!mounted) return;
+        if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session) {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+          if (session.user?.email) setInvitedUserEmail(session.user.email);
+          setNeedsNewPassword(true);
+        }
+      });
+      return () => {
+        mounted = false;
+        subscription.unsubscribe();
+      };
+    }
+
+    // No hash tokens: check existing session for must_set_password.
+    // Covers the SPA-callback redirect where the session lives in localStorage.
+    let cancelled = false;
+    void (async () => {
+      const { data: { session } } = await authSupabase.auth.getSession();
+      if (cancelled || !session) return;
+      const must = await fetchMustSetPassword(authSupabase);
+      if (cancelled) return;
+      if (must) {
+        if (session.user?.email) setInvitedUserEmail(session.user.email);
         setNeedsNewPassword(true);
       }
-    });
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    })();
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -512,7 +530,16 @@ function LoginForm() {
     }
 
     setLoading(true);
-    const { data: sessionData } = await authSupabase!.auth.getSession();
+
+    // Refresh the session before the API call to ensure a fresh access token.
+    // The invite access_token expires in 1h but the refresh_token lasts 7 days.
+    const { data: preRefreshed } = await authSupabase!.auth.refreshSession();
+    const { data: sessionData } = preRefreshed?.session
+      ? { data: { session: preRefreshed.session } }
+      : await authSupabase!.auth.getSession();
+
+    const userEmail = invitedUserEmail ?? sessionData.session?.user?.email;
+
     const res = await fetch("/api/auth/complete-forced-password", {
       method: "POST",
       headers: {
@@ -533,9 +560,25 @@ function LoginForm() {
       return;
     }
 
-    const { data: refreshed, error: refreshErr } = await authSupabase.auth.refreshSession();
+    // Sign in directly with the new password — more reliable than refreshSession
+    // after the invite token exchange.
+    if (userEmail) {
+      const { data: signInData, error: signInErr } = await authSupabase!.auth.signInWithPassword({
+        email: userEmail,
+        password: password.trim(),
+      });
+      if (!signInErr && signInData.session) {
+        setNeedsNewPassword(false);
+        redirectAfterSession(signInData.session);
+        setLoading(false);
+        return;
+      }
+    }
+
+    // Fallback: try refreshSession in case signInWithPassword is unavailable.
+    const { data: refreshed, error: refreshErr } = await authSupabase!.auth.refreshSession();
     if (refreshErr || !refreshed.session) {
-      setGeneralError("Contraseña actualizada. Volvé a iniciar sesión.");
+      setGeneralError("Contraseña activada. Podés iniciar sesión ahora.");
       setNeedsNewPassword(false);
       setAuthMode("login");
       setLoading(false);

@@ -61,6 +61,23 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
     },
   });
 
+  const iclMutation = useMutation({
+    mutationFn: async (val: number) => {
+      const now = new Date();
+      const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+      const { error } = await supabase.schema("shared").rpc("upsert_index_value", {
+        p_kind: "ICL",
+        p_period: period,
+        p_value: val,
+        p_source: "Manual",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["icl", "current"] });
+    },
+  });
+
   const alertSettings: AlertSettings = profileQuery.data?.alert_settings
     ? (profileQuery.data.alert_settings as unknown as AlertSettings)
     : DEFAULT_ALERT_SETTINGS;
@@ -130,6 +147,8 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
       },
       saveManualIpc: ipcMutation.mutateAsync,
       isSavingManualIpc: ipcMutation.isPending,
+      saveManualIcl: iclMutation.mutateAsync,
+      isSavingManualIcl: iclMutation.isPending,
       metaSettingsContent: <MetaSettingsForm />,
     };
   }, [
@@ -148,6 +167,7 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
     updateProfileMutation.isPending,
     cashAccounts,
     ipcMutation.isPending,
+    iclMutation.isPending,
     alertSettings,
   ]);
 

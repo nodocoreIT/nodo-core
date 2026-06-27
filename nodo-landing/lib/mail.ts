@@ -551,10 +551,10 @@ export async function sendInmoVerificationEmail({
   const verificationUrl = `${origin}/api/verify-registration?token=${token}`;
 
   await transporter.sendMail({
-    from: `"NODO Inmo" <${USER}>`,
+    from: `"NODO | Inmo" <${USER}>`,
     to: email,
     subject: `Activá tu cuenta en NODO | Inmo`,
-    text: `Hola ${nombre},\n\nGracias por registrarte en NODO | Inmo. Para activar tu cuenta de inmobiliaria y acceder al panel de gestión, hacé clic en el siguiente enlace:\n\n${verificationUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO Inmo`,
+    text: `Hola ${nombre},\n\nGracias por registrarte en NODO | Inmo. Para activar tu cuenta de inmobiliaria y acceder al panel de gestión, hacé clic en el siguiente enlace:\n\n${verificationUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO | Inmo`,
     attachments: [
       {
         filename: "logo_compuesto.png",
