@@ -16,9 +16,9 @@ export function isMailConfigured(): boolean {
 }
 
 function registrationLogoAttachments(): nodemailer.SendMailOptions["attachments"] {
-  const logoPath = path.join(process.cwd(), "public/logos/logo compuesto_50.png");
+  const logoPath = path.join(process.cwd(), "public/logos/logo compuestoa.png");
   if (!fs.existsSync(logoPath)) return [];
-  return [{ filename: "logo_compuesto.png", path: logoPath, cid: "nodologo" }];
+  return [{ filename: "logo_compuestoa.png", path: logoPath, cid: "nodologo" }];
 }
 
 type ContactPayload = {
@@ -557,8 +557,8 @@ export async function sendInmoVerificationEmail({
     text: `Hola ${nombre},\n\nGracias por registrarte en NODO | Inmo. Para activar tu cuenta de inmobiliaria y acceder al panel de gestión, hacé clic en el siguiente enlace:\n\n${verificationUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO | Inmo`,
     attachments: [
       {
-        filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuesto_50.png"),
+        filename: "logo_compuestoa.png",
+        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
         cid: "nodologo",
       },
     ],
@@ -695,8 +695,8 @@ export async function sendClientNodoInviteEmail({
     text: `Hola ${nombre},\n\nTe invitaron a usar ${nodeLabel}. Completá tu registro y elegí tu contraseña con este enlace:\n\n${activationUrl}\n\nEl enlace expira en 72 horas.\n\nSaludos,\nNODO Core`,
     attachments: [
       {
-        filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuesto_50.png"),
+        filename: "logo_compuestoa.png",
+        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
         cid: "nodologo",
       },
     ],

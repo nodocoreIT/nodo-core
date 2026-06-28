@@ -141,7 +141,7 @@ export async function POST(request: Request) {
 
   const origin = new URL(request.url).origin;
   const loginPath = getLoginHrefForNode(cfg?.slug ?? "inmo");
-  const loginUrl = `${origin}${loginPath}?mode=first-access`;
+  const loginUrl = `${origin}${loginPath}?mode=first-access&email=${encodeURIComponent(email)}`;
 
   if (isMailConfigured()) {
     await sendAccountEnabledEmail({

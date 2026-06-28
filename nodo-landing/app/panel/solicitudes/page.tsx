@@ -75,6 +75,8 @@ type Solicitud = {
 
 const DOC_LABELS: Record<string, string> = {
   id_photo: "Documento de identidad",
+  id_front: "DNI Frente",
+  id_back: "DNI Dorso",
   id_holding_selfie: "Selfie con DNI",
   selfie: "Selfie (verificación)",
   credit_card: "Foto de tarjeta",
