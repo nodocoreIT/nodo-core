@@ -23,7 +23,10 @@ export const metadata: Metadata = {
   description:
     "El ecosistema que centraliza, conecta y potencia. Una sola plataforma que articula cada unidad de negocio con transparencia tecnológica.",
   icons: {
-    icon: "/favicon.png",
+    icon: [
+      { url: "/favicon.png", media: "(prefers-color-scheme: light)" },
+      { url: "/favicon-dark.png", type: "image/png", media: "(prefers-color-scheme: dark)" },
+    ],
     shortcut: "/favicon.png",
     apple: "/favicon.png",
   },
