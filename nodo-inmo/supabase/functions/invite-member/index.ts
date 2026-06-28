@@ -107,12 +107,21 @@ Deno.serve(async (req) => {
         user_metadata: { full_name: displayName },
       });
 
+      // Generate a magic link so the user gets hash tokens on click —
+      // they may not have a password yet.
+      const { data: magicData } = await adminClient.auth.admin.generateLink({
+        type: "magiclink",
+        email: normalizedEmail,
+        options: { redirectTo: loginUrlWithParams },
+      });
+      const actionUrl = magicData?.properties?.action_link ?? loginUrlWithParams;
+
       const mail = await sendInmoStaffNotifyEmail(redirectTo, {
         kind: "invite",
         email: normalizedEmail,
         name: displayName,
         orgName,
-        actionUrl: loginUrlWithParams,
+        actionUrl,
         inviterName,
         nodeLabel: nodeLabel ?? "NODO | Inmo",
       });
