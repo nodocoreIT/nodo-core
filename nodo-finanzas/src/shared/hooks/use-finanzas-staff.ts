@@ -57,7 +57,7 @@ export const useFinanzasStaffStore = create<FinanzasStaffStore>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const data = await invokeFunction<{ members?: FinanzasStaffUser[] }>("list-org-members", {
-        products: ["nodo-finanzas"],
+        products: ["finanzas", "nodo-finanzas"],
       });
       const members = data.members ?? [];
       set({ users: members, loading: false });
@@ -103,7 +103,7 @@ export const useFinanzasStaffStore = create<FinanzasStaffStore>((set, get) => ({
       redirectTo,
       inviterName,
       nodeLabel: "NODO | Finanzas",
-      products: ["nodo-finanzas"],
+      products: ["finanzas", "nodo-finanzas"],
     });
 
     await get().fetchMembers();
@@ -119,7 +119,7 @@ export const useFinanzasStaffStore = create<FinanzasStaffStore>((set, get) => ({
     await invokeFunction("update-org-member-role", {
       userId,
       role,
-      products: ["nodo-finanzas"],
+      products: ["finanzas", "nodo-finanzas"],
     });
 
     set((state) => ({
@@ -130,7 +130,7 @@ export const useFinanzasStaffStore = create<FinanzasStaffStore>((set, get) => ({
   removeMember: async (userId) => {
     await invokeFunction("remove-org-member", {
       userId,
-      products: ["nodo-finanzas"],
+      products: ["finanzas", "nodo-finanzas"],
     });
 
     set((state) => ({ users: state.users.filter((u) => u.id !== userId) }));
