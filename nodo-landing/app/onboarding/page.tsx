@@ -6,6 +6,7 @@ import Link from "next/link";
 import NeuralNodesBackground from "@/components/NeuralNodesBackground";
 import { OnboardingNodeHeader } from "@/components/onboarding/OnboardingNodeHeader";
 import { OnboardingPlanSelector } from "@/components/onboarding/OnboardingPlanSelector";
+import { CreditCardInput } from "@/components/onboarding/CreditCardInput";
 import { DocumentNumberInput } from "@nodocore/shared-components";
 import { applyLoginAccent, getNodeAccentBySlug } from "@/lib/node-accents";
 import { getNodeBySlug } from "@/lib/nodes";
@@ -18,15 +19,6 @@ const inputReadOnlyClass =
   "mt-1 w-full rounded-lg px-3 py-2.5 text-sm bg-slate-100 border border-slate-200 text-slate-600 shadow-sm";
 
 const labelClass = "text-xs font-medium text-slate-300";
-
-function formatCardExpiryMmAa(raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-}
-
-const fileInputClass =
-  "mt-1 w-full rounded-lg bg-white px-3 py-2 text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-200 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-navy";
 
 function DniPhotoSlot({
   label,
@@ -42,7 +34,7 @@ function DniPhotoSlot({
   return (
     <div
       onClick={() => fileInputRef.current?.click()}
-      className="relative w-full border-2 border-dashed border-slate-300 rounded-lg p-6 cursor-pointer hover:border-slate-400 transition-colors aspect-video flex items-center justify-center bg-slate-50"
+      className="relative w-full border-2 border-dashed border-slate-300 rounded-lg p-4 cursor-pointer hover:border-slate-400 transition-colors h-52 flex items-center justify-center bg-slate-50"
     >
       <input
         ref={fileInputRef}
@@ -56,7 +48,7 @@ function DniPhotoSlot({
         <img
           src={URL.createObjectURL(file)}
           alt={label}
-          className="w-full h-full object-cover rounded"
+          className="w-full h-full object-contain rounded"
         />
       ) : (
         <div className="text-center">
@@ -97,9 +89,9 @@ function OnboardingForm() {
   const [nodeCode, setNodeCode] = useState("");
   const [plans, setPlans] = useState<OnboardingPlanOption[]>([]);
   const [cardHolder, setCardHolder] = useState("");
-  const [cardLastFour, setCardLastFour] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
-  const [cardPhoto, setCardPhoto] = useState<File | null>(null);
+  const [cardCvc, setCardCvc] = useState("");
   const [idPhotoFront, setIdPhotoFront] = useState<File | null>(null);
   const [idPhotoBack, setIdPhotoBack] = useState<File | null>(null);
   const [documentNumber, setDocumentNumber] = useState("");
@@ -171,15 +163,15 @@ function OnboardingForm() {
     formData.append("planChoice", planChoice);
     if (documentNumber) formData.append("documentNumber", documentNumber);
     formData.append("cardHolder", cardHolder);
-    formData.append("cardLastFour", cardLastFour);
+    formData.append("cardNumber", cardNumber);
     formData.append("cardExpiry", cardExpiry);
+    formData.append("cardCvc", cardCvc);
     if (idPhotoFront) {
       formData.append("idPhotoFront", idPhotoFront);
     }
     if (idPhotoBack) {
       formData.append("idPhotoBack", idPhotoBack);
     }
-    if (cardPhoto) formData.append("cardPhoto", cardPhoto);
 
     const res = await fetch("/api/onboarding/complete", { method: "POST", body: formData });
     const json = await res.json();
@@ -293,27 +285,27 @@ function OnboardingForm() {
               </label>
             </div>
 
-            {identityVerificationRequired && (
-              <div
-                className="rounded-xl border p-4 md:p-5 space-y-4"
-                style={{
-                  borderColor: `rgba(${accent.rgb}, 0.3)`,
-                  background: `rgba(${accent.rgb}, 0.08)`,
-                }}
-              >
-                <div>
-                  <p
-                    className="text-xs font-semibold uppercase tracking-wide"
-                    style={{ color: accent.brand300 }}
-                  >
-                    Documento de identidad
-                  </p>
-                  <p className="text-xs mt-1" style={{ color: "rgba(234,240,247,.55)" }}>
-                    Subí una foto clara del frente y dorso de tu DNI.
-                  </p>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {identityVerificationRequired && (
+                <div
+                  className="rounded-xl border p-4 md:p-5 space-y-4"
+                  style={{
+                    borderColor: `rgba(${accent.rgb}, 0.3)`,
+                    background: `rgba(${accent.rgb}, 0.08)`,
+                  }}
+                >
+                  <div>
+                    <p
+                      className="text-xs font-semibold uppercase tracking-wide"
+                      style={{ color: accent.brand300 }}
+                    >
+                      Documento de identidad
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: "rgba(234,240,247,.55)" }}>
+                      Subí una foto clara del frente y dorso de tu DNI.
+                    </p>
+                  </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className="block">
                     <span className={labelClass}>Número de DNI (opcional)</span>
                     <DocumentNumberInput
@@ -323,70 +315,50 @@ function OnboardingForm() {
                       onChange={(e) => setDocumentNumber(e.target.value)}
                     />
                   </label>
-                </div>
 
-                <div className="space-y-3">
-                  <div>
-                    <span className={labelClass}>Frente del DNI *</span>
-                    <DniPhotoSlot label="DNI Frente" file={idPhotoFront} onChange={setIdPhotoFront} />
-                  </div>
-                  <div>
-                    <span className={labelClass}>Dorso del DNI (opcional)</span>
-                    <DniPhotoSlot label="DNI Dorso" file={idPhotoBack} onChange={setIdPhotoBack} />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-                {!identityVerificationRequired && (
-                  <>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Documento de identidad</p>
-                    <div className="space-y-3">
-                      <div>
-                        <span className={labelClass}>Frente del DNI *</span>
-                        <DniPhotoSlot label="DNI Frente" file={idPhotoFront} onChange={setIdPhotoFront} />
-                      </div>
-                      <div>
-                        <span className={labelClass}>Dorso del DNI (opcional)</span>
-                        <DniPhotoSlot label="DNI Dorso" file={idPhotoBack} onChange={setIdPhotoBack} />
-                      </div>
+                  <div className="space-y-3">
+                    <div>
+                      <span className={labelClass}>Frente del DNI *</span>
+                      <DniPhotoSlot label="DNI Frente" file={idPhotoFront} onChange={setIdPhotoFront} />
                     </div>
-                  </>
-                )}
-
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-300 mb-3">Foto de tarjeta (opcional)</p>
-                  <label className="block">
-                    <input type="file" accept="image/*,.pdf" onChange={(e) => setCardPhoto(e.target.files?.[0] ?? null)} className={fileInputClass} />
-                  </label>
+                    <div>
+                      <span className={labelClass}>Dorso del DNI *</span>
+                      <DniPhotoSlot label="DNI Dorso" file={idPhotoBack} onChange={setIdPhotoBack} />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Tarjeta para débito (opcional)</p>
-                <label className="block">
-                  <span className={labelClass}>Titular</span>
-                  <input value={cardHolder} onChange={(e) => setCardHolder(e.target.value)} className={inputClass} />
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="block">
-                    <span className={labelClass}>Últimos 4 dígitos</span>
-                    <input maxLength={4} value={cardLastFour} onChange={(e) => setCardLastFour(e.target.value.replace(/\D/g, ""))} className={inputClass} />
-                  </label>
-                  <label className="block">
-                    <span className={labelClass}>Vencimiento (MM/AA)</span>
-                    <input
-                      placeholder="12/28"
-                      inputMode="numeric"
-                      maxLength={5}
-                      value={cardExpiry}
-                      onChange={(e) => setCardExpiry(formatCardExpiryMmAa(e.target.value))}
-                      className={inputClass}
-                    />
-                  </label>
+              {!identityVerificationRequired && (
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4 md:p-5 space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Documento de identidad</p>
+                  <div className="space-y-3">
+                    <div>
+                      <span className={labelClass}>Frente del DNI *</span>
+                      <DniPhotoSlot label="DNI Frente" file={idPhotoFront} onChange={setIdPhotoFront} />
+                    </div>
+                    <div>
+                      <span className={labelClass}>Dorso del DNI *</span>
+                      <DniPhotoSlot label="DNI Dorso" file={idPhotoBack} onChange={setIdPhotoBack} />
+                    </div>
+                  </div>
                 </div>
+              )}
+
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4 md:p-5 space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                  Tarjeta para débito (opcional)
+                </p>
+                <CreditCardInput
+                  cardNumber={cardNumber}
+                  onCardNumberChange={setCardNumber}
+                  cardHolder={cardHolder}
+                  onCardHolderChange={setCardHolder}
+                  cardExpiry={cardExpiry}
+                  onCardExpiryChange={setCardExpiry}
+                  cardCvc={cardCvc}
+                  onCardCvcChange={setCardCvc}
+                />
               </div>
             </div>
 

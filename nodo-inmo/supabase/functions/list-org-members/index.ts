@@ -64,12 +64,18 @@ Deno.serve(async (req) => {
       SELECT
         coalesce(oi.invitee_user_id::text, oi.id::text) AS id,
         oi.role AS db_role,
-        coalesce(u.raw_user_meta_data->>'full_name', split_part(oi.invitee_email, '@', 1)) AS name,
+        coalesce(
+          up.full_name,
+          u.raw_user_meta_data->>'full_name',
+          u.raw_user_meta_data->>'display_name',
+          split_part(oi.invitee_email, '@', 1)
+        ) AS name,
         oi.invitee_email AS email,
         false AS is_active,
         'invitation' AS source
       FROM shared.org_invitations oi
       LEFT JOIN auth.users u ON u.id = oi.invitee_user_id
+      LEFT JOIN shared.user_profiles up ON up.id = oi.invitee_user_id
       WHERE oi.org_id = ${orgId}::uuid
         AND oi.status = 'pending'
         AND NOT EXISTS (

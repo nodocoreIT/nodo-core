@@ -300,7 +300,11 @@ function LoginForm() {
   useEffect(() => {
     if (recoveryBootstrapping) return;
     if (modeParam === "register") setAuthMode("register");
-    else if (modeParam === "first-access") setAuthMode("first-access");
+    else if (modeParam === "first-access") {
+      setAuthMode("first-access");
+      const urlEmail = searchParams.get("email");
+      if (urlEmail) setEmail(urlEmail);
+    }
     else if (modeParam === "login") setAuthMode("login");
     else if (modeParam === "forgot") setAuthMode("forgot");
   }, [modeParam, recoveryBootstrapping, setAuthMode]);
@@ -639,6 +643,23 @@ function LoginForm() {
         setGeneralError(mapAuthLoginError(error.message));
         setLoading(false);
         return;
+      }
+
+      // For invite activation: accept pending invitations before checking access
+      // so the user gets added to org_members first.
+      if (modeParam === "activate-invite") {
+        try {
+          const { data: invitations } = await supabase.rpc("get_my_pending_invitations");
+          if (invitations?.length) {
+            for (const inv of invitations as { token: string }[]) {
+              await supabase.functions.invoke("accept-invitation", {
+                body: { token: inv.token, action: "accept" },
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("accept-invitation:", e);
+        }
       }
 
       if (matchedNode?.code) {
@@ -1556,23 +1577,6 @@ function LoginForm() {
                 <p className="text-slate2 text-[14.5px] mb-6">
                   Tu cuenta fue habilitada. Creá tu contraseña para ingresar a la aplicación.
                 </p>
-
-                <div className="mb-4">
-                  <label htmlFor="first-email" className="block text-[13px] font-semibold text-navy mb-1.5">
-                    Email
-                  </label>
-                  <input
-                    id="first-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      setEmailError("");
-                    }}
-                    className={`${inputBase} ${emailError ? inputError : inputNormal} ${inputFocus}`}
-                  />
-                  {emailError && <p className="text-[12.5px] text-[#C0392B] mt-1.5">{emailError}</p>}
-                </div>
 
                 <div className="mb-4">
                   <label htmlFor="first-pass" className="block text-[13px] font-semibold text-navy mb-1.5">
