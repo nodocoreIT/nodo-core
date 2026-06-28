@@ -23,7 +23,10 @@ export const metadata: Metadata = {
   description:
     "Telemedicina profesional con agenda, videoconsultas, historial clínico e informes con IA.",
   icons: {
-    icon: "/favicon.png",
+    icon: [
+      { url: "/favicon.png", media: "(prefers-color-scheme: light)" },
+      { url: "/clinica/favicon-dark.png", type: "image/png", media: "(prefers-color-scheme: dark)" },
+    ],
     shortcut: "/favicon.png",
     apple: "/favicon.png",
   },
