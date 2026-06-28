@@ -213,8 +213,8 @@ export async function sendPatientVerificationEmail({
     text: `Hola ${nombre},\n\nGracias por registrarte como paciente en NODO | Clínica Virtual. Para activar tu cuenta y acceder a las videoconsultas y turnos, hacé clic en el siguiente enlace:\n\n${verificationUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO Clínica Virtual`,
     attachments: [
       {
-        filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuesto_50.png"),
+        filename: "logo_compuestoa.png",
+        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
         cid: "nodologo",
       },
     ],
@@ -269,13 +269,7 @@ export async function sendPasswordResetEmail({
     to: email,
     subject: `Recuperá tu cuenta en ${nodeLabel}`,
     text: `Hola,\n\nRecibimos una solicitud para restablecer la contraseña de tu cuenta en ${nodeLabel}. Hacé clic en el siguiente enlace para crear una nueva contraseña:\n\n${recoveryUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de ${nodeLabel}`,
-    attachments: [
-      {
-        filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuesto_50.png"),
-        cid: "nodologo",
-      },
-    ],
+    attachments: registrationLogoAttachments(),
     html: `
       <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;background-color:#F5F8FC;">
         <div style="text-align:center;margin-bottom:20px;">
@@ -426,8 +420,8 @@ export async function sendStaffAddedEmail({
     text: `Hola ${name},\n\n${inviterName ? `${inviterName} te agregó` : "Te agregaron"} al equipo de ${orgName} en ${nodeLabel}. Ya podés ingresar con tu email y contraseña habituales:\n\n${loginUrl}\n\nSaludos,\nEl equipo de ${nodeLabel}`,
     attachments: [
       {
-        filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuesto_50.png"),
+        filename: "logo_compuestoa.png",
+        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
         cid: "nodologo",
       },
     ],
@@ -741,8 +735,8 @@ export async function sendActivationEmail({
     text: `Hola ${nombre},\n\nTu solicitud fue aprobada. Completá tu registro en ${nodeLabel} usando este enlace:\n\n${activationUrl}\n\nEl enlace expira en 72 horas.\n\nSaludos,\nNODO Core`,
     attachments: [
       {
-        filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuesto_50.png"),
+        filename: "logo_compuestoa.png",
+        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
         cid: "nodologo",
       },
     ],
