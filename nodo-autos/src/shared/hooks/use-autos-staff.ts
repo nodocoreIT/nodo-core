@@ -58,7 +58,7 @@ export const useAutosStaffStore = create<AutosStaffStore>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const data = await invokeFunction<{ members?: AutosStaffUser[] }>("list-org-members", {
-        products: ["nodo-autos"],
+        products: ["autos", "nodo-autos"],
       });
       const members = data.members ?? [];
       set({ users: members, loading: false });
@@ -105,7 +105,7 @@ export const useAutosStaffStore = create<AutosStaffStore>((set, get) => ({
       redirectTo,
       inviterName,
       nodeLabel: "NODO | Autos",
-      products: ["nodo-autos"],
+      products: ["autos", "nodo-autos"],
     });
 
     await get().fetchMembers();
@@ -121,7 +121,7 @@ export const useAutosStaffStore = create<AutosStaffStore>((set, get) => ({
     await invokeFunction("update-org-member-role", {
       userId,
       role,
-      products: ["nodo-autos"],
+      products: ["autos", "nodo-autos"],
     });
 
     set((state) => ({
@@ -132,7 +132,7 @@ export const useAutosStaffStore = create<AutosStaffStore>((set, get) => ({
   removeMember: async (userId) => {
     await invokeFunction("remove-org-member", {
       userId,
-      products: ["nodo-autos"],
+      products: ["autos", "nodo-autos"],
     });
 
     set((state) => ({ users: state.users.filter((u) => u.id !== userId) }));
