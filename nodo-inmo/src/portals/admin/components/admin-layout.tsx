@@ -59,6 +59,7 @@ import { IPLBadge } from "@/features/ipc/components/IPLBadge";
 import { PlanBadge } from "@/features/plan/components/plan-badge";
 import { INMO_DEFAULT_EMPLOYEE_SECTIONS } from "@/shared/lib/inmo-staff-nav";
 import { isProOnlyAdminRoute } from "@/shared/lib/pro-features";
+import { useSettingsTrigger } from "@/shared/hooks/use-settings-trigger";
 
 // ── Nav item definition ───────────────────────────────────────────────────────
 
@@ -187,6 +188,16 @@ export function AdminLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
+
+  const pendingSettingsTab = useSettingsTrigger((s) => s.pendingTab);
+  const clearPendingSettings = useSettingsTrigger((s) => s.clearPending);
+
+  useEffect(() => {
+    if (!pendingSettingsTab) return;
+    setSettingsInitialTab(pendingSettingsTab as SettingsTabId);
+    setSettingsOpen(true);
+    clearPendingSettings();
+  }, [pendingSettingsTab, clearPendingSettings]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
