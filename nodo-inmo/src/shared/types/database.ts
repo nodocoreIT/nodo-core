@@ -455,6 +455,7 @@ export type Database = {
       org_profiles: {
         Row: {
           address: string | null
+          ai_settings: Json | null
           alert_settings: Json | null
           created_at: string
           cuit: string | null
@@ -470,6 +471,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          ai_settings?: Json | null
           alert_settings?: Json | null
           created_at?: string
           cuit?: string | null
@@ -485,6 +487,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          ai_settings?: Json | null
           alert_settings?: Json | null
           created_at?: string
           cuit?: string | null

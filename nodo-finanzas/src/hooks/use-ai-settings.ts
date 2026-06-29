@@ -1,12 +1,15 @@
-import { create } from "zustand";
+import { useState, useEffect } from "react";
+import { FinanzasService } from "@/services/finanzas-service";
+import { useAuth } from "@nodocore/shared-components";
 
-export type AiProvider = "gemini" | "openai" | "anthropic";
+export type AiProvider = "gemini" | "openai" | "anthropic" | "groq";
 
 export interface AiSettings {
   provider: AiProvider;
   geminiApiKey: string;
   openaiApiKey: string;
   anthropicApiKey: string;
+  groqApiKey: string;
 }
 
 const DEFAULT_AI_SETTINGS: AiSettings = {
@@ -14,52 +17,58 @@ const DEFAULT_AI_SETTINGS: AiSettings = {
   geminiApiKey: "",
   openaiApiKey: "",
   anthropicApiKey: "",
+  groqApiKey: "",
 };
 
 export function getActiveApiKey(settings: AiSettings): string {
   if (settings.provider === "openai") return settings.openaiApiKey;
   if (settings.provider === "anthropic") return settings.anthropicApiKey;
+  if (settings.provider === "groq") return settings.groqApiKey;
   return settings.geminiApiKey;
 }
 
-const STORAGE_KEY = "nodo-ai-settings";
-
-interface AiStore {
-  aiSettings: AiSettings;
-  setAiSettings: (next: Partial<AiSettings>) => void;
-}
-
-const getInitialAiSettings = (): AiSettings => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (!parsed.provider) parsed.provider = "gemini";
-      if (!parsed.openaiApiKey) parsed.openaiApiKey = "";
-      if (!parsed.anthropicApiKey) parsed.anthropicApiKey = "";
-      return { ...DEFAULT_AI_SETTINGS, ...parsed };
-    }
-  } catch {
-    // ignored
-  }
-  return DEFAULT_AI_SETTINGS;
-};
-
-export const useAiStore = create<AiStore>((set) => ({
-  aiSettings: getInitialAiSettings(),
-  setAiSettings: (next) =>
-    set((state) => {
-      const updated = { ...state.aiSettings, ...next };
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      } catch {
-        // ignored
-      }
-      return { aiSettings: updated };
-    }),
-}));
+const AI_SETTINGS_KEY = "ai_settings";
 
 export function useAiSettings() {
-  const { aiSettings, setAiSettings } = useAiStore();
-  return { aiSettings, setAiSettings };
+  const { session } = useAuth();
+  const userId = session?.user?.id;
+  const [aiSettings, setAiSettingsState] = useState<AiSettings>(DEFAULT_AI_SETTINGS);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const load = async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const stored = await FinanzasService.obtenerConfiguracion(AI_SETTINGS_KEY) as any;
+        if (!cancelled && stored && typeof stored === "object") {
+          setAiSettingsState({ ...DEFAULT_AI_SETTINGS, ...stored });
+        }
+      } catch {
+        // Fallback to defaults on error
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  const setAiSettings = async (next: Partial<AiSettings>) => {
+    const merged = { ...aiSettings, ...next };
+    setAiSettingsState(merged);
+    try {
+      await FinanzasService.guardarConfiguracion(AI_SETTINGS_KEY, merged);
+    } catch {
+      // Best-effort
+    }
+  };
+
+  return { aiSettings, setAiSettings, loading };
 }

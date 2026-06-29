@@ -41,13 +41,29 @@ export interface ThemeSettings {
   brandText: string;
 }
 
-export type AiProvider = "gemini" | "openai" | "anthropic";
+export type AiProvider = "gemini" | "openai" | "anthropic" | "groq";
 
 export interface AiSettings {
   provider: AiProvider;
   geminiApiKey: string;
   openaiApiKey: string;
   anthropicApiKey: string;
+  groqApiKey: string;
+}
+
+export const DEFAULT_AI_SETTINGS: AiSettings = {
+  provider: "gemini",
+  geminiApiKey: "",
+  openaiApiKey: "",
+  anthropicApiKey: "",
+  groqApiKey: "",
+};
+
+export function getActiveApiKey(settings: AiSettings): string {
+  if (settings.provider === "openai") return settings.openaiApiKey;
+  if (settings.provider === "anthropic") return settings.anthropicApiKey;
+  if (settings.provider === "groq") return settings.groqApiKey;
+  return settings.geminiApiKey;
 }
 
 export interface AlertSettings {
@@ -71,6 +87,7 @@ export interface TenantProfileRow {
   pdf_logo_path?: string | null;
   theme_settings?: unknown;
   alert_settings?: unknown;
+  ai_settings?: unknown;
 }
 
 export type TenantProfileUpdate = Partial<TenantProfileRow>;

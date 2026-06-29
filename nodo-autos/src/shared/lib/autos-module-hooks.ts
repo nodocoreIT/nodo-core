@@ -32,6 +32,7 @@ export const autosTenantProfileHooks = createTenantProfileHooks({
     pdf_logo_path: (row.pdf_logo_path as string | null) ?? null,
     theme_settings: row.theme_settings,
     alert_settings: row.alert_settings,
+    ai_settings: row.ai_settings,
   }),
   mapUpdate: (input) => {
     const out: Record<string, unknown> = {};
@@ -44,6 +45,7 @@ export const autosTenantProfileHooks = createTenantProfileHooks({
     if (input.pdf_logo_path !== undefined) out.pdf_logo_path = input.pdf_logo_path;
     if (input.theme_settings !== undefined) out.theme_settings = input.theme_settings;
     if (input.alert_settings !== undefined) out.alert_settings = input.alert_settings;
+    if (input.ai_settings !== undefined) out.ai_settings = input.ai_settings;
     return out;
   },
 });

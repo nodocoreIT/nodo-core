@@ -580,6 +580,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
   const [apiKeyInput, setApiKeyInput] = useState(() => {
     if (aiSettings.provider === "openai") return aiSettings.openaiApiKey ?? "";
     if (aiSettings.provider === "anthropic") return aiSettings.anthropicApiKey ?? "";
+    if (aiSettings.provider === "groq") return aiSettings.groqApiKey ?? "";
     return aiSettings.geminiApiKey ?? "";
   });
   const [showApiKey, setShowApiKey] = useState(false);
@@ -591,6 +592,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
     setAiKeySaved(false);
     if (p === "openai") setApiKeyInput(aiSettings.openaiApiKey ?? "");
     else if (p === "anthropic") setApiKeyInput(aiSettings.anthropicApiKey ?? "");
+    else if (p === "groq") setApiKeyInput(aiSettings.groqApiKey ?? "");
     else setApiKeyInput(aiSettings.geminiApiKey ?? "");
   };
 
@@ -601,7 +603,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
     placeholder: string;
     helpUrl: string;
     helpLabel: string;
-    keyField: "geminiApiKey" | "openaiApiKey" | "anthropicApiKey";
+    keyField: "geminiApiKey" | "openaiApiKey" | "anthropicApiKey" | "groqApiKey";
     logo: React.ReactNode;
   }> = [
     {
@@ -643,6 +645,20 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
       logo: (
         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#D97706] text-[11px] font-black text-white">
           A
+        </div>
+      ),
+    },
+    {
+      id: "groq",
+      name: "Groq",
+      description: "Llama 3.1 — gratuito",
+      placeholder: "gsk_...",
+      helpUrl: "https://console.groq.com/keys",
+      helpLabel: "Obtené tu API key gratis en Groq Console",
+      keyField: "groqApiKey",
+      logo: (
+        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#F55036] text-[10px] font-black text-white">
+          GQ
         </div>
       ),
     },
@@ -1403,8 +1419,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
                 <p className="text-xs text-slate2">
                   Elegí tu proveedor de IA y configurá tu API key personal para habilitar
                   funciones como el dictado de propiedades por voz.
-                  La clave se guarda localmente en tu navegador y nunca se
-                  envía a ningún servidor externo de Nodo.
+                  La clave se guarda de forma segura en tu organización y está disponible en todos los dispositivos.
                 </p>
               </div>
 
@@ -1517,8 +1532,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
                   <li className="flex items-start gap-2">
                     <span className="mt-0.5 text-brand font-bold">🔒</span>
                     <span>
-                      La clave <strong className="text-navy">nunca sale de tu navegador</strong>.
-                      Nodo no la almacena ni la transmite.
+                      La clave se guarda <strong className="text-navy">de forma segura en tu organización</strong> y está disponible en todos los dispositivos.
                     </span>
                   </li>
                 </ul>
