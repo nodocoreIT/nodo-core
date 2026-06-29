@@ -1,4 +1,4 @@
-import { useAiStore } from "@/hooks/use-ai-settings";
+import { useAiSettings } from "@/hooks/use-ai-settings";
 import { geminiGenerateJson } from "@/lib/gemini-client";
 import type { Cuenta } from "@/types";
 
@@ -85,7 +85,8 @@ async function callGemini(
 }
 
 export function useExtractTransferFromVoice() {
-  const apiKey = useAiStore((s) => s.aiSettings.geminiApiKey);
+  const { aiSettings } = useAiSettings();
+  const apiKey = aiSettings.geminiApiKey;
 
   const extract = async (transcript: string, cuentas: Cuenta[]): Promise<ExtractedTransfer> => {
     if (!apiKey) throw new Error("NO_API_KEY");

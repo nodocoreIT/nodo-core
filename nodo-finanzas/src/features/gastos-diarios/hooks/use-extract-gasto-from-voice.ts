@@ -1,4 +1,4 @@
-import { useAiStore } from '@/hooks/use-ai-settings';
+import { useAiSettings } from '@/hooks/use-ai-settings';
 import { geminiGenerateJson } from '@/lib/gemini-client';
 import {
   parseGastoDictado,
@@ -144,7 +144,8 @@ function mergeParsed(local: ParsedGastoDictado, gemini: Partial<ParsedGastoDicta
 }
 
 export function useExtractGastoFromVoice() {
-  const apiKey = useAiStore((s) => s.aiSettings.geminiApiKey);
+  const { aiSettings } = useAiSettings();
+  const apiKey = aiSettings.geminiApiKey;
 
   const extract = async (context: ParseGastoDictadoContext): Promise<ParsedGastoDictado> => {
     const local = parseGastoDictado(context);

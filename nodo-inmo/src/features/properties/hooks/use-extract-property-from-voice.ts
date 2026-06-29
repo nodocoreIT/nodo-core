@@ -1,5 +1,5 @@
-import { useAiStore, getActiveApiKey } from "@/shared/hooks/use-ai-settings";
-import type { AiProvider } from "@/shared/hooks/use-ai-settings";
+import { useSettingsModule, getActiveApiKey } from "@nodocore/nodo-modules/settings";
+import type { AiProvider } from "@nodocore/nodo-modules/settings";
 import type { PropertyFormValues } from "@/features/properties/components/property-form-dialog";
 import { formatCurrencyInput } from "@/shared/lib/format-money";
 
@@ -205,7 +205,7 @@ async function callAI(
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useExtractPropertyFromVoice() {
-  const aiSettings = useAiStore((s) => s.aiSettings);
+  const { aiSettings } = useSettingsModule();
   const apiKey = getActiveApiKey(aiSettings);
   const provider = aiSettings.provider;
 
