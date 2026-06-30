@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Plus, Calculator, Search, X, Edit, Trash2, Mic, MicOff, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useOpenSettings } from '@/shared/hooks/use-open-settings';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,7 @@ export function GastosFijosPage() {
   const dolar = useDolar();
   const { rubrosActivos } = useRubros();
   const { extract, hasApiKey } = useExtractGastoFijoFromVoice();
-  const navigate = useNavigate();
+  const { openSettings } = useOpenSettings();
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [gastoEditando, setGastoEditando] = useState<GastoFijo | null>(null);
@@ -367,7 +367,7 @@ export function GastosFijosPage() {
                   <>
                     <p className="font-semibold mb-1">API Key no configurada</p>
                     <button
-                      onClick={() => navigate('/admin/configuracion')}
+                      onClick={() => openSettings('ai')}
                       className="underline font-medium"
                     >
                       Ir a Configuración → IA

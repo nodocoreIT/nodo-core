@@ -34,6 +34,7 @@ import { cn } from "@/shared/lib/utils";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { useFinanzas } from "@/hooks/use-finanzas";
 import { FinanzasSettingsModuleProvider } from "@/shared/lib/finanzas-settings-module";
+import { OpenSettingsContext } from "@/shared/hooks/use-open-settings";
 
 interface NavItem {
   to: string;
@@ -79,6 +80,11 @@ export function AdminLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTabId | undefined>();
+
+  const openSettings = useCallback((tab?: SettingsTabId) => {
+    setSettingsInitialTab(tab);
+    setSettingsOpen(true);
+  }, []);
   const { user, role, plan, signOut } = useAuth();
   const { gastosDiarios = [] } = useFinanzas();
 
@@ -338,7 +344,9 @@ export function AdminLayout() {
 
           {/* Content */}
           <main className="flex-1 overflow-auto p-6">
-            <Outlet />
+            <OpenSettingsContext.Provider value={{ openSettings }}>
+              <Outlet />
+            </OpenSettingsContext.Provider>
           </main>
         </div>
 
