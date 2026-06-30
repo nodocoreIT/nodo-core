@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
                 plan: "paciente",
                 status: "activo",
                 progress: 100,
-                access_url: "https://nodo-clinica.fly.dev/",
+                access_url: "https://www.nodocore.com.ar/clinica",
                 access_user: email,
               });
             }
@@ -144,7 +144,7 @@ export async function GET(request: NextRequest) {
               plan: "paciente",
               status: "activo",
               progress: 100,
-              access_url: "https://nodo-clinica.fly.dev/",
+              access_url: "https://www.nodocore.com.ar/clinica",
               access_user: email,
             });
           }
