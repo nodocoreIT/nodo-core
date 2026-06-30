@@ -8,7 +8,8 @@ export type SettingsTabId =
   | "ai"
   | "alerts"
   | "ipc"
-  | "redes-sociales";
+  | "redes-sociales"
+  | "system-config";
 
 export interface MetaSettings {
   instagram_account_id: string;
@@ -195,4 +196,5 @@ export interface SettingsModuleContextValue {
   isSavingManualIcl?: boolean;
 
   metaSettingsContent?: ReactNode;
+  systemConfigContent?: ReactNode;
 }

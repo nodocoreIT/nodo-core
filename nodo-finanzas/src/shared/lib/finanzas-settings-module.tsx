@@ -9,6 +9,7 @@ import { supabase } from "@/shared/lib/supabase";
 import { useThemeSettings } from "@/shared/hooks/use-theme-settings";
 import { useAiSettings } from "@/hooks/use-ai-settings";
 import { useFinanzasStaff } from "@/shared/hooks/use-finanzas-staff";
+import { ConfiguracionPage } from "@/features/configuracion/configuracion-page";
 
 const FINANZAS_MANAGED_NAV = [
   { to: "/admin/dashboard", label: "Dashboard" },
@@ -40,8 +41,8 @@ export function FinanzasSettingsModuleProvider({ children }: { children: React.R
 
   const value = useMemo((): SettingsModuleContextValue => {
     return {
-      // Hide tabs not applicable to finanzas (company, alerts, ipc, ai are still shown)
-      hiddenTabs: ["company"],
+      // Hide tabs not applicable to finanzas
+      hiddenTabs: ["company", "alerts", "ipc", "redes-sociales"],
       managedNav: FINANZAS_MANAGED_NAV,
       roleOptions: [
         { value: "member", label: "Miembro" },
@@ -81,6 +82,7 @@ export function FinanzasSettingsModuleProvider({ children }: { children: React.R
       },
       updateUserProfile: updateProfileMutation.mutateAsync,
       isUpdatingUserProfile: updateProfileMutation.isPending,
+      systemConfigContent: <ConfiguracionPage />,
     };
   }, [
     settings,
