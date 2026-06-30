@@ -12,6 +12,7 @@ export type {
   NavSection,
   StaffUser,
   ThemeSettings,
+  AiProvider,
   AiSettings,
   AlertSettings,
   MetaSettings,
@@ -23,4 +24,4 @@ export type {
   StaffApi,
   SettingsModuleContextValue,
 } from "./types";
-export { DEFAULT_ALERT_SETTINGS } from "./types";
+export { DEFAULT_ALERT_SETTINGS, DEFAULT_AI_SETTINGS, getActiveApiKey } from "./types";

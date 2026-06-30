@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-export type AiProvider = "gemini" | "openai" | "anthropic";
+export type AiProvider = "gemini" | "openai" | "anthropic" | "groq";
 
 export type TaskPriority = "alta" | "media" | "baja";
 export type TaskStatus = "pendiente" | "en_progreso" | "completada" | "cancelada";
@@ -68,4 +68,6 @@ export interface AgendaModuleConfig {
   aiProvider?: AiProvider;
   /** Active provider's API key — enables voice-to-task dictation */
   aiApiKey?: string | null;
+  /** Called when the user taps the "configure AI" link in the voice error panel */
+  onAiSettingsClick?: () => void;
 }

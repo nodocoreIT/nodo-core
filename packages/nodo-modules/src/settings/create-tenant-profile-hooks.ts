@@ -27,6 +27,7 @@ const defaultMapRow = (row: Record<string, unknown>): TenantProfileRow => ({
   pdf_logo_path: (row.pdf_logo_path as string | null) ?? null,
   theme_settings: row.theme_settings,
   alert_settings: row.alert_settings,
+  ai_settings: row.ai_settings,
 });
 
 export function createTenantProfileHooks(config: TenantProfileHooksConfig) {

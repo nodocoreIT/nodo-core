@@ -42,6 +42,7 @@ const DEFAULT_AI_SETTINGS: AiSettings = {
   geminiApiKey: "",
   openaiApiKey: "",
   anthropicApiKey: "",
+  groqApiKey: "",
 };
 
 function readAiSettings() {

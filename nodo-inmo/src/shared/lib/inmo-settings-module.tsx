@@ -2,13 +2,15 @@ import { useMemo } from "react";
 import {
   SettingsModuleProvider,
   type AlertSettings,
+  type AiSettings,
   type SettingsModuleContextValue,
   DEFAULT_ALERT_SETTINGS,
+  DEFAULT_AI_SETTINGS,
 } from "@nodocore/nodo-modules/settings";
 import { MetaSettingsForm } from "@/features/redes-sociales/components/meta-settings-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useThemeSettings } from "@/shared/hooks/use-theme-settings";
-import { useAiSettings } from "@/shared/hooks/use-ai-settings";
+import type { Json } from "@/shared/types/database";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import {
   useUpsertOrgProfile,
@@ -33,7 +35,6 @@ const INMO_MANAGED_NAV_LIST = INMO_MANAGED_NAV.map((item) => ({ ...item }));
 
 export function InmoSettingsModuleProvider({ children }: { children: React.ReactNode }) {
   const { settings, setSettings, resetSettings } = useThemeSettings();
-  const { aiSettings, setAiSettings } = useAiSettings();
   const profileQuery = useOrgProfile();
   const upsertMutation = useUpsertOrgProfile();
   const uploadLogoMutation = useUploadLogo();
@@ -81,6 +82,16 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
   const alertSettings: AlertSettings = profileQuery.data?.alert_settings
     ? (profileQuery.data.alert_settings as unknown as AlertSettings)
     : DEFAULT_ALERT_SETTINGS;
+
+  const rawAiSettings = profileQuery.data?.ai_settings;
+  const aiSettings: AiSettings = rawAiSettings
+    ? { ...DEFAULT_AI_SETTINGS, ...(rawAiSettings as unknown as AiSettings) }
+    : DEFAULT_AI_SETTINGS;
+
+  const setAiSettings = (next: Partial<AiSettings>) => {
+    const merged = { ...aiSettings, ...next };
+    upsertMutation.mutateAsync({ ai_settings: merged as unknown as Json }).catch(console.error);
+  };
 
   const value = useMemo((): SettingsModuleContextValue => {
     return {
@@ -156,10 +167,10 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
     setSettings,
     resetSettings,
     aiSettings,
-    setAiSettings,
     profileQuery.data,
     profileQuery.isLoading,
     upsertMutation.isPending,
+    upsertMutation.mutateAsync,
     uploadLogoMutation.isPending,
     logoUrlQuery.data,
     pdfLogoUrlQuery.data,

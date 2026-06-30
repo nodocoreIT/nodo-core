@@ -2,11 +2,12 @@ import { useMemo } from "react";
 import {
   SettingsModuleProvider,
   type AlertSettings,
+  type AiSettings,
   type SettingsModuleContextValue,
   DEFAULT_ALERT_SETTINGS,
+  DEFAULT_AI_SETTINGS,
 } from "@nodocore/nodo-modules/settings";
 import { useThemeSettings } from "@/shared/hooks/use-theme-settings";
-import { useAutosAiSettings } from "@/shared/hooks/use-autos-ai-settings";
 import { useAutosStaff } from "@/shared/hooks/use-autos-staff";
 import { useAutosBankAccounts } from "@/shared/hooks/use-autos-bank-accounts";
 import {
@@ -32,7 +33,6 @@ const { useUploadLogo, useLogoSignedUrl } = autosLogoHooks;
 
 export function AutosSettingsModuleProvider({ children }: { children: React.ReactNode }) {
   const { settings, setSettings, resetSettings } = useThemeSettings();
-  const { aiSettings, setAiSettings } = useAutosAiSettings();
   const profileQuery = useTenantProfile();
   const upsertMutation = useUpsertTenantProfile();
   const uploadLogoMutation = useUploadLogo();
@@ -55,6 +55,16 @@ export function AutosSettingsModuleProvider({ children }: { children: React.Reac
   const alertSettings: AlertSettings = profileQuery.data?.alert_settings
     ? (profileQuery.data.alert_settings as unknown as AlertSettings)
     : DEFAULT_ALERT_SETTINGS;
+
+  const rawAiSettings = profileQuery.data?.ai_settings;
+  const aiSettings: AiSettings = rawAiSettings
+    ? { ...DEFAULT_AI_SETTINGS, ...(rawAiSettings as unknown as AiSettings) }
+    : DEFAULT_AI_SETTINGS;
+
+  const setAiSettings = (next: Partial<AiSettings>) => {
+    const merged = { ...aiSettings, ...next };
+    upsertMutation.mutateAsync({ ai_settings: merged as unknown as Record<string, unknown> }).catch(console.error);
+  };
 
   const value = useMemo((): SettingsModuleContextValue => {
     return {
@@ -117,10 +127,10 @@ export function AutosSettingsModuleProvider({ children }: { children: React.Reac
     setSettings,
     resetSettings,
     aiSettings,
-    setAiSettings,
     profileQuery.data,
     profileQuery.isLoading,
     upsertMutation.isPending,
+    upsertMutation.mutateAsync,
     uploadLogoMutation.isPending,
     logoUrlQuery.data,
     pdfLogoUrlQuery.data,
