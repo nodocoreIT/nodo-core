@@ -246,7 +246,7 @@ export function VoiceTaskButton({
             type="button"
             role="alert"
             onClick={onSettingsClick}
-            className="absolute left-0 top-full z-50 mt-1.5 w-72 cursor-pointer rounded-md border border-red-200 bg-red-50 px-3 py-2 text-left text-xs text-red-700 shadow-md transition-colors hover:bg-red-100"
+            className="absolute left-0 top-full z-50 mt-1.5 w-64 max-w-[calc(100vw-2rem)] cursor-pointer rounded-md border border-red-200 bg-red-50 px-3 py-2 text-left text-xs text-red-700 shadow-md transition-colors hover:bg-red-100"
           >
             {errorMessage}
             <span className="mt-0.5 block font-semibold underline">
@@ -256,7 +256,7 @@ export function VoiceTaskButton({
         ) : (
           <div
             role="alert"
-            className="absolute left-0 top-full z-50 mt-1.5 w-72 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 shadow-md"
+            className="absolute left-0 top-full z-50 mt-1.5 w-64 max-w-[calc(100vw-2rem)] rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 shadow-md"
           >
             {errorMessage}
           </div>
