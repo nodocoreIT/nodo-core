@@ -30,6 +30,11 @@ import { clinicApi } from "@/lib/clinic/client-api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseLocalDate, formatDateKeyLabel, clinicTimeLabelFromIso } from "@/lib/clinic/schedule";
+import {
+  getSpeechRecognitionCtor,
+  speechErrorMessage,
+  SPEECH_LANG,
+} from "@/lib/clinic/speech-recognition";
 import { ConsultationPaymentPanel } from "@/components/patient/consultation-payment-panel";
 import { ReceiptValidationCard } from "@/components/patient/receipt-validation-card";
 import {
@@ -37,7 +42,7 @@ import {
   patientShowsPaymentStep,
   patientCanPayWithMercadoPago,
 } from "@/lib/clinic/payment";
-import type { PaymentReceiptAudit } from "@/lib/clinic/types";
+import type { PaymentReceiptAudit } from "@/lib/clinic/local-db";
 import { toast } from "sonner";
 
 interface BookAppointmentDialogProps {
@@ -287,10 +292,9 @@ export function BookAppointmentDialog({
 
   const toggleMic = () => {
     if (typeof window === "undefined") return;
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition = getSpeechRecognitionCtor();
     if (!SpeechRecognition) {
-      toast.error("Dictado por voz no disponible en este navegador");
+      toast.error("Dictado no disponible. Usá Chrome o Edge y permití el micrófono.");
       return;
     }
     if (listening) {
@@ -299,14 +303,14 @@ export function BookAppointmentDialog({
       return;
     }
     const recognition = new SpeechRecognition();
-    recognition.lang = "es-ES";
+    recognition.lang = SPEECH_LANG;
     recognition.continuous = true;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let chunk = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
-          chunk += event.results[i][0].transcript;
+          chunk += event.results[i][0]?.transcript ?? "";
         }
       }
       if (chunk.trim()) {
@@ -315,11 +319,21 @@ export function BookAppointmentDialog({
         );
       }
     };
-    recognition.onerror = () => setListening(false);
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      setListening(false);
+      if (event.error !== "aborted") {
+        toast.error(speechErrorMessage(event.error));
+      }
+    };
     recognition.onend = () => setListening(false);
     recognitionRef.current = recognition;
-    recognition.start();
-    setListening(true);
+    try {
+      recognition.start();
+      setListening(true);
+    } catch {
+      toast.error("No se pudo iniciar el dictado. Probá de nuevo.");
+      setListening(false);
+    }
   };
 
   const handleContinueFromSlot = () => {
@@ -622,7 +636,7 @@ export function BookAppointmentDialog({
           <div className="space-y-4">
             <p className="text-xs text-slate-500">
               {mpReady
-                ? "Recomendado: pagá con Mercado Pago desde el celular (confirmación al instante). También podés transferir y subir comprobante."
+                ? `El pago con Mercado Pago va directo a la cuenta de Dr/a. ${doctorName}. También podés transferir y subir comprobante.`
                 : "Transferí el honorario y subí el comprobante para continuar."}
             </p>
             <ConsultationPaymentPanel
@@ -658,8 +672,9 @@ export function BookAppointmentDialog({
 
             {resolvedPayment?.mercadopagoEnabled && !mpReady && (
               <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                Mercado Pago está activado pero falta el Access Token del
-                médico. Usá transferencia por ahora.
+                Este médico activó Mercado Pago pero aún no vinculó su cuenta.
+                Usá transferencia por ahora o pedile que complete la conexión en
+                Configuración → Cobros.
               </p>
             )}
 
@@ -697,6 +712,17 @@ export function BookAppointmentDialog({
               )}
               <p className="text-[10px] text-slate-500">
                 Validamos monto, destinatario y fecha del turno al subir el archivo.
+                {resolvedPayment?.consultationFee ? (
+                  <>
+                    {" "}
+                    Honorario configurado del médico:{" "}
+                    <strong>
+                      {(resolvedPayment.currency ?? "ARS")}{" "}
+                      {resolvedPayment.consultationFee.toLocaleString("es-AR")}
+                    </strong>
+                    . Sin GEMINI en local la validación es aproximada.
+                  </>
+                ) : null}
               </p>
             </div>
 

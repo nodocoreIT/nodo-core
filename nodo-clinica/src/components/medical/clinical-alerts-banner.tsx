@@ -1,6 +1,6 @@
 "use client";
 
-import type { PatientHealthProfile } from "@/lib/clinic/types";
+import type { PatientHealthProfile } from "@/lib/clinic/local-db";
 import { AlertTriangle, HeartPulse } from "lucide-react";
 
 interface ClinicalAlertsBannerProps {

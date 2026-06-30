@@ -49,8 +49,7 @@ export function SoapSummaryPanel({
 
     setIsGenerating(true);
     try {
-      const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-      const res = await fetch(`${basePath}/api/soap/generate`, {
+      const res = await fetch("/api/soap/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -135,12 +134,19 @@ export function SoapSummaryPanel({
         {!summary ? (
           <>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Generá un resumen SOAP desde la transcripción y las notas. Luego
-              podés aplicarlo al editor de notas para revisarlo y editarlo.
+              Durante la consulta, escribí notas en el panel. Al terminar, este
+              botón arma un resumen <strong>SOAP</strong> (Subjetivo, Objetivo,
+              Análisis, Plan) y lo podés pegar en las notas clínicas para
+              editarlo.
             </p>
+            {!transcriptionText && !clinicalNotes && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+                Primero escribí notas clínicas o dictá durante la consulta.
+              </p>
+            )}
             <Button
               onClick={handleGenerate}
-              disabled={isGenerating}
+              disabled={isGenerating || (!transcriptionText && !clinicalNotes)}
               className="w-full bg-violet-700 hover:bg-violet-800"
               size="sm"
             >

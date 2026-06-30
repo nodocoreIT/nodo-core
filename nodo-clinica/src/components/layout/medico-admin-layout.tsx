@@ -18,7 +18,10 @@ import { BrandMark } from "@/components/nodo/brand-mark";
 import { NodoChatWidget } from "@/components/nodo-chat/nodo-chat-widget";
 import { NodoChatBell } from "@/components/nodo-chat/nodo-chat-bell";
 import { clinicApi } from "@/lib/clinic/client-api";
+import { PlanBadge } from "@/components/plan/plan-badge";
 import { isProPlan } from "@/lib/nodo-chat/is-pro-plan";
+import { isPlatformMode } from "@/lib/clinic/platform-config";
+import { isProOnlyMedicoRoute } from "@/lib/clinic/pro-features";
 import { useThemeStore, useThemeSettings } from "@/hooks/use-theme-settings";
 import { mergeThemeSettings } from "@/lib/clinic/theme-settings";
 import { Button } from "@/components/ui/button";
@@ -67,7 +70,10 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [cobrosUnread, setCobrosUnread] = useState(0);
 
-  const isPro = isProPlan(doctor?.subscriptionPlan);
+  const [planTier, setPlanTier] = useState<string | null>(null);
+  const isPro = isPlatformMode()
+    ? isProPlan(planTier)
+    : isProPlan(doctor?.subscriptionPlan);
   const chatEmbedded = pathname === "/medico/interconsultas";
 
   const refreshCobrosUnread = useCallback(async () => {
@@ -107,7 +113,26 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     clinicApi.getSession().then(async ({ session, user }) => {
-      if (!session || !["doctor", "admin", "super_admin"].includes(session.role)) {
+      if (!session || session.role !== "doctor") {
+        if (isPlatformMode()) {
+          try {
+            const synced = await clinicApi.syncPlatformSession();
+            setDoctor({
+              id: synced.user.id,
+              fullName: synced.user.fullName,
+              email: synced.user.email,
+              subscriptionPlan: synced.user.subscriptionPlan,
+            });
+            setPlanTier(
+              synced.platform?.plan ?? synced.user.subscriptionPlan ?? null,
+            );
+            setChecking(false);
+            return;
+          } catch {
+            router.push("/login/medico");
+            return;
+          }
+        }
         router.push("/login");
         return;
       }
@@ -117,6 +142,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
         email: user.email ?? session.email,
         subscriptionPlan: user.subscriptionPlan,
       });
+      setPlanTier(user.subscriptionPlan ?? null);
       try {
         const office = await clinicApi.getDoctorSchedule(user.id);
         if (office.themeSettings) {
@@ -191,19 +217,23 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
               const isActive =
                 pathname === href ||
                 (href !== "/medico/dashboard" && pathname.startsWith(href));
+              const proLocked =
+                isProOnlyMedicoRoute(href) && !isPro;
               const showCobrosBadge =
                 href === "/medico/cobros" && cobrosUnread > 0 && pathname !== href;
               return (
                 <Link
                   key={href}
-                  href={href}
+                  href={proLocked ? "/medico/dashboard" : href}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
                     "flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors",
                     isActive
                       ? "bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)]"
                       : "text-[var(--color-sidebar-text)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]",
+                    proLocked && "opacity-50",
                   )}
+                  title={proLocked ? "Disponible en Plan Pro" : undefined}
                 >
                   <Icon className="h-4 w-4 flex-shrink-0" />
                   <span className="flex-1">{label}</span>
@@ -221,7 +251,11 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
           </div>
         </nav>
 
-        <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] p-3">
+        <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] p-3 space-y-2">
+          <PlanBadge
+            fallbackPlan={doctor?.subscriptionPlan}
+            variant="sidebar"
+          />
           <div className="flex items-center gap-3 px-1 py-1">
             <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[var(--sidebar-primary)] text-xs font-bold text-[var(--sidebar-primary-foreground)]">
               {initials(displayName)}
@@ -287,11 +321,14 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           {doctor && (
-            <NodoChatBell
+            <div className="flex items-center gap-2">
+              <PlanBadge fallbackPlan={doctor.subscriptionPlan} />
+              <NodoChatBell
               isPro={isPro}
               chatEmbedded={chatEmbedded}
               onOpenChat={() => setChatOpen(true)}
             />
+            </div>
           )}
         </header>
 
@@ -303,7 +340,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
       {doctor && !chatEmbedded && (
         <NodoChatWidget
           doctorId={doctor.id}
-          doctorName={doctor.fullName ?? doctor.email ?? ""}
+          doctorName={doctor.fullName}
           isPro={isPro}
           open={chatOpen}
           onOpenChange={setChatOpen}

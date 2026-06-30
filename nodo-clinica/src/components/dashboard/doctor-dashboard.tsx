@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useEffect, useCallback, useState } from "react";
@@ -20,7 +19,7 @@ import { PatientPreviewPanel } from "@/components/dashboard/patient-preview-pane
 import { PatientSearchHeader } from "@/components/dashboard/patient-search-header";
 import { MedicalReportPanel } from "@/components/medical/medical-report-panel";
 import { ClinicalAlertsBanner } from "@/components/medical/clinical-alerts-banner";
-import type { PatientHealthProfile } from "@/lib/clinic/types";
+import type { PatientHealthProfile } from "@/lib/clinic/local-db";
 import { useConsultationStore } from "@/store/consultation-store";
 import { createClient } from "@/lib/supabase/client";
 import { clinicApi } from "@/lib/clinic/client-api";
@@ -764,6 +763,7 @@ export function DoctorDashboard({
                 roomName={activeAppointment.jitsi_room_id}
                 displayName={doctorName}
                 isModerator
+                showProviderBanner
                 enableConsultorioBackground
                 height={520}
                 onMeetingEnd={() => {

@@ -1,8 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-/* TODO: enable when shared-components is linked */
-/* @import "@nodocore/shared-components/styles/interactive.css"; */
 
 @custom-variant dark (&:is(.dark *));
 

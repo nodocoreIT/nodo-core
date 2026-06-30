@@ -1,22 +1,23 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { readDb } from "@/lib/clinic/local-db";
 import { validatePaymentReceipt } from "@/lib/ai/payment-receipt";
+import { getSessionFromRequest } from "@/lib/clinic/session";
 import { buildPaymentReceiptAudit } from "@/lib/clinic/payment-receipt-audit";
 import { DEFAULT_AVAILABILITY } from "@/lib/clinic/schedule";
 
 /** Previsualiza validación IA del comprobante antes de confirmar el turno. */
 export async function POST(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (auth instanceof NextResponse) return auth;
-  const { user, supabase } = auth;
-
-  if (user.role !== "patient") {
+  const session = await getSessionFromRequest(request);
+  if (!session || session.role !== "patient") {
     return NextResponse.json({ error: "Debe iniciar sesión como paciente" }, { status: 401 });
   }
 
   const body = await request.json();
-  const { doctorId, scheduledAt, receipt } = body as {
+  const {
+    doctorId,
+    scheduledAt,
+    receipt,
+  } = body as {
     doctorId?: string;
     scheduledAt?: string;
     receipt?: { fileName?: string; mimeType?: string; dataBase64?: string };
@@ -29,43 +30,34 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Get professional to find org_id
-  const { data: professional } = await supabase
-    .from("professionals")
-    .select("org_id, full_name")
-    .eq("id", doctorId)
-    .maybeSingle();
-
-  if (!professional) {
+  const db = await readDb();
+  const doctor = db.doctors.find((d) => d.id === doctorId);
+  if (!doctor) {
     return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
   }
 
-  const { data: officeSettings } = await supabase
-    .from("office_settings")
-    .select("payment, availability")
-    .eq("org_id", professional.org_id)
-    .maybeSingle();
-
-  const payment = (officeSettings?.payment as Record<string, unknown>) ?? {};
-  const availability = (officeSettings?.availability as { slotDurationMinutes?: number } | null) ?? DEFAULT_AVAILABILITY;
-  const fee = typeof payment.consultationFee === "number" ? payment.consultationFee : 0;
-  const currency = (payment.currency as string | undefined) ?? "ARS";
+  const fee = doctor.payment?.consultationFee ?? 0;
+  const currency = doctor.payment?.currency ?? "ARS";
+  const availability = doctor.availability ?? DEFAULT_AVAILABILITY;
 
   const validation = await validatePaymentReceipt({
     imageBase64: receipt.dataBase64,
     mimeType: receipt.mimeType || "image/jpeg",
     fileName: receipt.fileName,
-    doctorName: professional.full_name,
-    doctorAlias: (payment.alias as string | undefined),
-    doctorCbu: (payment.cbu as string | undefined),
-    beneficiaryName: (payment.beneficiaryName as string | undefined),
+    doctorName: doctor.fullName,
+    doctorAlias: doctor.payment?.alias,
+    doctorCbu: doctor.payment?.cbu,
+    beneficiaryName: doctor.payment?.beneficiaryName,
     expectedAmount: fee,
     currency,
     appointmentDateIso: scheduledAt,
-    slotDurationMinutes: (availability as { slotDurationMinutes?: number }).slotDurationMinutes,
+    slotDurationMinutes: availability.slotDurationMinutes,
   });
 
   const audit = buildPaymentReceiptAudit(validation, fee, currency);
 
-  return NextResponse.json({ ...validation, audit });
+  return NextResponse.json({
+    ...validation,
+    audit,
+  });
 }

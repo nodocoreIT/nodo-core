@@ -1,43 +1,35 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
-import { getDoctorMercadoPagoAccessToken, orgHasMercadoPagoConnection } from "@/lib/mercadopago/tokens";
+import { readDb } from "@/lib/clinic/local-db";
+import { getSessionFromRequest } from "@/lib/clinic/session";
+import { doctorHasMercadoPagoConnection } from "@/lib/mercadopago/tokens";
 import { createQrOrder, getQrOrder } from "@/lib/mercadopago/qr";
-import { randomUUID } from "crypto";
+import { getDoctorMercadoPagoAccessToken } from "@/lib/mercadopago/tokens";
+import { newId } from "@/lib/clinic/local-db";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Crea una orden QR de prueba con el token OAuth del org conectado.
+ * Crea una orden QR de prueba con el token OAuth del médico conectado.
  * POST { amount?: number }
  * GET ?orderId=... — consulta estado
  */
 export async function POST(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (auth instanceof NextResponse) return auth;
-  const { user, supabase } = auth;
-
-  if (!user.org_id) {
-    return NextResponse.json({ error: "Org no encontrada" }, { status: 403 });
+  const session = await getSessionFromRequest(request);
+  if (!session || session.role !== "doctor") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const hasConnection = await orgHasMercadoPagoConnection(user.org_id);
-  if (!hasConnection) {
+  const db = await readDb();
+  const doctor = db.doctors.find((d) => d.id === session.userId);
+  if (!doctor || !doctorHasMercadoPagoConnection(doctor)) {
     return NextResponse.json(
       { error: "Conectá Mercado Pago primero (OAuth)" },
       { status: 400 },
     );
   }
 
-  const { data: officeSettings } = await supabase
-    .from("office_settings")
-    .select("payment")
-    .eq("org_id", user.org_id)
-    .maybeSingle();
-
-  const payment = (officeSettings?.payment as Record<string, unknown>) ?? {};
   const posId =
-    (payment.mercadopagoExternalPosId as string | undefined)?.trim() ||
+    doctor.payment?.mercadopagoExternalPosId?.trim() ||
     process.env.MERCADOPAGO_DEFAULT_EXTERNAL_POS_ID?.trim();
 
   if (!posId) {
@@ -53,32 +45,27 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const fee = typeof payment.consultationFee === "number" ? payment.consultationFee : 100;
   const amount =
-    typeof body.amount === "number" && body.amount > 0 ? body.amount : fee;
+    typeof body.amount === "number" && body.amount > 0
+      ? body.amount
+      : doctor.payment?.consultationFee ?? 100;
 
-  const token = await getDoctorMercadoPagoAccessToken(user.org_id);
+  const token = await getDoctorMercadoPagoAccessToken(doctor);
   if (!token) {
     return NextResponse.json(
-      { error: "No se pudo obtener Access Token del org" },
+      { error: "No se pudo obtener Access Token del médico" },
       { status: 500 },
     );
   }
 
-  const { data: professional } = await supabase
-    .from("professionals")
-    .select("full_name")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
-
-  const externalRef = `test-qr-${randomUUID()}`;
+  const externalRef = `test-${newId("qr")}`;
 
   try {
     const order = await createQrOrder({
       accessToken: token,
       amount,
-      currency: (payment.currency as string | undefined),
-      description: `Prueba consulta — ${professional?.full_name ?? "Médico"}`,
+      currency: doctor.payment?.currency,
+      description: `Prueba consulta — ${doctor.fullName}`,
       externalReference: externalRef,
       externalPosId: posId,
       mode: "dynamic",
@@ -104,12 +91,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (auth instanceof NextResponse) return auth;
-  const { user } = auth;
-
-  if (!user.org_id) {
-    return NextResponse.json({ error: "Org no encontrada" }, { status: 403 });
+  const session = await getSessionFromRequest(request);
+  if (!session || session.role !== "doctor") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
   const orderId = new URL(request.url).searchParams.get("orderId");
@@ -117,7 +101,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "orderId requerido" }, { status: 400 });
   }
 
-  const token = await getDoctorMercadoPagoAccessToken(user.org_id);
+  const db = await readDb();
+  const doctor = db.doctors.find((d) => d.id === session.userId);
+  if (!doctor) {
+    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+  }
+
+  const token = await getDoctorMercadoPagoAccessToken(doctor);
   if (!token) {
     return NextResponse.json({ error: "Sin token MP" }, { status: 400 });
   }

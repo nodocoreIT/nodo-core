@@ -17,6 +17,8 @@ interface JitsiMeetProps {
   isModerator?: boolean;
   /** Token de sala del paciente (sala de espera) */
   accessToken?: string;
+  /** Avisos técnicos JaaS / meet.jit.si — solo panel médico */
+  showProviderBanner?: boolean;
   onMeetingEnd?: () => void;
   height?: number;
   endScreen?: ReactNode;
@@ -60,6 +62,7 @@ export function JitsiMeet({
   displayName,
   isModerator = false,
   accessToken,
+  showProviderBanner = false,
   onMeetingEnd,
   height = 480,
   endScreen,
@@ -191,6 +194,8 @@ export function JitsiMeet({
           enableWelcomePage: false,
           disableInviteFunctions: true,
           disableVirtualBackground: false,
+          // Sin lobby: el paciente entra directo cuando el médico ya abrió la sala
+          enableLobby: false,
           enableLobbyChat: false,
           ...(enableConsultorioBackground
             ? {
@@ -214,6 +219,18 @@ export function JitsiMeet({
 
       apiRef.current.addListener("readyToClose", handleEnd);
       apiRef.current.addListener("videoConferenceLeft", handleEnd);
+      apiRef.current.addListener("errorOccurred", (payload: unknown) => {
+        if (cancelled) return;
+        const detail =
+          payload && typeof payload === "object" && "message" in payload
+            ? String((payload as { message?: string }).message ?? "")
+            : "";
+        if (/auth/i.test(detail)) {
+          setLoadError(
+            "No se pudo autenticar en JaaS. Revisá JAAS_API_KEY_ID en el servidor.",
+          );
+        }
+      });
       apiRef.current.addListener("videoConferenceJoined", () => {
         if (!cancelled) setJoined(true);
         if (enableConsultorioBackground && apiRef.current) {
@@ -290,7 +307,7 @@ export function JitsiMeet({
             </Button>
           )}
         </div>
-        {MEET_JIT_SI_EMBED_LIMIT && !ended && (
+        {showProviderBanner && MEET_JIT_SI_EMBED_LIMIT && !ended && (
           <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 mt-2 flex gap-1.5">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
             <span>
@@ -301,13 +318,13 @@ export function JitsiMeet({
             </span>
           </p>
         )}
-        {usingJaas && !ended && (
+        {showProviderBanner && usingJaas && !ended && (
           <p className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1.5 mt-2">
             Videollamada con JaaS — sin límite de 5 minutos. Finalizá el turno
             con &quot;Finalizar consulta&quot; en el panel del médico.
           </p>
         )}
-        {!usingJaas && !MEET_JIT_SI_EMBED_LIMIT && !ended && (
+        {showProviderBanner && !usingJaas && !MEET_JIT_SI_EMBED_LIMIT && !ended && (
           <p className="text-[11px] text-slate-500 mt-1">
             Servidor: {domainLabel}. El médico cierra el turno con
             &quot;Finalizar consulta&quot;.

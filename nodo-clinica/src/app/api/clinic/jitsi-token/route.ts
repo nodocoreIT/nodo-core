@@ -1,9 +1,8 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
 import { generateJaasJwt } from "@/lib/jitsi/generate-jaas-jwt";
 import { isJaasConfigured } from "@/lib/jitsi/jaas-config";
-import { requireAuth } from "@/lib/supabase/auth-guard";
-import { createClient } from "@/lib/supabase/server";
+import { getSessionFromRequest } from "@/lib/clinic/session";
+import { readDb } from "@/lib/clinic/local-db";
 
 export const dynamic = "force-dynamic";
 
@@ -19,57 +18,32 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const room = searchParams.get("room");
   const displayName = searchParams.get("displayName") ?? "Participante";
-  const accessTokenParam = searchParams.get("accessToken");
+  const accessToken = searchParams.get("accessToken");
   const moderator = searchParams.get("moderator") === "true";
 
   if (!room) {
     return NextResponse.json({ error: "room requerido" }, { status: 400 });
   }
 
-  const auth = await requireAuth(request);
-  const supabase = auth instanceof NextResponse ? await createClient() : auth.supabase;
-  const user = auth instanceof NextResponse ? null : auth.user;
+  const session = await getSessionFromRequest(request);
+  const db = await readDb();
 
-  if (accessTokenParam) {
-    // Patient waiting room: validate via access_token on appointment
-    const { data: apt } = await supabase
-      .from("appointments")
-      .select("id, jitsi_room_id, access_token")
-      .eq("access_token", accessTokenParam)
-      .maybeSingle();
-
+  if (accessToken) {
+    const apt = db.appointments.find((a) => a.accessToken === accessToken);
     if (!apt) {
       return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
     }
-
-    const aptRow = apt as Record<string, unknown>;
-    const jitsiRoom = aptRow.jitsi_room_id as string;
-    if (jitsiRoom !== room && !room.endsWith(jitsiRoom)) {
+    if (apt.jitsiRoomId !== room && !room.endsWith(apt.jitsiRoomId)) {
       return NextResponse.json({ error: "Sala no válida" }, { status: 403 });
     }
-  } else if (user?.role === "admin" || user?.role === "super_admin") {
-    // Doctor: verify they own a matching appointment
-    const { data: me } = await supabase
-      .from("professionals")
-      .select("id")
-      .eq("auth_user_id", user.id)
-      .maybeSingle();
-
-    if (!me) {
-      return NextResponse.json({ error: "No autorizado para esta sala" }, { status: 403 });
-    }
-
-    const { data: apt } = await supabase
-      .from("appointments")
-      .select("id")
-      .eq("jitsi_room_id", room)
-      .eq("doctor_id", me.id)
-      .maybeSingle();
-
+  } else if (session?.role === "doctor") {
+    const apt = db.appointments.find(
+      (a) => a.jitsiRoomId === room && a.doctorId === session.userId,
+    );
     if (!apt) {
       return NextResponse.json({ error: "No autorizado para esta sala" }, { status: 403 });
     }
-  } else if (!user) {
+  } else if (!session) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -78,8 +52,12 @@ export async function GET(request: NextRequest) {
       room,
       displayName,
       moderator,
-      userId: user?.id,
-      email: user?.email,
+      userId: session?.userId,
+      email: session?.role === "doctor"
+        ? db.doctors.find((d) => d.id === session.userId)?.email
+        : session?.role === "patient"
+          ? db.patients.find((p) => p.id === session.userId)?.email
+          : undefined,
     });
 
     return NextResponse.json(token);

@@ -3,7 +3,7 @@ import type {
   LocalDoctor,
   PaymentReceiptAudit,
   PaymentStatus,
-} from "@/lib/clinic/types";
+} from "@/lib/clinic/local-db";
 import { doctorHasMercadoPagoConnection } from "@/lib/mercadopago/connection";
 
 /** Exige pago simulado salvo que el médico lo desactive explícitamente en Cobros. */

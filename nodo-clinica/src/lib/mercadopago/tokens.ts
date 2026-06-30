@@ -1,95 +1,78 @@
-// @ts-nocheck
-/**
- * MercadoPago token helpers — Supabase version.
- *
- * Tokens are stored in nodo_clinica.payment_credentials (service_role only).
- * getDoctorMercadoPagoAccessToken is kept for API compatibility but now
- * accepts an orgId string instead of a LocalDoctor object.
- *
- * Legacy LocalDoctor overload is removed — callers must be migrated.
- */
-
+import { readDb, writeDb, type LocalDoctor } from "@/lib/clinic/local-db";
 import {
-  getPaymentCredentials,
-  getOrgMercadoPagoAccessToken,
-} from "@/lib/clinic/db/payments";
-import { getMpOAuthConfig, isTokenExpired, refreshOAuthToken, tokenExpiresAtIso } from "@/lib/mercadopago/oauth";
-import { createServiceClient } from "@/lib/supabase/server";
+  doctorHasMercadoPagoConnection,
+  readStoredAccessToken,
+} from "@/lib/mercadopago/connection";
+import {
+  getMpOAuthConfig,
+  isTokenExpired,
+  refreshOAuthToken,
+  tokenExpiresAtIso,
+} from "@/lib/mercadopago/oauth";
 
-export { getOrgMercadoPagoAccessToken };
-
-/**
- * Returns true if the org has MercadoPago credentials.
- * Replaces doctorHasMercadoPagoConnection.
- */
-export async function orgHasMercadoPagoConnection(orgId: string): Promise<boolean> {
-  const token = await getOrgMercadoPagoAccessToken(orgId);
-  return !!token;
-}
+export { doctorHasMercadoPagoConnection, readStoredAccessToken };
 
 /**
- * Reads and optionally refreshes the MP access token for an org.
- * Service_role only — never returns token to client.
+ * Obtiene Access Token del médico; refresca vía OAuth si está por vencer.
+ * Nunca exponer al frontend.
  */
 export async function getDoctorMercadoPagoAccessToken(
-  orgId: string,
+  doctorOrId: LocalDoctor | string,
 ): Promise<string | undefined> {
-  const creds = await getPaymentCredentials(orgId);
+  const db = await readDb();
+  const doctor =
+    typeof doctorOrId === "string"
+      ? db.doctors.find((d) => d.id === doctorOrId)
+      : doctorOrId;
+  if (!doctor?.payment?.mercadopagoEnabled) return undefined;
+
+  const payment = doctor.payment;
+  const manual = readStoredAccessToken(doctor);
 
   const needsRefresh =
-    !!creds?.refresh_token && isTokenExpired(creds.token_expires_at ?? undefined);
+    payment.mercadopagoRefreshToken &&
+    isTokenExpired(payment.mercadopagoTokenExpiresAt);
 
-  if (!needsRefresh && creds?.access_token?.trim()) {
-    return creds.access_token.trim();
+  if (!needsRefresh && manual) return manual;
+
+  if (!needsRefresh && payment.mercadopagoAccessToken?.trim()) {
+    const t = payment.mercadopagoAccessToken.trim();
+    if (!t.startsWith("····")) return t;
   }
 
-  // Env var fallback
-  const envToken =
-    process.env.CLINIC_MERCADOPAGO_ACCESS_TOKEN?.trim() ||
-    process.env.MERCADOPAGO_ACCESS_TOKEN?.trim();
-
-  if (!needsRefresh) return envToken || undefined;
-  if (!creds?.refresh_token) return envToken || undefined;
+  if (!payment.mercadopagoRefreshToken) {
+    return manual;
+  }
 
   const config = getMpOAuthConfig();
   if (!config) {
     console.error("[mp-tokens] missing OAuth config for refresh");
-    return creds?.access_token || envToken || undefined;
+    return manual;
   }
 
   try {
     const refreshed = await refreshOAuthToken({
       config,
-      refreshToken: creds.refresh_token,
+      refreshToken: payment.mercadopagoRefreshToken,
     });
     const expiresAt = tokenExpiresAtIso(refreshed.expires_in);
 
-    const supabase = await createServiceClient();
-    await supabase
-      .from("payment_credentials")
-      .update({
-        access_token: refreshed.access_token,
-        ...(refreshed.refresh_token ? { refresh_token: refreshed.refresh_token } : {}),
-        ...(expiresAt ? { token_expires_at: expiresAt } : {}),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("org_id", orgId);
+    await writeDb((d) => {
+      const target = d.doctors.find((x) => x.id === doctor.id);
+      if (!target?.payment) return;
+      target.payment.mercadopagoAccessToken = refreshed.access_token;
+      if (refreshed.refresh_token) {
+        target.payment.mercadopagoRefreshToken = refreshed.refresh_token;
+      }
+      if (expiresAt) target.payment.mercadopagoTokenExpiresAt = expiresAt;
+      if (refreshed.user_id != null) {
+        target.payment.mercadopagoUserId = String(refreshed.user_id);
+      }
+    });
 
     return refreshed.access_token;
   } catch (err) {
     console.error("[mp-tokens] refresh failed", err);
-    return creds?.access_token || envToken || undefined;
+    return manual;
   }
-}
-
-/** @deprecated Use orgHasMercadoPagoConnection(orgId) */
-export function doctorHasMercadoPagoConnection(_doctor: unknown): boolean {
-  console.warn("[mp-tokens] doctorHasMercadoPagoConnection is deprecated — use orgHasMercadoPagoConnection(orgId)");
-  return false;
-}
-
-/** @deprecated Use getDoctorMercadoPagoAccessToken(orgId) */
-export function readStoredAccessToken(_doctor: unknown): string | undefined {
-  console.warn("[mp-tokens] readStoredAccessToken is deprecated — use getDoctorMercadoPagoAccessToken(orgId)");
-  return undefined;
 }

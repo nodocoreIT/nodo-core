@@ -31,7 +31,7 @@ export async function generateJaasJwt(opts: {
     aud: "jitsi",
     iss: "chat",
     sub: appId,
-    room: opts.room,
+    room: "*",
     context: {
       user: {
         id: userId,

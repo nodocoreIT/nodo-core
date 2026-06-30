@@ -161,17 +161,32 @@ importers:
   nodo-clinica:
     dependencies:
       '@base-ui/react':
-        specifier: ^1.5.0
+        specifier: 1.6.0
         version: 1.6.0(@types/react@19.2.17)(date-fns@4.4.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@base-ui/utils':
+        specifier: 0.3.1
+        version: 0.3.1(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@google/generative-ai':
         specifier: ^0.24.1
         version: 0.24.1
+      '@nodocore/shared-components':
+        specifier: workspace:*
+        version: link:../packages/shared-components
+      '@radix-ui/react-label':
+        specifier: ^2.1.7
+        version: 2.1.9(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@radix-ui/react-slot':
+        specifier: ^1.2.3
+        version: 1.2.5(@types/react@19.2.17)(react@19.2.7)
       '@supabase/ssr':
         specifier: ^0.12.0
         version: 0.12.0(@supabase/supabase-js@2.108.1)
       '@supabase/supabase-js':
         specifier: ^2.108.1
         version: 2.108.1
+      '@tanstack/react-query':
+        specifier: ^5.80.2
+        version: 5.101.0(react@19.2.7)
       '@vercel/blob':
         specifier: ^2.4.0
         version: 2.5.0
@@ -205,6 +220,9 @@ importers:
       react-dom:
         specifier: 19.2.7
         version: 19.2.7(react@19.2.7)
+      react-hook-form:
+        specifier: ^7.77.0
+        version: 7.78.0(react@19.2.7)
       react-markdown:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@19.2.17)(react@19.2.7)
@@ -229,6 +247,9 @@ importers:
       uuid:
         specifier: ^14.0.0
         version: 14.0.1
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
       zustand:
         specifier: ^5.0.14
         version: 5.0.14(@types/react@19.2.17)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))

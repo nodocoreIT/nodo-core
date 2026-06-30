@@ -1,7 +1,7 @@
 import { generateSoapSummary } from "@/lib/ai/gemini";
 import { formatSoapAsMarkdown } from "@/lib/soap/format";
-import type { ClinicDatabase } from "@/lib/clinic/types";
-import { newId } from "@/lib/clinic/types";
+import type { ClinicDatabase } from "@/lib/clinic/local-db";
+import { newId } from "@/lib/clinic/local-db";
 
 interface FinalizeOptions {
   transcription?: string;

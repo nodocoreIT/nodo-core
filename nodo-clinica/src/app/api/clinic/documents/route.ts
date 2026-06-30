@@ -1,36 +1,49 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
-import { createServiceClient } from "@/lib/supabase/server";
-import { ALLOWED_MIME, MAX_FILE_BYTES } from "@/lib/clinic/storage";
+import { promises as fs } from "fs";
+import {
+  readDb,
+} from "@/lib/clinic/local-db";
+import { getSessionFromRequest } from "@/lib/clinic/session";
+import {
+  canAccessDocument,
+  doctorCanAccessPatient,
+  doctorOwnsAppointment,
+  forbidden,
+  requireDoctorSession,
+  requirePatientSession,
+  requireSession,
+  unauthorized,
+  findAppointmentByAccessToken,
+} from "@/lib/clinic/access-control";
+import {
+  ALLOWED_MIME,
+  MAX_FILE_BYTES,
+} from "@/lib/clinic/storage";
+import { attachDocumentToAppointment } from "@/lib/clinic/appointment-documents";
 import { markTransferReceiptPendingReview } from "@/lib/clinic/transfer-receipt-pending";
-import { createPatientDocument } from "@/lib/clinic/db/clinical-records";
 
-const STORAGE_BUCKET = "patient-documents";
-
-function mapDocument(doc: {
-  id: string;
-  patient_id: string;
-  appointment_id: string;
-  file_name: string;
-  mime_type: string;
-  uploaded_at: string;
-  file_path: string;
-  extra?: { doctorName?: string; scheduledAt?: string };
-}) {
+function mapDocument(
+  doc: {
+    id: string;
+    patientId: string;
+    appointmentId: string;
+    fileName: string;
+    mimeType: string;
+    uploadedAt: string;
+  },
+  extra?: { doctorName?: string; scheduledAt?: string }
+) {
   return {
     id: doc.id,
-    patientId: doc.patient_id,
-    appointmentId: doc.appointment_id,
-    fileName: doc.file_name,
-    mimeType: doc.mime_type,
-    uploadedAt: doc.uploaded_at,
+    patientId: doc.patientId,
+    appointmentId: doc.appointmentId,
+    fileName: doc.fileName,
+    mimeType: doc.mimeType,
+    uploadedAt: doc.uploadedAt,
     downloadUrl: `/api/clinic/documents?id=${doc.id}&download=1`,
-    ...(doc.extra ?? {}),
+    ...extra,
   };
 }
-
-// ── GET ───────────────────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -40,118 +53,107 @@ export async function GET(request: NextRequest) {
   const appointmentId = searchParams.get("appointmentId");
   const accessToken = searchParams.get("token");
 
-  const authResult = await requireAuth(request);
-  if (authResult instanceof NextResponse) return authResult;
-  const { user, supabase } = authResult;
+  const db = await readDb();
 
-  // Download a single file by id
   if (id && download) {
-    const { data: doc } = await supabase
-      .from("patient_documents")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
-
+    const doc = db.documents.find((d) => d.id === id);
     if (!doc) {
-      return NextResponse.json(
-        { error: "Archivo no encontrado" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
     }
 
-    // Auth check: doctor must own appointment, patient must own document
-    if (user.role === "admin" || user.role === "super_admin") {
-      const { data: apt } = await supabase
-        .from("appointments")
-        .select("doctor_id")
-        .eq("id", doc.appointment_id)
-        .maybeSingle();
-      const { data: professional } = await supabase
-        .from("professionals")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (!apt || !professional || apt.doctor_id !== professional.id) {
-        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-      }
-    } else if (user.role === "patient") {
-      const { data: patientRow } = await supabase
-        .from("patients")
-        .select("id")
-        .eq("profile_id", user.id)
-        .maybeSingle();
-      if (!patientRow || patientRow.id !== doc.patient_id) {
-        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-      }
+    const session = await getSessionFromRequest(request);
+    if (!canAccessDocument(db, doc, session, accessToken)) {
+      return forbidden("No autorizado para descargar este archivo");
     }
 
-    // Generate signed URL from Supabase Storage (server-side)
-    const serviceClient = await createServiceClient();
-    const { data: signedUrl, error: signError } =
-      await serviceClient.storage
-        .from(STORAGE_BUCKET)
-        .createSignedUrl(doc.file_path, 3600);
-
-    if (signError || !signedUrl?.signedUrl) {
-      return NextResponse.json(
-        { error: "Archivo no disponible" },
-        { status: 404 },
-      );
+    if (doc.inlineDataBase64) {
+      const buffer = Buffer.from(doc.inlineDataBase64, "base64");
+      return new NextResponse(buffer, {
+        headers: {
+          "Content-Type": doc.mimeType,
+          "Content-Disposition": `inline; filename="${encodeURIComponent(doc.fileName)}"`,
+          "Cache-Control": "private, max-age=3600",
+        },
+      });
     }
 
-    // Redirect to signed URL
-    return NextResponse.redirect(signedUrl.signedUrl);
+    try {
+      const buffer = await fs.readFile(doc.filePath);
+      return new NextResponse(buffer, {
+        headers: {
+          "Content-Type": doc.mimeType,
+          "Content-Disposition": `inline; filename="${encodeURIComponent(doc.fileName)}"`,
+          "Cache-Control": "private, max-age=3600",
+        },
+      });
+    } catch {
+      return NextResponse.json({ error: "Archivo no disponible" }, { status: 404 });
+    }
   }
 
-  // List documents
-  let docsQuery = supabase
-    .from("patient_documents")
-    .select("*, appointments(scheduled_at, professionals(full_name))")
-    .order("uploaded_at", { ascending: false });
+  let docs = db.documents;
+  const session = await getSessionFromRequest(request);
 
   if (accessToken) {
-    const { data: apt } = await supabase
-      .from("appointments")
-      .select("id")
-      .eq("access_token", accessToken)
-      .maybeSingle();
+    const apt = findAppointmentByAccessToken(db, accessToken);
     if (!apt) {
-      return NextResponse.json(
-        { error: "Turno no encontrado" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
     }
-    docsQuery = docsQuery.eq("appointment_id", apt.id);
+    docs = docs.filter((d) => d.appointmentId === apt.id);
   } else if (appointmentId) {
-    docsQuery = docsQuery.eq("appointment_id", appointmentId);
+    const apt = db.appointments.find((a) => a.id === appointmentId);
+    if (!apt) {
+      return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
+    }
+    if (!requireSession(session)) {
+      return unauthorized();
+    }
+    if (session.role === "patient" && session.userId !== apt.patientId) {
+      return forbidden();
+    }
+    if (
+      session.role === "doctor" &&
+      !doctorOwnsAppointment(db, session.userId, appointmentId)
+    ) {
+      return forbidden();
+    }
+    docs = docs.filter((d) => d.appointmentId === appointmentId);
   } else if (patientId) {
-    docsQuery = docsQuery.eq("patient_id", patientId);
+    if (!requireSession(session)) {
+      return unauthorized();
+    }
+    if (session.role === "patient" && session.userId !== patientId) {
+      return forbidden();
+    }
+    if (
+      session.role === "doctor" &&
+      !doctorCanAccessPatient(db, session.userId, patientId)
+    ) {
+      return forbidden();
+    }
+    docs = docs.filter((d) => d.patientId === patientId);
   } else {
-    return NextResponse.json(
-      { error: "Parámetro requerido" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Parámetro requerido" }, { status: 400 });
   }
 
-  const { data: docs } = await docsQuery;
-
-  const mapped = (docs ?? []).map((doc) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const apt = (doc as any).appointments;
-    return mapDocument({
-      ...doc,
-      extra: {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        doctorName: apt?.professionals?.full_name,
-        scheduledAt: apt?.scheduled_at,
-      },
+  const mapped = docs
+    .sort(
+      (a, b) =>
+        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+    )
+    .map((doc) => {
+      const apt = db.appointments.find((a) => a.id === doc.appointmentId);
+      const doctor = apt
+        ? db.doctors.find((d) => d.id === apt.doctorId)
+        : undefined;
+      return mapDocument(doc, {
+        doctorName: doctor?.fullName,
+        scheduledAt: apt?.scheduledAt,
+      });
     });
-  });
 
   return NextResponse.json(mapped);
 }
-
-// ── POST (upload) ─────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
@@ -166,74 +168,39 @@ export async function POST(request: NextRequest) {
   if (!ALLOWED_MIME.includes(file.type as (typeof ALLOWED_MIME)[number])) {
     return NextResponse.json(
       { error: "Formato no permitido (PDF, JPG, PNG)" },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
   if (file.size > MAX_FILE_BYTES) {
-    return NextResponse.json(
-      { error: "Archivo excede 10 MB" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Archivo excede 10 MB" }, { status: 400 });
   }
 
-  const authResult = await requireAuth(request);
-  if (authResult instanceof NextResponse) return authResult;
-  const { user, supabase } = authResult;
+  const db = await readDb();
+  let appointment = accessToken
+    ? db.appointments.find((a) => a.accessToken === accessToken)
+    : appointmentIdParam
+      ? db.appointments.find((a) => a.id === appointmentIdParam)
+      : undefined;
 
-  // Resolve the appointment
-  let appointment: {
-    id: string;
-    patient_id: string;
-    org_id: string;
-    status: string;
-    payment_status: string | null;
-  } | null = null;
+  if (!appointment && accessToken) {
+    return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
+  }
 
-  if (accessToken) {
-    const { data } = await supabase
-      .from("appointments")
-      .select("id, patient_id, org_id, status, payment_status")
-      .eq("access_token", accessToken)
-      .maybeSingle();
-    appointment = data;
-    if (!appointment) {
-      return NextResponse.json(
-        { error: "Turno no encontrado" },
-        { status: 404 },
-      );
+  if (!appointment) {
+    const session = await getSessionFromRequest(request);
+    if (!session || session.role !== "patient") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
-  } else if (appointmentIdParam) {
-    const { data } = await supabase
-      .from("appointments")
-      .select("id, patient_id, org_id, status, payment_status")
-      .eq("id", appointmentIdParam)
-      .maybeSingle();
-
-    if (data) {
-      // Patient uploads: verify ownership
-      if (user.role === "patient") {
-        const { data: patientRow } = await supabase
-          .from("patients")
-          .select("id")
-          .eq("profile_id", user.id)
-          .maybeSingle();
-        if (!patientRow || patientRow.id !== data.patient_id) {
-          return NextResponse.json(
-            { error: "No autorizado" },
-            { status: 401 },
-          );
-        }
-      }
-      appointment = data;
+    if (appointmentIdParam) {
+      appointment = db.appointments.find(
+        (a) => a.id === appointmentIdParam && a.patientId === session.userId
+      );
     }
   }
 
   if (!appointment) {
-    return NextResponse.json(
-      { error: "Turno no encontrado" },
-      { status: 404 },
-    );
+    return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
   }
 
   if (
@@ -241,66 +208,24 @@ export async function POST(request: NextRequest) {
   ) {
     return NextResponse.json(
       { error: "No se pueden subir archivos a este turno" },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
-  // Upload to Supabase Storage via service role (bypasses storage RLS for server-side uploads)
-  const serviceClient = await createServiceClient();
-  const storagePath = `${appointment.org_id}/${appointment.patient_id}/${Date.now()}-${file.name}`;
   const buffer = Buffer.from(await file.arrayBuffer());
-
-  const { error: uploadError } = await serviceClient.storage
-    .from(STORAGE_BUCKET)
-    .upload(storagePath, buffer, {
-      contentType: file.type,
-      upsert: false,
-    });
-
-  if (uploadError) {
-    return NextResponse.json(
-      { error: `Error al subir archivo: ${uploadError.message}` },
-      { status: 500 },
-    );
-  }
-
-  // Insert metadata row using the user's session client (RLS scoped)
-  const { data: doc, error: insertError } = await createPatientDocument(
-    supabase,
-    {
-      org_id: appointment.org_id,
-      patient_id: appointment.patient_id,
-      appointment_id: appointment.id,
-      file_name: file.name,
-      file_path: storagePath,
-      mime_type: file.type,
-    },
+  const doc = await attachDocumentToAppointment(
+    appointment.id,
+    appointment.patientId,
+    file.name,
+    file.type,
+    buffer,
   );
 
-  if (insertError || !doc) {
-    // Attempt to clean up uploaded file
-    await serviceClient.storage.from(STORAGE_BUCKET).remove([storagePath]);
-    return NextResponse.json(
-      { error: "Error al registrar documento" },
-      { status: 500 },
-    );
-  }
-
-  if (appointment.payment_status === "pending") {
-    await markTransferReceiptPendingReview(appointment as never, {
+  if (appointment.paymentStatus === "pending") {
+    await markTransferReceiptPendingReview(appointment, {
       fileName: file.name,
     });
   }
 
-  return NextResponse.json(
-    mapDocument({
-      id: doc.id,
-      patient_id: doc.patient_id,
-      appointment_id: doc.appointment_id,
-      file_name: doc.file_name,
-      mime_type: doc.mime_type,
-      uploaded_at: doc.uploaded_at,
-      file_path: doc.file_path,
-    }),
-  );
+  return NextResponse.json(mapDocument(doc));
 }
