@@ -561,6 +561,7 @@ const ALL_SETTINGS_TABS: { id: SettingsTabId; label: string }[] = [
   { id: "alerts", label: "Alertas" },
   { id: "ipc", label: "Índices" },
   { id: "redes-sociales", label: "Redes Sociales" },
+  { id: "system-config", label: "Configuración del Sistema" },
 ];
 
 export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialogProps) {
@@ -1850,6 +1851,9 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
 
           {/* TAB: Redes Sociales */}
           {activeTab === "redes-sociales" && module.metaSettingsContent}
+
+          {/* TAB: Configuración del Sistema */}
+          {activeTab === "system-config" && module.systemConfigContent}
           </div>
         </div>
       </DialogContent>

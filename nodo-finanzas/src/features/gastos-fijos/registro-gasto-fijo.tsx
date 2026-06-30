@@ -31,11 +31,20 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
+interface DatosIniciales {
+  monto?: number;
+  descripcion?: string;
+  rubroId?: string;
+  formaDePago?: string;
+  moneda?: 'ARS' | 'USD';
+}
+
 interface Props {
   onVolver: () => void;
   onGastoRegistrado?: () => void;
   gastoEditando?: GastoFijo | null;
   esDuplicacion?: boolean;
+  datosIniciales?: DatosIniciales | null;
 }
 
 const FORMAS_PAGO = [
@@ -51,7 +60,7 @@ const MONEDAS = [
   { value: 'USD', label: 'Dólares (USD)' },
 ];
 
-export function RegistroGastoFijo({ onVolver, onGastoRegistrado, gastoEditando, esDuplicacion = false }: Props) {
+export function RegistroGastoFijo({ onVolver, onGastoRegistrado, gastoEditando, esDuplicacion = false, datosIniciales }: Props) {
   const finanzas = useFinanzas();
   const [loading, setLoading] = useState(false);
 
@@ -95,10 +104,17 @@ export function RegistroGastoFijo({ onVolver, onGastoRegistrado, gastoEditando, 
         pagoTarjetaId: gastoEditando.pagoTarjetaId ?? '',
       });
     } else {
-      reset(emptyDefaults);
+      reset({
+        ...emptyDefaults,
+        ...(datosIniciales?.rubroId ? { rubroId: datosIniciales.rubroId } : {}),
+        ...(datosIniciales?.descripcion ? { descripcion: datosIniciales.descripcion } : {}),
+        ...(datosIniciales?.monto ? { monto: datosIniciales.monto } : {}),
+        ...(datosIniciales?.formaDePago ? { formaDePago: datosIniciales.formaDePago as FormData['formaDePago'] } : {}),
+        ...(datosIniciales?.moneda ? { moneda: datosIniciales.moneda } : {}),
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gastoEditando, esDuplicacion]);
+  }, [gastoEditando, esDuplicacion, datosIniciales]);
 
   const formaDePago = watch('formaDePago');
   const moneda = watch('moneda');
