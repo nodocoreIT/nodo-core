@@ -103,12 +103,15 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
   const monto = watch('monto') ?? 0;
 
   const tarjetasActivas = finanzas.tarjetas.filter((t) => t.activa);
+  const cuentasActivas = finanzas.cuentas.filter((c) => c.activa);
 
   // Auto-select account / card based on payment method
   useEffect(() => {
     if (gastoEditando) return;
+
+    const normalize = (s: string) => s.toLowerCase().replace(/\s/g, '');
+
     if (formaPago === 'TARJETA') {
-      // Auto-select card: prefer "visa santander" match, fallback to first active
       const match =
         tarjetasActivas.find((t) => {
           const n = t.nombre.toLowerCase();
@@ -116,11 +119,20 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
         }) ?? tarjetasActivas[0];
       if (match) setValue('tarjetaId', match.id);
     } else {
-      const cuenta = finanzas.resolverCuentaDeSaldo(undefined, formaPago);
-      if (cuenta) setValue('cuentaId', cuenta.id);
+      const keyword =
+        formaPago === 'MERCADO_PAGO' ? 'mercadopago' :
+        formaPago === 'EFECTIVO'     ? 'efectivo'    :
+        (formaPago === 'DEBITO' || formaPago === 'TRANSFERENCIA BANCO') ? 'santander' : null;
+
+      if (keyword) {
+        const cuenta = cuentasActivas.find((c) => {
+          const n = normalize(c.nombre);
+          return n.includes(keyword) && !n.includes('reserva');
+        });
+        if (cuenta) setValue('cuentaId', cuenta.id);
+      }
     }
-  }, [formaPago, finanzas, setValue, gastoEditando, tarjetasActivas]);
-  const cuentasActivas = finanzas.cuentas.filter((c) => c.activa);
+  }, [formaPago, setValue, gastoEditando, tarjetasActivas, cuentasActivas]);
   const opcionesCuotas = Array.from({ length: 24 }, (_, i) => ({
     value: i + 1,
     label: i === 0 ? '1 cuota (contado)' : `${i + 1} cuotas`,
