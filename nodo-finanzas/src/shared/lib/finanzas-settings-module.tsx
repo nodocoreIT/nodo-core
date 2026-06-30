@@ -8,6 +8,7 @@ import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/shared/lib/supabase";
 import { useThemeSettings } from "@/shared/hooks/use-theme-settings";
 import { useAiSettings } from "@/hooks/use-ai-settings";
+// useAiSettings reads from AiSettingsContext — single shared instance mounted in admin-layout
 import { useFinanzasStaff } from "@/shared/hooks/use-finanzas-staff";
 import { ConfiguracionPage } from "@/features/configuracion/configuracion-page";
 

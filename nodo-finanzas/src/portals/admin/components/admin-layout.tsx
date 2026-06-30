@@ -35,6 +35,7 @@ import { NotificationBell } from "@/components/ui/notification-bell";
 import { useFinanzas } from "@/hooks/use-finanzas";
 import { FinanzasSettingsModuleProvider } from "@/shared/lib/finanzas-settings-module";
 import { OpenSettingsContext } from "@/shared/hooks/use-open-settings";
+import { AiSettingsContext, useAiSettingsProvider } from "@/hooks/use-ai-settings";
 
 interface NavItem {
   to: string;
@@ -86,6 +87,7 @@ export function AdminLayout() {
     setSettingsOpen(true);
   }, []);
   const { user, role, plan, signOut } = useAuth();
+  const aiSettingsValue = useAiSettingsProvider(user?.id);
   const { gastosDiarios = [] } = useFinanzas();
 
   const today = new Date().toISOString().split("T")[0];
@@ -159,6 +161,7 @@ export function AdminLayout() {
   );
 
   return (
+    <AiSettingsContext.Provider value={aiSettingsValue}>
     <AdminCommandPaletteProvider
       items={commandItems}
       onSelectItem={(item) => handleCommandSelect(item)}
@@ -361,5 +364,6 @@ export function AdminLayout() {
       </div>
     </FinanzasSettingsModuleProvider>
     </AdminCommandPaletteProvider>
+    </AiSettingsContext.Provider>
   );
 }
