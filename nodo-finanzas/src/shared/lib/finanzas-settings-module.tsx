@@ -83,6 +83,27 @@ export function FinanzasSettingsModuleProvider({ children }: { children: React.R
       updateUserProfile: updateProfileMutation.mutateAsync,
       isUpdatingUserProfile: updateProfileMutation.isPending,
       systemConfigContent: <ConfiguracionPage />,
+      aiUseCases: [
+        {
+          icon: "🎤",
+          title: "Gastos diarios:",
+          description: "Dictás un gasto en lenguaje natural y el sistema extrae monto, rubro, fecha y medio de pago automáticamente.",
+        },
+        {
+          icon: "📌",
+          title: "Gastos fijos:",
+          description: "Registrás un gasto mensual recurrente por voz: descripción, monto, rubro y forma de pago.",
+        },
+        {
+          icon: "🔄",
+          title: "Movimientos entre cuentas:",
+          description: "Dictás una transferencia entre tus cuentas indicando origen, destino y monto.",
+        },
+        {
+          icon: "🔒",
+          description: "La clave se guarda de forma segura en tu organización y está disponible en todos los dispositivos.",
+        },
+      ],
     };
   }, [
     settings,
