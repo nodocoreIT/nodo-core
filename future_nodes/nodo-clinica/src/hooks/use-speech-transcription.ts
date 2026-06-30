@@ -66,7 +66,8 @@ export function useSpeechTranscription({
       return;
     }
 
-    const recognition = new SpeechRecognition();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recognition = new SpeechRecognition() as any;
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = SPEECH_LANG;
