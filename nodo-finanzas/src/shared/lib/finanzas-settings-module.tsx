@@ -42,7 +42,7 @@ export function FinanzasSettingsModuleProvider({ children }: { children: React.R
   const value = useMemo((): SettingsModuleContextValue => {
     return {
       // Hide tabs not applicable to finanzas
-      hiddenTabs: ["company", "alerts", "ipc", "redes-sociales"],
+      hiddenTabs: ["company", "alerts", "ipc", "redes-sociales", "system-config"],
       managedNav: FINANZAS_MANAGED_NAV,
       roleOptions: [
         { value: "member", label: "Miembro" },
