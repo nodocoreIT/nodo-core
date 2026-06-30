@@ -21,6 +21,11 @@ import {
   isSamePasswordAuthError,
 } from "@nodocore/shared-components";
 import { createNodeBrowserClient } from "@/lib/supabase/nodo-browser";
+import {
+  getNodoAuthCode,
+  getNodoPublicAuthConfigError,
+} from "@/lib/supabase/nodo-auth-config";
+import { ClinicaLocalLoginEntry } from "@/components/ClinicaLocalLoginEntry";
 import { getNodeBySlug, getNodeMailLabel, getChildNodes, needsModulePicker } from "@/lib/nodes";
 import {
   submitDoctorRegistration,
@@ -221,11 +226,34 @@ export default function LoginPage() {
   );
 }
 
-function LoginForm() {
+export function LoginForm({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
+  const params = useParams();
+  const nodeParam = forcedNodeSlug ?? (params?.nodeSlug as string) ?? "";
+
+  const isClinicaNode =
+    nodeParam === "nodo-clinica" ||
+    nodeParam === "clinica-virtual" ||
+    nodeParam === "clinica";
+
+  const clinicaAuthError = useMemo(() => {
+    if (!isClinicaNode) return null;
+    const code = getNodoAuthCode(nodeParam);
+    if (!code) return "Auth no configurado para Clínica.";
+    return getNodoPublicAuthConfigError(code);
+  }, [isClinicaNode, nodeParam]);
+
+  if (isClinicaNode && clinicaAuthError) {
+    return <ClinicaLocalLoginEntry nodeParam={nodeParam} />;
+  }
+
+  return <LoginFormInner forcedNodeSlug={forcedNodeSlug} />;
+}
+
+function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const params = useParams();
-  const nodeSlug = params?.nodeSlug as string;
+  const nodeSlug = forcedNodeSlug ?? (params?.nodeSlug as string);
   const nodeParam = nodeSlug || "";
   const modeParam = searchParams.get("mode") || "login";
   const roleParam = searchParams.get("role") || "paciente";
