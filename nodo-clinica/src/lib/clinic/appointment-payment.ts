@@ -8,12 +8,17 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 export function appBaseUrl() {
-  return (
+  const origin = (
     process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
     (process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
       : "http://localhost:3002")
   );
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, "") || "";
+  if (basePath && !origin.endsWith(basePath)) {
+    return `${origin}${basePath}`;
+  }
+  return origin;
 }
 
 export async function confirmAppointmentPaymentAndNotify(

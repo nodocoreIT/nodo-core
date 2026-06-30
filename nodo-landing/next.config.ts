@@ -11,6 +11,11 @@ const NODO_FINANZAS_URL = process.env.NODO_FINANZAS_URL ?? "http://localhost:517
 
 const isDev = process.env.NODE_ENV !== "production";
 
+const clinicaProxy = [
+  { source: "/clinica", destination: `${NODO_CLINICA_URL}/clinica` },
+  { source: "/clinica/:path*", destination: `${NODO_CLINICA_URL}/clinica/:path*` },
+];
+
 const nextConfig: NextConfig = {
   transpilePackages: ["@nodocore/shared-components", "@nodocore/nodo-modules"],
   allowedDevOrigins: ["127.0.0.1", "192.168.1.37"],
@@ -40,9 +45,8 @@ const nextConfig: NextConfig = {
           { source: "/brand/:path*", destination: `${NODO_INMO_URL}/brand/:path*` },
           { source: "/assets/:path*", destination: `${NODO_INMO_URL}/assets/:path*` },
           // ── nodo-clinica ───────────────────────────────────────────────────
-          // Landing lives at /nodo-clinica (Next.js page), app at /clinica (proxy)
-          { source: "/clinica", destination: `${NODO_CLINICA_URL}/clinica` },
-          { source: "/clinica/:path*", destination: `${NODO_CLINICA_URL}/clinica/:path*` },
+          // Landing: /nodo-clinica (marketing). App: /clinica → deploy nodo-clinica
+          ...clinicaProxy,
           // ── nodo-autos ─────────────────────────────────────────────────────
           { source: "/autos", destination: `${NODO_AUTOS_URL}/autos` },
           { source: "/autos/:path*", destination: `${NODO_AUTOS_URL}/autos/:path*` },
@@ -60,8 +64,23 @@ const nextConfig: NextConfig = {
     return {
       beforeFiles: [
         { source: "/favicon.ico", destination: "/favicon.png" },
+        ...clinicaProxy,
       ],
     };
+  },
+  async redirects() {
+    return [
+      {
+        source: "/nodo-clinica/login",
+        destination: "/clinica/login",
+        permanent: false,
+      },
+      {
+        source: "/nodo-clinica/login/:path*",
+        destination: "/clinica/login/:path*",
+        permanent: false,
+      },
+    ];
   },
 };
 
