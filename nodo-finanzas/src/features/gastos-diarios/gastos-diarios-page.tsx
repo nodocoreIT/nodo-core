@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useCallback } from 'react';
 import { Search, Plus, Edit, Trash2, Receipt, X, Mic, MicOff, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useOpenSettings } from '@/shared/hooks/use-open-settings';
 import { foldForSearch } from '@nodocore/shared-components';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ export function GastosDiariosPage() {
   const { rubrosActivos } = useRubros();
   const { aiSettings } = useAiSettings();
   const { extract } = useExtractGastoFromVoice();
-  const navigate = useNavigate();
+  const { openSettings } = useOpenSettings();
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [gastoEditando, setGastoEditando] = useState<GastoDiario | null>(null);
   const [datosIniciales, setDatosIniciales] = useState<Partial<GastoDiario> | undefined>();
@@ -299,7 +299,7 @@ export function GastosDiariosPage() {
             <button
               type="button"
               role="alert"
-              onClick={() => navigate('/admin/configuracion')}
+              onClick={() => openSettings('ai')}
               className="absolute left-0 top-full z-50 mt-1.5 w-64 max-w-[calc(100vw-2rem)] cursor-pointer rounded-md border border-red-200 bg-red-50 px-3 py-2 text-left text-xs text-red-700 shadow-md transition-colors hover:bg-red-100"
             >
               {voiceError}
