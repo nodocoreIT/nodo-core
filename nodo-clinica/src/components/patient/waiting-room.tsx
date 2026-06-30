@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -32,7 +31,7 @@ import { WaitingRoomIntake } from "@/components/patient/waiting-room-intake";
 import { ReceiptValidationCard } from "@/components/patient/receipt-validation-card";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { clinicTimeLabelFromIso, formatDateKeyLabel, localDateKeyFromIso } from "@/lib/clinic/schedule";
-import type { PaymentReceiptAudit } from "@/lib/clinic/types";
+import type { PaymentReceiptAudit } from "@/lib/clinic/local-db";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
 interface WaitingRoomProps {
@@ -577,6 +576,63 @@ export function WaitingRoom({
     );
   }
 
+  if (isInConsultation && videoEnded) {
+    return (
+      <div className="min-h-screen bg-slate-900 p-4">
+        <div className="max-w-4xl mx-auto">
+          {backLink}
+          <ConsultationEndScreen
+            role="patient"
+            doctorName={doctorName}
+            autoRedirectSeconds={0}
+            onRejoin={() => {
+              setVideoEnded(false);
+              setVideoSessionKey((k) => k + 1);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (isInConsultation && !videoEnded) {
+    return (
+      <div className="min-h-screen bg-slate-900 p-4">
+        <div className="max-w-4xl mx-auto">
+          {backLink}
+          <div className="text-center mb-4">
+            <Badge className="bg-emerald-600 text-white">
+              <Video className="h-3 w-3 mr-1" />
+              Consulta en curso
+            </Badge>
+            <p className="text-white/70 text-sm mt-2">
+              Con Dr/a. {doctorName}
+            </p>
+          </div>
+          <JitsiMeet
+            key={`${appointment.jitsi_room_id}-${videoSessionKey}`}
+            roomName={appointment.jitsi_room_id}
+            displayName={patientName}
+            accessToken={accessToken}
+            height={560}
+            onMeetingEnd={() => setVideoEnded(true)}
+            endScreen={
+              <ConsultationEndScreen
+                role="patient"
+                doctorName={doctorName}
+                autoRedirectSeconds={0}
+                onRejoin={() => {
+                  setVideoEnded(false);
+                  setVideoSessionKey((k) => k + 1);
+                }}
+              />
+            }
+          />
+        </div>
+      </div>
+    );
+  }
+
   const receiptAlreadySubmitted =
     !!paymentReceiptAudit || uploadedFiles.length > 0;
 
@@ -887,63 +943,6 @@ export function WaitingRoom({
     );
   }
 
-  if (isInConsultation && videoEnded) {
-    return (
-      <div className="min-h-screen bg-slate-900 p-4">
-        <div className="max-w-4xl mx-auto">
-          {backLink}
-          <ConsultationEndScreen
-            role="patient"
-            doctorName={doctorName}
-            autoRedirectSeconds={0}
-            onRejoin={() => {
-              setVideoEnded(false);
-              setVideoSessionKey((k) => k + 1);
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  if (isInConsultation && !videoEnded) {
-    return (
-      <div className="min-h-screen bg-slate-900 p-4">
-        <div className="max-w-4xl mx-auto">
-          {backLink}
-          <div className="text-center mb-4">
-            <Badge className="bg-emerald-600 text-white">
-              <Video className="h-3 w-3 mr-1" />
-              Consulta en curso
-            </Badge>
-            <p className="text-white/70 text-sm mt-2">
-              Con Dr/a. {doctorName}
-            </p>
-          </div>
-          <JitsiMeet
-            key={`${appointment.jitsi_room_id}-${videoSessionKey}`}
-            roomName={appointment.jitsi_room_id}
-            displayName={patientName}
-            accessToken={accessToken}
-            height={560}
-            onMeetingEnd={() => setVideoEnded(true)}
-            endScreen={
-              <ConsultationEndScreen
-                role="patient"
-                doctorName={doctorName}
-                autoRedirectSeconds={0}
-                onRejoin={() => {
-                  setVideoEnded(false);
-                  setVideoSessionKey((k) => k + 1);
-                }}
-              />
-            }
-          />
-        </div>
-      </div>
-    );
-  }
-
   if (isCompleted) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
@@ -1001,6 +1000,11 @@ export function WaitingRoom({
             <h1 className="text-xl font-semibold text-slate-900">
               Sala de espera
             </h1>
+            <p className="text-sm text-slate-600 mt-2 max-w-sm mx-auto">
+              Cuando el médico pulse <strong>Iniciar consulta</strong> en el
+              consultorio, vas a entrar automáticamente a la videollamada (sin
+              recargar).
+            </p>
             <p className="text-sm text-slate-600 mt-1">
               Hola, {patientName}
             </p>

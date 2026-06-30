@@ -1,207 +1,154 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { readDb, writeDb, publicPatient } from "@/lib/clinic/local-db";
+import { getSessionFromRequest } from "@/lib/clinic/session";
 import {
-  getPatients,
-  getPatientById,
-  updatePatient,
-  upsertHealthProfile,
-} from "@/lib/clinic/db/patients";
+  doctorCanAccessPatient,
+  forbidden,
+  requireDoctorSession,
+  requirePatientSession,
+  requireSession,
+  unauthorized,
+} from "@/lib/clinic/access-control";
 
 export async function GET(request: NextRequest) {
-  const authResult = await requireAuth(request);
-  if (authResult instanceof NextResponse) return authResult;
-  const { user, supabase } = authResult;
-
   const { searchParams } = new URL(request.url);
-  const q = searchParams.get("q")?.trim();
+  const q = searchParams.get("q")?.trim().toLowerCase();
+  const doctorId = searchParams.get("doctorId");
   const patientId = searchParams.get("patientId");
 
+  const session = await getSessionFromRequest(request);
+  const db = await readDb();
+
   if (patientId) {
-    // Return single patient with stats
-    const { data: patient, error } = await getPatientById(
-      supabase,
-      patientId,
-      user.org_id ?? "",
-    );
-    if (error || !patient) {
-      return NextResponse.json(
-        { error: "Paciente no encontrado" },
-        { status: 404 },
-      );
+    if (!requireSession(session)) {
+      return unauthorized();
+    }
+    if (session.role === "patient" && session.userId !== patientId) {
+      return forbidden();
+    }
+    if (
+      session.role === "doctor" &&
+      !doctorCanAccessPatient(db, session.userId, patientId)
+    ) {
+      return forbidden();
     }
 
-    // Fetch related counts
-    const [{ count: aptCount }, { count: docCount }, { count: recCount }] =
-      await Promise.all([
-        supabase
-          .from("appointments")
-          .select("*", { count: "exact", head: true })
-          .eq("patient_id", patientId)
-          .eq("org_id", user.org_id ?? ""),
-        supabase
-          .from("patient_documents")
-          .select("*", { count: "exact", head: true })
-          .eq("patient_id", patientId)
-          .eq("org_id", user.org_id ?? ""),
-        supabase
-          .from("clinical_records")
-          .select("*", { count: "exact", head: true })
-          .eq("patient_id", patientId)
-          .eq("org_id", user.org_id ?? ""),
-      ]);
+    const patient = db.patients.find((p) => p.id === patientId);
+    if (!patient) {
+      return NextResponse.json({ error: "Paciente no encontrado" }, { status: 404 });
+    }
 
-    const { data: lastApt } = await supabase
-      .from("appointments")
-      .select("scheduled_at")
-      .eq("patient_id", patientId)
-      .eq("org_id", user.org_id ?? "")
-      .order("scheduled_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const appointments = db.appointments.filter((a) => a.patientId === patientId);
+    const documents = db.documents.filter((d) => d.patientId === patientId);
+    const records = db.clinicalRecords.filter((r) => r.patientId === patientId);
 
     return NextResponse.json({
-      id: patient.id,
-      fullName: patient.full_name,
-      email: patient.email,
-      phone: patient.phone,
-      profilePhotoUrl: patient.profile_photo_url,
-      dateOfBirth: patient.date_of_birth,
-      medicalRecordNumber: patient.medical_record_number,
-      createdAt: patient.created_at,
+      ...publicPatient(patient, {
+        includeHealth:
+          (session.role === "patient" && session.userId === patientId) ||
+          (session.role === "doctor" &&
+            db.appointments.some(
+              (a) =>
+                a.patientId === patientId &&
+                a.doctorId === session.userId &&
+                a.shareHealthProfile === true &&
+                a.status !== "cancelled",
+            )),
+      }),
       stats: {
-        appointments: aptCount ?? 0,
-        documents: docCount ?? 0,
-        clinicalRecords: recCount ?? 0,
+        appointments: appointments.length,
+        documents: documents.length,
+        clinicalRecords: records.length,
       },
-      lastAppointment: lastApt?.scheduled_at ?? null,
+      lastAppointment: appointments.sort(
+        (a, b) =>
+          new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime()
+      )[0]?.scheduledAt,
     });
   }
 
-  // List patients for the org
-  if (!user.org_id) {
-    return NextResponse.json({ error: "org_id requerido" }, { status: 403 });
+  if (!doctorId) {
+    return NextResponse.json({ error: "doctorId requerido" }, { status: 400 });
   }
 
-  const { data: patients, error } = await getPatients(
-    supabase,
-    user.org_id,
-    q ?? undefined,
+  if (!requireDoctorSession(session, doctorId)) {
+    return unauthorized();
+  }
+
+  const patientIds = new Set(
+    db.appointments.filter((a) => a.doctorId === doctorId).map((a) => a.patientId)
   );
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+
+  let patients = db.patients.filter((p) => patientIds.has(p.id));
+
+  if (q) {
+    patients = patients.filter(
+      (p) =>
+        p.fullName.toLowerCase().includes(q) ||
+        p.email.toLowerCase().includes(q) ||
+        (p.phone?.includes(q) ?? false)
+    );
   }
 
-  // For each patient, attach basic stats + last appointment
-  const results = await Promise.all(
-    (patients ?? []).map(async (patient) => {
-      const [{ count: aptCount }, { count: docCount }, { count: recCount }, { data: lastApt }] =
-        await Promise.all([
-          supabase
-            .from("appointments")
-            .select("*", { count: "exact", head: true })
-            .eq("patient_id", patient.id)
-            .eq("org_id", user.org_id ?? ""),
-          supabase
-            .from("patient_documents")
-            .select("*", { count: "exact", head: true })
-            .eq("patient_id", patient.id)
-            .eq("org_id", user.org_id ?? ""),
-          supabase
-            .from("clinical_records")
-            .select("*", { count: "exact", head: true })
-            .eq("patient_id", patient.id)
-            .eq("org_id", user.org_id ?? ""),
-          supabase
-            .from("appointments")
-            .select("scheduled_at, status")
-            .eq("patient_id", patient.id)
-            .eq("org_id", user.org_id ?? "")
-            .order("scheduled_at", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-        ]);
+  const results = patients
+    .map((patient) => {
+      const appointments = db.appointments.filter(
+        (a) => a.patientId === patient.id && a.doctorId === doctorId
+      );
+      const documents = db.documents.filter((d) => d.patientId === patient.id);
+      const records = db.clinicalRecords.filter((r) => r.patientId === patient.id);
+      const lastApt = appointments.sort(
+        (a, b) =>
+          new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime()
+      )[0];
 
       return {
-        id: patient.id,
-        fullName: patient.full_name,
-        email: patient.email,
-        phone: patient.phone,
-        profilePhotoUrl: patient.profile_photo_url,
-        createdAt: patient.created_at,
+        ...publicPatient(patient),
         stats: {
-          appointments: aptCount ?? 0,
-          documents: docCount ?? 0,
-          clinicalRecords: recCount ?? 0,
+          appointments: appointments.length,
+          documents: documents.length,
+          clinicalRecords: records.length,
         },
-        lastAppointment: lastApt?.scheduled_at ?? null,
-        lastStatus: lastApt?.status ?? null,
+        lastAppointment: lastApt?.scheduledAt,
+        lastStatus: lastApt?.status,
       };
-    }),
-  );
+    })
+    .sort((a, b) => a.fullName.localeCompare(b.fullName, "es"));
 
   return NextResponse.json(results);
 }
 
 export async function PUT(request: NextRequest) {
-  const authResult = await requireAuth(request);
-  if (authResult instanceof NextResponse) return authResult;
-  const { user, supabase } = authResult;
-
-  const body = await request.json();
-  const { profilePhotoUrl, healthProfile } = body as {
-    profilePhotoUrl?: string;
-    healthProfile?: {
-      blood_type?: string | null;
-      allergies?: string[] | null;
-      chronic_conditions?: string[] | null;
-      insurance_provider?: string | null;
-      insurance_number?: string | null;
-    };
-  };
-
-  // Patients update their own profile; doctors can update any patient in org
-  if (user.role === "patient") {
-    // Find the patient row linked to the auth user
-    const { data: patientRow } = await supabase
-      .from("patients")
-      .select("id, org_id")
-      .eq("profile_id", user.id)
-      .maybeSingle();
-
-    if (!patientRow) {
-      return NextResponse.json(
-        { error: "Paciente no encontrado" },
-        { status: 404 },
-      );
-    }
-
-    if (profilePhotoUrl !== undefined) {
-      await updatePatient(supabase, patientRow.id, patientRow.org_id, {
-        profile_photo_url: profilePhotoUrl,
-      });
-    }
-
-    if (healthProfile !== undefined) {
-      await upsertHealthProfile(supabase, {
-        patient_id: patientRow.id,
-        ...healthProfile,
-      });
-    }
-
-    const { data: updated } = await supabase
-      .from("patients")
-      .select("*")
-      .eq("id", patientRow.id)
-      .maybeSingle();
-
-    return NextResponse.json({
-      id: updated?.id,
-      fullName: updated?.full_name,
-      email: updated?.email,
-      phone: updated?.phone,
-    });
+  const session = await getSessionFromRequest(request);
+  if (!session || session.role !== "patient") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  const body = await request.json();
+  const { profilePhotoData, healthProfile } = body as {
+    profilePhotoData?: string;
+    healthProfile?: import("@/lib/clinic/local-db").PatientHealthProfile;
+  };
+
+  await writeDb((db) => {
+    const patient = db.patients.find((p) => p.id === session.userId);
+    if (!patient) return;
+    if (profilePhotoData !== undefined) {
+      patient.profilePhotoData = profilePhotoData;
+    }
+    if (healthProfile !== undefined) {
+      patient.healthProfile = {
+        ...healthProfile,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+  });
+
+  const db = await readDb();
+  const patient = db.patients.find((p) => p.id === session.userId);
+  if (!patient) {
+    return NextResponse.json({ error: "Paciente no encontrado" }, { status: 404 });
+  }
+
+  return NextResponse.json(publicPatient(patient, { includeHealth: true }));
 }

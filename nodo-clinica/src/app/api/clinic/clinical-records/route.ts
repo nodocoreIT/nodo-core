@@ -1,14 +1,20 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
-import { getRecords, createRecord } from "@/lib/clinic/db/clinical-records";
+import { readDb, writeDb, newId } from "@/lib/clinic/local-db";
+import { getSessionFromRequest } from "@/lib/clinic/session";
+import {
+  doctorCanAccessPatient,
+  doctorCanViewClinicalRecord,
+  doctorOwnsAppointment,
+  forbidden,
+  requireDoctorSession,
+  requirePatientSession,
+  requireSession,
+  unauthorized,
+} from "@/lib/clinic/access-control";
 
 export async function POST(request: NextRequest) {
-  const authResult = await requireAuth(request);
-  if (authResult instanceof NextResponse) return authResult;
-  const { user, supabase } = authResult;
-
   try {
+    const session = await getSessionFromRequest(request);
     const { patientId, doctorId, appointmentId, title, content, recordType } =
       await request.json();
 
@@ -19,57 +25,60 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!user.org_id) {
-      return NextResponse.json({ error: "org_id requerido" }, { status: 403 });
+    if (!requireDoctorSession(session, doctorId)) {
+      return forbidden("Solo el médico autenticado puede guardar informes");
     }
 
-    // Verify patient and doctor exist in the org
-    const [{ data: patient }, { data: professional }] = await Promise.all([
-      supabase
-        .from("patients")
-        .select("id, full_name")
-        .eq("id", patientId)
-        .eq("org_id", user.org_id)
-        .maybeSingle(),
-      supabase
-        .from("professionals")
-        .select("id, full_name")
-        .eq("id", doctorId)
-        .eq("org_id", user.org_id)
-        .maybeSingle(),
-    ]);
+    const db = await readDb();
+    if (!doctorCanAccessPatient(db, session.userId, patientId)) {
+      return forbidden("Sin relación clínica con este paciente");
+    }
 
-    if (!patient || !professional) {
+    if (appointmentId && !doctorOwnsAppointment(db, session.userId, appointmentId)) {
+      return forbidden("Turno no asignado a este médico");
+    }
+
+    const patient = db.patients.find((p) => p.id === patientId);
+    const doctor = db.doctors.find((d) => d.id === doctorId);
+    if (!patient || !doctor) {
       return NextResponse.json(
         { error: "Paciente o médico no encontrado" },
         { status: 404 },
       );
     }
 
-    const { data: record, error } = await createRecord(supabase, {
-      org_id: user.org_id,
-      patient_id: patientId,
-      doctor_id: doctorId,
-      appointment_id: appointmentId || null,
+    const record = {
+      id: newId("rec"),
+      patientId,
+      doctorId,
+      appointmentId: appointmentId || undefined,
       title:
         title?.trim() ||
-        `Informe clínico — ${new Date().toLocaleDateString("es-AR")} · ${professional.full_name}`,
+        `Informe clínico — ${new Date().toLocaleDateString("es-AR")} · ${doctor.fullName}`,
       content: content.trim(),
-      record_type: recordType || "informe",
-    });
+      recordType: recordType || "informe",
+      createdAt: new Date().toISOString(),
+    };
 
-    if (error || !record) {
-      return NextResponse.json({ error: error?.message ?? "Error al crear registro" }, { status: 500 });
-    }
+    await writeDb((d) => {
+      d.clinicalRecords.push(record);
+      if (appointmentId && d.clinicalNotes[appointmentId]) {
+        d.clinicalNotes[appointmentId] = {
+          ...d.clinicalNotes[appointmentId],
+          content: content.trim(),
+          updatedAt: new Date().toISOString(),
+        };
+      }
+    });
 
     return NextResponse.json({
       id: record.id,
-      patient_id: record.patient_id,
-      doctor_id: record.doctor_id,
-      record_type: record.record_type,
+      patient_id: record.patientId,
+      doctor_id: record.doctorId,
+      record_type: record.recordType,
       title: record.title,
       content: record.content,
-      created_at: record.created_at,
+      created_at: record.createdAt,
       appointment_id: appointmentId,
     });
   } catch (err) {
@@ -79,49 +88,53 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const authResult = await requireAuth(request);
-  if (authResult instanceof NextResponse) return authResult;
-  const { user, supabase } = authResult;
-
   const { searchParams } = new URL(request.url);
   const patientId = searchParams.get("patientId");
   if (!patientId) {
-    return NextResponse.json(
-      { error: "patientId requerido" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "patientId requerido" }, { status: 400 });
   }
 
-  if (!user.org_id) {
-    return NextResponse.json({ error: "org_id requerido" }, { status: 403 });
+  const session = await getSessionFromRequest(request);
+  if (!requireSession(session)) {
+    return unauthorized();
   }
 
-  const { data: records, error } = await getRecords(
-    supabase,
-    patientId,
-    user.org_id,
-  );
+  const db = await readDb();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (session.role === "patient" && session.userId !== patientId) {
+    return forbidden();
   }
 
-  return NextResponse.json(
-    (records ?? []).map((r) => ({
+  if (session.role === "doctor") {
+    if (!doctorCanAccessPatient(db, session.userId, patientId)) {
+      return forbidden();
+    }
+  }
+
+  const records = db.clinicalRecords
+    .filter((r) => r.patientId === patientId)
+    .filter((r) => {
+      if (session.role === "patient") return true;
+      return doctorCanViewClinicalRecord(db, session.userId, r);
+    })
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+    .map((r) => ({
       id: r.id,
-      patient_id: r.patient_id,
-      doctor_id: r.doctor_id,
-      record_type: r.record_type,
+      patient_id: r.patientId,
+      doctor_id: r.doctorId,
+      record_type: r.recordType,
       title: r.title,
       content: r.content,
-      created_at: r.created_at,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      doctor: (r as any).professionals
+      created_at: r.createdAt,
+      doctor: db.doctors.find((d) => d.id === r.doctorId)
         ? {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            full_name: (r as any).professionals.full_name,
+            full_name: db.doctors.find((d) => d.id === r.doctorId)!.fullName,
           }
         : undefined,
-    })),
-  );
+    }));
+
+  return NextResponse.json(records);
 }

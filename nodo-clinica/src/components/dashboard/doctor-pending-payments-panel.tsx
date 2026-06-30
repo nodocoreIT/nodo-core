@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { clinicApi } from "@/lib/clinic/client-api";
-import type { PaymentReceiptAudit } from "@/lib/clinic/types";
+import type { PaymentReceiptAudit } from "@/lib/clinic/local-db";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {

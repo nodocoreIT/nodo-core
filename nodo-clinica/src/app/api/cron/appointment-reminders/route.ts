@@ -1,6 +1,5 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { readDb, writeDb } from "@/lib/clinic/local-db";
 import { isPaymentConfirmed } from "@/lib/clinic/payment";
 import { sendAppointmentReminderEmail } from "@/lib/email/resend";
 import { format } from "date-fns";
@@ -15,9 +14,9 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const supabase = await createServiceClient();
+  const db = await readDb();
   const now = Date.now();
-  /** Hobby tier: cron runs once/day; send if already past reminder time (up to 36 h tolerance). */
+  /** Hobby: cron corre 1×/día; enviamos si ya pasó la hora del aviso (hasta 36 h de tolerancia). */
   const maxLatenessMs = 36 * 60 * 60 * 1000;
   let sent = 0;
 
@@ -27,27 +26,20 @@ export async function GET(request: NextRequest) {
       ? `https://${process.env.VERCEL_URL}`
       : "http://localhost:3000");
 
-  // Fetch appointments that are still pending a reminder
-  const { data: appointments } = await supabase
-    .from("appointments")
-    .select("*, patients(email, full_name), professionals(full_name, office_settings(reminder_settings))")
-    .in("status", ["scheduled", "waiting"])
-    .is("reminder_sent_at", null);
+  for (const apt of db.appointments) {
+    if (!["scheduled", "waiting"].includes(apt.status)) continue;
+    if (!isPaymentConfirmed(apt)) continue;
+    if (apt.reminderSentAt) continue;
 
-  for (const apt of appointments ?? []) {
-    if (!isPaymentConfirmed(apt as never)) continue;
+    const doctor = db.doctors.find((d) => d.id === apt.doctorId);
+    const patient = db.patients.find((p) => p.id === apt.patientId);
+    if (!doctor || !patient) continue;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const professional = (apt as any).professionals;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const patient = (apt as any).patients;
-    if (!professional || !patient) continue;
-
-    const settings = professional.office_settings?.reminder_settings;
+    const settings = doctor.reminderSettings;
     if (!settings?.enabled) continue;
 
     const minutesBefore = settings.minutesBefore ?? 1440;
-    const scheduledMs = new Date(apt.scheduled_at).getTime();
+    const scheduledMs = new Date(apt.scheduledAt).getTime();
     const remindAt = scheduledMs - minutesBefore * 60 * 1000;
 
     if (now < remindAt) continue;
@@ -55,28 +47,27 @@ export async function GET(request: NextRequest) {
     if (now >= scheduledMs) continue;
 
     const scheduledLabel = format(
-      new Date(apt.scheduled_at),
+      new Date(apt.scheduledAt),
       "EEEE d 'de' MMMM 'a las' HH:mm 'hs'",
-      { locale: es },
+      { locale: es }
     );
 
     try {
       await sendAppointmentReminderEmail({
         patientEmail: patient.email,
-        patientName: patient.full_name,
-        doctorName: professional.full_name,
+        patientName: patient.fullName,
+        doctorName: doctor.fullName,
         scheduledAt: scheduledLabel,
-        waitingRoomUrl: `${baseUrl}/paciente/sala/${apt.access_token}`,
+        waitingRoomUrl: `${baseUrl}/paciente/sala/${apt.accessToken}`,
       });
 
-      await supabase
-        .from("appointments")
-        .update({
-          reminder_sent_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", apt.id);
-
+      await writeDb((d) => {
+        const target = d.appointments.find((a) => a.id === apt.id);
+        if (target) {
+          target.reminderSentAt = new Date().toISOString();
+          target.updatedAt = new Date().toISOString();
+        }
+      });
       sent++;
     } catch (err) {
       console.error("[Reminder] failed for", apt.id, err);

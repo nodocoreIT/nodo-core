@@ -1,60 +1,44 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { readDb } from "@/lib/clinic/local-db";
+import { getSessionFromRequest } from "@/lib/clinic/session";
+import { isPaymentConfirmed } from "@/lib/clinic/payment";
 import { buildCheckoutForAppointment } from "@/lib/mercadopago/checkout";
-import { createClient } from "@/lib/supabase/server";
-import { getAppointmentByToken, getAppointmentById } from "@/lib/clinic/db/appointments";
 
 /** Obtiene o regenera URL de checkout MP para un turno pendiente. */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const accessTokenParam = searchParams.get("accessToken");
+  const accessToken = searchParams.get("accessToken");
   const appointmentId = searchParams.get("appointmentId");
 
-  // Allow unauthenticated access when a patient uses accessToken (waiting room)
-  const auth = await requireAuth(request);
-  const supabase = auth instanceof NextResponse
-    ? await createClient()
-    : auth.supabase;
+  const session = await getSessionFromRequest(request);
+  const db = await readDb();
 
-  const { data: apt } = accessTokenParam
-    ? await getAppointmentByToken(supabase, accessTokenParam)
+  const apt = accessToken
+    ? db.appointments.find((a) => a.accessToken === accessToken)
     : appointmentId
-      ? await getAppointmentById(supabase, appointmentId, "")
-      : { data: null };
+      ? db.appointments.find((a) => a.id === appointmentId)
+      : undefined;
 
   if (!apt) {
     return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
   }
 
-  const row = apt as Record<string, unknown>;
-
-  // If patient is authenticated, verify ownership
-  if (!(auth instanceof NextResponse) && auth.user.role === "patient") {
-    const { data: patient } = await supabase
-      .from("patients")
-      .select("id")
-      .eq("profile_id", auth.user.id)
-      .maybeSingle();
-
-    if (!patient || patient.id !== row.patient_id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
+  if (session?.role === "patient" && session.userId !== apt.patientId) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const paymentStatus = row.payment_status as string | null;
-  if (paymentStatus === "confirmed" || paymentStatus === "waived") {
+  if (isPaymentConfirmed(apt)) {
     return NextResponse.json({
       paid: true,
-      waitingRoomUrl: `/paciente/sala/${row.access_token}`,
+      waitingRoomUrl: `/paciente/sala/${apt.accessToken}`,
     });
   }
 
-  const result = await buildCheckoutForAppointment(row.id as string);
+  const result = await buildCheckoutForAppointment(apt.id);
   if (!result) {
     return NextResponse.json(
       { error: "Mercado Pago no configurado para este médico" },
-      { status: 400 },
+      { status: 400 }
     );
   }
 

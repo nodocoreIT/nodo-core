@@ -14,7 +14,7 @@ export function LocalMedicoCobros() {
 
   useEffect(() => {
     clinicApi.getSession().then(({ session, user }) => {
-      if (!session || !["doctor", "admin", "super_admin"].includes(session.role)) {
+      if (!session || session.role !== "doctor") {
         router.push("/login/medico");
         return;
       }

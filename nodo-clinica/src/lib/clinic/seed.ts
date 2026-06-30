@@ -1,5 +1,5 @@
 import { DEFAULT_THEME_SETTINGS } from "@/lib/clinic/theme-settings";
-import type { ClinicDatabase } from "@/lib/clinic/types";
+import type { ClinicDatabase } from "@/lib/clinic/local-db";
 import { DEFAULT_AVAILABILITY } from "@/lib/clinic/schedule";
 
 /** Incrementar para resetear clinic.json / Blob en deploy (cuentas demo limpias). */

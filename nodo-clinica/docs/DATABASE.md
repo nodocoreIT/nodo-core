@@ -51,7 +51,7 @@ BLOB_READ_WRITE_TOKEN=vercel_blob_...
 CLINIC_DATA_DIR=/data
 ```
 
-**Recomendación hoy:** desarrollar y probar con `npm run dev` en `future_nodes/nodo-clinica`. Los datos quedan en `data/clinic.json` (gitignored). Para producción estable usar **Fly.io + volumen** o migrar a **Supabase** (schema abajo).
+**Recomendación hoy:** desarrollar y probar con `pnpm dev` en `nodo-clinica`. Los datos quedan en `data/clinic.json` (gitignored). Para producción estable usar **Fly.io + volumen** o migrar a **Supabase** (schema abajo).
 
 ---
 

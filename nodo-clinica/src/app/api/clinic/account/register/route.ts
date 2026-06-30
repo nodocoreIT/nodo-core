@@ -1,140 +1,121 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
-
-async function registerDoctor(body: {
-  fullName: string;
-  email: string;
-  password: string;
-  specialty?: string;
-  licenseNumber?: string;
-  orgId: string;
-}): Promise<NextResponse> {
-  const supabase = await createClient();
-  const serviceClient = await createServiceClient();
-
-  const { data, error } = await supabase.auth.signUp({
-    email: body.email,
-    password: body.password,
-    options: { data: { full_name: body.fullName } },
-  });
-
-  if (error || !data.user) {
-    if (error?.message?.toLowerCase().includes("already registered")) {
-      return NextResponse.json({ error: "Email ya registrado" }, { status: 409 });
-    }
-    return NextResponse.json(
-      { error: error?.message ?? "Error al crear cuenta" },
-      { status: 400 },
-    );
-  }
-
-  const userId = data.user.id;
-
-  const { error: orgMemberError } = await serviceClient
-    .schema("shared" as never)
-    .from("org_members")
-    .insert({ profile_id: userId, org_id: body.orgId, role: "admin" });
-
-  if (orgMemberError) {
-    console.error("[register/doctor] org_members insert error", orgMemberError);
-    return NextResponse.json({ error: "Error al registrar miembro de organización" }, { status: 500 });
-  }
-
-  const { error: profError } = await serviceClient
-    .from("professionals")
-    .insert({
-      user_id: userId,
-      org_id: body.orgId,
-      full_name: body.fullName,
-      specialty: body.specialty ?? "Medicina General",
-      license_number: body.licenseNumber ?? "Pendiente",
-    });
-
-  if (profError) {
-    console.error("[register/doctor] professionals insert error", profError);
-    return NextResponse.json({ error: "Error al crear perfil profesional" }, { status: 500 });
-  }
-
-  return NextResponse.json({
-    user: { id: userId, email: data.user.email, role: "admin" },
-    role: "admin",
-  });
-}
-
-async function registerPatient(body: {
-  fullName: string;
-  email: string;
-  password: string;
-  phone?: string;
-  orgId: string;
-}): Promise<NextResponse> {
-  const supabase = await createClient();
-  const serviceClient = await createServiceClient();
-
-  const { data, error } = await supabase.auth.signUp({
-    email: body.email,
-    password: body.password,
-    options: { data: { full_name: body.fullName } },
-  });
-
-  if (error || !data.user) {
-    if (error?.message?.toLowerCase().includes("already registered")) {
-      return NextResponse.json({ error: "Este email ya está registrado como paciente" }, { status: 409 });
-    }
-    return NextResponse.json(
-      { error: error?.message ?? "Error al crear cuenta" },
-      { status: 400 },
-    );
-  }
-
-  const userId = data.user.id;
-
-  const { error: patientError } = await serviceClient.from("patients").insert({
-    profile_id: userId,
-    org_id: body.orgId,
-    full_name: body.fullName,
-    email: body.email.toLowerCase().trim(),
-    phone: body.phone ?? null,
-  });
-
-  if (patientError) {
-    console.error("[register/patient] patients insert error", patientError);
-    return NextResponse.json({ error: "Error al crear perfil de paciente" }, { status: 500 });
-  }
-
-  // No org_members row for patients — patient JWT has no org_id claim
-  return NextResponse.json({
-    user: { id: userId, email: data.user.email, role: "patient" },
-    role: "patient",
-  });
-}
+import {
+  readDb,
+  writeDb,
+  newId,
+  publicDoctor,
+  publicPatient,
+} from "@/lib/clinic/local-db";
+import {
+  jsonWithSession,
+  type ClinicSession,
+} from "@/lib/clinic/session";
+import { hashPassword } from "@/lib/clinic/password";
+import { isOpenRegistrationAllowed } from "@/lib/clinic/platform-config";
 
 export async function POST(request: NextRequest) {
   try {
+    if (!isOpenRegistrationAllowed()) {
+      return NextResponse.json(
+        {
+          error:
+            "El registro abierto está deshabilitado. Suscribite en nodocore.com.ar.",
+        },
+        { status: 403 },
+      );
+    }
+
     const body = await request.json();
-    const { role, fullName, email, password } = body;
+    const { role, fullName, email, password, specialty, licenseNumber, phone, plan } =
+      body;
 
     if (!role || !fullName || !email || !password) {
       return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
     }
 
-    if (!body.orgId) {
-      return NextResponse.json({ error: "org_id requerido" }, { status: 400 });
-    }
+    const db = await readDb();
+    const emailLower = email.toLowerCase().trim();
+    const passwordHash = hashPassword(String(password));
 
     if (role === "doctor") {
-      return await registerDoctor(body);
+      if (db.doctors.some((d) => d.email === emailLower)) {
+        return NextResponse.json(
+          { error: "Email ya registrado como médico" },
+          { status: 409 },
+        );
+      }
+
+      const doctor = {
+        id: newId("doc"),
+        fullName,
+        email: emailLower,
+        password: passwordHash,
+        specialty: specialty || "Medicina General",
+        licenseNumber: licenseNumber || "Pendiente",
+        subscriptionStatus: "active" as const,
+        subscriptionPlan: plan || "trial",
+        createdAt: new Date().toISOString(),
+      };
+
+      await writeDb((d) => {
+        d.doctors.push(doctor);
+      });
+
+      const session: ClinicSession = {
+        userId: doctor.id,
+        role: "doctor",
+        email: doctor.email,
+        fullName: doctor.fullName,
+      };
+
+      return jsonWithSession(
+        { user: publicDoctor(doctor), role: "doctor", session },
+        session,
+      );
     }
+
     if (role === "patient") {
-      return await registerPatient(body);
+      if (db.patients.some((p) => p.email === emailLower)) {
+        return NextResponse.json(
+          { error: "Este email ya está registrado como paciente" },
+          { status: 409 },
+        );
+      }
+
+      const patient = {
+        id: newId("pat"),
+        fullName,
+        email: emailLower,
+        password: passwordHash,
+        phone,
+        createdAt: new Date().toISOString(),
+      };
+
+      await writeDb((d) => {
+        d.patients.push(patient);
+      });
+
+      const session: ClinicSession = {
+        userId: patient.id,
+        role: "patient",
+        email: patient.email,
+        fullName: patient.fullName,
+      };
+
+      return jsonWithSession(
+        { user: publicPatient(patient), role: "patient", session },
+        session,
+      );
     }
 
     return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
   } catch (err) {
     console.error("[register]", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Error al registrar. Reintentá." },
+      {
+        error:
+          err instanceof Error ? err.message : "Error al registrar. Reintentá.",
+      },
       { status: 500 },
     );
   }

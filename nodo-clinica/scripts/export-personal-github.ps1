@@ -1,4 +1,4 @@
-# Exporta future_nodes/nodo-clinica a un repo GitHub personal (standalone).
+# Exporta nodo-clinica a un repo GitHub personal (standalone).
 param(
   [Parameter(Mandatory = $true)]
   [string]$RepoUrl
@@ -18,7 +18,7 @@ $remote = "clinica-personal"
 git fetch origin 2>$null
 
 Write-Host "Creando rama subtree '$branch'..." -ForegroundColor Yellow
-git subtree split --prefix=future_nodes/nodo-clinica -b $branch
+git subtree split --prefix=nodo-clinica -b $branch
 
 $remotes = git remote
 if ($remotes -notcontains $remote) {

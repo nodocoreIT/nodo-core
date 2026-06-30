@@ -18,7 +18,7 @@ Necesitás tu propio par RSA y subir la **clave pública** a JaaS.
 Si no existe:
 
 ```powershell
-cd future_nodes/nodo-clinica
+cd nodo-clinica
 ssh-keygen -t rsa -b 4096 -m PEM -f jaasauth.key
 ```
 

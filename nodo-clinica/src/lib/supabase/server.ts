@@ -1,8 +1,6 @@
-// @ts-nocheck
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/types/database";
-import { clinicaSupabaseClientOptions } from "@/lib/supabase/clinica-auth";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -11,7 +9,6 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      ...clinicaSupabaseClientOptions,
       cookies: {
         getAll() {
           return cookieStore.getAll();
@@ -31,15 +28,10 @@ export async function createClient() {
 }
 
 export async function createServiceClient() {
-  const { createClient: createSupabaseClient } = await import(
-    "@supabase/supabase-js"
-  );
-  return createSupabaseClient<Database>(
+  const { createClient } = await import("@supabase/supabase-js");
+  return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: { persistSession: false },
-      db: { schema: "nodo_clinica" },
-    }
-  ) as any;
+    { auth: { persistSession: false } }
+  );
 }

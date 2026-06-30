@@ -1,69 +1,31 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { readDb, publicDoctor, publicDoctorSummary } from "@/lib/clinic/local-db";
 
 export const dynamic = "force-dynamic";
 
+function isActiveDoctor(d: { subscriptionStatus?: string }) {
+  return (
+    !d.subscriptionStatus ||
+    d.subscriptionStatus === "active" ||
+    d.subscriptionStatus === "trial"
+  );
+}
+
 export async function GET(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (auth instanceof NextResponse) return auth;
-  const { user, supabase } = auth;
-
-  if (!user.org_id) {
-    return NextResponse.json({ error: "Org no encontrada" }, { status: 403 });
-  }
-
   const doctorId = request.nextUrl.searchParams.get("doctorId");
+  const db = await readDb();
 
   if (doctorId) {
-    const { data: professional } = await supabase
-      .from("professionals")
-      .select("id, full_name, specialty, license_number, profile_photo_url, org_id")
-      .eq("id", doctorId)
-      .eq("org_id", user.org_id)
-      .maybeSingle();
-
-    if (!professional) {
+    const doctor = db.doctors.find((d) => d.id === doctorId);
+    if (!doctor || !isActiveDoctor(doctor)) {
       return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
     }
-
-    const { data: officeSettings } = await supabase
-      .from("office_settings")
-      .select("payment")
-      .eq("org_id", user.org_id)
-      .maybeSingle();
-
-    const payment = (officeSettings?.payment as Record<string, unknown>) ?? {};
-    // Strip sensitive OAuth token fields from payment before returning
-    const { mercadopagoAccessToken: _at, mercadopagoRefreshToken: _rt, mercadopagoPublicKey: _pk, ...safePayment } = payment as {
-      mercadopagoAccessToken?: unknown;
-      mercadopagoRefreshToken?: unknown;
-      mercadopagoPublicKey?: unknown;
-      [k: string]: unknown;
-    };
-
-    return NextResponse.json({
-      id: professional.id,
-      fullName: professional.full_name,
-      specialty: professional.specialty,
-      licenseNumber: professional.license_number,
-      profilePhotoUrl: professional.profile_photo_url,
-      payment: safePayment,
-    });
+    return NextResponse.json(publicDoctorSummary(doctor));
   }
 
-  const { data: professionals } = await supabase
-    .from("professionals")
-    .select("id, full_name, specialty, license_number, profile_photo_url")
-    .eq("org_id", user.org_id);
+  const doctors = db.doctors
+    .filter(isActiveDoctor)
+    .map(publicDoctor);
 
-  return NextResponse.json(
-    (professionals ?? []).map((p) => ({
-      id: p.id,
-      fullName: p.full_name,
-      specialty: p.specialty,
-      licenseNumber: p.license_number,
-      profilePhotoUrl: p.profile_photo_url,
-    })),
-  );
+  return NextResponse.json(doctors);
 }

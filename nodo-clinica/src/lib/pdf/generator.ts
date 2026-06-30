@@ -3,6 +3,40 @@ import type { Medication, Profile } from "@/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
+function signatureImageFormat(dataUrl: string): "PNG" | "JPEG" | "WEBP" {
+  if (
+    dataUrl.startsWith("data:image/jpeg") ||
+    dataUrl.startsWith("data:image/jpg")
+  ) {
+    return "JPEG";
+  }
+  if (dataUrl.startsWith("data:image/webp")) return "WEBP";
+  return "PNG";
+}
+
+function addSignatureImage(
+  doc: jsPDF,
+  signatureImageData: string | undefined,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  if (!signatureImageData?.startsWith("data:image")) return;
+  try {
+    doc.addImage(
+      signatureImageData,
+      signatureImageFormat(signatureImageData),
+      x,
+      y,
+      width,
+      height,
+    );
+  } catch {
+    /* ignore invalid image */
+  }
+}
+
 interface PrescriptionPdfOptions {
   doctor: Pick<Profile, "full_name" | "specialty" | "license_number">;
   patientName: string;
@@ -75,13 +109,7 @@ export function generatePrescriptionPdf(options: PrescriptionPdfOptions): jsPDF 
   doc.setTextColor(100, 116, 139);
   doc.text("Firma en documentos del profesional:", 20, 248);
 
-  if (signatureImageData?.startsWith("data:image")) {
-    try {
-      doc.addImage(signatureImageData, "PNG", 20, 250, 40, 18);
-    } catch {
-      /* ignore invalid image */
-    }
-  }
+  addSignatureImage(doc, signatureImageData, 20, 250, 40, 18);
 
   doc.setFontSize(11);
   doc.setTextColor(30, 64, 110);
@@ -180,13 +208,7 @@ export function generateStudyOrderPdf(options: StudyOrderPdfOptions): jsPDF {
   doc.setTextColor(100, 116, 139);
   doc.text("Firma en documentos del profesional:", 20, 248);
 
-  if (signatureImageData?.startsWith("data:image")) {
-    try {
-      doc.addImage(signatureImageData, "PNG", 20, 250, 40, 18);
-    } catch {
-      /* ignore invalid image */
-    }
-  }
+  addSignatureImage(doc, signatureImageData, 20, 250, 40, 18);
 
   doc.setFontSize(11);
   doc.setTextColor(30, 64, 110);
@@ -305,13 +327,7 @@ export function generateClinicalReportPdf(
   doc.setTextColor(100, 116, 139);
   doc.text("Firma en documentos del profesional:", 20, 248);
 
-  if (signatureImageData?.startsWith("data:image")) {
-    try {
-      doc.addImage(signatureImageData, "PNG", 20, 250, 40, 18);
-    } catch {
-      /* ignore */
-    }
-  }
+  addSignatureImage(doc, signatureImageData, 20, 250, 40, 18);
 
   doc.setFontSize(11);
   doc.setTextColor(30, 64, 110);

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Sora, Hanken_Grotesk } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { AppProviders } from "@/components/providers/app-providers";
 import "./globals.css";
 
 const sora = Sora({
@@ -23,10 +24,7 @@ export const metadata: Metadata = {
   description:
     "Telemedicina profesional con agenda, videoconsultas, historial clínico e informes con IA.",
   icons: {
-    icon: [
-      { url: "/favicon.png", media: "(prefers-color-scheme: light)" },
-      { url: "/clinica/favicon-dark.png", type: "image/png", media: "(prefers-color-scheme: dark)" },
-    ],
+    icon: "/favicon.png",
     shortcut: "/favicon.png",
     apple: "/favicon.png",
   },
@@ -50,10 +48,12 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col font-sans" suppressHydrationWarning>
-        <ThemeProvider>
-          {children}
-          <Toaster position="top-right" richColors />
-        </ThemeProvider>
+        <AppProviders>
+          <ThemeProvider>
+            {children}
+            <Toaster position="top-right" richColors />
+          </ThemeProvider>
+        </AppProviders>
       </body>
     </html>
   );

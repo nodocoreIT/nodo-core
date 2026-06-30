@@ -1,52 +1,36 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { getSessionFromRequest } from "@/lib/clinic/session";
 import {
   countUnreadDoctorNotifications,
   listDoctorNotifications,
   markDoctorNotificationsRead,
-  type DoctorNotificationType,
 } from "@/lib/clinic/doctor-notifications";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (auth instanceof NextResponse) return auth;
-  const { user, supabase } = auth;
-
-  if (user.role === "patient") {
+  const session = await getSessionFromRequest(request);
+  if (!session || session.role !== "doctor") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-
-  // Resolve professional_id from auth user
-  const { data: me } = await supabase
-    .from("professionals")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!me) {
-    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
   }
 
   const { searchParams } = new URL(request.url);
   const scope = searchParams.get("scope") ?? "all";
   const typesParam = searchParams.get("types");
   const types = typesParam
-    ? (typesParam.split(",") as DoctorNotificationType[])
+    ? (typesParam.split(",") as Array<"mercadopago_payment" | "transfer_pending" | "general">)
     : undefined;
 
   if (scope === "unread_count") {
-    const count = await countUnreadDoctorNotifications(me.id, types);
-    const cobrosCount = await countUnreadDoctorNotifications(me.id, [
+    const count = await countUnreadDoctorNotifications(session.userId, types);
+    const cobrosCount = await countUnreadDoctorNotifications(session.userId, [
       "mercadopago_payment",
       "transfer_pending",
     ]);
     return NextResponse.json({ count, cobrosCount });
   }
 
-  const items = await listDoctorNotifications(me.id, {
+  const items = await listDoctorNotifications(session.userId, {
     unreadOnly: scope === "unread",
     limit: 30,
   });
@@ -59,22 +43,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (auth instanceof NextResponse) return auth;
-  const { user, supabase } = auth;
-
-  if (user.role === "patient") {
+  const session = await getSessionFromRequest(request);
+  if (!session || session.role !== "doctor") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-
-  const { data: me } = await supabase
-    .from("professionals")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!me) {
-    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
   }
 
   const body = await request.json().catch(() => ({}));
@@ -82,17 +53,16 @@ export async function PATCH(request: NextRequest) {
   const scope = body.scope as string | undefined;
 
   if (scope === "cobros") {
-    const items = await listDoctorNotifications(me.id, { unreadOnly: true });
+    const items = await listDoctorNotifications(session.userId, {
+      unreadOnly: true,
+    });
     const cobrosIds = items
-      .filter(
-        (n) =>
-          n.type === "mercadopago_payment" || n.type === "transfer_pending",
-      )
+      .filter((n) => n.type === "mercadopago_payment" || n.type === "transfer_pending")
       .map((n) => n.id);
-    const marked = await markDoctorNotificationsRead(me.id, cobrosIds);
+    const marked = await markDoctorNotificationsRead(session.userId, cobrosIds);
     return NextResponse.json({ ok: true, marked });
   }
 
-  const marked = await markDoctorNotificationsRead(me.id, ids);
+  const marked = await markDoctorNotificationsRead(session.userId, ids);
   return NextResponse.json({ ok: true, marked });
 }

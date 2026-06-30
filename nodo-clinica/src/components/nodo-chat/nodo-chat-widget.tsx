@@ -83,7 +83,7 @@ export function NodoChatWidget({
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const firstName = (doctorName ?? "").trim().split(/\s+/)[0] || "Colega";
+  const firstName = doctorName.trim().split(/\s+/)[0] || "Colega";
 
   const loadMessages = useCallback(async () => {
     if (!isPro) return;

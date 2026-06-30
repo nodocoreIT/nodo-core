@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, XCircle, Loader2, Sparkles } from "lucide-react";
-import type { PaymentReceiptAudit } from "@/lib/clinic/types";
+import type { PaymentReceiptAudit } from "@/lib/clinic/local-db";
 
 interface ReceiptValidationCardProps {
   audit: PaymentReceiptAudit | null;
