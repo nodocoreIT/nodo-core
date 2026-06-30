@@ -20,7 +20,7 @@ const FINANZAS_MANAGED_NAV = [
   { to: "/admin/planes-ahorro", label: "Planes de Ahorro" },
   { to: "/admin/saldos", label: "Saldos" },
   { to: "/admin/informe-mensual", label: "Informe Mensual" },
-  { to: "/admin/configuracion", label: "Configuración" },
+  { to: "/admin/configuracion", label: "Administración" },
 ];
 
 export function FinanzasSettingsModuleProvider({ children }: { children: React.ReactNode }) {

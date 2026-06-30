@@ -351,7 +351,7 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
         <div className="flex items-center gap-3">
           <Settings className="w-8 h-8 text-brand" />
           <div>
-            <h2 className="text-3xl font-bold text-navy">Configuración</h2>
+            <h2 className="text-3xl font-bold text-navy">Administración</h2>
             <p className="text-slate2">Gestiona rubros, cuentas, tarjetas y sueldos</p>
           </div>
         </div>
