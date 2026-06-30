@@ -1,7 +1,7 @@
 import React from 'react';
 import { Spinner } from './spinner';
 
-type Variant = 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost' | 'success';
 type Size = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -17,6 +17,7 @@ const variantClasses: Record<Variant, string> = {
   outline: 'bg-transparent text-navy border-mist hover:bg-mist hover:border-brand',
   danger: 'bg-red-600 text-white hover:bg-red-700 border-transparent',
   ghost: 'bg-transparent text-slate2 hover:bg-mist border-transparent',
+  success: 'bg-green-600 text-white hover:bg-green-700 border-transparent',
 };
 
 const sizeClasses: Record<Size, string> = {

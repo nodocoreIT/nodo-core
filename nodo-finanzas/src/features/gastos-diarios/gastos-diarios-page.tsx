@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
-import { Search, Plus, Edit, Trash2, Receipt, X } from 'lucide-react';
+import { useState, useMemo, useRef, useCallback } from 'react';
+import { Search, Plus, Edit, Trash2, Receipt, X, Mic, MicOff, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 import { foldForSearch } from '@nodocore/shared-components';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,13 +12,116 @@ import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { Spinner } from '@/components/ui/spinner';
 import { RegistroGastoDiario } from './registro-gasto-diario';
 import { useFinanzas } from '@/hooks/use-finanzas';
+import { useAiSettings, getActiveApiKey } from '@/hooks/use-ai-settings';
+import { useExtractGastoFromVoice } from './hooks/use-extract-gasto-from-voice';
+import { useRubros } from '@/hooks/use-rubros';
 import { formatearMoneda, formatearFecha } from '@/utils/formatters';
 import type { GastoDiario } from '@/types';
 
+type VoiceState = 'idle' | 'listening' | 'extracting' | 'error';
+
 export function GastosDiariosPage() {
   const finanzas = useFinanzas();
+  const { rubrosActivos } = useRubros();
+  const { aiSettings } = useAiSettings();
+  const { extract } = useExtractGastoFromVoice();
+  const navigate = useNavigate();
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [gastoEditando, setGastoEditando] = useState<GastoDiario | null>(null);
+  const [datosIniciales, setDatosIniciales] = useState<Partial<GastoDiario> | undefined>();
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
+
+  const hasApiKey = !!getActiveApiKey(aiSettings);
+  const isSupported =
+    typeof window !== 'undefined' &&
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
+  const handleVoiceClick = useCallback(async () => {
+    if (voiceState === 'listening') {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    if (!hasApiKey) {
+      setVoiceError('Configurá tu API key en Configuración → Integraciones IA');
+      setVoiceState('error');
+      setTimeout(() => setVoiceState('idle'), 4000);
+      return;
+    }
+
+    if (!isSupported) {
+      setVoiceError('Tu navegador no soporta dictado por voz. Probá en Chrome o Edge.');
+      setVoiceState('error');
+      setTimeout(() => setVoiceState('idle'), 4000);
+      return;
+    }
+
+    setVoiceError(null);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SpeechRecognitionAPI = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recognition = new SpeechRecognitionAPI() as any;
+    recognitionRef.current = recognition;
+
+    recognition.lang = 'es-AR';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setVoiceState('listening');
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onresult = async (event: any) => {
+      const transcript = event.results[0]?.[0]?.transcript ?? '';
+      if (!transcript.trim()) { setVoiceState('idle'); return; }
+
+      setVoiceState('extracting');
+      try {
+        const parsed = await extract({
+          texto: transcript,
+          rubros: rubrosActivos,
+          cuentas: finanzas.cuentas,
+          tarjetas: finanzas.tarjetas,
+          fechaReferencia: new Date().toISOString().slice(0, 10),
+        });
+        setDatosIniciales({
+          descripcion: parsed.descripcion,
+          monto: parsed.monto,
+          fecha: parsed.fecha,
+          formaPago: parsed.formaPago,
+          rubroId: parsed.rubroId,
+          rubro: parsed.rubroCodigo,
+          cuotas: parsed.cuotas,
+        });
+        setGastoEditando(null);
+        setMostrarFormulario(true);
+        setVoiceState('idle');
+      } catch {
+        setVoiceError('No se pudo interpretar el dictado. Intentá de nuevo.');
+        setVoiceState('error');
+        setTimeout(() => setVoiceState('idle'), 4000);
+      }
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onerror = (event: any) => {
+      if (event.error === 'aborted') { setVoiceState('idle'); return; }
+      setVoiceError('Error al escuchar. Verificá que el micrófono esté habilitado.');
+      setVoiceState('error');
+      setTimeout(() => setVoiceState('idle'), 4000);
+    };
+
+    recognition.onend = () => {
+      setVoiceState((curr) => curr === 'listening' ? 'idle' : curr);
+    };
+
+    recognition.start();
+  }, [voiceState, hasApiKey, isSupported, extract, rubrosActivos, finanzas]);
   const [filtroMes, setFiltroMes] = useState(() => {
     const hoy = new Date();
     return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
@@ -60,6 +164,7 @@ export function GastosDiariosPage() {
   function cerrarFormulario() {
     setMostrarFormulario(false);
     setGastoEditando(null);
+    setDatosIniciales(undefined);
   }
 
   async function handleGastoRegistrado() {
@@ -108,6 +213,7 @@ export function GastosDiariosPage() {
         onVolver={cerrarFormulario}
         onGastoRegistrado={handleGastoRegistrado}
         gastoEditando={gastoEditando}
+        datosIniciales={datosIniciales}
       />
     );
   }
@@ -157,11 +263,60 @@ export function GastosDiariosPage() {
         </div>
       </div>
 
-      {/* Add button */}
-      <Button onClick={() => abrirFormulario()} className="w-full">
-        <Plus className="h-4 w-4" />
-        Nuevo Gasto Diario
-      </Button>
+      {/* Actions */}
+      <div className="flex items-center gap-2">
+        <div className="relative">
+          <Button
+            type="button"
+            variant="success"
+            onClick={handleVoiceClick}
+            disabled={voiceState === 'extracting'}
+            title={
+              voiceState === 'listening' ? 'Escuchando… hacé clic para detener' :
+              voiceState === 'extracting' ? 'Procesando con IA…' :
+              !hasApiKey ? 'Configurá tu API key en Configuración → Integraciones IA' :
+              'Cargá tu gasto por voz'
+            }
+            className={`shrink-0 whitespace-nowrap ${voiceState === 'listening' ? 'animate-pulse !bg-red-500 !border-red-500 hover:!bg-red-600' : ''}`}
+          >
+            {voiceState === 'extracting' ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : voiceState === 'listening' ? (
+              <MicOff className="h-4 w-4" />
+            ) : (
+              <Mic className="h-4 w-4" />
+            )}
+            {voiceState === 'listening' ? 'Escuchando…' :
+             voiceState === 'extracting' ? 'Procesando…' :
+             'Cargá tu gasto por voz'}
+          </Button>
+
+          {voiceState === 'listening' && (
+            <span className="absolute -right-1 -top-1 h-3 w-3 animate-ping rounded-full bg-red-500 ring-2 ring-white" />
+          )}
+
+          {voiceState === 'error' && voiceError && (
+            <button
+              type="button"
+              role="alert"
+              onClick={() => navigate('/admin/configuracion')}
+              className="absolute left-0 top-full z-50 mt-1.5 w-64 max-w-[calc(100vw-2rem)] cursor-pointer rounded-md border border-red-200 bg-red-50 px-3 py-2 text-left text-xs text-red-700 shadow-md transition-colors hover:bg-red-100"
+            >
+              {voiceError}
+              {!hasApiKey && (
+                <span className="mt-0.5 block font-semibold underline">
+                  Ir a Configuración → IA
+                </span>
+              )}
+            </button>
+          )}
+        </div>
+
+        <Button variant="secondary" onClick={() => abrirFormulario()} className="shrink-0 whitespace-nowrap mr-4 !bg-green-100 !text-green-800 hover:!bg-green-200 !border-transparent">
+          <Plus className="h-4 w-4" />
+          Gasto Diario
+        </Button>
+      </div>
 
       {/* List */}
       <Card>
