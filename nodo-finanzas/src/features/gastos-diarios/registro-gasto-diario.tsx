@@ -14,13 +14,6 @@ import { useFinanzas } from '@/hooks/use-finanzas';
 import { useRubros } from '@/hooks/use-rubros';
 import { getFechaHoy, formatearMoneda } from '@/utils/formatters';
 import { capitalizarDescripcion } from '@/utils/capitalizar-descripcion';
-import { VoiceGastoButton } from '@/features/gastos-diarios/components/voice-gasto-button';
-import { useExtractGastoFromVoice } from '@/features/gastos-diarios/hooks/use-extract-gasto-from-voice';
-import {
-  parseGastoDictado,
-  parsedTieneDatosUtiles,
-  type ParsedGastoDictado,
-} from '@/features/gastos-diarios/lib/parse-gasto-dictado';
 import type { FormaDePago, GastoDiario } from '@/types';
 
 const schema = z.object({
@@ -60,10 +53,7 @@ const FORMAS_PAGO: Array<{ value: FormaDePago; label: string }> = [
 export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando, datosIniciales }: Props) {
   const finanzas = useFinanzas();
   const { rubrosActivos } = useRubros();
-  const { extract: extractGastoFromVoice } = useExtractGastoFromVoice();
   const [procesando, setProcesando] = useState(false);
-  const [dictadoPreview, setDictadoPreview] = useState<ParsedGastoDictado | null>(null);
-  const [ultimoDictado, setUltimoDictado] = useState('');
 
   const defaults: FormData = gastoEditando
     ? {
@@ -128,75 +118,6 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
     label: i === 0 ? '1 cuota (contado)' : `${i + 1} cuotas`,
   }));
 
-  const formaPagoLabels = Object.fromEntries(FORMAS_PAGO.map((item) => [item.value, item.label])) as Record<
-    FormaDePago,
-    string
-  >;
-
-  const applyParsedGasto = useCallback(
-    (parsed: ParsedGastoDictado) => {
-      const opts = { shouldDirty: true, shouldTouch: true };
-      if (parsed.fecha) setValue('fecha', parsed.fecha, opts);
-      if (parsed.monto) setValue('monto', parsed.monto, opts);
-      if (parsed.descripcion) setValue('descripcion', parsed.descripcion, opts);
-      if (parsed.formaPago) setValue('formaPago', parsed.formaPago, opts);
-      if (parsed.rubroId) {
-        setValue('rubroId', parsed.rubroId, opts);
-        if (parsed.rubroCodigo) setValue('rubro', parsed.rubroCodigo, opts);
-      }
-      if (parsed.tarjetaId) setValue('tarjetaId', parsed.tarjetaId, opts);
-      if (parsed.cuotas) setValue('cuotas', parsed.cuotas, opts);
-      if (parsed.cuentaId) setValue('cuentaId', parsed.cuentaId, opts);
-    },
-    [setValue],
-  );
-
-  const handleDictado = useCallback(
-    async (transcript: string) => {
-      const context = {
-        texto: transcript,
-        rubros: rubrosActivos,
-        tarjetas: tarjetasActivas,
-        cuentas: cuentasActivas,
-        fechaReferencia: getFechaHoy(),
-      };
-
-      let parsed = parseGastoDictado(context);
-
-      if (!parsed.monto) {
-        try {
-          parsed = await extractGastoFromVoice(context);
-        } catch (err) {
-          if (!parsedTieneDatosUtiles(parsed)) throw err;
-        }
-      }
-
-      setUltimoDictado(transcript);
-      setDictadoPreview(parsed);
-      applyParsedGasto(parsed);
-
-      if (!parsedTieneDatosUtiles(parsed)) {
-        throw new Error('EMPTY_PARSE');
-      }
-
-      const resumen = [
-        parsed.monto ? formatearMoneda(parsed.monto) : null,
-        parsed.descripcion ?? null,
-        parsed.formaPago ? formaPagoLabels[parsed.formaPago] : null,
-      ]
-        .filter(Boolean)
-        .join(' · ');
-
-      if (!parsed.monto) {
-        toast('Detectamos parte del gasto pero no el monto. Completalo manualmente.', { icon: '⚠️' });
-      } else if (parsed.advertencias.length > 0) {
-        toast(resumen || 'Dictado interpretado con advertencias', { icon: '⚠️' });
-      } else {
-        toast.success(resumen ? `Dictado aplicado: ${resumen}` : 'Dictado aplicado al formulario');
-      }
-    },
-    [applyParsedGasto, cuentasActivas, extractGastoFromVoice, formaPagoLabels, rubrosActivos, tarjetasActivas],
-  );
 
   async function onSubmit(data: FormData) {
     setProcesando(true);
@@ -255,62 +176,6 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
       </nav>
 
       <Card>
-        {!gastoEditando && (
-          <div className="mb-5 rounded-xl border border-brand/20 bg-brand/5 p-4">
-            <div className="flex flex-col gap-4">
-              <div>
-                <p className="text-sm font-semibold text-ink">Cargá el gasto hablando</p>
-                <p className="text-xs text-slate2 mt-1">
-                  Ej: &quot;Hoy gasté 250 pesos en el médico con Mercado Pago&quot;
-                </p>
-              </div>
-              <VoiceGastoButton onTranscript={handleDictado} disabled={procesando} />
-            </div>
-
-            {dictadoPreview && (
-              <div className="mt-4 rounded-lg border border-mist bg-white/80 p-3 text-sm">
-                <p className="font-medium text-ink">Interpretación del dictado</p>
-                {ultimoDictado && (
-                  <p className="text-xs text-slate2 mt-1 italic">&quot;{ultimoDictado}&quot;</p>
-                )}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {dictadoPreview.monto && (
-                    <span className="rounded-full bg-mist px-2.5 py-1 text-xs font-medium text-ink">
-                      {formatearMoneda(dictadoPreview.monto)}
-                    </span>
-                  )}
-                  {dictadoPreview.descripcion && (
-                    <span className="rounded-full bg-mist px-2.5 py-1 text-xs font-medium text-ink">
-                      {dictadoPreview.descripcion}
-                    </span>
-                  )}
-                  {dictadoPreview.formaPago && (
-                    <span className="rounded-full bg-mist px-2.5 py-1 text-xs font-medium text-ink">
-                      {formaPagoLabels[dictadoPreview.formaPago]}
-                    </span>
-                  )}
-                  {dictadoPreview.rubroId && (
-                    <span className="rounded-full bg-mist px-2.5 py-1 text-xs font-medium text-ink">
-                      {rubrosActivos.find((rubro) => rubro.id === dictadoPreview.rubroId)?.nombre ?? 'Rubro detectado'}
-                    </span>
-                  )}
-                  {dictadoPreview.cuotas && dictadoPreview.cuotas > 1 && (
-                    <span className="rounded-full bg-mist px-2.5 py-1 text-xs font-medium text-ink">
-                      {dictadoPreview.cuotas} cuotas
-                    </span>
-                  )}
-                </div>
-                {dictadoPreview.advertencias.length > 0 && (
-                  <ul className="mt-2 space-y-1 text-xs text-amber-700">
-                    {dictadoPreview.advertencias.map((warning) => (
-                      <li key={warning}>• {warning}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Hidden fields */}
