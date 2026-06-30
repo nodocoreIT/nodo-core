@@ -1520,8 +1520,8 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
                 </div>
               </div>
 
-              <div className="border-t border-border pt-8">
-                <h4 className="text-sm font-bold text-navy mb-3">¿Para qué se usa?</h4>
+              <div className="border-t border-border pt-4">
+                <h4 className="text-sm font-bold text-navy mb-4">¿Para qué se usa?</h4>
                 <ul className="space-y-2 text-xs text-slate2">
                   {(module.aiUseCases ?? [
                     {
