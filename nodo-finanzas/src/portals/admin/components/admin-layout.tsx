@@ -50,7 +50,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/planes-ahorro", label: "Planes de Ahorro", icon: PiggyBank },
   { to: "/admin/saldos", label: "Saldos", icon: Wallet },
   { to: "/admin/informe-mensual", label: "Informe Mensual", icon: BarChart2 },
-  { to: "/admin/configuracion", label: "Configuración", icon: Settings },
+  { to: "/admin/configuracion", label: "Administración", icon: Settings },
 ];
 
 const ROUTE_TITLES: Record<string, string> = {
@@ -62,7 +62,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/planes-ahorro": "Planes de Ahorro",
   "/admin/saldos": "Saldos",
   "/admin/informe-mensual": "Informe Mensual",
-  "/admin/configuracion": "Configuración",
+  "/admin/configuracion": "Administración",
 };
 
 function initials(value: string): string {
@@ -274,7 +274,7 @@ export function AdminLayout() {
               {isSuperAdmin && (
                 <button
                   type="button"
-                  aria-label="Configuración"
+                  aria-label="Administración"
                   onClick={() => {
                     setMobileMenuOpen(false);
                     setSettingsOpen(true);
