@@ -4,7 +4,7 @@ export interface MedicationCatalogEntry {
   id: string;
   name: string;
   activeIngredient: string;
-  presentations: string[];
+  presentations?: string[];
   defaultDosage: string;
   defaultFrequency: string;
   defaultDuration: string;
