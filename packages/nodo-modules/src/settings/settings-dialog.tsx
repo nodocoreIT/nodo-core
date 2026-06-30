@@ -970,7 +970,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
             />
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 bg-white">
+          <div className={`flex-1 overflow-y-auto bg-white ${activeTab === "system-config" ? "p-4" : "p-6"}`}>
           {/* TAB 0: Mi Perfil */}
           {activeTab === "profile" && <ProfileSettingsSection />}
 
