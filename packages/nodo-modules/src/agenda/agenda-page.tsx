@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useSearchStore } from "@nodocore/shared-components";
 import {
   AlertCircle,
   Calendar,
@@ -13,6 +14,7 @@ import {
   Link2,
   Loader2,
   Plus,
+  Search,
   Square,
   Trash2,
   User,
@@ -75,10 +77,14 @@ export function AgendaPage() {
     entityLabel,
     aiApiKey,
     aiProvider,
+    onAiSettingsClick,
   } = useAgendaModule();
 
   const todayStr = getTodayString();
   const pageEntityLabel = entityLabel ?? DEFAULT_ENTITY_LABEL;
+
+  const searchQuery = useSearchStore((s) => s.query);
+  const setSearchQuery = useSearchStore((s) => s.setQuery);
 
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
@@ -143,7 +149,17 @@ export function AgendaPage() {
     setFormPriority(values.priority ?? "media");
     setFormDueDate(values.due_date ?? selectedDateStr);
     setFormAssignedTo(values.assigned_to ?? "");
-    resetLinkValues();
+    // Pre-fill link fields from voice extraction (e.g. property_id matched by address)
+    const voiceLinkValues: LinkValuesState = {};
+    for (const linkField of linkFields) {
+      const key = String(linkField.field);
+      if (key === "property_id" && values.property_id) {
+        voiceLinkValues[key] = values.property_id;
+      } else {
+        voiceLinkValues[key] = "";
+      }
+    }
+    setFormLinkValues(voiceLinkValues);
     setDialogOpen(true);
     clearTaskParam();
   };
@@ -234,6 +250,9 @@ export function AgendaPage() {
     }
   };
 
+  const propertyLinkField = linkFields.find((f) => String(f.field) === "property_id");
+  const propertyOptions = propertyLinkField?.options ?? [];
+
   const handleDeleteTask = async (taskId: string) => {
     if (!window.confirm("¿Seguro que querés eliminar esta tarea?")) return;
     try {
@@ -251,20 +270,24 @@ export function AgendaPage() {
 
   const currentWeekDates = useMemo(() => getWeekDates(selectedDateStr), [selectedDateStr]);
 
-  const filteredTasks = useMemo(
-    () =>
-      tasks.filter((task) => {
-        if (filterCategory !== "all" && task.category !== filterCategory) return false;
-        if (filterPriority !== "all" && task.priority !== filterPriority) return false;
-        if (filterStatus !== "all" && task.status !== filterStatus) return false;
-        if (filterAssignee !== "all") {
-          if (filterAssignee === "") return !task.assigned_to;
-          if (task.assigned_to !== filterAssignee) return false;
-        }
-        return true;
-      }),
-    [tasks, filterCategory, filterPriority, filterStatus, filterAssignee],
-  );
+  const filteredTasks = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return tasks.filter((task) => {
+      if (filterCategory !== "all" && task.category !== filterCategory) return false;
+      if (filterPriority !== "all" && task.priority !== filterPriority) return false;
+      if (filterStatus !== "all" && task.status !== filterStatus) return false;
+      if (filterAssignee !== "all") {
+        if (filterAssignee === "") return !task.assigned_to;
+        if (task.assigned_to !== filterAssignee) return false;
+      }
+      if (q) {
+        const inTitle = task.title.toLowerCase().includes(q);
+        const inDesc = task.description?.toLowerCase().includes(q) ?? false;
+        if (!inTitle && !inDesc) return false;
+      }
+      return true;
+    });
+  }, [tasks, filterCategory, filterPriority, filterStatus, filterAssignee, searchQuery]);
 
   const overdueTasks = filteredTasks.filter(
     (task) => task.status !== "completada" && task.due_date < todayStr,
@@ -316,6 +339,43 @@ export function AgendaPage() {
 
   return (
     <div className="space-y-6">
+      {/* Mobile-only: search + action buttons */}
+      <div className="flex flex-col gap-2 lg:hidden">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate2" />
+          <Input
+            type="search"
+            placeholder="Buscar tareas…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-10 pl-9 text-sm"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <VoiceTaskButton
+            apiKey={aiApiKey}
+            provider={aiProvider}
+            onExtracted={handleVoiceExtracted}
+            categories={categories}
+            assigneeOptions={assigneeOptions}
+            propertyOptions={propertyOptions}
+            onSettingsClick={onAiSettingsClick}
+            label="Grabá tu tarea por voz"
+            idleVariant="default"
+            className="flex-1 justify-center bg-orange-500 hover:bg-orange-600"
+          />
+          <Button
+            onClick={handleOpenCreateDialog}
+            variant="outline"
+            size="sm"
+            className="shrink-0 gap-1.5 text-xs text-slate2"
+          >
+            <Plus className="h-4 w-4" />
+            Nueva
+          </Button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="flex items-center justify-between rounded-md border border-border bg-card p-4">
           <div className="space-y-1">
@@ -490,8 +550,16 @@ export function AgendaPage() {
             <h2 className="text-base font-bold text-navy">
               {`Tareas organizadas de ${pageEntityLabel}`}
             </h2>
-            <div className="flex items-center gap-2">
-              <VoiceTaskButton apiKey={aiApiKey} provider={aiProvider} onExtracted={handleVoiceExtracted} />
+            <div className="hidden items-center gap-2 lg:flex">
+              <VoiceTaskButton
+                apiKey={aiApiKey}
+                provider={aiProvider}
+                onExtracted={handleVoiceExtracted}
+                categories={categories}
+                assigneeOptions={assigneeOptions}
+                propertyOptions={propertyOptions}
+                onSettingsClick={onAiSettingsClick}
+              />
               <Button onClick={handleOpenCreateDialog} className="gap-2 text-xs">
                 <Plus className="h-4 w-4" />
                 Nueva Tarea

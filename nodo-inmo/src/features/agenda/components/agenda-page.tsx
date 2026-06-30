@@ -7,7 +7,9 @@ import {
   type UpdateTaskInput,
 } from "@nodocore/nodo-modules/agenda";
 import { useAuth } from "@nodocore/shared-components";
-import { useAiStore, getActiveApiKey } from "@/shared/hooks/use-ai-settings";
+import { useSettingsModule } from "@nodocore/nodo-modules/settings";
+import { getActiveApiKey } from "@nodocore/nodo-modules/settings";
+import { useSettingsTrigger } from "@/shared/hooks/use-settings-trigger";
 import { useProperties } from "@/features/properties/hooks/use-properties";
 import { useContacts } from "@/features/contacts/hooks/use-contacts";
 import { useStaff } from "@/shared/hooks/use-staff";
@@ -16,7 +18,7 @@ import { INMO_TASK_CATEGORIES } from "../agenda-config";
 
 function InmoAgendaInner() {
   const { orgId } = useAuth();
-  const aiSettings = useAiStore((s) => s.aiSettings);
+  const { aiSettings } = useSettingsModule();
   const { data: properties = [] } = useProperties();
   const { data: contacts = [] } = useContacts();
   const { users } = useStaff();
@@ -67,6 +69,7 @@ function InmoAgendaInner() {
       entityLabel: "la Agencia",
       aiApiKey: getActiveApiKey(aiSettings),
       aiProvider: aiSettings.provider,
+      onAiSettingsClick: () => useSettingsTrigger.getState().requestTab("ai"),
       tasks,
       isLoading: isLoading || !orgId,
       createTask: (input: CreateTaskInput) => createMutation.mutateAsync(input),

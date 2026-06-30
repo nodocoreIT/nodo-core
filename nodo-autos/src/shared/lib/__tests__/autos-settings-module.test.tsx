@@ -21,10 +21,6 @@ vi.mock("@/shared/hooks/use-theme-settings", () => ({
   useThemeSettings: () => ({ settings: {}, setSettings: vi.fn(), resetSettings: vi.fn() }),
 }));
 
-vi.mock("@/shared/hooks/use-autos-ai-settings", () => ({
-  useAutosAiSettings: () => ({ aiSettings: {}, setAiSettings: vi.fn() }),
-}));
-
 vi.mock("@/shared/hooks/use-autos-staff", () => ({
   useAutosStaff: () => ({
     users: [],

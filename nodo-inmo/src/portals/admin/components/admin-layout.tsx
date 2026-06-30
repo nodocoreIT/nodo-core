@@ -53,12 +53,11 @@ import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { InmoSettingsModuleProvider } from "@/shared/lib/inmo-settings-module";
 import { FeedbackFAB } from "@/features/feedback/components/feedback-node";
 import { NotificationsBell } from "@/features/dashboard/components/notifications-bell";
-import { IPCBadge } from "@/features/ipc/components/IPCBadge";
-import { ICLBadge } from "@/features/ipc/components/ICLBadge";
-import { IPLBadge } from "@/features/ipc/components/IPLBadge";
+import { IndicesBadge } from "@/features/ipc/components/IndicesBadge";
 import { PlanBadge } from "@/features/plan/components/plan-badge";
 import { INMO_DEFAULT_EMPLOYEE_SECTIONS } from "@/shared/lib/inmo-staff-nav";
 import { isProOnlyAdminRoute } from "@/shared/lib/pro-features";
+import { useSettingsTrigger } from "@/shared/hooks/use-settings-trigger";
 
 // ── Nav item definition ───────────────────────────────────────────────────────
 
@@ -187,6 +186,16 @@ export function AdminLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
+
+  const pendingSettingsTab = useSettingsTrigger((s) => s.pendingTab);
+  const clearPendingSettings = useSettingsTrigger((s) => s.clearPending);
+
+  useEffect(() => {
+    if (!pendingSettingsTab) return;
+    setSettingsInitialTab(pendingSettingsTab as SettingsTabId);
+    setSettingsOpen(true);
+    clearPendingSettings();
+  }, [pendingSettingsTab, clearPendingSettings]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -577,9 +586,7 @@ function AdminLayoutShell({
                 </p>
                 <h1 className="truncate text-base font-bold text-navy">{title}</h1>
               </div>
-              <IPCBadge />
-              <ICLBadge />
-              <IPLBadge />
+              <IndicesBadge />
             </div>
             <div className="flex items-center justify-end gap-1.5">
               <NotificationsBell />
@@ -605,9 +612,7 @@ function AdminLayoutShell({
             }
             metrics={
               <>
-                <IPCBadge />
-                <ICLBadge />
-                <IPLBadge />
+                <IndicesBadge />
                 <PlanBadge />
               </>
             }
