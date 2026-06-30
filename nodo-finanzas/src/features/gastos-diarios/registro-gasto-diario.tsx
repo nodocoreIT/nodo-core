@@ -102,16 +102,24 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
   const cuotas = watch('cuotas') ?? 1;
   const monto = watch('monto') ?? 0;
 
-  // Auto-select account based on payment method
+  const tarjetasActivas = finanzas.tarjetas.filter((t) => t.activa);
+
+  // Auto-select account / card based on payment method
   useEffect(() => {
     if (gastoEditando) return;
-    if (formaPago !== 'TARJETA') {
+    if (formaPago === 'TARJETA') {
+      // Auto-select card: prefer "visa santander" match, fallback to first active
+      const match =
+        tarjetasActivas.find((t) => {
+          const n = t.nombre.toLowerCase();
+          return n.includes('visa') || n.includes('santander');
+        }) ?? tarjetasActivas[0];
+      if (match) setValue('tarjetaId', match.id);
+    } else {
       const cuenta = finanzas.resolverCuentaDeSaldo(undefined, formaPago);
       if (cuenta) setValue('cuentaId', cuenta.id);
     }
-  }, [formaPago, finanzas, setValue, gastoEditando]);
-
-  const tarjetasActivas = finanzas.tarjetas.filter((t) => t.activa);
+  }, [formaPago, finanzas, setValue, gastoEditando, tarjetasActivas]);
   const cuentasActivas = finanzas.cuentas.filter((c) => c.activa);
   const opcionesCuotas = Array.from({ length: 24 }, (_, i) => ({
     value: i + 1,
@@ -216,7 +224,7 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
           />
 
           <Input
-            label="Detalle / Notas (opcional)"
+            label="Notas (opcional)"
             {...register('detalle')}
             placeholder="Notas adicionales"
           />
