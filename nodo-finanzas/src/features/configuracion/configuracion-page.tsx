@@ -14,7 +14,6 @@ import {
   Search,
   X,
   Banknote,
-  Mic,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +22,6 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { ModalConfirmacion } from '@/components/ui/modal-confirmacion';
 import { RubroGestion } from '@/components/rubros/rubro-gestion';
 import { useFinanzas } from '@/hooks/use-finanzas';
-import { useAiSettings } from '@/hooks/use-ai-settings';
 import type {
   CuentaBancaria,
   Tarjeta,
@@ -77,13 +75,12 @@ type FormCategoria = z.infer<typeof schemaCategoria>;
 type FormSueldo = z.infer<typeof schemaSueldo>;
 type FormMedio = z.infer<typeof schemaMedio>;
 
-type Seccion = 'rubros' | 'categorias' | 'cuentas' | 'tarjetas' | 'sueldos' | 'medios' | 'ia';
+type Seccion = 'rubros' | 'categorias' | 'cuentas' | 'tarjetas' | 'sueldos' | 'medios';
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } = {}) {
   const finanzas = useFinanzas();
-  const { aiSettings, setAiSettings } = useAiSettings();
   const [seccion, setSeccion] = useState<Seccion>('rubros');
   const [mostrarForm, setMostrarForm] = useState(false);
 
@@ -365,7 +362,6 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
         <TabBtn id="tarjetas" label="Tarjetas" icon={CreditCard} />
         <TabBtn id="sueldos" label="Sueldos" icon={Banknote} />
         <TabBtn id="medios" label="Medios" icon={CreditCard} />
-        <TabBtn id="ia" label="Integraciones IA" icon={Mic} />
       </div>
 
       {/* ── Rubros ── */}
@@ -812,30 +808,6 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
       )}
 
       {/* ── Integraciones IA ── */}
-      {seccion === 'ia' && (
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-lg font-bold text-navy">Integraciones IA</h3>
-            <p className="text-sm text-slate2 mt-1">
-              Necesaria para dictar transferencias en Saldos (Gemini interpreta origen, destino y monto).
-            </p>
-          </div>
-          <Card className="p-5 space-y-4">
-            <Input
-              label="API Key de Google Gemini"
-              type="password"
-              value={aiSettings.geminiApiKey}
-              onChange={(e) => setAiSettings({ geminiApiKey: e.target.value })}
-              placeholder="AIza…"
-            />
-            <p className="text-xs text-slate2">
-              La clave se guarda solo en este dispositivo. Podés obtenerla en Google AI Studio.
-              Comparte la misma clave que uses en Nodo Inmo si ya la configuraste ahí.
-            </p>
-          </Card>
-        </div>
-      )}
-
       {/* ── Modal Form ── */}
       {mostrarForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
