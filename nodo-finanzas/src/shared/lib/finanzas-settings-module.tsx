@@ -82,7 +82,7 @@ export function FinanzasSettingsModuleProvider({ children }: { children: React.R
       },
       updateUserProfile: updateProfileMutation.mutateAsync,
       isUpdatingUserProfile: updateProfileMutation.isPending,
-      systemConfigContent: <ConfiguracionPage />,
+      systemConfigContent: <ConfiguracionPage embedded />,
       aiUseCases: [
         {
           icon: "🎤",

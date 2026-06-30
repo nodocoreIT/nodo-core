@@ -81,7 +81,7 @@ type Seccion = 'rubros' | 'categorias' | 'cuentas' | 'tarjetas' | 'sueldos' | 'm
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export function ConfiguracionPage() {
+export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } = {}) {
   const finanzas = useFinanzas();
   const { aiSettings, setAiSettings } = useAiSettings();
   const [seccion, setSeccion] = useState<Seccion>('rubros');
@@ -345,15 +345,17 @@ export function ConfiguracionPage() {
   const tarjetas = finanzas.tarjetas || [];
 
   return (
-    <div className="space-y-6">
+    <div className={embedded ? "space-y-4" : "space-y-6"}>
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Settings className="w-8 h-8 text-brand" />
-        <div>
-          <h2 className="text-3xl font-bold text-navy">Configuración</h2>
-          <p className="text-slate2">Gestiona rubros, cuentas, tarjetas y sueldos</p>
+      {!embedded && (
+        <div className="flex items-center gap-3">
+          <Settings className="w-8 h-8 text-brand" />
+          <div>
+            <h2 className="text-3xl font-bold text-navy">Configuración</h2>
+            <p className="text-slate2">Gestiona rubros, cuentas, tarjetas y sueldos</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Tabs */}
       <div className="flex overflow-x-auto gap-1 bg-mist p-1 rounded-lg">
