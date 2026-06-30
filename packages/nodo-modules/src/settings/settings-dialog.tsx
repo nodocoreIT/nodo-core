@@ -1523,19 +1523,25 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
               <div className="border-t border-border pt-6">
                 <h4 className="text-sm font-bold text-navy mb-2">¿Para qué se usa?</h4>
                 <ul className="space-y-2 text-xs text-slate2">
-                  <li className="flex items-start gap-2">
-                    <span className="mt-0.5 text-brand font-bold">🎤</span>
-                    <span>
-                      <strong className="text-navy">Dictado de propiedades:</strong> Hablás en lenguaje natural
-                      y el sistema extrae automáticamente dirección, tipo, precio, moneda y ambientes.
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-0.5 text-brand font-bold">🔒</span>
-                    <span>
-                      La clave se guarda <strong className="text-navy">de forma segura en tu organización</strong> y está disponible en todos los dispositivos.
-                    </span>
-                  </li>
+                  {(module.aiUseCases ?? [
+                    {
+                      icon: "🎤",
+                      title: "Dictado de propiedades:",
+                      description: "Hablás en lenguaje natural y el sistema extrae automáticamente dirección, tipo, precio, moneda y ambientes.",
+                    },
+                    {
+                      icon: "🔒",
+                      description: "La clave se guarda de forma segura en tu organización y está disponible en todos los dispositivos.",
+                    },
+                  ]).map((item, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="mt-0.5 text-brand font-bold">{item.icon}</span>
+                      <span>
+                        {item.title && <strong className="text-navy">{item.title} </strong>}
+                        {item.description}
+                      </span>
+                    </li>
+                  ))}
                 </ul>
               </div>
             </div>

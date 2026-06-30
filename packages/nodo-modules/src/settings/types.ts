@@ -197,4 +197,6 @@ export interface SettingsModuleContextValue {
 
   metaSettingsContent?: ReactNode;
   systemConfigContent?: ReactNode;
+  /** Override the "¿Para qué se usa?" list in the AI settings tab. */
+  aiUseCases?: Array<{ icon: string; title?: string; description: string }>;
 }
