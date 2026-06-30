@@ -6,14 +6,29 @@ import type { NextConfig } from "next";
 // and in Vercel environment variables for production.
 const NODO_INMO_URL = process.env.NODO_INMO_URL ?? "http://localhost:5173";
 const NODO_CLINICA_URL = process.env.NODO_CLINICA_URL ?? "http://localhost:3002";
+/** En el deploy nuevo la app usa basePath /clinica. En legacy (nodo-clinica.vercel.app raíz) dejá vacío. */
+const NODO_CLINICA_REMOTE_PREFIX =
+  process.env.NODO_CLINICA_REMOTE_PREFIX === ""
+    ? ""
+    : (process.env.NODO_CLINICA_REMOTE_PREFIX ?? "/clinica").replace(/\/$/, "");
 const NODO_AUTOS_URL = process.env.NODO_AUTOS_URL ?? "http://localhost:5175";
 const NODO_FINANZAS_URL = process.env.NODO_FINANZAS_URL ?? "http://localhost:5176";
 
 const isDev = process.env.NODE_ENV !== "production";
 
 const clinicaProxy = [
-  { source: "/clinica", destination: `${NODO_CLINICA_URL}/clinica` },
-  { source: "/clinica/:path*", destination: `${NODO_CLINICA_URL}/clinica/:path*` },
+  {
+    source: "/clinica",
+    destination: NODO_CLINICA_REMOTE_PREFIX
+      ? `${NODO_CLINICA_URL}${NODO_CLINICA_REMOTE_PREFIX}`
+      : NODO_CLINICA_URL,
+  },
+  {
+    source: "/clinica/:path*",
+    destination: NODO_CLINICA_REMOTE_PREFIX
+      ? `${NODO_CLINICA_URL}${NODO_CLINICA_REMOTE_PREFIX}/:path*`
+      : `${NODO_CLINICA_URL}/:path*`,
+  },
 ];
 
 const nextConfig: NextConfig = {
@@ -67,20 +82,6 @@ const nextConfig: NextConfig = {
         ...clinicaProxy,
       ],
     };
-  },
-  async redirects() {
-    return [
-      {
-        source: "/nodo-clinica/login",
-        destination: "/clinica/login",
-        permanent: false,
-      },
-      {
-        source: "/nodo-clinica/login/:path*",
-        destination: "/clinica/login/:path*",
-        permanent: false,
-      },
-    ];
   },
 };
 
