@@ -1,5 +1,6 @@
-import { useAiSettings } from "@/hooks/use-ai-settings";
-import { geminiGenerateJson } from "@/lib/gemini-client";
+import { useAiSettings, getActiveApiKey } from "@/hooks/use-ai-settings";
+import { aiGenerateJson } from "@/lib/ai-client";
+import type { AiProvider } from "@/hooks/use-ai-settings";
 import type { Cuenta } from "@/types";
 
 export interface ExtractedTransfer {
@@ -35,12 +36,14 @@ Reglas:
 - No devuelvas nada más que el JSON.`;
 }
 
-async function callGemini(
+async function callAI(
+  provider: AiProvider,
   apiKey: string,
   transcript: string,
   cuentas: Cuenta[],
 ): Promise<ExtractedTransfer> {
-  const parsed = await geminiGenerateJson(
+  const parsed = await aiGenerateJson(
+    provider,
     apiKey,
     buildSystemPrompt(cuentas),
     `Texto dictado: "${transcript}"`,
@@ -86,13 +89,14 @@ async function callGemini(
 
 export function useExtractTransferFromVoice() {
   const { aiSettings } = useAiSettings();
-  const apiKey = aiSettings.geminiApiKey;
+  const apiKey = getActiveApiKey(aiSettings);
+  const provider = aiSettings.provider;
 
   const extract = async (transcript: string, cuentas: Cuenta[]): Promise<ExtractedTransfer> => {
     if (!apiKey) throw new Error("NO_API_KEY");
     if (!transcript.trim()) throw new Error("EMPTY_TRANSCRIPT");
     if (cuentas.length < 2) throw new Error("NEED_TWO_ACCOUNTS");
-    return callGemini(apiKey, transcript, cuentas);
+    return callAI(provider, apiKey, transcript, cuentas);
   };
 
   return { extract, hasApiKey: !!apiKey };
