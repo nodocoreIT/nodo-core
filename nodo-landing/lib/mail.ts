@@ -64,6 +64,67 @@ export async function sendContactEmail({
   });
 }
 
+const FEEDBACK_CATEGORY_LABELS: Record<string, string> = {
+  bug: "ERROR",
+  idea: "IDEA",
+  bloat: "ESTÁ DE MÁS",
+};
+
+type FeedbackPayload = {
+  category: "bug" | "idea" | "bloat";
+  content: string;
+  sourceNode: string;
+  userEmail?: string;
+};
+
+export async function sendFeedbackEmail({
+  category,
+  content,
+  sourceNode,
+  userEmail,
+}: FeedbackPayload): Promise<void> {
+  if (!isMailConfigured()) {
+    throw new Error(
+      "SMTP no configurado: faltan ZOHO_SMTP_USER y/o ZOHO_SMTP_PASSWORD."
+    );
+  }
+
+  const to = process.env.FEEDBACK_TO ?? "nodocore.lp@gmail.com";
+  const categoryLabel = FEEDBACK_CATEGORY_LABELS[category] ?? category.toUpperCase();
+  const escaped = content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  const transporter = nodemailer.createTransport({
+    host: HOST,
+    port: PORT,
+    secure: PORT === 465,
+    auth: { user: USER, pass: PASS },
+  });
+
+  await transporter.sendMail({
+    from: `"NODO Core · Feedback" <${USER}>`,
+    to,
+    replyTo: userEmail,
+    subject: `[${categoryLabel}] Feedback desde NODO ${sourceNode}`,
+    text: [
+      `Categoría: ${categoryLabel}`,
+      `Nodo: ${sourceNode}`,
+      userEmail ? `Usuario: ${userEmail}` : "",
+      "",
+      "Mensaje:",
+      content,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    html: `
+      <h2 style="font-family:sans-serif;margin:0 0 12px">[${categoryLabel}] Feedback desde NODO ${sourceNode}</h2>
+      <p style="font-family:sans-serif;margin:0 0 6px"><strong>Categoría:</strong> ${categoryLabel}</p>
+      ${userEmail ? `<p style="font-family:sans-serif;margin:0 0 6px"><strong>Usuario:</strong> ${userEmail}</p>` : ""}
+      <p style="font-family:sans-serif;margin:12px 0 4px"><strong>Mensaje:</strong></p>
+      <p style="font-family:sans-serif;white-space:pre-wrap;background:#f5f5f5;padding:12px;border-radius:4px;margin:0">${escaped}</p>
+    `,
+  });
+}
+
 export async function sendRegistrationVerificationEmail({
   nombre,
   email,

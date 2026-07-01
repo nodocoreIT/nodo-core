@@ -6,6 +6,7 @@ import {
   buildPanelNotifications,
   type PanelClient,
   type PanelClientUnit,
+  type PanelFeedbackNotification,
   type PanelIdea,
   type PanelOnboardingProfile,
   type PanelTask,
@@ -22,6 +23,8 @@ export function usePanelNotifications() {
   const load = useCallback(async () => {
     try {
       const supabase = createClient();
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
       const [
         { data: units, error: unitsErr },
         { data: clients, error: clientsErr },
@@ -29,6 +32,7 @@ export function usePanelNotifications() {
         { data: ideas, error: ideasErr },
         { data: profiles, error: profilesErr },
         { data: splits, error: splitsErr },
+        { data: feedbackRaw },
       ] = await Promise.all([
         supabase
           .from("client_units")
@@ -42,6 +46,12 @@ export function usePanelNotifications() {
           .from("onboarding_profiles")
           .select("client_unit_id, plan_choice, demo_days"),
         supabase.from("expense_splits").select("share_amount, settled"),
+        supabase
+          .from("panel_notifications")
+          .select("id, kind, category, content, source_node, created_at")
+          .gte("created_at", sevenDaysAgo)
+          .order("created_at", { ascending: false })
+          .limit(10),
       ]);
 
       const queryError =
@@ -62,6 +72,7 @@ export function usePanelNotifications() {
         profiles: (profiles ?? []) as PanelOnboardingProfile[],
         unsettledCajaCount: unsettled.length,
         unsettledCajaTotal,
+        feedbackNotifications: (feedbackRaw ?? []) as PanelFeedbackNotification[],
       });
 
       setItems(notifications);
