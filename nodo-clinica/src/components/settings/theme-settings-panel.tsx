@@ -212,8 +212,14 @@ export function ThemeSettingsPanel({
       </div>
 
       {onReset && (
-        <div className="pt-4 border-t border-border">
-          <Button type="button" variant="outline" onClick={onReset}>
+        <div className="flex justify-center pt-4 border-t border-border">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 px-4 text-xs border-slate-300 text-slate-600"
+            onClick={onReset}
+          >
             Restablecer apariencia por defecto
           </Button>
         </div>

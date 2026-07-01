@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import type { DoctorPaymentSettings, DoctorReminderSettings } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
 import { mergeThemeSettings } from "@/lib/clinic/theme-settings";
+import { mergeConsultorioLayout } from "@/lib/clinic/consultorio-layout";
 import {
   DEFAULT_AVAILABILITY,
   getAvailableDateKeys,
@@ -56,6 +57,7 @@ function doctorOfficePayload(doctor: {
   reminderSettings?: DoctorReminderSettings;
   googleCalendarId?: string;
   themeSettings?: import("@/lib/clinic/theme-settings").DoctorThemeSettings;
+  consultorioLayout?: import("@/lib/clinic/consultorio-layout").ConsultorioLayoutSettings;
   customStudyLabels?: string[];
 }) {
   const availability = getAvailability(doctor);
@@ -70,6 +72,7 @@ function doctorOfficePayload(doctor: {
     googleCalendarId: doctor.googleCalendarId ?? "",
     blockedDates: availability.blockedDates ?? [],
     themeSettings: mergeThemeSettings(doctor.themeSettings),
+    consultorioLayout: mergeConsultorioLayout(doctor.consultorioLayout),
     customStudyLabels: doctor.customStudyLabels ?? [],
   };
 }
@@ -155,6 +158,7 @@ export async function PUT(request: NextRequest) {
     reminderSettings,
     themeSettings,
     customStudyLabels,
+    consultorioLayout,
   } = body as {
     availability?: DoctorAvailability;
     signatureText?: string;
@@ -166,6 +170,7 @@ export async function PUT(request: NextRequest) {
     googleCalendarId?: string;
     reminderSettings?: DoctorReminderSettings;
     themeSettings?: import("@/lib/clinic/theme-settings").DoctorThemeSettings;
+    consultorioLayout?: import("@/lib/clinic/consultorio-layout").ConsultorioLayoutSettings;
     customStudyLabels?: string[];
   };
 
@@ -237,6 +242,9 @@ export async function PUT(request: NextRequest) {
     if (googleCalendarId !== undefined) doctor.googleCalendarId = googleCalendarId;
     if (themeSettings !== undefined) {
       doctor.themeSettings = mergeThemeSettings(themeSettings);
+    }
+    if (consultorioLayout !== undefined) {
+      doctor.consultorioLayout = mergeConsultorioLayout(consultorioLayout);
     }
     if (customStudyLabels !== undefined) {
       doctor.customStudyLabels = customStudyLabels

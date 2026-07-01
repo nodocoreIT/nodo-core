@@ -373,10 +373,18 @@ export function BookAppointmentDialog({
       if (result.valid) {
         toast.success("Comprobante validado — podés continuar");
       } else {
+        const amountFailed = result.checks && !result.checks.amount.pass;
         const failed = result.checks
           ? Object.values(result.checks).find((c) => !c.pass)?.detail
           : result.reasons?.[0];
-        toast.warning(failed ?? "Revisá los datos del comprobante");
+        if (amountFailed) {
+          toast.warning(
+            "El monto del comprobante no coincide con el honorario. Podés reservar igual: el médico lo revisará en Cobros.",
+            { duration: 8000 },
+          );
+        } else {
+          toast.warning(failed ?? "Revisá los datos del comprobante");
+        }
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo analizar el comprobante");

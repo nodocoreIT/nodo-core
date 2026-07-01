@@ -100,6 +100,8 @@ export interface LocalDoctor {
   googleCalendarId?: string;
   /** Colores, tipografía y marca del panel médico */
   themeSettings?: DoctorThemeSettings;
+  /** Disposición del consultorio (módulos, cola, calendario) */
+  consultorioLayout?: import("@/lib/clinic/consultorio-layout").ConsultorioLayoutSettings;
   /** Estudios agregados manualmente por el médico */
   customStudyLabels?: string[];
   createdAt: string;

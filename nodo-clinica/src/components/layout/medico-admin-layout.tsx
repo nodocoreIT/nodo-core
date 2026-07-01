@@ -105,11 +105,11 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (pathname === "/medico/cobros" && doctor) {
       clinicApi.markCobrosNotificationsRead().then(() => {
-        setCobrosUnread(0);
+        refreshCobrosUnread();
         window.dispatchEvent(new CustomEvent("cobros-notifications-read"));
       }).catch(() => {});
     }
-  }, [pathname, doctor]);
+  }, [pathname, doctor, refreshCobrosUnread]);
 
   useEffect(() => {
     clinicApi.getSession().then(async ({ session, user }) => {
@@ -220,7 +220,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
               const proLocked =
                 isProOnlyMedicoRoute(href) && !isPro;
               const showCobrosBadge =
-                href === "/medico/cobros" && cobrosUnread > 0 && pathname !== href;
+                href === "/medico/cobros" && cobrosUnread > 0;
               return (
                 <Link
                   key={href}
@@ -239,10 +239,10 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                   <span className="flex-1">{label}</span>
                   {showCobrosBadge && (
                     <span
-                      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white"
-                      aria-label={`${cobrosUnread} cobro${cobrosUnread === 1 ? "" : "s"} sin leer`}
+                      className="ml-auto shrink-0 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold leading-tight text-white whitespace-nowrap"
+                      aria-label={`${cobrosUnread} pago${cobrosUnread === 1 ? "" : "s"} pendiente${cobrosUnread === 1 ? "" : "s"} de revisión`}
                     >
-                      {cobrosUnread > 9 ? "9+" : cobrosUnread}
+                      {cobrosUnread} Pendiente{cobrosUnread === 1 ? "" : "s"}
                     </span>
                   )}
                 </Link>
@@ -252,10 +252,6 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] p-3 space-y-2">
-          <PlanBadge
-            fallbackPlan={doctor?.subscriptionPlan}
-            variant="sidebar"
-          />
           <div className="flex items-center gap-3 px-1 py-1">
             <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[var(--sidebar-primary)] text-xs font-bold text-[var(--sidebar-primary-foreground)]">
               {initials(displayName)}

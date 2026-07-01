@@ -104,9 +104,10 @@ export function NodoChatBell({
         )}
         aria-label={
           count > 0
-            ? `${count} mensajes nuevos en Nodo Chat`
-            : "Notificaciones de Nodo Chat"
+            ? `${count} mensajes de interconsulta sin leer`
+            : "Mensajes de interconsulta (Nodo Chat)"
         }
+        title="Interconsultas"
       >
         <Bell className="h-5 w-5" />
         {count > 0 && (

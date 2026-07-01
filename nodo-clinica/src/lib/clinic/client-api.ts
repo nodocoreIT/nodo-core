@@ -543,6 +543,7 @@ export const clinicApi = {
     reminderSettings?: import("@/lib/clinic/local-db").DoctorReminderSettings;
     googleCalendarId?: string;
     themeSettings?: import("@/lib/clinic/theme-settings").DoctorThemeSettings;
+    consultorioLayout?: import("@/lib/clinic/consultorio-layout").ConsultorioLayoutSettings;
   }) {
     const res = await fetch("/api/clinic/schedule", {
       method: "PUT",
