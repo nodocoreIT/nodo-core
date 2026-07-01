@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/clinic/session";
+import { readDb } from "@/lib/clinic/local-db";
+import { appointmentNeedsDoctorPaymentReview } from "@/lib/clinic/payment";
 import {
   countUnreadDoctorNotifications,
   listDoctorNotifications,
@@ -23,11 +25,33 @@ export async function GET(request: NextRequest) {
 
   if (scope === "unread_count") {
     const count = await countUnreadDoctorNotifications(session.userId, types);
-    const cobrosCount = await countUnreadDoctorNotifications(session.userId, [
-      "mercadopago_payment",
-      "transfer_pending",
-    ]);
-    return NextResponse.json({ count, cobrosCount });
+    const notificationCobros = await countUnreadDoctorNotifications(
+      session.userId,
+      ["mercadopago_payment", "transfer_pending"],
+    );
+
+    const db = await readDb();
+    let pendingPaymentsCount = 0;
+    for (const apt of db.appointments) {
+      if (apt.doctorId !== session.userId) continue;
+      const docCount = db.documents.filter((d) => d.appointmentId === apt.id)
+        .length;
+      if (
+        appointmentNeedsDoctorPaymentReview(apt, {
+          receiptDocumentCount: docCount,
+        })
+      ) {
+        pendingPaymentsCount += 1;
+      }
+    }
+
+    const cobrosCount = Math.max(notificationCobros, pendingPaymentsCount);
+    return NextResponse.json({
+      count,
+      cobrosCount,
+      pendingPaymentsCount,
+      notificationCobros,
+    });
   }
 
   const items = await listDoctorNotifications(session.userId, {
