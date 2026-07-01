@@ -1,6 +1,5 @@
 import { useState, useEffect, useContext, createContext, useCallback } from "react";
 import { FinanzasService } from "@/services/finanzas-service";
-import { useAuth } from "@nodocore/shared-components";
 
 export type AiProvider = "gemini" | "openai" | "anthropic" | "groq";
 
