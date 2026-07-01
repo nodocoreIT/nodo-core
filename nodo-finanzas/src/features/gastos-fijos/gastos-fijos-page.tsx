@@ -450,7 +450,7 @@ export function GastosFijosPage() {
                         </p>
                       )}
                       {(() => {
-                        const cuenta = gasto.cuentaId ? finanzas.cuentas.find((c) => c.id === gasto.cuentaId) : null;
+                        const cuenta = gasto.cuentaBancariaId ? finanzas.cuentas.find((c) => c.id === gasto.cuentaBancariaId) : null;
                         const pillClass = cuenta ? cuentaPillClass(cuenta.nombre) : 'bg-mist text-slate2';
                         const n = cuenta ? cuenta.nombre.toLowerCase().replace(/\s+/g, '') : '';
                         const banco = n.includes('santander') ? ' Santander' : n.includes('pampa') ? ' Pampa' : '';
@@ -545,7 +545,7 @@ export function GastosFijosPage() {
                     </td>
                     <td className="hidden lg:table-cell py-3 px-2 text-center">
                       {(() => {
-                        const cuenta = gasto.cuentaId ? finanzas.cuentas.find((c) => c.id === gasto.cuentaId) : null;
+                        const cuenta = gasto.cuentaBancariaId ? finanzas.cuentas.find((c) => c.id === gasto.cuentaBancariaId) : null;
                         const pillClass = cuenta ? cuentaPillClass(cuenta.nombre) : 'bg-mist text-slate2';
                         const n = cuenta ? cuenta.nombre.toLowerCase().replace(/\s+/g, '') : '';
                         const banco = n.includes('santander') ? ' Santander' : n.includes('pampa') ? ' Pampa' : '';
