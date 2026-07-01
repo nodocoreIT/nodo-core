@@ -15,12 +15,15 @@ interface VoiceTransferButtonProps {
     descripcion?: string;
   }) => void | Promise<void>;
   disabled?: boolean;
+  /** When true renders a compact outline button (for use inside modal headers) */
+  compact?: boolean;
 }
 
 export function VoiceTransferButton({
   cuentas,
   onTransferExtracted,
   disabled,
+  compact = false,
 }: VoiceTransferButtonProps) {
   const [state, setState] = useState<VoiceState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -152,28 +155,35 @@ export function VoiceTransferButton({
     <div className="relative">
       <Button
         type="button"
-        variant={state === "error" || isListening ? "danger" : "outline"}
-        size="sm"
+        variant={
+          isListening ? "danger" :
+          state === "error" ? (compact ? "danger" : "success") :
+          compact ? "outline" : "success"
+        }
+        size={compact ? "sm" : undefined}
         onClick={handleClick}
         disabled={disabled || isProcessing}
         title={tooltip}
         aria-label={tooltip}
-        className={isListening ? recordingButtonClass : undefined}
+        className={[
+          isListening ? recordingButtonClass : '',
+          !compact ? 'shrink-0 whitespace-nowrap' : '',
+        ].join(' ') || undefined}
       >
         {isProcessing ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="hidden sm:inline">Procesando…</span>
+            <span>{compact ? 'Procesando…' : 'Procesando…'}</span>
           </>
         ) : isListening ? (
           <>
             <MicOff className="h-4 w-4" />
-            <span className="hidden sm:inline">Detener</span>
+            <span>{compact ? 'Detener' : 'Escuchando…'}</span>
           </>
         ) : (
           <>
             <Mic className="h-4 w-4" />
-            <span className="hidden sm:inline">Dictar</span>
+            <span>{compact ? 'Dictar' : 'Transferir por voz'}</span>
           </>
         )}
       </Button>

@@ -1171,21 +1171,22 @@ export class FinanzasService {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private static mapearConsumoTarjetaParaDB(consumo: Partial<ConsumoTarjeta>): any {
-    return {
-      tarjeta_id: consumo.tarjetaId && consumo.tarjetaId !== '' ? consumo.tarjetaId : null,
-      fecha: consumo.fecha,
-      lugar: consumo.lugar,
-      rubro_id: consumo.rubroId && consumo.rubroId !== '' ? consumo.rubroId : null,
-      detalle: consumo.detalle,
-      importe_ars: consumo.importeARS,
-      importe_usd: consumo.importeUSD,
-      cuotas: consumo.cuotas,
-      cuota_actual: consumo.cuotaActual,
-      total_cuotas: consumo.totalCuotas,
-      gasto_fijo: consumo.gastoFijo || false,
-      codigo_operacion: consumo.codigoOperacion,
-      fecha_compra: consumo.fechaCompra,
+    const raw: Record<string, any> = {
+      ...(consumo.tarjetaId !== undefined && { tarjeta_id: consumo.tarjetaId !== '' ? consumo.tarjetaId : null }),
+      ...(consumo.fecha !== undefined && { fecha: consumo.fecha }),
+      ...(consumo.lugar !== undefined && { lugar: consumo.lugar }),
+      ...(consumo.rubroId !== undefined && { rubro_id: consumo.rubroId !== '' ? consumo.rubroId : null }),
+      ...(consumo.detalle !== undefined && { detalle: consumo.detalle }),
+      ...(consumo.importeARS !== undefined && { importe_ars: consumo.importeARS }),
+      ...(consumo.importeUSD !== undefined && { importe_usd: consumo.importeUSD }),
+      ...(consumo.cuotas !== undefined && { cuotas: consumo.cuotas }),
+      ...(consumo.cuotaActual !== undefined && { cuota_actual: consumo.cuotaActual }),
+      ...(consumo.totalCuotas !== undefined && { total_cuotas: consumo.totalCuotas }),
+      ...(consumo.gastoFijo !== undefined && { gasto_fijo: consumo.gastoFijo }),
+      ...(consumo.codigoOperacion !== undefined && { codigo_operacion: consumo.codigoOperacion }),
+      ...(consumo.fechaCompra !== undefined && { fecha_compra: consumo.fechaCompra }),
     };
+    return raw;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
