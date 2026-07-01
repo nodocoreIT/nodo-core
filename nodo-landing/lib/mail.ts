@@ -65,9 +65,22 @@ export async function sendContactEmail({
 }
 
 const FEEDBACK_CATEGORY_LABELS: Record<string, string> = {
-  bug: "ERROR",
-  idea: "IDEA",
-  bloat: "ESTÁ DE MÁS",
+  bug: "Bug",
+  idea: "Idea",
+  bloat: "Mejora",
+};
+
+const FEEDBACK_CATEGORY_COLORS: Record<string, string> = {
+  bug: "#DA5A0E",
+  idea: "#2563EB",
+  bloat: "#059669",
+};
+
+const FEEDBACK_NODE_LABELS: Record<string, string> = {
+  inmo: "NODO | Inmo",
+  autos: "NODO | Autos",
+  finanzas: "NODO | Finanzas",
+  clinica: "NODO | Clínica",
 };
 
 type FeedbackPayload = {
@@ -90,8 +103,10 @@ export async function sendFeedbackEmail({
   }
 
   const to = process.env.FEEDBACK_TO ?? "nodocore.lp@gmail.com";
-  const categoryLabel = FEEDBACK_CATEGORY_LABELS[category] ?? category.toUpperCase();
-  const escaped = content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const categoryLabel = FEEDBACK_CATEGORY_LABELS[category] ?? category;
+  const accentColor = FEEDBACK_CATEGORY_COLORS[category] ?? "#DA5A0E";
+  const nodeLabel = FEEDBACK_NODE_LABELS[sourceNode] ?? `NODO | ${sourceNode}`;
+  const escaped = content.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br/>");
 
   const transporter = nodemailer.createTransport({
     host: HOST,
@@ -104,10 +119,10 @@ export async function sendFeedbackEmail({
     from: `"NODO Core · Feedback" <${USER}>`,
     to,
     replyTo: userEmail,
-    subject: `[${categoryLabel}] Feedback desde NODO ${sourceNode}`,
+    subject: `[${categoryLabel}] Feedback desde ${nodeLabel}`,
     text: [
       `Categoría: ${categoryLabel}`,
-      `Nodo: ${sourceNode}`,
+      `Nodo: ${nodeLabel}`,
       userEmail ? `Usuario: ${userEmail}` : "",
       "",
       "Mensaje:",
@@ -115,12 +130,25 @@ export async function sendFeedbackEmail({
     ]
       .filter(Boolean)
       .join("\n"),
+    attachments: [
+      {
+        filename: "logo_compuestoa.png",
+        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
+        cid: "nodologo",
+      },
+    ],
     html: `
-      <h2 style="font-family:sans-serif;margin:0 0 12px">[${categoryLabel}] Feedback desde NODO ${sourceNode}</h2>
-      <p style="font-family:sans-serif;margin:0 0 6px"><strong>Categoría:</strong> ${categoryLabel}</p>
-      ${userEmail ? `<p style="font-family:sans-serif;margin:0 0 6px"><strong>Usuario:</strong> ${userEmail}</p>` : ""}
-      <p style="font-family:sans-serif;margin:12px 0 4px"><strong>Mensaje:</strong></p>
-      <p style="font-family:sans-serif;white-space:pre-wrap;background:#f5f5f5;padding:12px;border-radius:4px;margin:0">${escaped}</p>
+      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;background-color:#F5F8FC;">
+        <div style="text-align:center;margin-bottom:20px;">
+          <img src="cid:nodologo" alt="NODO Core" style="height:32px;display:inline-block;"/>
+        </div>
+        <h2 style="color:${accentColor};margin-top:0;font-size:20px;text-align:center;">${categoryLabel}</h2>
+        <p style="color:#647890;font-size:13px;text-align:center;margin-top:-12px;margin-bottom:20px;">${nodeLabel}</p>
+        <div style="background:#ffffff;border:1px solid #DEE7F1;border-radius:10px;padding:16px 20px;">
+          <p style="color:#1E293B;font-size:15px;line-height:1.6;margin:0;white-space:pre-wrap;">${escaped}</p>
+        </div>
+        ${userEmail ? `<p style="color:#9DACBE;font-size:12px;margin-top:16px;margin-bottom:0;">Enviado por: <a href="mailto:${userEmail}" style="color:#DA5A0E;">${userEmail}</a></p>` : ""}
+      </div>
     `,
   });
 }
