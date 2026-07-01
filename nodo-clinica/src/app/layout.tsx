@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.png", media: "(prefers-color-scheme: light)" },
-      { url: "/clinica/favicon-dark.png", type: "image/png", media: "(prefers-color-scheme: dark)" },
+      { url: "/favicon-dark.png", type: "image/png", media: "(prefers-color-scheme: dark)" },
     ],
     shortcut: "/favicon.png",
     apple: "/favicon.png",

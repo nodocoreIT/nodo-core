@@ -8,7 +8,9 @@ import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/shared/lib/supabase";
 import { useThemeSettings } from "@/shared/hooks/use-theme-settings";
 import { useAiSettings } from "@/hooks/use-ai-settings";
+// useAiSettings reads from AiSettingsContext — single shared instance mounted in admin-layout
 import { useFinanzasStaff } from "@/shared/hooks/use-finanzas-staff";
+import { ConfiguracionPage } from "@/features/configuracion/configuracion-page";
 
 const FINANZAS_MANAGED_NAV = [
   { to: "/admin/dashboard", label: "Dashboard" },
@@ -19,7 +21,7 @@ const FINANZAS_MANAGED_NAV = [
   { to: "/admin/planes-ahorro", label: "Planes de Ahorro" },
   { to: "/admin/saldos", label: "Saldos" },
   { to: "/admin/informe-mensual", label: "Informe Mensual" },
-  { to: "/admin/configuracion", label: "Configuración" },
+  { to: "/admin/configuracion", label: "Administración" },
 ];
 
 export function FinanzasSettingsModuleProvider({ children }: { children: React.ReactNode }) {
@@ -40,8 +42,8 @@ export function FinanzasSettingsModuleProvider({ children }: { children: React.R
 
   const value = useMemo((): SettingsModuleContextValue => {
     return {
-      // Hide tabs not applicable to finanzas (company, alerts, ipc, ai are still shown)
-      hiddenTabs: ["company"],
+      // Hide tabs not applicable to finanzas
+      hiddenTabs: ["company", "alerts", "ipc", "redes-sociales", "system-config"],
       managedNav: FINANZAS_MANAGED_NAV,
       roleOptions: [
         { value: "member", label: "Miembro" },
@@ -81,6 +83,28 @@ export function FinanzasSettingsModuleProvider({ children }: { children: React.R
       },
       updateUserProfile: updateProfileMutation.mutateAsync,
       isUpdatingUserProfile: updateProfileMutation.isPending,
+      systemConfigContent: <ConfiguracionPage embedded />,
+      aiUseCases: [
+        {
+          icon: "🎤",
+          title: "Gastos diarios:",
+          description: "Dictás un gasto en lenguaje natural y el sistema extrae monto, rubro, fecha y medio de pago automáticamente.",
+        },
+        {
+          icon: "📌",
+          title: "Gastos fijos:",
+          description: "Registrás un gasto mensual recurrente por voz: descripción, monto, rubro y forma de pago.",
+        },
+        {
+          icon: "🔄",
+          title: "Movimientos entre cuentas:",
+          description: "Dictás una transferencia entre tus cuentas indicando origen, destino y monto.",
+        },
+        {
+          icon: "🔒",
+          description: "La clave se guarda de forma segura en tu organización y está disponible en todos los dispositivos.",
+        },
+      ],
     };
   }, [
     settings,

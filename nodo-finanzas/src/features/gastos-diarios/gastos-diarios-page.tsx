@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
-import { Search, Plus, Edit, Trash2, Receipt, X } from 'lucide-react';
+import { useState, useMemo, useRef, useCallback } from 'react';
+import { Search, Plus, Edit, Trash2, Receipt, X, Mic, MicOff, Loader2, Copy, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useOpenSettings } from '@/shared/hooks/use-open-settings';
 import { foldForSearch } from '@nodocore/shared-components';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,13 +12,121 @@ import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { Spinner } from '@/components/ui/spinner';
 import { RegistroGastoDiario } from './registro-gasto-diario';
 import { useFinanzas } from '@/hooks/use-finanzas';
+import { useAiSettings, getActiveApiKey } from '@/hooks/use-ai-settings';
+import { useExtractGastoFromVoice } from './hooks/use-extract-gasto-from-voice';
+import { useRubros } from '@/hooks/use-rubros';
 import { formatearMoneda, formatearFecha } from '@/utils/formatters';
+import { cuentaPillClass } from '@/utils/cuenta-colors';
 import type { GastoDiario } from '@/types';
+
+type VoiceState = 'idle' | 'listening' | 'extracting' | 'error';
+type SortField = 'fecha' | 'descripcion' | 'rubro' | 'monto' | 'formaPago';
+type SortDir = 'asc' | 'desc';
 
 export function GastosDiariosPage() {
   const finanzas = useFinanzas();
+  const { rubrosActivos } = useRubros();
+  const { aiSettings } = useAiSettings();
+  const { extract } = useExtractGastoFromVoice();
+  const { openSettings } = useOpenSettings();
+  const [sortField, setSortField] = useState<SortField>('fecha');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [gastoEditando, setGastoEditando] = useState<GastoDiario | null>(null);
+  const [datosIniciales, setDatosIniciales] = useState<Partial<GastoDiario> | undefined>();
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
+
+  const hasApiKey = !!getActiveApiKey(aiSettings);
+  const isSupported =
+    typeof window !== 'undefined' &&
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
+  const handleVoiceClick = useCallback(async () => {
+    if (voiceState === 'listening') {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    if (!hasApiKey) {
+      setVoiceError('Configurá tu API key en Configuración → Integraciones IA');
+      setVoiceState('error');
+      setTimeout(() => setVoiceState('idle'), 4000);
+      return;
+    }
+
+    if (!isSupported) {
+      setVoiceError('Tu navegador no soporta dictado por voz. Probá en Chrome o Edge.');
+      setVoiceState('error');
+      setTimeout(() => setVoiceState('idle'), 4000);
+      return;
+    }
+
+    setVoiceError(null);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SpeechRecognitionAPI = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recognition = new SpeechRecognitionAPI() as any;
+    recognitionRef.current = recognition;
+
+    recognition.lang = 'es-AR';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setVoiceState('listening');
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onresult = async (event: any) => {
+      const transcript = event.results[0]?.[0]?.transcript ?? '';
+      if (!transcript.trim()) { setVoiceState('idle'); return; }
+
+      setVoiceState('extracting');
+      try {
+        const parsed = await extract({
+          texto: transcript,
+          rubros: rubrosActivos,
+          cuentas: finanzas.cuentas,
+          tarjetas: finanzas.tarjetas,
+          fechaReferencia: new Date().toISOString().slice(0, 10),
+        });
+        setDatosIniciales({
+          descripcion: parsed.descripcion,
+          monto: parsed.monto,
+          fecha: parsed.fecha,
+          formaPago: parsed.formaPago,
+          rubroId: parsed.rubroId,
+          rubro: parsed.rubroCodigo,
+          cuotas: parsed.cuotas,
+        });
+        setGastoEditando(null);
+        setMostrarFormulario(true);
+        setVoiceState('idle');
+      } catch {
+        setVoiceError('No se pudo interpretar el dictado. Intentá de nuevo.');
+        setVoiceState('error');
+        setTimeout(() => setVoiceState('idle'), 4000);
+      }
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onerror = (event: any) => {
+      if (event.error === 'aborted') { setVoiceState('idle'); return; }
+      setVoiceError('Error al escuchar. Verificá que el micrófono esté habilitado.');
+      setVoiceState('error');
+      setTimeout(() => setVoiceState('idle'), 4000);
+    };
+
+    recognition.onend = () => {
+      setVoiceState((curr) => curr === 'listening' ? 'idle' : curr);
+    };
+
+    recognition.start();
+  }, [voiceState, hasApiKey, isSupported, extract, rubrosActivos, finanzas]);
   const [filtroMes, setFiltroMes] = useState(() => {
     const hoy = new Date();
     return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
@@ -45,8 +154,38 @@ export function GastosDiariosPage() {
       list = list.filter((g) => g.rubroId === rubroFiltro);
     }
 
-    return [...list].sort((a, b) => b.fecha.localeCompare(a.fecha));
-  }, [finanzas.gastosDiarios, filtroMes, busqueda, rubroFiltro]);
+    return [...list].sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'fecha':       cmp = a.fecha.localeCompare(b.fecha); break;
+        case 'descripcion': cmp = a.descripcion.localeCompare(b.descripcion, 'es'); break;
+        case 'rubro': {
+          const stripEmoji = (s: string) => s.replace(/^\p{Emoji}\s*/u, '');
+          cmp = stripEmoji(a.rubro ?? '').localeCompare(stripEmoji(b.rubro ?? ''), 'es');
+          break;
+        }
+        case 'monto':       cmp = a.monto - b.monto; break;
+        case 'formaPago':   cmp = a.formaPago.localeCompare(b.formaPago, 'es'); break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [finanzas.gastosDiarios, filtroMes, busqueda, rubroFiltro, sortField, sortDir]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ChevronsUpDown className="inline h-3 w-3 ml-1 opacity-40" />;
+    return sortDir === 'asc'
+      ? <ChevronUp className="inline h-3 w-3 ml-1 text-brand" />
+      : <ChevronDown className="inline h-3 w-3 ml-1 text-brand" />;
+  };
 
   const totalMes = gastosFiltrados.reduce((s, g) => s + g.monto, 0);
   const totalUSD = gastosFiltrados.filter((g) => g.montoUSD && g.montoUSD > 0)
@@ -60,6 +199,7 @@ export function GastosDiariosPage() {
   function cerrarFormulario() {
     setMostrarFormulario(false);
     setGastoEditando(null);
+    setDatosIniciales(undefined);
   }
 
   async function handleGastoRegistrado() {
@@ -85,13 +225,15 @@ export function GastosDiariosPage() {
       const t = finanzas.tarjetas.find((t) => t.id === g.tarjetaId);
       return t ? `T. ${t.nombre}` : 'Tarjeta';
     }
-    const map: Record<string, string> = {
-      EFECTIVO: 'Efectivo',
-      DEBITO: 'Débito',
-      MERCADO_PAGO: 'Mercado Pago',
-      'TRANSFERENCIA BANCO': 'Transferencia',
-    };
-    return map[g.formaPago] ?? g.formaPago;
+    const cuenta = g.cuentaId ? finanzas.cuentas.find((c) => c.id === g.cuentaId) : null;
+    const n = cuenta ? cuenta.nombre.toLowerCase().replace(/\s+/g, '') : '';
+    const banco = n.includes('santander') ? ' Santander' : n.includes('pampa') ? ' Pampa' : '';
+    const esMPReserva = n.includes('mercadopago') && n.includes('reserva');
+    if (g.formaPago === 'MERCADO_PAGO') return esMPReserva ? 'MP Reservas' : 'Mercado Pago';
+    if (g.formaPago === 'DEBITO') return `Débito${banco}`;
+    if (g.formaPago === 'TRANSFERENCIA BANCO') return `Transfer.${banco}`;
+    if (g.formaPago === 'EFECTIVO') return 'Efectivo';
+    return g.formaPago;
   }
 
   if (finanzas.loading && finanzas.gastosDiarios.length === 0) {
@@ -108,6 +250,7 @@ export function GastosDiariosPage() {
         onVolver={cerrarFormulario}
         onGastoRegistrado={handleGastoRegistrado}
         gastoEditando={gastoEditando}
+        datosIniciales={datosIniciales}
       />
     );
   }
@@ -157,11 +300,60 @@ export function GastosDiariosPage() {
         </div>
       </div>
 
-      {/* Add button */}
-      <Button onClick={() => abrirFormulario()} className="w-full">
-        <Plus className="h-4 w-4" />
-        Nuevo Gasto Diario
-      </Button>
+      {/* Actions */}
+      <div className="flex items-center gap-2">
+        <div className="relative">
+          <Button
+            type="button"
+            variant="success"
+            onClick={handleVoiceClick}
+            disabled={voiceState === 'extracting'}
+            title={
+              voiceState === 'listening' ? 'Escuchando… hacé clic para detener' :
+              voiceState === 'extracting' ? 'Procesando con IA…' :
+              !hasApiKey ? 'Configurá tu API key en Configuración → Integraciones IA' :
+              'Cargá tu gasto por voz'
+            }
+            className={`shrink-0 whitespace-nowrap ${voiceState === 'listening' ? 'animate-pulse !bg-red-500 !border-red-500 hover:!bg-red-600' : ''}`}
+          >
+            {voiceState === 'extracting' ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : voiceState === 'listening' ? (
+              <MicOff className="h-4 w-4" />
+            ) : (
+              <Mic className="h-4 w-4" />
+            )}
+            {voiceState === 'listening' ? 'Escuchando…' :
+             voiceState === 'extracting' ? 'Procesando…' :
+             'Cargá tu gasto por voz'}
+          </Button>
+
+          {voiceState === 'listening' && (
+            <span className="absolute -right-1 -top-1 h-3 w-3 animate-ping rounded-full bg-red-500 ring-2 ring-white" />
+          )}
+
+          {voiceState === 'error' && voiceError && (
+            <button
+              type="button"
+              role="alert"
+              onClick={() => openSettings('ai')}
+              className="absolute left-0 top-full z-50 mt-1.5 w-64 max-w-[calc(100vw-2rem)] cursor-pointer rounded-md border border-red-200 bg-red-50 px-3 py-2 text-left text-xs text-red-700 shadow-md transition-colors hover:bg-red-100"
+            >
+              {voiceError}
+              {!hasApiKey && (
+                <span className="mt-0.5 block font-semibold underline">
+                  Ir a Configuración → IA
+                </span>
+              )}
+            </button>
+          )}
+        </div>
+
+        <Button variant="secondary" onClick={() => abrirFormulario()} className="shrink-0 whitespace-nowrap mr-4 !bg-green-100 !text-green-800 hover:!bg-green-200 !border-transparent">
+          <Plus className="h-4 w-4" />
+          Gasto Diario
+        </Button>
+      </div>
 
       {/* List */}
       <Card>
@@ -181,11 +373,31 @@ export function GastosDiariosPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-mist">
-                <th className="text-left py-3 px-2 font-medium text-slate2">Fecha</th>
-                <th className="text-left py-3 px-2 font-medium text-slate2">Descripción</th>
-                <th className="hidden sm:table-cell text-left py-3 px-2 font-medium text-slate2">Rubro</th>
-                <th className="text-right py-3 px-2 font-medium text-slate2">Monto</th>
-                <th className="hidden lg:table-cell text-center py-3 px-2 font-medium text-slate2">Forma</th>
+                <th className="text-left py-3 px-2 font-medium text-slate2">
+                  <button onClick={() => handleSort('fecha')} className="flex items-center hover:text-ink transition-colors">
+                    Fecha<SortIcon field="fecha" />
+                  </button>
+                </th>
+                <th className="text-left py-3 px-2 font-medium text-slate2">
+                  <button onClick={() => handleSort('descripcion')} className="flex items-center hover:text-ink transition-colors">
+                    Descripción<SortIcon field="descripcion" />
+                  </button>
+                </th>
+                <th className="hidden sm:table-cell text-left py-3 px-2 font-medium text-slate2">
+                  <button onClick={() => handleSort('rubro')} className="flex items-center hover:text-ink transition-colors">
+                    Rubro<SortIcon field="rubro" />
+                  </button>
+                </th>
+                <th className="text-right py-3 px-2 font-medium text-slate2">
+                  <button onClick={() => handleSort('monto')} className="flex items-center justify-end w-full hover:text-ink transition-colors">
+                    Monto<SortIcon field="monto" />
+                  </button>
+                </th>
+                <th className="hidden lg:table-cell text-center py-3 px-2 font-medium text-slate2">
+                  <button onClick={() => handleSort('formaPago')} className="flex items-center justify-center w-full hover:text-ink transition-colors">
+                    Forma<SortIcon field="formaPago" />
+                  </button>
+                </th>
                 <th className="text-right py-3 px-2 font-medium text-slate2">Acciones</th>
               </tr>
             </thead>
@@ -210,12 +422,28 @@ export function GastosDiariosPage() {
                       }
                     </td>
                     <td className="hidden lg:table-cell py-3 px-2 text-center">
-                      <span className="text-[9px] font-bold uppercase bg-mist text-slate2 px-2 py-1 rounded-md">
-                        {obtenerEtiquetaFormaPago(g)}
-                      </span>
+                      {(() => {
+                        const cuenta = g.cuentaId ? finanzas.cuentas.find((c) => c.id === g.cuentaId) : null;
+                        const pillClass = cuenta ? cuentaPillClass(cuenta.nombre) : 'bg-mist text-slate2';
+                        return (
+                          <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md ${pillClass}`}>
+                            {obtenerEtiquetaFormaPago(g)}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="py-3 px-2">
                       <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => {
+                            setDatosIniciales({ descripcion: g.descripcion, detalle: g.detalle, monto: g.monto, fecha: g.fecha, rubroId: g.rubroId, rubro: g.rubro, formaPago: g.formaPago, tarjetaId: g.tarjetaId, cuentaId: g.cuentaId, cuotas: g.cuotas });
+                            setMostrarFormulario(true);
+                          }}
+                          className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"
+                          title="Duplicar"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
                         <button
                           onClick={() => abrirFormulario(g)}
                           className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"

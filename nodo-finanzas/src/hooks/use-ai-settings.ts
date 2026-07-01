@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext, createContext, useCallback } from "react";
 import { FinanzasService } from "@/services/finanzas-service";
-import { useAuth } from "@nodocore/shared-components";
 
 export type AiProvider = "gemini" | "openai" | "anthropic" | "groq";
 
@@ -29,9 +28,21 @@ export function getActiveApiKey(settings: AiSettings): string {
 
 const AI_SETTINGS_KEY = "ai_settings";
 
-export function useAiSettings() {
-  const { session } = useAuth();
-  const userId = session?.user?.id;
+// ── Shared context so all consumers react to the same state ──────────────────
+
+interface AiSettingsContextValue {
+  aiSettings: AiSettings;
+  setAiSettings: (next: Partial<AiSettings>) => Promise<void>;
+  loading: boolean;
+}
+
+export const AiSettingsContext = createContext<AiSettingsContextValue>({
+  aiSettings: DEFAULT_AI_SETTINGS,
+  setAiSettings: async () => {},
+  loading: true,
+});
+
+export function useAiSettingsProvider(userId: string | undefined) {
   const [aiSettings, setAiSettingsState] = useState<AiSettings>(DEFAULT_AI_SETTINGS);
   const [loading, setLoading] = useState(true);
 
@@ -60,7 +71,7 @@ export function useAiSettings() {
     return () => { cancelled = true; };
   }, [userId]);
 
-  const setAiSettings = async (next: Partial<AiSettings>) => {
+  const setAiSettings = useCallback(async (next: Partial<AiSettings>) => {
     const merged = { ...aiSettings, ...next };
     setAiSettingsState(merged);
     try {
@@ -68,7 +79,11 @@ export function useAiSettings() {
     } catch {
       // Best-effort
     }
-  };
+  }, [aiSettings]);
 
   return { aiSettings, setAiSettings, loading };
+}
+
+export function useAiSettings() {
+  return useContext(AiSettingsContext);
 }
