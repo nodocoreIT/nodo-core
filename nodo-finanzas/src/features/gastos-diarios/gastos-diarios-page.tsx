@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from 'react';
-import { Search, Plus, Edit, Trash2, Receipt, X, Mic, MicOff, Loader2 } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Receipt, X, Mic, MicOff, Loader2, Copy, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useOpenSettings } from '@/shared/hooks/use-open-settings';
 import { foldForSearch } from '@nodocore/shared-components';
@@ -16,9 +16,12 @@ import { useAiSettings, getActiveApiKey } from '@/hooks/use-ai-settings';
 import { useExtractGastoFromVoice } from './hooks/use-extract-gasto-from-voice';
 import { useRubros } from '@/hooks/use-rubros';
 import { formatearMoneda, formatearFecha } from '@/utils/formatters';
+import { cuentaPillClass } from '@/utils/cuenta-colors';
 import type { GastoDiario } from '@/types';
 
 type VoiceState = 'idle' | 'listening' | 'extracting' | 'error';
+type SortField = 'fecha' | 'descripcion' | 'rubro' | 'monto' | 'formaPago';
+type SortDir = 'asc' | 'desc';
 
 export function GastosDiariosPage() {
   const finanzas = useFinanzas();
@@ -26,6 +29,8 @@ export function GastosDiariosPage() {
   const { aiSettings } = useAiSettings();
   const { extract } = useExtractGastoFromVoice();
   const { openSettings } = useOpenSettings();
+  const [sortField, setSortField] = useState<SortField>('fecha');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [gastoEditando, setGastoEditando] = useState<GastoDiario | null>(null);
   const [datosIniciales, setDatosIniciales] = useState<Partial<GastoDiario> | undefined>();
@@ -149,8 +154,38 @@ export function GastosDiariosPage() {
       list = list.filter((g) => g.rubroId === rubroFiltro);
     }
 
-    return [...list].sort((a, b) => b.fecha.localeCompare(a.fecha));
-  }, [finanzas.gastosDiarios, filtroMes, busqueda, rubroFiltro]);
+    return [...list].sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'fecha':       cmp = a.fecha.localeCompare(b.fecha); break;
+        case 'descripcion': cmp = a.descripcion.localeCompare(b.descripcion, 'es'); break;
+        case 'rubro': {
+          const stripEmoji = (s: string) => s.replace(/^\p{Emoji}\s*/u, '');
+          cmp = stripEmoji(a.rubro ?? '').localeCompare(stripEmoji(b.rubro ?? ''), 'es');
+          break;
+        }
+        case 'monto':       cmp = a.monto - b.monto; break;
+        case 'formaPago':   cmp = a.formaPago.localeCompare(b.formaPago, 'es'); break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [finanzas.gastosDiarios, filtroMes, busqueda, rubroFiltro, sortField, sortDir]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ChevronsUpDown className="inline h-3 w-3 ml-1 opacity-40" />;
+    return sortDir === 'asc'
+      ? <ChevronUp className="inline h-3 w-3 ml-1 text-brand" />
+      : <ChevronDown className="inline h-3 w-3 ml-1 text-brand" />;
+  };
 
   const totalMes = gastosFiltrados.reduce((s, g) => s + g.monto, 0);
   const totalUSD = gastosFiltrados.filter((g) => g.montoUSD && g.montoUSD > 0)
@@ -190,13 +225,15 @@ export function GastosDiariosPage() {
       const t = finanzas.tarjetas.find((t) => t.id === g.tarjetaId);
       return t ? `T. ${t.nombre}` : 'Tarjeta';
     }
-    const map: Record<string, string> = {
-      EFECTIVO: 'Efectivo',
-      DEBITO: 'Débito',
-      MERCADO_PAGO: 'Mercado Pago',
-      'TRANSFERENCIA BANCO': 'Transferencia',
-    };
-    return map[g.formaPago] ?? g.formaPago;
+    const cuenta = g.cuentaId ? finanzas.cuentas.find((c) => c.id === g.cuentaId) : null;
+    const n = cuenta ? cuenta.nombre.toLowerCase().replace(/\s+/g, '') : '';
+    const banco = n.includes('santander') ? ' Santander' : n.includes('pampa') ? ' Pampa' : '';
+    const esMPReserva = n.includes('mercadopago') && n.includes('reserva');
+    if (g.formaPago === 'MERCADO_PAGO') return esMPReserva ? 'MP Reservas' : 'Mercado Pago';
+    if (g.formaPago === 'DEBITO') return `Débito${banco}`;
+    if (g.formaPago === 'TRANSFERENCIA BANCO') return `Transfer.${banco}`;
+    if (g.formaPago === 'EFECTIVO') return 'Efectivo';
+    return g.formaPago;
   }
 
   if (finanzas.loading && finanzas.gastosDiarios.length === 0) {
@@ -336,11 +373,31 @@ export function GastosDiariosPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-mist">
-                <th className="text-left py-3 px-2 font-medium text-slate2">Fecha</th>
-                <th className="text-left py-3 px-2 font-medium text-slate2">Descripción</th>
-                <th className="hidden sm:table-cell text-left py-3 px-2 font-medium text-slate2">Rubro</th>
-                <th className="text-right py-3 px-2 font-medium text-slate2">Monto</th>
-                <th className="hidden lg:table-cell text-center py-3 px-2 font-medium text-slate2">Forma</th>
+                <th className="text-left py-3 px-2 font-medium text-slate2">
+                  <button onClick={() => handleSort('fecha')} className="flex items-center hover:text-ink transition-colors">
+                    Fecha<SortIcon field="fecha" />
+                  </button>
+                </th>
+                <th className="text-left py-3 px-2 font-medium text-slate2">
+                  <button onClick={() => handleSort('descripcion')} className="flex items-center hover:text-ink transition-colors">
+                    Descripción<SortIcon field="descripcion" />
+                  </button>
+                </th>
+                <th className="hidden sm:table-cell text-left py-3 px-2 font-medium text-slate2">
+                  <button onClick={() => handleSort('rubro')} className="flex items-center hover:text-ink transition-colors">
+                    Rubro<SortIcon field="rubro" />
+                  </button>
+                </th>
+                <th className="text-right py-3 px-2 font-medium text-slate2">
+                  <button onClick={() => handleSort('monto')} className="flex items-center justify-end w-full hover:text-ink transition-colors">
+                    Monto<SortIcon field="monto" />
+                  </button>
+                </th>
+                <th className="hidden lg:table-cell text-center py-3 px-2 font-medium text-slate2">
+                  <button onClick={() => handleSort('formaPago')} className="flex items-center justify-center w-full hover:text-ink transition-colors">
+                    Forma<SortIcon field="formaPago" />
+                  </button>
+                </th>
                 <th className="text-right py-3 px-2 font-medium text-slate2">Acciones</th>
               </tr>
             </thead>
@@ -365,12 +422,28 @@ export function GastosDiariosPage() {
                       }
                     </td>
                     <td className="hidden lg:table-cell py-3 px-2 text-center">
-                      <span className="text-[9px] font-bold uppercase bg-mist text-slate2 px-2 py-1 rounded-md">
-                        {obtenerEtiquetaFormaPago(g)}
-                      </span>
+                      {(() => {
+                        const cuenta = g.cuentaId ? finanzas.cuentas.find((c) => c.id === g.cuentaId) : null;
+                        const pillClass = cuenta ? cuentaPillClass(cuenta.nombre) : 'bg-mist text-slate2';
+                        return (
+                          <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md ${pillClass}`}>
+                            {obtenerEtiquetaFormaPago(g)}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="py-3 px-2">
                       <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => {
+                            setDatosIniciales({ descripcion: g.descripcion, detalle: g.detalle, monto: g.monto, fecha: g.fecha, rubroId: g.rubroId, rubro: g.rubro, formaPago: g.formaPago, tarjetaId: g.tarjetaId, cuentaId: g.cuentaId, cuotas: g.cuotas });
+                            setMostrarFormulario(true);
+                          }}
+                          className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"
+                          title="Duplicar"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
                         <button
                           onClick={() => abrirFormulario(g)}
                           className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"

@@ -76,7 +76,7 @@ export function DetalleTarjetaPage() {
   const handleSaveEdit = async (cambios: Partial<ConsumoTarjeta>) => {
     if (!consumoEditando) return;
     try {
-      await finanzas.actualizarConsumo(consumoEditando.id, cambios);
+      await finanzas.actualizarConsumo(consumoEditando.id, { tarjetaId: consumoEditando.tarjetaId, ...cambios });
       await finanzas.recargarConsumosTarjetas();
       setConsumoEditando(null);
       toast.success('Consumo actualizado');
@@ -271,23 +271,21 @@ export function DetalleTarjetaPage() {
                           : ''}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
+                        <div className="flex items-center justify-end gap-1">
+                          <button
                             onClick={() => setConsumoEditando(consumo)}
-                            className="h-8 w-8 p-0"
+                            className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"
+                            title="Editar"
                           >
-                            <Edit className="w-4 h-4 text-brand" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <button
                             onClick={() => handleEliminar(consumo)}
-                            className="h-8 w-8 p-0 border-red-200 hover:bg-red-50"
+                            className="p-1.5 text-slate2 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Eliminar"
                           >
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </Button>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>

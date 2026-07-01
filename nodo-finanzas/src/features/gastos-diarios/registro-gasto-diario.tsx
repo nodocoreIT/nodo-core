@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArrowLeft, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useForm, Controller } from 'react-hook-form';
@@ -105,34 +105,25 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
   const tarjetasActivas = finanzas.tarjetas.filter((t) => t.activa);
   const cuentasActivas = finanzas.cuentas.filter((c) => c.activa);
 
-  // Auto-select account / card based on payment method
-  useEffect(() => {
-    if (gastoEditando) return;
+  const norm = useCallback((s: string) => s.toLowerCase().replace(/\s/g, ''), []);
 
-    const normalize = (s: string) => s.toLowerCase().replace(/\s/g, '');
+  // Compute auto-selections inline — instant, no effect delay
+  const autoTarjetaId = useMemo(() => {
+    if (gastoEditando) return '';
+    const visibles = tarjetasActivas.filter((t) => !t.banco?.toLowerCase().includes('pampa'));
+    return (
+      visibles.find((t) => { const n = t.nombre.toLowerCase(); return n.includes('visa') || n.includes('santander'); })
+      ?? visibles[0]
+    )?.id ?? '';
+  }, [tarjetasActivas, gastoEditando]);
 
-    if (formaPago === 'TARJETA') {
-      const match =
-        tarjetasActivas.find((t) => {
-          const n = t.nombre.toLowerCase();
-          return n.includes('visa') || n.includes('santander');
-        }) ?? tarjetasActivas[0];
-      if (match) setValue('tarjetaId', match.id);
-    } else {
-      const keyword =
-        formaPago === 'MERCADO_PAGO' ? 'mercadopago' :
-        formaPago === 'EFECTIVO'     ? 'efectivo'    :
-        (formaPago === 'DEBITO' || formaPago === 'TRANSFERENCIA BANCO') ? 'santander' : null;
-
-      if (keyword) {
-        const cuenta = cuentasActivas.find((c) => {
-          const n = normalize(c.nombre);
-          return n.includes(keyword) && !n.includes('reserva');
-        });
-        if (cuenta) setValue('cuentaId', cuenta.id);
-      }
-    }
-  }, [formaPago, setValue, gastoEditando, tarjetasActivas, cuentasActivas]);
+  const autoCuentaId = useMemo(() => {
+    if (gastoEditando) return '';
+    if (formaPago === 'EFECTIVO') return cuentasActivas.find((c) => norm(c.nombre).includes('efectivo'))?.id ?? '';
+    if (formaPago === 'MERCADO_PAGO') return cuentasActivas.find((c) => { const n = norm(c.nombre); return n.includes('mercadopago') && !n.includes('reserva'); })?.id ?? '';
+    if (formaPago === 'DEBITO' || formaPago === 'TRANSFERENCIA BANCO') return cuentasActivas.find((c) => { const n = norm(c.nombre); return n.includes('santander') && !n.includes('pampa'); })?.id ?? '';
+    return '';
+  }, [cuentasActivas, formaPago, gastoEditando, norm]);
   const opcionesCuotas = Array.from({ length: 24 }, (_, i) => ({
     value: i + 1,
     label: i === 0 ? '1 cuota (contado)' : `${i + 1} cuotas`,
@@ -142,7 +133,10 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
   async function onSubmit(data: FormData) {
     setProcesando(true);
     try {
-      if (data.formaPago === 'TARJETA' && !data.tarjetaId) {
+      const effectiveTarjetaId = data.tarjetaId || autoTarjetaId;
+      const effectiveCuentaId = data.cuentaId || autoCuentaId;
+
+      if (data.formaPago === 'TARJETA' && !effectiveTarjetaId) {
         toast.error('Seleccioná una tarjeta para continuar');
         return;
       }
@@ -155,8 +149,8 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
         rubroId: data.rubroId,
         rubro: data.rubro || data.rubroId,
         formaPago: data.formaPago,
-        tarjetaId: data.tarjetaId || undefined,
-        cuentaId: data.cuentaId || undefined,
+        tarjetaId: effectiveTarjetaId || undefined,
+        cuentaId: effectiveCuentaId || undefined,
         cuotas: data.cuotas,
         planId: data.planId || undefined,
         prestamoId: data.prestamoId || undefined,
@@ -256,38 +250,58 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
               )}
             />
 
-            <Select
-              label="Forma de Pago"
-              options={FORMAS_PAGO}
-              error={errors.formaPago?.message}
-              {...register('formaPago')}
+            <Controller
+              control={control}
+              name="formaPago"
+              render={({ field }) => (
+                <Select
+                  label="Forma de Pago"
+                  options={FORMAS_PAGO}
+                  error={errors.formaPago?.message}
+                  value={field.value ?? ''}
+                  onChange={(e) => {
+                    field.onChange(e.target.value);
+                    setValue('cuentaId', '');
+                    setValue('tarjetaId', '');
+                  }}
+                  name={field.name}
+                />
+              )}
             />
           </div>
 
-          {/* Tarjeta fields */}
-          {formaPago === 'TARJETA' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <Select
-                label="Tarjeta"
-                options={tarjetasActivas.map((t) => ({
-                  value: t.id,
-                  label: `${t.nombre} - ${t.banco}`,
-                }))}
-                allowEmpty
-                emptyLabel="— Seleccioná una tarjeta —"
-                {...register('tarjetaId')}
-              />
+          {/* Tarjeta fields — always mounted so setValue fires reliably */}
+          <div className={formaPago !== 'TARJETA' ? 'hidden' : 'grid grid-cols-1 md:grid-cols-2 gap-5'}>
+            <Controller
+              control={control}
+              name="tarjetaId"
+              render={({ field }) => (
+                <Select
+                  label="Tarjeta"
+                  options={tarjetasActivas
+                    .filter((t) => !t.banco?.toLowerCase().includes('pampa'))
+                    .map((t) => ({
+                      value: t.id,
+                      label: t.nombre,
+                    }))}
+                  allowEmpty
+                  emptyLabel="— Seleccioná una tarjeta —"
+                  value={field.value || autoTarjetaId}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  name={field.name}
+                />
+              )}
+            />
 
-              <Select
-                label="Cuotas"
-                options={opcionesCuotas.map((option) => ({
-                  value: String(option.value),
-                  label: option.label,
-                }))}
-                {...register('cuotas', { valueAsNumber: true })}
-              />
-            </div>
-          )}
+            <Select
+              label="Cuotas"
+              options={opcionesCuotas.map((option) => ({
+                value: String(option.value),
+                label: option.label,
+              }))}
+              {...register('cuotas', { valueAsNumber: true })}
+            />
+          </div>
 
           {/* Cuotas summary */}
           {formaPago === 'TARJETA' && cuotas > 1 && (
@@ -299,19 +313,27 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
             </div>
           )}
 
-          {/* Non-card account selector */}
-          {(formaPago === 'DEBITO' || formaPago === 'MERCADO_PAGO' || formaPago === 'EFECTIVO' || formaPago === 'TRANSFERENCIA BANCO') && (
-            <Select
-              label="Cuenta origen"
-              options={cuentasActivas.map((c) => ({
-                value: c.id,
-                label: `${c.nombre} — ${new Intl.NumberFormat('es-AR').format(c.saldoActual)}`,
-              }))}
-              allowEmpty
-              emptyLabel="Seleccioná una cuenta"
-              {...register('cuentaId')}
+          {/* Account selector — always mounted so setValue fires reliably */}
+          <div className={(formaPago === 'DEBITO' || formaPago === 'MERCADO_PAGO' || formaPago === 'EFECTIVO' || formaPago === 'TRANSFERENCIA BANCO') ? '' : 'hidden'}>
+            <Controller
+              control={control}
+              name="cuentaId"
+              render={({ field }) => (
+                <Select
+                  label="Cuenta origen"
+                  options={cuentasActivas.map((c) => ({
+                    value: c.id,
+                    label: `${c.nombre} — ${new Intl.NumberFormat('es-AR').format(c.saldoActual)}`,
+                  }))}
+                  allowEmpty
+                  emptyLabel="Seleccioná una cuenta"
+                  value={field.value || autoCuentaId}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  name={field.name}
+                />
+              )}
             />
-          )}
+          </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-mist">
             <Button type="button" variant="outline" onClick={onVolver} disabled={procesando}>

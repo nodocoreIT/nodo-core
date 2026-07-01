@@ -401,6 +401,26 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
             )}
           </div>
 
+          {finanzas.loading && categoriasOrdenadas.length === 0 && (
+            <Card className="p-0 overflow-hidden">
+              <table className="w-full">
+                <tbody className="divide-y divide-mist animate-pulse">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <tr key={i}>
+                      <td className="px-6 py-4"><div className="h-4 w-40 bg-mist rounded-md" /></td>
+                      <td className="px-6 py-4"><div className="h-5 w-14 bg-mist rounded-full" /></td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <div className="h-7 w-7 bg-mist rounded-lg" />
+                          <div className="h-7 w-7 bg-mist rounded-lg" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          )}
           {categoriasOrdenadas.length > 0 ? (
             <Card className="p-0 overflow-hidden">
               <div className="overflow-x-auto">
@@ -590,7 +610,27 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
               </Card>
             ))}
 
-            {cuentasBancarias.length === 0 && (
+            {finanzas.loading ? (
+              [0, 1, 2].map((i) => (
+                <Card key={i} className="p-4 animate-pulse">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-40 bg-mist rounded-md" />
+                      <div className="h-3 w-28 bg-mist/70 rounded-md" />
+                      <div className="h-3 w-48 bg-mist/70 rounded-md" />
+                      <div className="flex gap-1.5 mt-3">
+                        <div className="h-4 w-20 bg-mist rounded-md" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="h-6 w-14 bg-mist rounded-full" />
+                      <div className="h-8 w-8 bg-mist rounded-lg" />
+                      <div className="h-8 w-8 bg-mist rounded-lg" />
+                    </div>
+                  </div>
+                </Card>
+              ))
+            ) : cuentasBancarias.length === 0 && (
               <Card className="p-8 text-center">
                 <Building2 className="w-12 h-12 text-slate2 mx-auto mb-4 opacity-30" />
                 <p className="text-slate2">No hay cuentas bancarias configuradas</p>
@@ -616,6 +656,25 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
           </div>
 
           <div className="grid gap-4">
+            {finanzas.loading && tarjetas.length === 0 && [0, 1, 2].map((i) => (
+              <Card key={i} className="p-4 animate-pulse">
+                <div className="flex items-start gap-4">
+                  <div className="p-2 bg-mist rounded-lg flex-shrink-0">
+                    <div className="w-5 h-5 bg-mist/80 rounded" />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-36 bg-mist rounded-md" />
+                    <div className="h-3 w-24 bg-mist/70 rounded-md" />
+                    <div className="h-4 w-16 bg-mist rounded-md mt-2" />
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="h-6 w-14 bg-mist rounded-full" />
+                    <div className="h-8 w-8 bg-mist rounded-lg" />
+                    <div className="h-8 w-8 bg-mist rounded-lg" />
+                  </div>
+                </div>
+              </Card>
+            ))}
             {tarjetas.map((tarjeta) => (
               <Card key={tarjeta.id} className="p-4">
                 <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -661,7 +720,7 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
               </Card>
             ))}
 
-            {tarjetas.length === 0 && (
+            {!finanzas.loading && tarjetas.length === 0 && (
               <Card className="p-8 text-center">
                 <CreditCard className="w-12 h-12 text-slate2 mx-auto mb-4 opacity-30" />
                 <p className="text-slate2">No hay tarjetas configuradas</p>
@@ -687,6 +746,21 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {finanzas.loading && finanzas.configuracion.sueldos.length === 0 && [0, 1].map((i) => (
+              <Card key={i} className="relative overflow-hidden p-5 animate-pulse">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-mist rounded" />
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-mist rounded-lg w-9 h-9" />
+                    <div className="space-y-1.5">
+                      <div className="h-4 w-28 bg-mist rounded-md" />
+                      <div className="h-3 w-10 bg-mist/70 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+                <div className="h-7 w-32 bg-mist rounded-md" />
+              </Card>
+            ))}
             {finanzas.configuracion.sueldos.map((sueldo) => (
               <Card key={sueldo.id} className="relative overflow-hidden group p-5">
                 <div className="flex justify-between items-start mb-4">
@@ -723,7 +797,7 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
             ))}
           </div>
 
-          {finanzas.configuracion.sueldos.length === 0 && (
+          {!finanzas.loading && finanzas.configuracion.sueldos.length === 0 && (
             <div className="text-center py-12 bg-mist/20 rounded-xl border-2 border-dashed border-mist">
               <Banknote className="w-12 h-12 text-slate2 mx-auto mb-3 opacity-30" />
               <p className="text-slate2">No hay sueldos cargados todavía</p>
@@ -757,6 +831,22 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-mist">
+                  {finanzas.loading && finanzas.configuracion.formasDePago.length === 0 && [0, 1, 2, 3].map((i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 bg-mist rounded-lg flex-shrink-0" />
+                          <div className="space-y-1.5">
+                            <div className="h-3.5 w-28 bg-mist rounded-md" />
+                            <div className="h-2.5 w-16 bg-mist/70 rounded-md" />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4"><div className="h-3.5 w-36 bg-mist rounded-md" /></td>
+                      <td className="px-6 py-4"><div className="h-5 w-14 bg-mist rounded-full" /></td>
+                      <td className="px-6 py-4 text-right"><div className="h-8 w-16 bg-mist rounded-lg ml-auto" /></td>
+                    </tr>
+                  ))}
                   {finanzas.configuracion.formasDePago.map((medio) => {
                     const cuentaVinc = finanzas.cuentas.find((c) => c.id === medio.cuentaSaldoId);
                     return (

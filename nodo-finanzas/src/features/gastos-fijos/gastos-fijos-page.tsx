@@ -16,6 +16,7 @@ import { useRubros } from '@/hooks/use-rubros';
 import { useDolar } from '@/hooks/use-dolar';
 import { useExtractGastoFijoFromVoice, type ExtractedGastoFijo } from './hooks/use-extract-gasto-fijo-from-voice';
 import { formatearMoneda, esFechaDelMesActual } from '@/utils/formatters';
+import { cuentaPillClass } from '@/utils/cuenta-colors';
 import { normalizarCodigoRubro } from '@/utils/rubro-formatters';
 import type { GastoFijo } from '@/types';
 
@@ -448,9 +449,24 @@ export function GastosFijosPage() {
                           ≈ {formatearMoneda(dolar.convertirUSDaARS(gasto.monto))}
                         </p>
                       )}
-                      <span className="text-[9px] font-bold uppercase bg-mist text-slate2 px-2 py-1 rounded-md">
-                        {gasto.formaDePago}
-                      </span>
+                      {(() => {
+                        const cuenta = gasto.cuentaId ? finanzas.cuentas.find((c) => c.id === gasto.cuentaId) : null;
+                        const pillClass = cuenta ? cuentaPillClass(cuenta.nombre) : 'bg-mist text-slate2';
+                        const n = cuenta ? cuenta.nombre.toLowerCase().replace(/\s+/g, '') : '';
+                        const banco = n.includes('santander') ? ' Santander' : n.includes('pampa') ? ' Pampa' : '';
+                        const esMPReserva = n.includes('mercadopago') && n.includes('reserva');
+                        const label =
+                          gasto.formaDePago === 'MERCADO_PAGO' ? (esMPReserva ? 'MP Reservas' : 'Mercado Pago') :
+                          gasto.formaDePago === 'DEBITO' ? `Débito${banco}` :
+                          gasto.formaDePago === 'TRANSFERENCIA BANCO' ? `Transfer.${banco}` :
+                          gasto.formaDePago === 'EFECTIVO' ? 'Efectivo' :
+                          gasto.formaDePago;
+                        return (
+                          <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md ${pillClass}`}>
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     <div className="flex items-center justify-end gap-1">
@@ -528,9 +544,24 @@ export function GastosFijosPage() {
                       )}
                     </td>
                     <td className="hidden lg:table-cell py-3 px-2 text-center">
-                      <span className="text-[9px] font-bold uppercase bg-mist text-slate2 px-2 py-1 rounded-md">
-                        {gasto.formaDePago}
-                      </span>
+                      {(() => {
+                        const cuenta = gasto.cuentaId ? finanzas.cuentas.find((c) => c.id === gasto.cuentaId) : null;
+                        const pillClass = cuenta ? cuentaPillClass(cuenta.nombre) : 'bg-mist text-slate2';
+                        const n = cuenta ? cuenta.nombre.toLowerCase().replace(/\s+/g, '') : '';
+                        const banco = n.includes('santander') ? ' Santander' : n.includes('pampa') ? ' Pampa' : '';
+                        const esMPReserva = n.includes('mercadopago') && n.includes('reserva');
+                        const label =
+                          gasto.formaDePago === 'MERCADO_PAGO' ? (esMPReserva ? 'MP Reservas' : 'Mercado Pago') :
+                          gasto.formaDePago === 'DEBITO' ? `Débito${banco}` :
+                          gasto.formaDePago === 'TRANSFERENCIA BANCO' ? `Transfer.${banco}` :
+                          gasto.formaDePago === 'EFECTIVO' ? 'Efectivo' :
+                          gasto.formaDePago;
+                        return (
+                          <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md ${pillClass}`}>
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="hidden sm:table-cell py-3 px-2 text-center">
                       <button
