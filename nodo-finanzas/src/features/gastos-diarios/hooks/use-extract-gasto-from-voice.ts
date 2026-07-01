@@ -1,5 +1,6 @@
-import { useAiSettings } from '@/hooks/use-ai-settings';
-import { geminiGenerateJson } from '@/lib/gemini-client';
+import { useAiSettings, getActiveApiKey } from '@/hooks/use-ai-settings';
+import type { AiProvider } from '@/hooks/use-ai-settings';
+import { aiGenerateJson } from '@/lib/ai-client';
 import {
   parseGastoDictado,
   parsedTieneDatosUtiles,
@@ -57,13 +58,15 @@ function normalizeFormaPago(raw: unknown): FormaDePago | undefined {
   return undefined;
 }
 
-async function callGemini(
+async function callAI(
+  provider: AiProvider,
   apiKey: string,
   transcript: string,
   context: ParseGastoDictadoContext,
 ): Promise<Partial<ParsedGastoDictado>> {
   const fechaReferencia = context.fechaReferencia ?? new Date().toISOString().slice(0, 10);
-  const parsed = await geminiGenerateJson(
+  const parsed = await aiGenerateJson(
+    provider,
     apiKey,
     buildSystemPrompt(context.rubros, fechaReferencia),
     `Texto dictado: "${transcript}"`,
@@ -145,12 +148,13 @@ function mergeParsed(local: ParsedGastoDictado, gemini: Partial<ParsedGastoDicta
 
 export function useExtractGastoFromVoice() {
   const { aiSettings } = useAiSettings();
-  const apiKey = aiSettings.geminiApiKey;
+  const apiKey = getActiveApiKey(aiSettings);
+  const provider = aiSettings.provider;
 
   const extract = async (context: ParseGastoDictadoContext): Promise<ParsedGastoDictado> => {
     const local = parseGastoDictado(context);
 
-    // Parser local alcanza: no llamar a Gemini (evita fallos de red/API innecesarios).
+    // Parser local alcanza: no llamar a IA (evita fallos de red/API innecesarios).
     if (parsedTieneDatosUtiles(local)) {
       return local;
     }
@@ -160,7 +164,7 @@ export function useExtractGastoFromVoice() {
     }
 
     try {
-      const gemini = await callGemini(apiKey, context.texto, context);
+      const gemini = await callAI(provider, apiKey, context.texto, context);
       const merged = mergeParsed(local, gemini);
       if (!parsedTieneDatosUtiles(merged)) throw new Error('EMPTY_PARSE');
       return merged;
@@ -168,7 +172,7 @@ export function useExtractGastoFromVoice() {
       if (parsedTieneDatosUtiles(local)) return local;
       if (err instanceof Error) {
         if (err.message === 'NO_MONTO') throw new Error('NO_MONTO');
-        if (err.message.startsWith('GEMINI_ERROR')) throw err;
+        if (err.message.startsWith('AI_ERROR')) throw err;
       }
       throw new Error('EMPTY_PARSE');
     }

@@ -14,7 +14,6 @@ import {
   Search,
   X,
   Banknote,
-  Mic,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +22,6 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { ModalConfirmacion } from '@/components/ui/modal-confirmacion';
 import { RubroGestion } from '@/components/rubros/rubro-gestion';
 import { useFinanzas } from '@/hooks/use-finanzas';
-import { useAiSettings } from '@/hooks/use-ai-settings';
 import type {
   CuentaBancaria,
   Tarjeta,
@@ -77,13 +75,12 @@ type FormCategoria = z.infer<typeof schemaCategoria>;
 type FormSueldo = z.infer<typeof schemaSueldo>;
 type FormMedio = z.infer<typeof schemaMedio>;
 
-type Seccion = 'rubros' | 'categorias' | 'cuentas' | 'tarjetas' | 'sueldos' | 'medios' | 'ia';
+type Seccion = 'rubros' | 'categorias' | 'cuentas' | 'tarjetas' | 'sueldos' | 'medios';
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export function ConfiguracionPage() {
+export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } = {}) {
   const finanzas = useFinanzas();
-  const { aiSettings, setAiSettings } = useAiSettings();
   const [seccion, setSeccion] = useState<Seccion>('rubros');
   const [mostrarForm, setMostrarForm] = useState(false);
 
@@ -345,15 +342,17 @@ export function ConfiguracionPage() {
   const tarjetas = finanzas.tarjetas || [];
 
   return (
-    <div className="space-y-6">
+    <div className={embedded ? "space-y-4" : "space-y-6"}>
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Settings className="w-8 h-8 text-brand" />
-        <div>
-          <h2 className="text-3xl font-bold text-navy">Configuración</h2>
-          <p className="text-slate2">Gestiona rubros, cuentas, tarjetas y sueldos</p>
+      {!embedded && (
+        <div className="flex items-center gap-3">
+          <Settings className="w-8 h-8 text-brand" />
+          <div>
+            <h2 className="text-3xl font-bold text-navy">Administración</h2>
+            <p className="text-slate2">Gestiona rubros, cuentas, tarjetas y sueldos</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Tabs */}
       <div className="flex overflow-x-auto gap-1 bg-mist p-1 rounded-lg">
@@ -363,7 +362,6 @@ export function ConfiguracionPage() {
         <TabBtn id="tarjetas" label="Tarjetas" icon={CreditCard} />
         <TabBtn id="sueldos" label="Sueldos" icon={Banknote} />
         <TabBtn id="medios" label="Medios" icon={CreditCard} />
-        <TabBtn id="ia" label="Integraciones IA" icon={Mic} />
       </div>
 
       {/* ── Rubros ── */}
@@ -403,6 +401,26 @@ export function ConfiguracionPage() {
             )}
           </div>
 
+          {finanzas.loading && categoriasOrdenadas.length === 0 && (
+            <Card className="p-0 overflow-hidden">
+              <table className="w-full">
+                <tbody className="divide-y divide-mist animate-pulse">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <tr key={i}>
+                      <td className="px-6 py-4"><div className="h-4 w-40 bg-mist rounded-md" /></td>
+                      <td className="px-6 py-4"><div className="h-5 w-14 bg-mist rounded-full" /></td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <div className="h-7 w-7 bg-mist rounded-lg" />
+                          <div className="h-7 w-7 bg-mist rounded-lg" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          )}
           {categoriasOrdenadas.length > 0 ? (
             <Card className="p-0 overflow-hidden">
               <div className="overflow-x-auto">
@@ -592,7 +610,27 @@ export function ConfiguracionPage() {
               </Card>
             ))}
 
-            {cuentasBancarias.length === 0 && (
+            {finanzas.loading ? (
+              [0, 1, 2].map((i) => (
+                <Card key={i} className="p-4 animate-pulse">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-40 bg-mist rounded-md" />
+                      <div className="h-3 w-28 bg-mist/70 rounded-md" />
+                      <div className="h-3 w-48 bg-mist/70 rounded-md" />
+                      <div className="flex gap-1.5 mt-3">
+                        <div className="h-4 w-20 bg-mist rounded-md" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="h-6 w-14 bg-mist rounded-full" />
+                      <div className="h-8 w-8 bg-mist rounded-lg" />
+                      <div className="h-8 w-8 bg-mist rounded-lg" />
+                    </div>
+                  </div>
+                </Card>
+              ))
+            ) : cuentasBancarias.length === 0 && (
               <Card className="p-8 text-center">
                 <Building2 className="w-12 h-12 text-slate2 mx-auto mb-4 opacity-30" />
                 <p className="text-slate2">No hay cuentas bancarias configuradas</p>
@@ -618,6 +656,25 @@ export function ConfiguracionPage() {
           </div>
 
           <div className="grid gap-4">
+            {finanzas.loading && tarjetas.length === 0 && [0, 1, 2].map((i) => (
+              <Card key={i} className="p-4 animate-pulse">
+                <div className="flex items-start gap-4">
+                  <div className="p-2 bg-mist rounded-lg flex-shrink-0">
+                    <div className="w-5 h-5 bg-mist/80 rounded" />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-36 bg-mist rounded-md" />
+                    <div className="h-3 w-24 bg-mist/70 rounded-md" />
+                    <div className="h-4 w-16 bg-mist rounded-md mt-2" />
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="h-6 w-14 bg-mist rounded-full" />
+                    <div className="h-8 w-8 bg-mist rounded-lg" />
+                    <div className="h-8 w-8 bg-mist rounded-lg" />
+                  </div>
+                </div>
+              </Card>
+            ))}
             {tarjetas.map((tarjeta) => (
               <Card key={tarjeta.id} className="p-4">
                 <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -663,7 +720,7 @@ export function ConfiguracionPage() {
               </Card>
             ))}
 
-            {tarjetas.length === 0 && (
+            {!finanzas.loading && tarjetas.length === 0 && (
               <Card className="p-8 text-center">
                 <CreditCard className="w-12 h-12 text-slate2 mx-auto mb-4 opacity-30" />
                 <p className="text-slate2">No hay tarjetas configuradas</p>
@@ -689,6 +746,21 @@ export function ConfiguracionPage() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {finanzas.loading && finanzas.configuracion.sueldos.length === 0 && [0, 1].map((i) => (
+              <Card key={i} className="relative overflow-hidden p-5 animate-pulse">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-mist rounded" />
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-mist rounded-lg w-9 h-9" />
+                    <div className="space-y-1.5">
+                      <div className="h-4 w-28 bg-mist rounded-md" />
+                      <div className="h-3 w-10 bg-mist/70 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+                <div className="h-7 w-32 bg-mist rounded-md" />
+              </Card>
+            ))}
             {finanzas.configuracion.sueldos.map((sueldo) => (
               <Card key={sueldo.id} className="relative overflow-hidden group p-5">
                 <div className="flex justify-between items-start mb-4">
@@ -725,7 +797,7 @@ export function ConfiguracionPage() {
             ))}
           </div>
 
-          {finanzas.configuracion.sueldos.length === 0 && (
+          {!finanzas.loading && finanzas.configuracion.sueldos.length === 0 && (
             <div className="text-center py-12 bg-mist/20 rounded-xl border-2 border-dashed border-mist">
               <Banknote className="w-12 h-12 text-slate2 mx-auto mb-3 opacity-30" />
               <p className="text-slate2">No hay sueldos cargados todavía</p>
@@ -759,6 +831,22 @@ export function ConfiguracionPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-mist">
+                  {finanzas.loading && finanzas.configuracion.formasDePago.length === 0 && [0, 1, 2, 3].map((i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 bg-mist rounded-lg flex-shrink-0" />
+                          <div className="space-y-1.5">
+                            <div className="h-3.5 w-28 bg-mist rounded-md" />
+                            <div className="h-2.5 w-16 bg-mist/70 rounded-md" />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4"><div className="h-3.5 w-36 bg-mist rounded-md" /></td>
+                      <td className="px-6 py-4"><div className="h-5 w-14 bg-mist rounded-full" /></td>
+                      <td className="px-6 py-4 text-right"><div className="h-8 w-16 bg-mist rounded-lg ml-auto" /></td>
+                    </tr>
+                  ))}
                   {finanzas.configuracion.formasDePago.map((medio) => {
                     const cuentaVinc = finanzas.cuentas.find((c) => c.id === medio.cuentaSaldoId);
                     return (
@@ -810,30 +898,6 @@ export function ConfiguracionPage() {
       )}
 
       {/* ── Integraciones IA ── */}
-      {seccion === 'ia' && (
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-lg font-bold text-navy">Integraciones IA</h3>
-            <p className="text-sm text-slate2 mt-1">
-              Necesaria para dictar transferencias en Saldos (Gemini interpreta origen, destino y monto).
-            </p>
-          </div>
-          <Card className="p-5 space-y-4">
-            <Input
-              label="API Key de Google Gemini"
-              type="password"
-              value={aiSettings.geminiApiKey}
-              onChange={(e) => setAiSettings({ geminiApiKey: e.target.value })}
-              placeholder="AIza…"
-            />
-            <p className="text-xs text-slate2">
-              La clave se guarda solo en este dispositivo. Podés obtenerla en Google AI Studio.
-              Comparte la misma clave que uses en Nodo Inmo si ya la configuraste ahí.
-            </p>
-          </Card>
-        </div>
-      )}
-
       {/* ── Modal Form ── */}
       {mostrarForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">

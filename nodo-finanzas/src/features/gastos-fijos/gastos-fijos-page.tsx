@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
-import { Plus, Calculator, Search, X, Edit, Trash2 } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { Plus, Calculator, Search, X, Edit, Trash2, Mic, MicOff, Loader2 } from 'lucide-react';
+import { useOpenSettings } from '@/shared/hooks/use-open-settings';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,18 +14,27 @@ import { RegistroGastoFijo } from './registro-gasto-fijo';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { useRubros } from '@/hooks/use-rubros';
 import { useDolar } from '@/hooks/use-dolar';
+import { useExtractGastoFijoFromVoice, type ExtractedGastoFijo } from './hooks/use-extract-gasto-fijo-from-voice';
 import { formatearMoneda, esFechaDelMesActual } from '@/utils/formatters';
+import { cuentaPillClass } from '@/utils/cuenta-colors';
 import { normalizarCodigoRubro } from '@/utils/rubro-formatters';
 import type { GastoFijo } from '@/types';
+
+type VoiceState = 'idle' | 'listening' | 'extracting' | 'error';
 
 export function GastosFijosPage() {
   const finanzas = useFinanzas();
   const dolar = useDolar();
   const { rubrosActivos } = useRubros();
+  const { extract, hasApiKey } = useExtractGastoFijoFromVoice();
+  const { openSettings } = useOpenSettings();
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [gastoEditando, setGastoEditando] = useState<GastoFijo | null>(null);
   const [esDuplicacion, setEsDuplicacion] = useState(false);
+  const [datosIniciales, setDatosIniciales] = useState<ExtractedGastoFijo | null>(null);
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [rubroFiltro, setRubroFiltro] = useState('');
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
@@ -84,7 +94,56 @@ export function GastosFijosPage() {
     setMostrarFormulario(false);
     setGastoEditando(null);
     setEsDuplicacion(false);
+    setDatosIniciales(null);
   }
+
+  const handleVoiceClick = useCallback(() => {
+    if (!hasApiKey) {
+      setVoiceError('NO_API_KEY');
+      return;
+    }
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceError('NO_BROWSER_SUPPORT');
+      return;
+    }
+    setVoiceError(null);
+    setVoiceState('listening');
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'es-AR';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = async (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setVoiceState('extracting');
+      try {
+        const datos = await extract(transcript, rubrosActivos);
+        setDatosIniciales(datos);
+        abrirFormulario();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'ERROR';
+        if (msg === 'NO_MONTO') setVoiceError('NO_MONTO');
+        else if (msg === 'NO_API_KEY') setVoiceError('NO_API_KEY');
+        else setVoiceError('GENERIC');
+      } finally {
+        setVoiceState('idle');
+      }
+    };
+
+    recognition.onerror = () => {
+      setVoiceState('idle');
+      setVoiceError('MIC_ERROR');
+    };
+
+    recognition.onend = () => {
+      if (voiceState === 'listening') setVoiceState('idle');
+    };
+
+    recognition.start();
+  }, [hasApiKey, extract, rubrosActivos, voiceState, abrirFormulario]);
 
   async function handleGastoRegistrado() {
     await finanzas.recargarGastosFijos();
@@ -185,6 +244,7 @@ export function GastosFijosPage() {
         onGastoRegistrado={handleGastoRegistrado}
         gastoEditando={gastoEditando}
         esDuplicacion={esDuplicacion}
+        datosIniciales={datosIniciales}
       />
     );
   }
@@ -275,10 +335,66 @@ export function GastosFijosPage() {
           </div>
         </div>
 
-        <Button onClick={() => abrirFormulario()} className="w-full">
-          <Plus className="h-4 w-4" />
-          Nuevo Gasto Fijo
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Button
+              variant="success"
+              onClick={handleVoiceClick}
+              disabled={voiceState === 'extracting'}
+              className={`shrink-0 whitespace-nowrap ${voiceState === 'listening' ? 'animate-pulse !bg-red-500 !border-red-500' : ''}`}
+            >
+              {voiceState === 'listening' ? (
+                <MicOff className="h-4 w-4" />
+              ) : voiceState === 'extracting' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Mic className="h-4 w-4" />
+              )}
+              {voiceState === 'listening'
+                ? 'Escuchando…'
+                : voiceState === 'extracting'
+                ? 'Procesando…'
+                : 'Cargá tu gasto por voz'}
+            </Button>
+            {voiceState === 'listening' && (
+              <span className="absolute -top-1 -right-1 h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+              </span>
+            )}
+            {voiceError && (
+              <div className="absolute top-full mt-2 left-0 z-50 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-red-200 bg-white p-3 shadow-lg text-xs text-red-700">
+                {voiceError === 'NO_API_KEY' ? (
+                  <>
+                    <p className="font-semibold mb-1">API Key no configurada</p>
+                    <button
+                      onClick={() => openSettings('ai')}
+                      className="underline font-medium"
+                    >
+                      Ir a Configuración → IA
+                    </button>
+                  </>
+                ) : voiceError === 'NO_BROWSER_SUPPORT' ? (
+                  <p>Tu navegador no soporta grabación de voz. Usá Chrome o Edge.</p>
+                ) : voiceError === 'NO_MONTO' ? (
+                  <p>No se detectó el monto. Intentá de nuevo mencionando el importe.</p>
+                ) : voiceError === 'MIC_ERROR' ? (
+                  <p>No se pudo acceder al micrófono. Verificá los permisos.</p>
+                ) : (
+                  <p>No se pudo procesar el dictado. Intentá de nuevo.</p>
+                )}
+              </div>
+            )}
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => abrirFormulario()}
+            className="shrink-0 whitespace-nowrap mr-4 !bg-green-100 !text-green-800 hover:!bg-green-200 !border-transparent"
+          >
+            <Plus className="h-4 w-4" />
+            Gasto Fijo
+          </Button>
+        </div>
       </div>
 
       {/* List */}
@@ -333,9 +449,24 @@ export function GastosFijosPage() {
                           ≈ {formatearMoneda(dolar.convertirUSDaARS(gasto.monto))}
                         </p>
                       )}
-                      <span className="text-[9px] font-bold uppercase bg-mist text-slate2 px-2 py-1 rounded-md">
-                        {gasto.formaDePago}
-                      </span>
+                      {(() => {
+                        const cuenta = gasto.cuentaBancariaId ? finanzas.cuentas.find((c) => c.id === gasto.cuentaBancariaId) : null;
+                        const pillClass = cuenta ? cuentaPillClass(cuenta.nombre) : 'bg-mist text-slate2';
+                        const n = cuenta ? cuenta.nombre.toLowerCase().replace(/\s+/g, '') : '';
+                        const banco = n.includes('santander') ? ' Santander' : n.includes('pampa') ? ' Pampa' : '';
+                        const esMPReserva = n.includes('mercadopago') && n.includes('reserva');
+                        const label =
+                          gasto.formaDePago === 'MERCADO_PAGO' ? (esMPReserva ? 'MP Reservas' : 'Mercado Pago') :
+                          gasto.formaDePago === 'DEBITO' ? `Débito${banco}` :
+                          gasto.formaDePago === 'TRANSFERENCIA BANCO' ? `Transfer.${banco}` :
+                          gasto.formaDePago === 'EFECTIVO' ? 'Efectivo' :
+                          gasto.formaDePago;
+                        return (
+                          <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md ${pillClass}`}>
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     <div className="flex items-center justify-end gap-1">
@@ -413,9 +544,24 @@ export function GastosFijosPage() {
                       )}
                     </td>
                     <td className="hidden lg:table-cell py-3 px-2 text-center">
-                      <span className="text-[9px] font-bold uppercase bg-mist text-slate2 px-2 py-1 rounded-md">
-                        {gasto.formaDePago}
-                      </span>
+                      {(() => {
+                        const cuenta = gasto.cuentaBancariaId ? finanzas.cuentas.find((c) => c.id === gasto.cuentaBancariaId) : null;
+                        const pillClass = cuenta ? cuentaPillClass(cuenta.nombre) : 'bg-mist text-slate2';
+                        const n = cuenta ? cuenta.nombre.toLowerCase().replace(/\s+/g, '') : '';
+                        const banco = n.includes('santander') ? ' Santander' : n.includes('pampa') ? ' Pampa' : '';
+                        const esMPReserva = n.includes('mercadopago') && n.includes('reserva');
+                        const label =
+                          gasto.formaDePago === 'MERCADO_PAGO' ? (esMPReserva ? 'MP Reservas' : 'Mercado Pago') :
+                          gasto.formaDePago === 'DEBITO' ? `Débito${banco}` :
+                          gasto.formaDePago === 'TRANSFERENCIA BANCO' ? `Transfer.${banco}` :
+                          gasto.formaDePago === 'EFECTIVO' ? 'Efectivo' :
+                          gasto.formaDePago;
+                        return (
+                          <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md ${pillClass}`}>
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="hidden sm:table-cell py-3 px-2 text-center">
                       <button

@@ -34,6 +34,8 @@ import { cn } from "@/shared/lib/utils";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { useFinanzas } from "@/hooks/use-finanzas";
 import { FinanzasSettingsModuleProvider } from "@/shared/lib/finanzas-settings-module";
+import { OpenSettingsContext } from "@/shared/hooks/use-open-settings";
+import { AiSettingsContext, useAiSettingsProvider } from "@/hooks/use-ai-settings";
 
 interface NavItem {
   to: string;
@@ -50,7 +52,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/planes-ahorro", label: "Planes de Ahorro", icon: PiggyBank },
   { to: "/admin/saldos", label: "Saldos", icon: Wallet },
   { to: "/admin/informe-mensual", label: "Informe Mensual", icon: BarChart2 },
-  { to: "/admin/configuracion", label: "Configuración", icon: Settings },
+  { to: "/admin/configuracion", label: "Administración", icon: Settings },
 ];
 
 const ROUTE_TITLES: Record<string, string> = {
@@ -62,7 +64,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/planes-ahorro": "Planes de Ahorro",
   "/admin/saldos": "Saldos",
   "/admin/informe-mensual": "Informe Mensual",
-  "/admin/configuracion": "Configuración",
+  "/admin/configuracion": "Administración",
 };
 
 function initials(value: string): string {
@@ -79,7 +81,13 @@ export function AdminLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTabId | undefined>();
+
+  const openSettings = useCallback((tab?: SettingsTabId) => {
+    setSettingsInitialTab(tab);
+    setSettingsOpen(true);
+  }, []);
   const { user, role, plan, signOut } = useAuth();
+  const aiSettingsValue = useAiSettingsProvider(user?.id);
   const { gastosDiarios = [] } = useFinanzas();
 
   const today = new Date().toISOString().split("T")[0];
@@ -153,6 +161,7 @@ export function AdminLayout() {
   );
 
   return (
+    <AiSettingsContext.Provider value={aiSettingsValue}>
     <AdminCommandPaletteProvider
       items={commandItems}
       onSelectItem={(item) => handleCommandSelect(item)}
@@ -274,7 +283,7 @@ export function AdminLayout() {
               {isSuperAdmin && (
                 <button
                   type="button"
-                  aria-label="Configuración"
+                  aria-label="Administración"
                   onClick={() => {
                     setMobileMenuOpen(false);
                     setSettingsOpen(true);
@@ -338,7 +347,9 @@ export function AdminLayout() {
 
           {/* Content */}
           <main className="flex-1 overflow-auto p-6">
-            <Outlet />
+            <OpenSettingsContext.Provider value={{ openSettings }}>
+              <Outlet />
+            </OpenSettingsContext.Provider>
           </main>
         </div>
 
@@ -353,5 +364,6 @@ export function AdminLayout() {
       </div>
     </FinanzasSettingsModuleProvider>
     </AdminCommandPaletteProvider>
+    </AiSettingsContext.Provider>
   );
 }
