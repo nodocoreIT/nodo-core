@@ -38,6 +38,15 @@ export type PanelOnboardingProfile = {
   demo_days: number | null;
 };
 
+export type PanelFeedbackNotification = {
+  id: string;
+  kind: string;
+  category: string | null;
+  content: string | null;
+  source_node: string;
+  created_at: string;
+};
+
 export type PanelNotificationInput = {
   units: PanelClientUnit[];
   clients: PanelClient[];
@@ -46,6 +55,7 @@ export type PanelNotificationInput = {
   profiles: PanelOnboardingProfile[];
   unsettledCajaCount: number;
   unsettledCajaTotal: number;
+  feedbackNotifications?: PanelFeedbackNotification[];
   today?: Date;
 };
 
@@ -75,6 +85,19 @@ function daysBetween(from: Date, to: Date): number {
   return Math.floor(ms / (1000 * 60 * 60 * 24));
 }
 
+const FEEDBACK_CATEGORY_LABELS: Record<string, string> = {
+  bug: "Error reportado",
+  idea: "Idea nueva",
+  bloat: "Algo que sobra",
+};
+
+const FEEDBACK_NODE_LABELS: Record<string, string> = {
+  inmo: "NODO | Inmo",
+  autos: "NODO | Autos",
+  finanzas: "NODO | Finanzas",
+  clinica: "NODO | Clínica",
+};
+
 export function buildPanelNotifications({
   units,
   clients,
@@ -83,6 +106,7 @@ export function buildPanelNotifications({
   profiles,
   unsettledCajaCount,
   unsettledCajaTotal,
+  feedbackNotifications = [],
   today = new Date(),
 }: PanelNotificationInput): AppNotification[] {
   const list: AppNotification[] = [];
@@ -234,6 +258,20 @@ export function buildPanelNotifications({
       description: "Revisá el tablero de ideas del equipo",
       href: "/panel/ideas",
       priority: 22,
+    });
+  }
+
+  for (const fb of feedbackNotifications.slice(0, 10)) {
+    const categoryLabel = FEEDBACK_CATEGORY_LABELS[fb.category ?? ""] ?? "Feedback";
+    const nodeLabel = FEEDBACK_NODE_LABELS[fb.source_node] ?? `NODO | ${fb.source_node}`;
+    const snippet = fb.content ? fb.content.slice(0, 80) + (fb.content.length > 80 ? "…" : "") : "";
+    list.push({
+      id: `feedback-${fb.id}`,
+      kind: "new_feedback",
+      title: `${categoryLabel} · ${nodeLabel}`,
+      description: snippet || "Sin mensaje",
+      href: "/panel",
+      priority: 15,
     });
   }
 

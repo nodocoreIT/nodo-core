@@ -337,23 +337,16 @@ function FeedbackDialog({ isOpen, onClose }: FeedbackDialogProps) {
         .limit(1)
         .maybeSingle();
 
-      const metadata = {
-        route: window.location.pathname,
-        userAgent: navigator.userAgent,
-        screenSize: `${window.innerWidth}x${window.innerHeight}`,
-        dictated: true,
-      };
-
-      await supabase
-        .schema("shared")
-        .from("feedback")
-        .insert({
-          org_id: memberData?.org_id || null,
-          user_id: user?.id || null,
+      const { error } = await supabase.functions.invoke("submit-feedback", {
+        body: {
           category,
           content: content.trim(),
-          metadata,
-        });
+          orgId: memberData?.org_id ?? null,
+          redirectTo: window.location.origin,
+        },
+      });
+
+      if (error) throw error;
 
       setSubmitSuccess(true);
       setTimeout(() => {
