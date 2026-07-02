@@ -2,6 +2,7 @@
   "name": "nodo-clinica",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.30.0",
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3002 --webpack",
     "dev:local": "next dev -H 0.0.0.0 -p 3002",
