@@ -1,2 +1,0 @@
-# Datos locales (no van en la imagen; Fly usa volumen en /data)
-.env*.local
