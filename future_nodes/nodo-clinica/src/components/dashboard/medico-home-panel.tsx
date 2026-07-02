@@ -95,8 +95,7 @@ export function MedicoHomePanel({ doctorId, doctorName }: MedicoHomePanelProps) 
         <MedicoHomeAgendaSidebar
           loading={agenda.loading}
           todayAppts={agenda.todayAppts}
-          nextDayAppts={agenda.nextDayAppts}
-          nextDayKey={agenda.nextDayKey}
+          upcomingAppts={agenda.upcomingAppts}
           todayBlocks={agenda.todayBlocks}
           stats={agenda.stats}
         />

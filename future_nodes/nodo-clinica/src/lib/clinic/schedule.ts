@@ -1,11 +1,7 @@
 import {
   addDays,
-  addMinutes,
   format,
   isAfter,
-  setHours,
-  setMinutes,
-  startOfDay,
 } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -100,57 +96,119 @@ export function normalizeAvailability(
   };
 }
 
-function parseTimeOnDate(date: Date, time: string): Date {
-  const [h, m] = time.split(":").map(Number);
-  return setMinutes(setHours(startOfDay(date), h), m);
-}
-
 export function generateSlotsForDate(
-  date: Date,
+  dateKey: string,
   availability: DoctorAvailability,
-  bookedTimes: string[]
+  bookedTimes: string[],
 ): { iso: string; label: string }[] {
   const normalized = normalizeAvailability(availability);
-  const dow = date.getDay();
+  const dow = clinicDayOfWeek(dateKey);
   const dayBlocks = normalized.days.filter((d) => d.dayOfWeek === dow);
   if (dayBlocks.length === 0) return [];
 
   const slots: { iso: string; label: string }[] = [];
   const seen = new Set<string>();
-  const bookedSet = new Set(
-    bookedTimes.map((t) => new Date(t).toISOString().slice(0, 16))
-  );
+  const bookedSet = new Set(bookedTimes.map((t) => t.slice(0, 16)));
+  const duration = normalized.slotDurationMinutes;
+  const now = new Date();
 
   for (const block of dayBlocks) {
-    let cursor = parseTimeOnDate(date, block.startTime);
-    const end = parseTimeOnDate(date, block.endTime);
+    let cursorMin = timeToMinutes(block.startTime);
+    const endMin = timeToMinutes(block.endTime);
 
-    while (cursor < end) {
-      const slotEnd = addMinutes(cursor, normalized.slotDurationMinutes);
-      if (slotEnd > end) break;
+    while (cursorMin + duration <= endMin) {
+      const hh = Math.floor(cursorMin / 60);
+      const mm = cursorMin % 60;
+      const time = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+      const iso = argentinaDateTimeToIso(dateKey, time);
 
-      const iso = cursor.toISOString();
-      const key = iso.slice(0, 16);
-      if (!seen.has(iso) && !bookedSet.has(key) && isAfter(cursor, new Date())) {
+      if (
+        !seen.has(iso) &&
+        !bookedSet.has(iso.slice(0, 16)) &&
+        isAfter(new Date(iso), now)
+      ) {
         seen.add(iso);
-        slots.push({
-          iso,
-          label: format(cursor, "HH:mm", { locale: es }),
-        });
+        slots.push({ iso, label: formatClinicTimeLabel(iso) });
       }
-      cursor = addMinutes(cursor, normalized.slotDurationMinutes);
+      cursorMin += duration;
     }
   }
 
   return slots;
 }
 
+export const CLINIC_TIMEZONE = "America/Argentina/Buenos_Aires";
+
 export function localDateKeyFromIso(iso: string): string {
-  return format(new Date(iso), "yyyy-MM-dd");
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: CLINIC_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
 }
 
 export function localDateKeyFromDate(d: Date): string {
-  return format(d, "yyyy-MM-dd");
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: CLINIC_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function argentinaDateTimeToIso(dateKey: string, time: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const [h, min] = time.split(":").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, h + 3, min)).toISOString();
+}
+
+function clinicDayOfWeek(dateKey: string): number {
+  const ref = new Date(argentinaDateTimeToIso(dateKey, "12:00"));
+  const wd = new Intl.DateTimeFormat("en-US", {
+    timeZone: CLINIC_TIMEZONE,
+    weekday: "short",
+  }).format(ref);
+  const map: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+  return map[wd] ?? 0;
+}
+
+function formatClinicTimeLabel(iso: string): string {
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: CLINIC_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+export function clinicTimeLabelFromIso(iso: string): string {
+  return formatClinicTimeLabel(iso);
+}
+
+export function addDaysToDateKey(dateKey: string, days: number): string {
+  const base = new Date(argentinaDateTimeToIso(dateKey, "12:00"));
+  return localDateKeyFromDate(addDays(base, days));
+}
+
+function clinicMinutesFromIso(iso: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: CLINIC_TIMEZONE,
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  return hour * 60 + minute;
 }
 
 /** Next N working days from today (includes today if it is a working day). */
@@ -161,15 +219,14 @@ export function getUpcomingWorkingDateKeys(
   const normalized = normalizeAvailability(availability);
   const blocked = new Set(availability.blockedDates ?? []);
   const keys: string[] = [];
-  const today = startOfDay(new Date());
+  const todayKey = localDateKeyFromDate(new Date());
 
   for (let i = 0; i < 90 && keys.length < count; i++) {
-    const d = addDays(today, i);
-    const dateStr = format(d, "yyyy-MM-dd");
-    const dow = d.getDay();
+    const dateKey = addDaysToDateKey(todayKey, i);
+    const dow = clinicDayOfWeek(dateKey);
     if (!normalized.days.some((day) => day.dayOfWeek === dow)) continue;
-    if (blocked.has(dateStr)) continue;
-    keys.push(dateStr);
+    if (blocked.has(dateKey)) continue;
+    keys.push(dateKey);
   }
   return keys;
 }
@@ -185,9 +242,9 @@ export function getNextAttendanceDateKey(
 
 export function getScheduleBlocksForDate(
   availability: DoctorAvailability,
-  date: Date,
+  dateKey: string,
 ): DaySchedule[] {
-  const dow = date.getDay();
+  const dow = clinicDayOfWeek(dateKey);
   return normalizeAvailability(availability).days.filter(
     (d) => d.dayOfWeek === dow,
   );
@@ -207,11 +264,10 @@ export function appointmentMatchesScheduleGrid(
   const dateKey = localDateKeyFromIso(scheduledAtIso);
   if ((normalized.blockedDates ?? []).includes(dateKey)) return false;
 
-  const date = new Date(scheduledAtIso);
-  const blocks = getScheduleBlocksForDate(normalized, date);
+  const blocks = getScheduleBlocksForDate(normalized, dateKey);
   if (blocks.length === 0) return false;
 
-  const aptMinutes = date.getHours() * 60 + date.getMinutes();
+  const aptMinutes = clinicMinutesFromIso(scheduledAtIso);
   const duration = normalized.slotDurationMinutes;
 
   return blocks.some((block) => {
@@ -231,30 +287,44 @@ export function formatDateKeyLabel(dateKey: string): string {
   return format(d, "EEEE d 'de' MMMM", { locale: es });
 }
 
+export function formatDateKeyShortLabel(dateKey: string): string {
+  const d = parseLocalDate(dateKey);
+  return format(d, "EEE, d MMM", { locale: es });
+}
+
+export function getAvailableDateKeys(
+  availability: DoctorAvailability,
+  daysAhead = 28,
+  bookedTimes: string[] = [],
+): string[] {
+  const normalized = normalizeAvailability(availability);
+  const blocked = new Set(availability.blockedDates ?? []);
+  const keys: string[] = [];
+  const todayKey = localDateKeyFromDate(new Date());
+
+  for (let i = 0; i < daysAhead; i++) {
+    const dateKey = addDaysToDateKey(todayKey, i);
+    const dow = clinicDayOfWeek(dateKey);
+    if (!normalized.days.some((day) => day.dayOfWeek === dow)) continue;
+    if (blocked.has(dateKey)) continue;
+
+    const dayBooked = bookedTimes.filter(
+      (t) => localDateKeyFromIso(t) === dateKey,
+    );
+    const slots = generateSlotsForDate(dateKey, normalized, dayBooked);
+    if (slots.length === 0) continue;
+
+    keys.push(dateKey);
+  }
+  return keys;
+}
+
 export function getAvailableDates(
   availability: DoctorAvailability,
   daysAhead = 28,
-  bookedTimes: string[] = []
+  bookedTimes: string[] = [],
 ): Date[] {
-  const normalized = normalizeAvailability(availability);
-  const blocked = new Set(availability.blockedDates ?? []);
-  const dates: Date[] = [];
-  const today = startOfDay(new Date());
-
-  for (let i = 0; i < daysAhead; i++) {
-    const d = addDays(today, i);
-    const dateStr = format(d, "yyyy-MM-dd");
-    const dow = d.getDay();
-    if (!normalized.days.some((day) => day.dayOfWeek === dow)) continue;
-    if (blocked.has(dateStr)) continue;
-
-    const dayBooked = bookedTimes.filter(
-      (t) => localDateKeyFromIso(t) === dateStr
-    );
-    const slots = generateSlotsForDate(d, normalized, dayBooked);
-    if (slots.length === 0) continue;
-
-    dates.push(d);
-  }
-  return dates;
+  return getAvailableDateKeys(availability, daysAhead, bookedTimes).map(
+    parseLocalDate,
+  );
 }

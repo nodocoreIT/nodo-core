@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   CalendarDays,
@@ -32,11 +32,19 @@ const STATUS_STYLES: Record<PatientLifecycleStatus, string> = {
   finalizada: "bg-mist text-slate2 border-mist",
 };
 
-function PatientRow({ apt }: { apt: AppointmentRow }) {
+function PatientRow({
+  apt,
+  showDate = false,
+}: {
+  apt: AppointmentRow;
+  showDate?: boolean;
+}) {
   const lifecycle = mapAppointmentStatusToLifecycle(
     apt.status as "scheduled" | "waiting" | "in_consultation" | "completed" | "cancelled",
   );
-  const time = format(new Date(apt.scheduledAt), "HH:mm", { locale: es });
+  const when = new Date(apt.scheduledAt);
+  const time = format(when, "HH:mm", { locale: es });
+  const dateLabel = format(when, "EEE d MMM", { locale: es });
 
   return (
     <Link
@@ -54,7 +62,7 @@ function PatientRow({ apt }: { apt: AppointmentRow }) {
         </p>
         <div className="flex items-center gap-1 text-[10px] text-slate2 mt-0.5">
           <Clock className="h-3 w-3 shrink-0" />
-          {time}
+          {showDate ? `${dateLabel} · ${time}` : time}
         </div>
       </div>
       <Badge
@@ -70,8 +78,7 @@ function PatientRow({ apt }: { apt: AppointmentRow }) {
 interface MedicoHomeAgendaSidebarProps {
   loading: boolean;
   todayAppts: AppointmentRow[];
-  nextDayAppts: AppointmentRow[];
-  nextDayKey: string | null;
+  upcomingAppts: AppointmentRow[];
   todayBlocks: { startTime: string; endTime: string }[];
   stats: { waiting: number; inConsult: number; done: number };
 }
@@ -79,8 +86,7 @@ interface MedicoHomeAgendaSidebarProps {
 export function MedicoHomeAgendaSidebar({
   loading,
   todayAppts,
-  nextDayAppts,
-  nextDayKey,
+  upcomingAppts,
   todayBlocks,
   stats,
 }: MedicoHomeAgendaSidebarProps) {
@@ -174,36 +180,30 @@ export function MedicoHomeAgendaSidebar({
         </div>
       </section>
 
-      {/* Próximo día */}
+      {/* Próximos turnos */}
       <section className="rounded-md border border-border bg-card shadow-sm overflow-hidden">
         <div className="px-3 py-2.5 border-b border-border bg-[#EEF3F8]">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-navy shrink-0" />
             <div>
               <p className="text-[9px] font-bold uppercase tracking-wide text-slate2">
-                Próximo día de atención
+                Próximos turnos
               </p>
-              <h3 className="font-display font-bold text-navy text-xs capitalize">
-                {nextDayKey
-                  ? format(parseISO(`${nextDayKey}T12:00:00`), "EEEE d MMM", {
-                      locale: es,
-                    })
-                  : "Sin día configurado"}
+              <h3 className="font-display font-bold text-navy text-xs">
+                Programados
               </h3>
             </div>
           </div>
         </div>
-        <div className="p-2 space-y-1.5 max-h-[180px] overflow-y-auto">
-          {!nextDayKey ? (
+        <div className="p-2 space-y-1.5 max-h-[240px] overflow-y-auto">
+          {upcomingAppts.length === 0 ? (
             <p className="text-xs text-slate2 py-3 text-center">
-              Configurá días en Configuración (ícono ⚙ junto a tu nombre).
-            </p>
-          ) : nextDayAppts.length === 0 ? (
-            <p className="text-xs text-slate2 py-3 text-center">
-              Aún no hay turnos para el próximo día de atención.
+              No hay turnos programados a futuro.
             </p>
           ) : (
-            nextDayAppts.map((apt) => <PatientRow key={apt.id} apt={apt} />)
+            upcomingAppts.map((apt) => (
+              <PatientRow key={apt.id} apt={apt} showDate />
+            ))
           )}
         </div>
       </section>

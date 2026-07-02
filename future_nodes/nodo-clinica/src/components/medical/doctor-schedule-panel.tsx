@@ -174,7 +174,7 @@ export function DoctorSchedulePanel({ doctorId }: DoctorSchedulePanelProps) {
         </div>
 
         <div>
-          <Label className="text-xs">Firma digital (aparece en informes y recetas)</Label>
+          <Label className="text-xs">Firma en documentos (informes y recetas)</Label>
           <Input
             value={signatureText}
             onChange={(e) => setSignatureText(e.target.value)}

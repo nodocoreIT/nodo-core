@@ -1,18 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
-import path from "path";
 import {
   readDb,
-  writeDb,
-  newId,
 } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
 import {
+  canAccessDocument,
+  doctorCanAccessPatient,
+  doctorOwnsAppointment,
+  forbidden,
+  requireDoctorSession,
+  requirePatientSession,
+  requireSession,
+  unauthorized,
+  findAppointmentByAccessToken,
+} from "@/lib/clinic/access-control";
+import {
   ALLOWED_MIME,
   MAX_FILE_BYTES,
-  ensureUploadsDir,
-  sanitizeFileName,
 } from "@/lib/clinic/storage";
+import { attachDocumentToAppointment } from "@/lib/clinic/appointment-documents";
+import { markTransferReceiptPendingReview } from "@/lib/clinic/transfer-receipt-pending";
 
 function mapDocument(
   doc: {
@@ -53,6 +61,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
     }
 
+    const session = await getSessionFromRequest(request);
+    if (!canAccessDocument(db, doc, session, accessToken)) {
+      return forbidden("No autorizado para descargar este archivo");
+    }
+
+    if (doc.inlineDataBase64) {
+      const buffer = Buffer.from(doc.inlineDataBase64, "base64");
+      return new NextResponse(buffer, {
+        headers: {
+          "Content-Type": doc.mimeType,
+          "Content-Disposition": `inline; filename="${encodeURIComponent(doc.fileName)}"`,
+          "Cache-Control": "private, max-age=3600",
+        },
+      });
+    }
+
     try {
       const buffer = await fs.readFile(doc.filePath);
       return new NextResponse(buffer, {
@@ -68,16 +92,45 @@ export async function GET(request: NextRequest) {
   }
 
   let docs = db.documents;
+  const session = await getSessionFromRequest(request);
 
   if (accessToken) {
-    const apt = db.appointments.find((a) => a.accessToken === accessToken);
+    const apt = findAppointmentByAccessToken(db, accessToken);
     if (!apt) {
       return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
     }
     docs = docs.filter((d) => d.appointmentId === apt.id);
   } else if (appointmentId) {
+    const apt = db.appointments.find((a) => a.id === appointmentId);
+    if (!apt) {
+      return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
+    }
+    if (!requireSession(session)) {
+      return unauthorized();
+    }
+    if (session.role === "patient" && session.userId !== apt.patientId) {
+      return forbidden();
+    }
+    if (
+      session.role === "doctor" &&
+      !doctorOwnsAppointment(db, session.userId, appointmentId)
+    ) {
+      return forbidden();
+    }
     docs = docs.filter((d) => d.appointmentId === appointmentId);
   } else if (patientId) {
+    if (!requireSession(session)) {
+      return unauthorized();
+    }
+    if (session.role === "patient" && session.userId !== patientId) {
+      return forbidden();
+    }
+    if (
+      session.role === "doctor" &&
+      !doctorCanAccessPatient(db, session.userId, patientId)
+    ) {
+      return forbidden();
+    }
     docs = docs.filter((d) => d.patientId === patientId);
   } else {
     return NextResponse.json({ error: "Parámetro requerido" }, { status: 400 });
@@ -159,30 +212,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await ensureUploadsDir();
-  const safeName = sanitizeFileName(file.name);
-  const storedName = `${Date.now()}-${safeName}`;
-  const relDir = path.join(appointment.id);
-  const absDir = path.join(await ensureUploadsDir(), relDir);
-  await fs.mkdir(absDir, { recursive: true });
-  const absPath = path.join(absDir, storedName);
-
   const buffer = Buffer.from(await file.arrayBuffer());
-  await fs.writeFile(absPath, buffer);
+  const doc = await attachDocumentToAppointment(
+    appointment.id,
+    appointment.patientId,
+    file.name,
+    file.type,
+    buffer,
+  );
 
-  const doc = {
-    id: newId("doc"),
-    patientId: appointment.patientId,
-    appointmentId: appointment.id,
-    fileName: file.name,
-    filePath: absPath,
-    mimeType: file.type,
-    uploadedAt: new Date().toISOString(),
-  };
-
-  await writeDb((d) => {
-    d.documents.push(doc);
-  });
+  if (appointment.paymentStatus === "pending") {
+    await markTransferReceiptPendingReview(appointment, {
+      fileName: file.name,
+    });
+  }
 
   return NextResponse.json(mapDocument(doc));
 }

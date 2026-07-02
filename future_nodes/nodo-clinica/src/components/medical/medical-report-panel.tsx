@@ -36,6 +36,8 @@ interface MedicalReportPanelProps {
   doctorSpecialty?: string;
   doctorLicense?: string;
   compact?: boolean;
+  /** Abierto automáticamente al finalizar la videoconsulta */
+  postConsult?: boolean;
   onSaved?: () => void;
   onClose?: () => void;
 }
@@ -51,17 +53,17 @@ export function MedicalReportPanel({
   doctorSpecialty,
   doctorLicense,
   compact = false,
+  postConsult = false,
   onSaved,
   onClose,
 }: MedicalReportPanelProps) {
-  const { transcriptionText, clinicalNotes } = useConsultationStore();
+  const { clinicalNotes } = useConsultationStore();
   const [dictation, setDictation] = useState("");
   const [report, setReport] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [interimDictation, setInterimDictation] = useState("");
-  const [prefilled, setPrefilled] = useState(false);
   const [signatureText, setSignatureText] = useState("");
   const [signatureImageData, setSignatureImageData] = useState("");
 
@@ -77,8 +79,11 @@ export function MedicalReportPanel({
 
   const { isSupported: speechSupported } = useSpeechTranscription({
     enabled: isRecording,
+    syncToConsultationStore: false,
     onSegment: (seg) =>
-      setDictation((prev) => (prev ? `${prev}\n${seg.text}` : seg.text)),
+      setDictation((prev) =>
+        prev ? `${prev} ${seg.text}` : seg.text,
+      ),
     onInterim: setInterimDictation,
     onError: (msg) => {
       toast.error(msg);
@@ -87,35 +92,37 @@ export function MedicalReportPanel({
     },
   });
 
-  useEffect(() => {
-    if (prefilled || !transcriptionText) return;
-    setDictation((prev) =>
-      prev ? prev : `Transcripción de consulta:\n${transcriptionText}`
-    );
-    setPrefilled(true);
-  }, [transcriptionText, prefilled]);
-
   const handleGenerate = async () => {
-    const source = [dictation, transcriptionText, clinicalNotes]
-      .filter(Boolean)
-      .join("\n\n");
-    if (!source.trim()) {
-      toast.error("Dictá o escribí contenido clínico primero");
+    if (!dictation.trim()) {
+      toast.error("Dictá o escribí el informe primero");
       return;
     }
     setIsGenerating(true);
     try {
       const data = await clinicApi.generateClinicalReport({
         dictation,
-        transcription: transcriptionText,
-        clinicalNotes,
+        clinicalNotes: clinicalNotes || undefined,
         patientName,
         doctorName,
         doctorSpecialty,
         doctorLicense,
       });
       setReport(data.report);
-      toast.success("Informe generado con IA — podés editarlo antes de guardar");
+      if (data.localDraft) {
+        if (data.localDraftReason === "quota_exceeded") {
+          toast.message(
+            "Cuota diaria de Gemini agotada. Se armó un borrador local — revisalo y guardalo.",
+            { duration: 10_000 },
+          );
+        } else {
+          toast.message(
+            "Informe redactado localmente (sin IA en la nube). Revisalo y guardalo.",
+            { duration: 8_000 },
+          );
+        }
+      } else {
+        toast.success("Informe generado con IA — podés editarlo antes de guardar");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al generar informe");
     } finally {
@@ -191,6 +198,17 @@ export function MedicalReportPanel({
 
   const inner = (
     <div className="space-y-3">
+      {postConsult && (
+        <div className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2.5 text-xs text-violet-900">
+          <p className="font-semibold">Consulta finalizada</p>
+          <p className="mt-0.5 text-violet-800">
+            Dictá el informe con el micrófono o escribilo, generá con IA y guardalo en el historial.
+          </p>
+        </div>
+      )}
+      <p className="text-xs text-slate-500 leading-relaxed">
+        Dictá o escribí hallazgos y plan. La IA redacta el informe formal; después podés editarlo, guardarlo o exportar PDF.
+      </p>
       <Textarea
         value={
           interimDictation
@@ -211,7 +229,7 @@ export function MedicalReportPanel({
           disabled={!speechSupported}
           onClick={() => {
             if (!speechSupported) {
-              toast.error("Usá Chrome o Edge en escritorio para dictar por voz.");
+              toast.error("Usá Chrome o Edge para dictar por voz.");
               return;
             }
             setIsRecording(!isRecording);
@@ -255,7 +273,7 @@ export function MedicalReportPanel({
       )}
       {!speechSupported && (
         <p className="text-xs text-amber-700">
-          Dictado por voz: usá Chrome o Edge. En Firefox/Safari escribí o pegá el texto.
+          Dictado por voz: usá Chrome o Edge. En iPhone/iPad escribí o pegá el texto.
         </p>
       )}
 
@@ -278,6 +296,24 @@ export function MedicalReportPanel({
             className={`text-sm ${compact ? "min-h-[160px]" : "min-h-[220px]"}`}
             disabled={isGenerating}
           />
+          {(signatureImageData || signatureText) && (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 flex items-center gap-3">
+              <p className="text-[10px] text-slate-500 shrink-0">
+                Firma en PDF:
+              </p>
+              {signatureImageData ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={signatureImageData}
+                  alt="Firma"
+                  className="h-8 object-contain"
+                />
+              ) : null}
+              {signatureText && (
+                <span className="text-xs text-slate-700">{signatureText}</span>
+              )}
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"

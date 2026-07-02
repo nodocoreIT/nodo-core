@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { readDb } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
 import { buildPatientTimeline } from "@/lib/clinic/patient-timeline";
+import {
+  doctorCanAccessPatient,
+  doctorCanViewFullPatientHistory,
+  forbidden,
+  hasHealthProfileConsent,
+  requireSession,
+  unauthorized,
+} from "@/lib/clinic/access-control";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -12,21 +20,48 @@ export async function GET(request: NextRequest) {
   }
 
   const session = await getSessionFromRequest(request);
-  if (
-    session &&
-    session.role === "patient" &&
-    session.userId !== patientId
-  ) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  if (!requireSession(session)) {
+    return unauthorized();
   }
 
   const db = await readDb();
+  const patient = db.patients.find((p) => p.id === patientId);
+  if (!patient) {
+    return NextResponse.json({ error: "Paciente no encontrado" }, { status: 404 });
+  }
 
-  const appointments = db.appointments
-    .filter((a) => a.patientId === patientId)
+  if (session.role === "patient" && session.userId !== patientId) {
+    return forbidden();
+  }
+
+  if (session.role === "doctor") {
+    if (!doctorCanAccessPatient(db, session.userId, patientId)) {
+      return forbidden(
+        "No tenés relación clínica con este paciente. Solo podés ver historias de pacientes con turno.",
+      );
+    }
+  }
+
+  const fullHistory =
+    session.role === "patient" ||
+    (session.role === "doctor" &&
+      doctorCanViewFullPatientHistory(db, session.userId, patientId));
+
+  const viewingDoctorId = session.role === "doctor" ? session.userId : null;
+
+  let patientAppointments = db.appointments.filter(
+    (a) => a.patientId === patientId,
+  );
+  if (!fullHistory && viewingDoctorId) {
+    patientAppointments = patientAppointments.filter(
+      (a) => a.doctorId === viewingDoctorId,
+    );
+  }
+
+  const appointments = patientAppointments
     .sort(
       (a, b) =>
-        new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime()
+        new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime(),
     )
     .map((apt) => {
       const doctor = db.doctors.find((d) => d.id === apt.doctorId);
@@ -53,45 +88,48 @@ export async function GET(request: NextRequest) {
       };
     });
 
-  const clinicalRecords = db.clinicalRecords
-    .filter((r) => r.patientId === patientId)
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )
-    .map((r) => ({
-      id: r.id,
-      title: r.title,
-      content: r.content,
-      recordType: r.recordType,
-      createdAt: r.createdAt,
-      appointmentId: r.appointmentId,
-      doctorName: db.doctors.find((d) => d.id === r.doctorId)?.fullName,
-    }));
-
-  const timeline = buildPatientTimeline(appointments, clinicalRecords);
-
-  const patient = db.patients.find((p) => p.id === patientId);
-  let healthProfile = undefined;
-  if (session?.role === "patient" && session.userId === patientId) {
-    healthProfile = patient?.healthProfile;
-  } else if (session?.role === "doctor") {
-    const doctorId = searchParams.get("doctorId") ?? session.userId;
-    const consented = db.appointments.some(
-      (a) =>
-        a.patientId === patientId &&
-        a.doctorId === doctorId &&
-        a.shareHealthProfile,
+  let clinicalRecords = db.clinicalRecords.filter(
+    (r) => r.patientId === patientId,
+  );
+  if (!fullHistory && viewingDoctorId) {
+    clinicalRecords = clinicalRecords.filter(
+      (r) => r.doctorId === viewingDoctorId,
     );
-    if (consented) {
-      healthProfile = patient?.healthProfile;
-    }
+  }
+
+  clinicalRecords = clinicalRecords.sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+
+  const mappedRecords = clinicalRecords.map((r) => ({
+    id: r.id,
+    title: r.title,
+    content: r.content,
+    recordType: r.recordType,
+    createdAt: r.createdAt,
+    appointmentId: r.appointmentId,
+    doctorName: db.doctors.find((d) => d.id === r.doctorId)?.fullName,
+    documentId: r.documentId,
+  }));
+
+  const timeline = buildPatientTimeline(appointments, mappedRecords);
+
+  let healthProfile: typeof patient.healthProfile | null = null;
+  if (session.role === "patient" && session.userId === patientId) {
+    healthProfile = patient.healthProfile ?? null;
+  } else if (
+    session.role === "doctor" &&
+    hasHealthProfileConsent(db, session.userId, patientId)
+  ) {
+    healthProfile = patient.healthProfile ?? null;
   }
 
   return NextResponse.json({
     appointments,
-    clinicalRecords,
+    clinicalRecords: mappedRecords,
     timeline,
-    healthProfile: healthProfile ?? null,
+    healthProfile,
+    accessLevel: fullHistory ? "full" : "scoped",
   });
 }

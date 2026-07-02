@@ -200,10 +200,13 @@ export function ThemeSettingsPanel({
             <Label htmlFor="brandText">Texto de la marca</Label>
             <Input
               id="brandText"
-              placeholder="Ej. Consultorio Dr. García"
+              placeholder="Ej. Juan Mendía"
               value={settings.brandText}
               onChange={(e) => onChange({ brandText: e.target.value })}
             />
+            <p className="text-[11px] text-slate2">
+              La última palabra se muestra con el color primario (como &quot;salud&quot; en Nodo Salud).
+            </p>
           </div>
         )}
       </div>

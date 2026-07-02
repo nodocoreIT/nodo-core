@@ -43,6 +43,7 @@ export interface TimelineSourceRecord {
   createdAt: string;
   appointmentId?: string;
   doctorName?: string;
+  documentId?: string;
 }
 
 const RECORD_KIND_MAP: Record<string, TimelineItemKind> = {
@@ -116,14 +117,26 @@ export function buildPatientTimeline(
   }
 
   for (const rec of records) {
+    const kind = recordTypeToKind(rec.recordType);
     items.push({
       id: `rec-${rec.id}`,
-      kind: recordTypeToKind(rec.recordType),
+      kind,
       date: rec.createdAt,
       title: rec.title,
       content: rec.content,
       doctorName: rec.doctorName,
       appointmentId: rec.appointmentId,
+      downloadUrl: rec.documentId
+        ? `/api/clinic/documents?id=${rec.documentId}&download=1`
+        : kind === "receta" || kind === "estudio"
+          ? `/api/clinic/clinical-records/pdf?id=${rec.id}`
+          : undefined,
+      fileName:
+        kind === "receta"
+          ? "receta-medica.pdf"
+          : kind === "estudio"
+            ? "orden-estudios.pdf"
+            : undefined,
     });
   }
 

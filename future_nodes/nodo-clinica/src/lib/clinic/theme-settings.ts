@@ -22,6 +22,19 @@ export const DEFAULT_THEME_SETTINGS: DoctorThemeSettings = {
   brandText: "nodo salud",
 };
 
+/** Tema fijo del portal paciente — no hereda colores del médico. */
+export const PATIENT_THEME_SETTINGS: DoctorThemeSettings = {
+  primaryColor: "#047857",
+  secondaryColor: "#0f172a",
+  sidebarTextColor: "#cbd5e1",
+  fontColor: "#1e293b",
+  buttonFontColor: "#ffffff",
+  borderRadius: "md",
+  fontFamily: "Inter",
+  logoType: "default",
+  brandText: "nodosalud",
+};
+
 export function mergeThemeSettings(
   partial?: Partial<DoctorThemeSettings> | null,
 ): DoctorThemeSettings {

@@ -114,10 +114,13 @@ function TimelineEntry({ item }: { item: PatientTimelineItem }) {
               href={item.downloadUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 hover:bg-slate-50"
-              title="Descargar"
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              title="Descargar PDF"
             >
-              <Download className="h-4 w-4 text-slate-600" />
+              <Download className="h-3.5 w-3.5" />
+              {item.kind === "receta" || item.kind === "estudio"
+                ? "Ver PDF"
+                : "Descargar"}
             </a>
           )}
         </div>

@@ -40,6 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 /data/clinic.json
 /data/uploads/
+/jaasauth.key
+/jaasauth.key.pub
+/jaas-public-upload.pem
 
 # notas locales de desarrollo
 /falta

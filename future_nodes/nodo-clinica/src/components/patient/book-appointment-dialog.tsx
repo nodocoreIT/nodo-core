@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -27,11 +27,32 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 import { clinicApi } from "@/lib/clinic/client-api";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { parseLocalDate } from "@/lib/clinic/schedule";
+import { parseLocalDate, formatDateKeyLabel, clinicTimeLabelFromIso } from "@/lib/clinic/schedule";
+import {
+  getSpeechRecognitionCtor,
+  speechErrorMessage,
+  SPEECH_LANG,
+} from "@/lib/clinic/speech-recognition";
 import { ConsultationPaymentPanel } from "@/components/patient/consultation-payment-panel";
+import { ReceiptValidationCard } from "@/components/patient/receipt-validation-card";
+import {
+  patientRequiresPayment,
+  patientShowsPaymentStep,
+  patientCanPayWithMercadoPago,
+} from "@/lib/clinic/payment";
+import type { PaymentReceiptAudit } from "@/lib/clinic/local-db";
 import { toast } from "sonner";
+
+interface BookAppointmentDialogProps {
+  doctorId: string;
+  doctorName: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+type WizardStep = "slot" | "payment" | "intake" | "studies" | "confirm";
 
 interface PaymentInfo {
   consultationFee?: number;
@@ -43,26 +64,7 @@ interface PaymentInfo {
   qrImageData?: string;
   requirePaymentBeforeBooking?: boolean;
   mercadopagoEnabled?: boolean;
-}
-
-interface BookAppointmentDialogProps {
-  doctorId: string;
-  doctorName: string;
-  payment?: PaymentInfo;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-type WizardStep = "slot" | "payment" | "intake" | "studies" | "confirm";
-
-function requiresPaymentStep(payment?: PaymentInfo): boolean {
-  return payment?.requirePaymentBeforeBooking !== false;
-}
-
-function usesMercadoPago(payment?: PaymentInfo): boolean {
-  return !!(
-    payment?.mercadopagoEnabled && (payment.consultationFee ?? 0) > 0
-  );
+  mercadopagoReady?: boolean;
 }
 
 async function fileToBase64(file: File): Promise<string> {
@@ -123,7 +125,6 @@ function WizardProgress({
 export function BookAppointmentDialog({
   doctorId,
   doctorName,
-  payment,
   open,
   onOpenChange,
 }: BookAppointmentDialogProps) {
@@ -132,7 +133,8 @@ export function BookAppointmentDialog({
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [slots, setSlots] = useState<{ iso: string; label: string }[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingDates, setLoadingDates] = useState(false);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [booking, setBooking] = useState(false);
   const [shareHealthProfile, setShareHealthProfile] = useState(true);
   const [duration, setDuration] = useState(30);
@@ -144,16 +146,36 @@ export function BookAppointmentDialog({
     null,
   );
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const slotsSectionRef = useRef<HTMLDivElement | null>(null);
+  const [resolvedPayment, setResolvedPayment] = useState<PaymentInfo | undefined>(
+    undefined,
+  );
+  const [paymentRequiredOverride, setPaymentRequiredOverride] = useState(false);
+  const [paymentSettingsReady, setPaymentSettingsReady] = useState(false);
+  const [receiptAudit, setReceiptAudit] = useState<PaymentReceiptAudit | null>(null);
+  const [validatingReceipt, setValidatingReceipt] = useState(false);
 
-  const needsPayment = requiresPaymentStep(payment);
-  const mpEnabled = usesMercadoPago(payment);
+  const showPaymentStep =
+    patientShowsPaymentStep(resolvedPayment) || paymentRequiredOverride;
+  const needsPayment =
+    patientRequiresPayment(resolvedPayment) || paymentRequiredOverride;
+  const mpReady = patientCanPayWithMercadoPago(resolvedPayment);
+  const transferRequired = needsPayment && !mpReady;
+  const paymentBlockedWithoutProof =
+    needsPayment && !receiptFile && (transferRequired || mpReady);
 
   const steps = useMemo((): WizardStep[] => {
-    if (needsPayment) {
+    if (showPaymentStep) {
       return ["slot", "payment", "intake", "studies", "confirm"];
     }
     return ["slot", "intake", "studies", "confirm"];
-  }, [needsPayment]);
+  }, [showPaymentStep]);
+
+  const loadDoctorPayment = useCallback(async () => {
+    const doctor = await clinicApi.getDoctorForBooking(doctorId);
+    setResolvedPayment(doctor.payment);
+    return doctor.payment;
+  }, [doctorId]);
 
   const resetWizard = () => {
     setStep("slot");
@@ -165,33 +187,89 @@ export function BookAppointmentDialog({
     setSelectedDate(null);
     setSelectedSlot(null);
     setListening(false);
+    setPaymentRequiredOverride(false);
+    setPaymentSettingsReady(false);
+    setReceiptAudit(null);
+    setValidatingReceipt(false);
+    setResolvedPayment(undefined);
     recognitionRef.current?.stop();
   };
 
   useEffect(() => {
     if (!open) return;
     resetWizard();
-    setLoading(true);
-    clinicApi
-      .getAvailableDates(doctorId)
-      .then((data) => {
-        setDates(data.dates ?? []);
-        setDuration(data.slotDurationMinutes ?? 30);
+    setLoadingDates(true);
+    setPaymentSettingsReady(false);
+
+    let cancelled = false;
+
+    Promise.all([
+      loadDoctorPayment(),
+      clinicApi.getAvailableDates(doctorId),
+    ])
+      .then(([, dateData]) => {
+        if (cancelled) return;
+        setDates(dateData.dates ?? []);
+        setDuration(dateData.slotDurationMinutes ?? 30);
+        setPaymentSettingsReady(true);
       })
-      .finally(() => setLoading(false));
-  }, [open, doctorId]);
+      .catch((err) => {
+        if (cancelled) return;
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "No se pudieron cargar los honorarios del médico",
+        );
+        setPaymentSettingsReady(false);
+        clinicApi
+          .getAvailableDates(doctorId)
+          .then((dateData) => {
+            if (cancelled) return;
+            setDates(dateData.dates ?? []);
+            setDuration(dateData.slotDurationMinutes ?? 30);
+          })
+          .catch(() => undefined);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDates(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, doctorId, loadDoctorPayment]);
+
+  useEffect(() => {
+    if (!open || step !== "payment") return;
+    void loadDoctorPayment().catch(() => {
+      toast.error("No se pudieron actualizar los datos de cobro");
+    });
+  }, [open, step, doctorId, loadDoctorPayment]);
 
   useEffect(() => {
     if (!selectedDate) {
       setSlots([]);
+      setLoadingSlots(false);
       return;
     }
-    setLoading(true);
+    setLoadingSlots(true);
+    setSelectedSlot(null);
     clinicApi
       .getSlots(doctorId, selectedDate)
-      .then((data) => setSlots(data.slots ?? []))
-      .finally(() => setLoading(false));
+      .then((data) => {
+        const nextSlots = data.slots ?? [];
+        setSlots(nextSlots);
+        if (nextSlots.length === 1) {
+          setSelectedSlot(nextSlots[0].iso);
+        }
+      })
+      .finally(() => setLoadingSlots(false));
   }, [selectedDate, doctorId]);
+
+  useEffect(() => {
+    if (!selectedDate || loadingSlots) return;
+    slotsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [selectedDate, loadingSlots, slots.length]);
 
   useEffect(() => {
     return () => recognitionRef.current?.stop();
@@ -199,7 +277,8 @@ export function BookAppointmentDialog({
 
   const slotLabel =
     selectedSlot &&
-    format(parseISO(selectedSlot), "EEEE dd/MM 'a las' HH:mm", { locale: es });
+    selectedDate &&
+    `${formatDateKeyLabel(selectedDate)} a las ${clinicTimeLabelFromIso(selectedSlot)}`;
 
   const goBack = () => {
     const idx = steps.indexOf(step);
@@ -213,10 +292,9 @@ export function BookAppointmentDialog({
 
   const toggleMic = () => {
     if (typeof window === "undefined") return;
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition = getSpeechRecognitionCtor();
     if (!SpeechRecognition) {
-      toast.error("Dictado por voz no disponible en este navegador");
+      toast.error("Dictado no disponible. Usá Chrome o Edge y permití el micrófono.");
       return;
     }
     if (listening) {
@@ -225,14 +303,14 @@ export function BookAppointmentDialog({
       return;
     }
     const recognition = new SpeechRecognition();
-    recognition.lang = "es-ES";
+    recognition.lang = SPEECH_LANG;
     recognition.continuous = true;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let chunk = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
-          chunk += event.results[i][0].transcript;
+          chunk += event.results[i][0]?.transcript ?? "";
         }
       }
       if (chunk.trim()) {
@@ -241,22 +319,96 @@ export function BookAppointmentDialog({
         );
       }
     };
-    recognition.onerror = () => setListening(false);
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      setListening(false);
+      if (event.error !== "aborted") {
+        toast.error(speechErrorMessage(event.error));
+      }
+    };
     recognition.onend = () => setListening(false);
     recognitionRef.current = recognition;
-    recognition.start();
-    setListening(true);
+    try {
+      recognition.start();
+      setListening(true);
+    } catch {
+      toast.error("No se pudo iniciar el dictado. Probá de nuevo.");
+      setListening(false);
+    }
   };
 
   const handleContinueFromSlot = () => {
-    if (!selectedSlot) return;
+    if (!paymentSettingsReady) {
+      toast.message("Cargando datos del médico…");
+      return;
+    }
+    if (!selectedSlot) {
+      if (selectedDate && !loadingSlots) {
+        toast.message("Elegí un horario para continuar");
+      }
+      return;
+    }
     goNext();
   };
 
+  const runReceiptPreview = async (file: File) => {
+    if (!selectedSlot) {
+      toast.error("Elegí fecha y horario antes del comprobante");
+      return;
+    }
+    setValidatingReceipt(true);
+    setReceiptAudit(null);
+    setValidationChecks(null);
+    try {
+      const result = await clinicApi.previewPaymentReceipt({
+        doctorId,
+        scheduledAt: selectedSlot,
+        receipt: {
+          fileName: file.name,
+          mimeType: file.type || "image/jpeg",
+          dataBase64: await fileToBase64(file),
+        },
+      });
+      if (result.audit) setReceiptAudit(result.audit);
+      if (result.checks) setValidationChecks(result.checks as ReceiptChecks);
+      if (result.valid) {
+        toast.success("Comprobante validado — podés continuar");
+      } else {
+        const failed = result.checks
+          ? Object.values(result.checks).find((c) => !c.pass)?.detail
+          : result.reasons?.[0];
+        toast.warning(failed ?? "Revisá los datos del comprobante");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo analizar el comprobante");
+    } finally {
+      setValidatingReceipt(false);
+    }
+  };
+
+  const goToPaymentStep = () => {
+    setPaymentRequiredOverride(true);
+    setStep("payment");
+  };
+
   const handleContinueFromPayment = () => {
-    if (needsPayment && !receiptFile) {
+    if (needsPayment && !receiptFile && mpReady) {
+      toast.error(
+        "Usá el botón «Pagar con Mercado Pago» o subí el comprobante de transferencia",
+      );
+      return;
+    }
+    if (transferRequired && !receiptFile) {
       toast.error("Subí el comprobante de transferencia para continuar");
       return;
+    }
+    if (transferRequired && validatingReceipt) {
+      toast.message("Esperá el análisis del comprobante…");
+      return;
+    }
+    if (transferRequired && receiptAudit && !receiptAudit.valid) {
+      toast.message(
+        "La IA no pudo validar todo automáticamente. Podés continuar: el médico revisará el comprobante.",
+      );
     }
     goNext();
   };
@@ -265,9 +417,9 @@ export function BookAppointmentDialog({
     mode: "none" | "transfer" | "mercadopago",
   ) => {
     if (!selectedSlot) return;
-    if (mode === "transfer" && needsPayment && !receiptFile) {
+    if (needsPayment && mode === "transfer" && !receiptFile) {
       toast.error("Falta el comprobante de pago");
-      setStep("payment");
+      goToPaymentStep();
       return;
     }
 
@@ -310,14 +462,21 @@ export function BookAppointmentDialog({
         return;
       }
 
-      toast.success("Turno confirmado. Te esperamos en la sala virtual.");
+      toast.success(
+        result.paymentPendingReview
+          ? "Turno reservado. El médico revisará tu comprobante antes de la consulta."
+          : "Turno confirmado. Te esperamos en la sala virtual.",
+      );
       onOpenChange(false);
       window.location.assign(result.waitingRoomUrl);
     } catch (e) {
-      const err = e as Error & { checks?: ReceiptChecks };
-      if (err.checks) {
-        setValidationChecks(err.checks);
-        setStep("payment");
+      const err = e as Error & {
+        checks?: ReceiptChecks;
+        requiresReceipt?: boolean;
+      };
+      if (err.requiresReceipt || err.checks) {
+        if (err.checks) setValidationChecks(err.checks);
+        goToPaymentStep();
       }
       toast.error(err.message || "Error al confirmar el turno");
     } finally {
@@ -379,9 +538,9 @@ export function BookAppointmentDialog({
           <div className="space-y-4">
             <div>
               <p className="text-sm font-medium text-slate-700 mb-2">Elegí el día</p>
-              {loading && dates.length === 0 ? (
+              {loadingDates && dates.length === 0 ? (
                 <div className="flex justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                  <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
                 </div>
               ) : dates.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-4 bg-slate-50 rounded-lg">
@@ -392,15 +551,15 @@ export function BookAppointmentDialog({
                   {dates.map((d) => (
                     <Button
                       key={d.date}
+                      type="button"
                       size="sm"
                       variant={selectedDate === d.date ? "default" : "outline"}
                       className={
-                        selectedDate === d.date ? "bg-blue-700 hover:bg-blue-800" : ""
+                        selectedDate === d.date
+                          ? "bg-emerald-700 hover:bg-emerald-800"
+                          : ""
                       }
-                      onClick={() => {
-                        setSelectedDate(d.date);
-                        setSelectedSlot(null);
-                      }}
+                      onClick={() => setSelectedDate(d.date)}
                     >
                       {d.label}
                     </Button>
@@ -410,25 +569,28 @@ export function BookAppointmentDialog({
             </div>
 
             {selectedDate && (
-              <div>
+              <div ref={slotsSectionRef}>
                 <p className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-1">
                   <Clock className="h-4 w-4" />
-                  Horario —{" "}
+                  Elegí el horario —{" "}
                   {format(parseLocalDate(selectedDate), "dd MMM yyyy", {
                     locale: es,
                   })}
                 </p>
-                {loading ? (
-                  <Loader2 className="h-6 w-6 animate-spin text-blue-600 mx-auto" />
+                {loadingSlots ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                  </div>
                 ) : slots.length === 0 ? (
-                  <p className="text-sm text-slate-400 text-center py-4">
-                    Sin horarios este día
+                  <p className="text-sm text-amber-700 text-center py-4 bg-amber-50 rounded-lg border border-amber-100">
+                    No hay horarios libres este día. Probá con otro día.
                   </p>
                 ) : (
                   <div className="grid grid-cols-4 gap-2">
                     {slots.map((slot) => (
                       <Button
                         key={slot.iso}
+                        type="button"
                         size="sm"
                         variant={selectedSlot === slot.iso ? "default" : "outline"}
                         className={
@@ -446,24 +608,46 @@ export function BookAppointmentDialog({
               </div>
             )}
 
+            {selectedDate && !selectedSlot && !loadingSlots && slots.length > 0 && (
+              <p className="text-xs text-slate-500 text-center">
+                Seleccioná un horario de la lista para continuar.
+              </p>
+            )}
+
             <Button
-              className="w-full bg-blue-700 hover:bg-blue-800"
-              disabled={!selectedSlot}
+              type="button"
+              className="w-full bg-emerald-700 hover:bg-emerald-800"
+              disabled={!selectedSlot || loadingSlots || !paymentSettingsReady}
               onClick={handleContinueFromSlot}
             >
-              Continuar
+              {!paymentSettingsReady ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Cargando…
+                </>
+              ) : (
+                "Continuar"
+              )}
             </Button>
           </div>
         )}
 
         {step === "payment" && (
           <div className="space-y-4">
-            <ConsultationPaymentPanel doctorName={doctorName} payment={payment} />
+            <p className="text-xs text-slate-500">
+              {mpReady
+                ? `El pago con Mercado Pago va directo a la cuenta de Dr/a. ${doctorName}. También podés transferir y subir comprobante.`
+                : "Transferí el honorario y subí el comprobante para continuar."}
+            </p>
+            <ConsultationPaymentPanel
+              doctorName={doctorName}
+              payment={resolvedPayment}
+            />
 
-            {mpEnabled && (
+            {mpReady && (
               <>
                 <Button
-                  className="w-full bg-[#009ee3] hover:bg-[#008ecf] text-white"
+                  className="w-full bg-[#009ee3] hover:bg-[#008ecf] text-white h-11"
                   disabled={booking}
                   onClick={() => handleFinalConfirm("mercadopago")}
                 >
@@ -472,14 +656,26 @@ export function BookAppointmentDialog({
                   ) : (
                     <>
                       <Wallet className="h-4 w-4 mr-2" />
-                      Pagar con Mercado Pago y confirmar
+                      Pagar con Mercado Pago (celular o QR)
                     </>
                   )}
                 </Button>
+                <p className="text-[10px] text-center text-slate-400">
+                  Abrís Mercado Pago, pagás con tarjeta, débito o dinero en
+                  cuenta — el turno se confirma solo.
+                </p>
                 <p className="text-xs text-center text-slate-400">
                   — o transferencia manual —
                 </p>
               </>
+            )}
+
+            {resolvedPayment?.mercadopagoEnabled && !mpReady && (
+              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                Este médico activó Mercado Pago pero aún no vinculó su cuenta.
+                Usá transferencia por ahora o pedile que complete la conexión en
+                Configuración → Cobros.
+              </p>
             )}
 
             <div className="rounded-lg border border-dashed border-violet-200 bg-violet-50/40 p-3 space-y-2">
@@ -490,9 +686,12 @@ export function BookAppointmentDialog({
                 type="file"
                 accept="image/jpeg,image/png,image/jpg,application/pdf"
                 className="text-xs w-full"
-                onChange={(e) => {
-                  setReceiptFile(e.target.files?.[0] ?? null);
+                onChange={async (e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  setReceiptFile(file);
+                  setReceiptAudit(null);
                   setValidationChecks(null);
+                  if (file) await runReceiptPreview(file);
                 }}
               />
               {receiptFile && (
@@ -501,16 +700,38 @@ export function BookAppointmentDialog({
                   {receiptFile.name}
                 </p>
               )}
+              <ReceiptValidationCard
+                audit={receiptAudit}
+                loading={validatingReceipt}
+              />
+              {receiptAudit && !receiptAudit.valid && receiptFile && (
+                <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+                  La validación automática no fue concluyente. Podés continuar:
+                  el médico revisará el comprobante manualmente.
+                </p>
+              )}
               <p className="text-[10px] text-slate-500">
-                Validamos monto, alias del médico y coherencia con el turno al
-                confirmar.
+                Validamos monto, destinatario y fecha del turno al subir el archivo.
+                {resolvedPayment?.consultationFee ? (
+                  <>
+                    {" "}
+                    Honorario configurado del médico:{" "}
+                    <strong>
+                      {(resolvedPayment.currency ?? "ARS")}{" "}
+                      {resolvedPayment.consultationFee.toLocaleString("es-AR")}
+                    </strong>
+                    . Sin GEMINI en local la validación es aproximada.
+                  </>
+                ) : null}
               </p>
             </div>
 
             <NavButtons
               onBack={goBack}
               onContinue={handleContinueFromPayment}
-              continueDisabled={!receiptFile}
+              continueDisabled={
+                paymentBlockedWithoutProof || validatingReceipt
+              }
               continueLabel="Continuar"
             />
           </div>
@@ -617,6 +838,9 @@ export function BookAppointmentDialog({
                   {receiptFile.name}
                 </p>
               )}
+              {receiptAudit && (
+                <ReceiptValidationCard audit={receiptAudit} title="Pago validado" />
+              )}
               {intakeReason.trim() && (
                 <p className="text-xs text-slate-600 line-clamp-2">
                   <span className="font-medium">Motivo:</span> {intakeReason}
@@ -628,6 +852,57 @@ export function BookAppointmentDialog({
                 </p>
               )}
             </div>
+
+            {needsPayment && mpReady && !receiptFile && (
+              <div className="rounded-lg border border-[#009ee3]/30 bg-sky-50 p-3 text-sm space-y-2">
+                <p className="text-sky-900 font-medium">
+                  Pagá con Mercado Pago para confirmar al instante
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="w-full bg-[#009ee3] hover:bg-[#008ecf] text-white"
+                  disabled={booking}
+                  onClick={() => handleFinalConfirm("mercadopago")}
+                >
+                  <Wallet className="h-4 w-4 mr-1" />
+                  Ir a Mercado Pago
+                </Button>
+              </div>
+            )}
+
+            {needsPayment && !receiptAudit?.valid && transferRequired && !receiptFile && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm space-y-2">
+                <p className="text-amber-900 font-medium">
+                  Falta el comprobante de pago
+                </p>
+                <p className="text-xs text-amber-800">
+                  Este médico exige transferencia antes de confirmar el turno.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="w-full bg-amber-700 hover:bg-amber-800"
+                  onClick={goToPaymentStep}
+                >
+                  <CreditCard className="h-4 w-4 mr-1" />
+                  Ir a pagar y subir comprobante
+                </Button>
+              </div>
+            )}
+
+            {needsPayment && receiptAudit && !receiptAudit.valid && receiptFile && (
+              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                El comprobante quedará en revisión manual del médico. Podés confirmar el turno igual.
+              </p>
+            )}
+
+            {needsPayment && receiptFile && (
+              <p className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1.5">
+                <FileText className="h-3.5 w-3.5" />
+                Comprobante listo: {receiptFile.name}
+              </p>
+            )}
 
             <label className="flex items-start gap-2 rounded-md border border-emerald-100 bg-emerald-50/50 p-3 cursor-pointer">
               <input
@@ -667,9 +942,23 @@ export function BookAppointmentDialog({
               </Button>
               <Button
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                disabled={booking}
+                disabled={
+                  booking ||
+                  (needsPayment &&
+                    !receiptFile &&
+                    !mpReady &&
+                    transferRequired)
+                }
                 onClick={() =>
-                  handleFinalConfirm(needsPayment ? "transfer" : "none")
+                  handleFinalConfirm(
+                    !needsPayment
+                      ? "none"
+                      : receiptFile
+                        ? "transfer"
+                        : mpReady
+                          ? "mercadopago"
+                          : "transfer",
+                  )
                 }
               >
                 {booking ? (

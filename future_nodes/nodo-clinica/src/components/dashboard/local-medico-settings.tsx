@@ -1,19 +1,32 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { DoctorOfficePanel } from "@/components/medical/doctor-office-panel";
 import { clinicApi } from "@/lib/clinic/client-api";
 
+const VALID_TABS = new Set([
+  "agenda",
+  "perfil",
+  "cobros",
+  "avisos",
+  "libres",
+  "apariencia",
+]);
+
 export function LocalMedicoSettings() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const defaultTab =
+    tabParam && VALID_TABS.has(tabParam) ? tabParam : undefined;
   const [doctorId, setDoctorId] = useState<string | null>(null);
 
   useEffect(() => {
     clinicApi.getSession().then(({ session, user }) => {
       if (!session || session.role !== "doctor") {
-        router.push("/login");
+        router.push("/login/medico");
         return;
       }
       setDoctorId(user.id);
@@ -28,5 +41,11 @@ export function LocalMedicoSettings() {
     );
   }
 
-  return <DoctorOfficePanel doctorId={doctorId} fullPage />;
+  return (
+    <DoctorOfficePanel
+      doctorId={doctorId}
+      fullPage
+      defaultTab={defaultTab}
+    />
+  );
 }

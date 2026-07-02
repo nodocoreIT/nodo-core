@@ -21,7 +21,6 @@ import { MedicalReportPanel } from "@/components/medical/medical-report-panel";
 import { ClinicalAlertsBanner } from "@/components/medical/clinical-alerts-banner";
 import type { PatientHealthProfile } from "@/lib/clinic/local-db";
 import { useConsultationStore } from "@/store/consultation-store";
-import { useSpeechTranscription } from "@/hooks/use-speech-transcription";
 import { createClient } from "@/lib/supabase/client";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { mapAppointmentStatusToLifecycle } from "@/types";
@@ -108,7 +107,6 @@ export function DoctorDashboard({
     hasActiveSession,
     dismissConsultation,
   } = useConsultationStore();
-
   const [doctorPhoto, setDoctorPhoto] = useState<string>();
   const [googleCalendarId, setGoogleCalendarId] = useState<string>();
   const [previewPatient, setPreviewPatient] = useState<QueuePatient | null>(
@@ -120,18 +118,13 @@ export function DoctorDashboard({
     patientName: string;
     patientEmail?: string;
     patientPhone?: string;
+    postConsult?: boolean;
   } | null>(null);
   const [consultationToolsTab, setConsultationToolsTab] = useState("prescription");
   const [activeHealthProfile, setActiveHealthProfile] =
     useState<PatientHealthProfile | null>(null);
+  const [videoSessionKey, setVideoSessionKey] = useState(0);
   const { queue } = useConsultationStore();
-
-  const transcriptionEnabled = useConsultationStore(
-    (s) =>
-      !!s.activeAppointment &&
-      s.activeAppointment.status === "in_consultation"
-  );
-  useSpeechTranscription({ enabled: transcriptionEnabled });
 
   useEffect(() => {
     if (dataSource !== "local") return;
@@ -400,15 +393,39 @@ export function DoctorDashboard({
   const finishConsultation = useCallback(
     async (appointmentId: string) => {
       if (dataSource === "local") {
-        const { transcriptionText, clinicalNotes } =
-          useConsultationStore.getState();
+        const store = useConsultationStore.getState();
+        const { transcriptionText, clinicalNotes, activeAppointment, queue } =
+          store;
+        const queuePatient = queue.find((q) => q.appointmentId === appointmentId);
+
         await clinicApi.updateAppointmentStatus(appointmentId, "completed", {
           transcription: transcriptionText,
           clinicalNotes,
         });
+
+        const patientId =
+          activeAppointment?.patient_id ?? queuePatient?.patientId;
+        const patientName = queuePatient?.patientName ?? "Paciente";
+
         updatePatientStatus(appointmentId, "finalizada");
         setActiveHealthProfile(null);
-        toast.success("Consulta finalizada — evolución y SOAP guardados en historial");
+
+        if (patientId) {
+          setInlineReport({
+            appointmentId,
+            patientId,
+            patientName,
+            patientEmail: queuePatient?.patientEmail,
+            patientPhone: queuePatient?.patientPhone,
+            postConsult: true,
+          });
+          setPreviewPatient(null);
+          dismissConsultation();
+        }
+
+        toast.message(
+          "Consulta finalizada — dictá el informe y generá con IA cuando estés listo",
+        );
         loadQueue();
         return;
       }
@@ -423,7 +440,12 @@ export function DoctorDashboard({
       toast.success("Consulta finalizada");
       loadQueue();
     },
-    [dataSource, loadQueue, updatePatientStatus]
+    [
+      dataSource,
+      loadQueue,
+      updatePatientStatus,
+      dismissConsultation,
+    ],
   );
 
   const openReportForPatient = useCallback(
@@ -737,17 +759,23 @@ export function DoctorDashboard({
                 patientName={patientProfile?.profile?.full_name || "Paciente"}
               />
               <JitsiMeet
+                key={`${activeAppointment.jitsi_room_id}-${videoSessionKey}`}
                 roomName={activeAppointment.jitsi_room_id}
                 displayName={doctorName}
+                isModerator
+                showProviderBanner
                 enableConsultorioBackground
                 height={520}
-                onMeetingEnd={() =>
-                  finishConsultation(activeAppointment.id)
-                }
+                onMeetingEnd={() => {
+                  toast.message(
+                    "Saliste de la videollamada. Reingresá o usá «Finalizar consulta» cuando termines.",
+                  );
+                }}
                 endScreen={
                   <ConsultationEndScreen
                     role="doctor"
                     autoRedirectSeconds={0}
+                    onRejoin={() => setVideoSessionKey((k) => k + 1)}
                     onReturn={handleDismissConsultation}
                     onGenerateReport={() =>
                       openReportForPatient({
@@ -874,6 +902,7 @@ export function DoctorDashboard({
                   doctorSpecialty={doctorSpecialty}
                   doctorLicense={doctorLicense}
                   compact
+                  postConsult={inlineReport.postConsult}
                   onClose={() => setInlineReport(null)}
                   onSaved={() => {
                     loadClinicalHistory(inlineReport.patientId);

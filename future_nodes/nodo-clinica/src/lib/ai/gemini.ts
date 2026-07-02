@@ -1,5 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+const GEMINI_MODELS = [
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-latest",
+] as const;
+
 export interface SoapResult {
   subjective: string;
   objective: string;
@@ -9,7 +15,7 @@ export interface SoapResult {
 
 export async function generateSoapSummary(
   transcription: string,
-  clinicalNotes?: string
+  clinicalNotes?: string,
 ): Promise<SoapResult> {
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -17,10 +23,25 @@ export async function generateSoapSummary(
     return generateMockSoap(transcription, clinicalNotes);
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const prompt = buildSoapPrompt(transcription, clinicalNotes);
 
-  const prompt = `Eres un médico especialista en documentación clínica. A partir de la siguiente transcripción de consulta médica y notas del profesional, genera un resumen estructurado en formato SOAP (Subjetivo, Objetivo, Análisis, Plan) siguiendo estándares de historia clínica.
+  try {
+    const text = await generateWithGeminiModels(apiKey, prompt);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No se pudo parsear la respuesta de Gemini");
+    }
+    return JSON.parse(jsonMatch[0]) as SoapResult;
+  } catch (err) {
+    if (isGeminiQuotaError(err)) {
+      return generateMockSoap(transcription, clinicalNotes);
+    }
+    throw err;
+  }
+}
+
+function buildSoapPrompt(transcription: string, clinicalNotes?: string) {
+  return `Eres un médico especialista en documentación clínica. A partir de la siguiente transcripción de consulta médica y notas del profesional, genera un resumen estructurado en formato SOAP (Subjetivo, Objetivo, Análisis, Plan) siguiendo estándares de historia clínica.
 
 TRANSCRIPCIÓN:
 ${transcription}
@@ -37,21 +58,11 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura exacta:
 }
 
 Usa terminología médica profesional en español. Sé conciso pero completo.`;
-
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error("No se pudo parsear la respuesta de Gemini");
-  }
-
-  return JSON.parse(jsonMatch[0]) as SoapResult;
 }
 
 function generateMockSoap(
   transcription: string,
-  clinicalNotes?: string
+  clinicalNotes?: string,
 ): SoapResult {
   return {
     subjective:
@@ -66,6 +77,43 @@ function generateMockSoap(
   };
 }
 
+function isGeminiQuotaError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /429|quota|RESOURCE_EXHAUSTED|Too Many Requests/i.test(msg);
+}
+
+async function generateWithGeminiModels(
+  apiKey: string,
+  prompt: string,
+): Promise<string> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  let lastError: unknown;
+
+  for (const modelName of GEMINI_MODELS) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    } catch (err) {
+      lastError = err;
+      if (!isGeminiQuotaError(err)) throw err;
+    }
+  }
+
+  throw lastError ?? new Error("Cuota de Gemini agotada");
+}
+
+export type ClinicalReportDraftReason = "no_api_key" | "quota_exceeded";
+
+export interface ClinicalReportResult {
+  report: string;
+  /** Informe armado sin llamar a Gemini (siempre gratis) */
+  localDraft?: boolean;
+  localDraftReason?: ClinicalReportDraftReason;
+  /** @deprecated usar localDraft */
+  quotaFallback?: boolean;
+}
+
 export interface ClinicalReportInput {
   dictation: string;
   transcription?: string;
@@ -77,8 +125,8 @@ export interface ClinicalReportInput {
 }
 
 export async function generateClinicalReport(
-  input: ClinicalReportInput
-): Promise<string> {
+  input: ClinicalReportInput,
+): Promise<ClinicalReportResult> {
   const source = [
     input.dictation,
     input.transcription,
@@ -89,13 +137,37 @@ export async function generateClinicalReport(
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return buildMockClinicalReport(input, source);
+    return {
+      report: buildMockClinicalReport(input, source),
+      localDraft: true,
+      localDraftReason: "no_api_key",
+      quotaFallback: true,
+    };
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const prompt = buildClinicalReportPrompt(input, source);
 
-  const prompt = `Eres un médico especialista redactando un informe clínico formal en español (Argentina).
+  try {
+    const report = (await generateWithGeminiModels(apiKey, prompt)).trim();
+    return { report };
+  } catch (err) {
+    if (isGeminiQuotaError(err)) {
+      return {
+        report: buildMockClinicalReport(input, source),
+        localDraft: true,
+        localDraftReason: "quota_exceeded",
+        quotaFallback: true,
+      };
+    }
+    throw err;
+  }
+}
+
+function buildClinicalReportPrompt(
+  input: ClinicalReportInput,
+  source: string,
+) {
+  return `Eres un médico especialista redactando un informe clínico formal en español (Argentina).
 A partir del dictado del profesional, la transcripción de la consulta y las notas clínicas, redactá un informe médico completo, claro y profesional.
 
 PACIENTE: ${input.patientName}
@@ -114,14 +186,11 @@ Redactá el informe con estas secciones en markdown (usá ## para títulos):
 
 Usá terminología médica apropiada. Sé conciso pero completo. No inventes datos que no estén en el contenido clínico.
 Respondé ÚNICAMENTE con el texto del informe en markdown, sin explicaciones adicionales.`;
-
-  const result = await model.generateContent(prompt);
-  return result.response.text().trim();
 }
 
 function buildMockClinicalReport(
   input: ClinicalReportInput,
-  source: string
+  source: string,
 ): string {
   const excerpt = source.slice(0, 400) || "Consulta por telemedicina.";
   return `## Motivo de consulta
@@ -143,7 +212,7 @@ Evaluación clínica basada en entrevista y exploración virtual. Correlacionar 
 
 ## Observaciones
 Consulta realizada por telemedicina.
-Informe generado asistido por IA — revisar y validar antes de firmar.
+Borrador asistido — revisar y validar antes de firmar.
 
 ---
 Dr/a. ${input.doctorName}${input.doctorLicense ? ` — ${input.doctorLicense}` : ""}`;

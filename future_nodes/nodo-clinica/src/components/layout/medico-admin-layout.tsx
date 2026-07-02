@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -11,14 +11,18 @@ import {
   Menu,
   X,
   MessageSquare,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/nodo/brand-mark";
 import { NodoChatWidget } from "@/components/nodo-chat/nodo-chat-widget";
 import { NodoChatBell } from "@/components/nodo-chat/nodo-chat-bell";
 import { clinicApi } from "@/lib/clinic/client-api";
+import { PlanBadge } from "@/components/plan/plan-badge";
 import { isProPlan } from "@/lib/nodo-chat/is-pro-plan";
-import { useThemeStore } from "@/hooks/use-theme-settings";
+import { isPlatformMode } from "@/lib/clinic/platform-config";
+import { isProOnlyMedicoRoute } from "@/lib/clinic/pro-features";
+import { useThemeStore, useThemeSettings } from "@/hooks/use-theme-settings";
 import { mergeThemeSettings } from "@/lib/clinic/theme-settings";
 import { Button } from "@/components/ui/button";
 
@@ -31,12 +35,14 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/medico/dashboard", label: "Inicio", icon: LayoutDashboard },
   { href: "/medico/consultorio", label: "Consultorio", icon: Stethoscope },
+  { href: "/medico/cobros", label: "Cobros", icon: Wallet },
   { href: "/medico/interconsultas", label: "Interconsultas", icon: MessageSquare },
 ];
 
 const ROUTE_TITLES: Record<string, string> = {
   "/medico/dashboard": "Inicio",
   "/medico/consultorio": "Consultorio",
+  "/medico/cobros": "Cobros",
   "/medico/interconsultas": "Interconsultas",
   "/medico/configuracion": "Configuración",
 };
@@ -50,6 +56,7 @@ function initials(value: string): string {
 }
 
 export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
+  useThemeSettings();
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -61,13 +68,71 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   } | null>(null);
   const [checking, setChecking] = useState(true);
   const [chatOpen, setChatOpen] = useState(false);
+  const [cobrosUnread, setCobrosUnread] = useState(0);
 
-  const isPro = isProPlan(doctor?.subscriptionPlan);
+  const [planTier, setPlanTier] = useState<string | null>(null);
+  const isPro = isPlatformMode()
+    ? isProPlan(planTier)
+    : isProPlan(doctor?.subscriptionPlan);
   const chatEmbedded = pathname === "/medico/interconsultas";
+
+  const refreshCobrosUnread = useCallback(async () => {
+    try {
+      const data = await clinicApi.getCobrosUnreadCount();
+      setCobrosUnread(data.cobrosCount);
+    } catch {
+      setCobrosUnread(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!doctor) return;
+    refreshCobrosUnread();
+    const interval = setInterval(refreshCobrosUnread, 10_000);
+    const onRead = () => refreshCobrosUnread();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshCobrosUnread();
+    };
+    window.addEventListener("cobros-notifications-read", onRead);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("cobros-notifications-read", onRead);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [doctor, refreshCobrosUnread]);
+
+  useEffect(() => {
+    if (pathname === "/medico/cobros" && doctor) {
+      clinicApi.markCobrosNotificationsRead().then(() => {
+        setCobrosUnread(0);
+        window.dispatchEvent(new CustomEvent("cobros-notifications-read"));
+      }).catch(() => {});
+    }
+  }, [pathname, doctor]);
 
   useEffect(() => {
     clinicApi.getSession().then(async ({ session, user }) => {
       if (!session || session.role !== "doctor") {
+        if (isPlatformMode()) {
+          try {
+            const synced = await clinicApi.syncPlatformSession();
+            setDoctor({
+              id: synced.user.id,
+              fullName: synced.user.fullName,
+              email: synced.user.email,
+              subscriptionPlan: synced.user.subscriptionPlan,
+            });
+            setPlanTier(
+              synced.platform?.plan ?? synced.user.subscriptionPlan ?? null,
+            );
+            setChecking(false);
+            return;
+          } catch {
+            router.push("/login/medico");
+            return;
+          }
+        }
         router.push("/login");
         return;
       }
@@ -77,6 +142,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
         email: user.email ?? session.email,
         subscriptionPlan: user.subscriptionPlan,
       });
+      setPlanTier(user.subscriptionPlan ?? null);
       try {
         const office = await clinicApi.getDoctorSchedule(user.id);
         if (office.themeSettings) {
@@ -105,18 +171,18 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
 
   if (checking) {
     return (
-      <div className="flex h-screen items-center justify-center bg-paper">
+      <div className="flex h-dvh items-center justify-center bg-paper">
         <div
           role="status"
           aria-label="Cargando panel"
-          className="h-8 w-8 animate-spin rounded-full border-4 border-brand border-t-transparent"
+          className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-primary)] border-t-transparent"
         />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-paper">
+    <div className="flex h-dvh max-h-dvh overflow-hidden bg-paper">
       {mobileMenuOpen && (
         <div
           className="fixed inset-0 z-50 bg-black/50 transition-opacity md:hidden"
@@ -126,7 +192,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
 
       <aside
         className={cn(
-          "fixed bottom-0 top-0 left-0 z-50 flex h-screen w-60 flex-shrink-0 flex-col bg-[var(--color-sidebar-bg)] transition-transform duration-300 ease-in-out border-r border-[var(--color-sidebar-border)] md:static md:z-auto md:translate-x-0 md:flex",
+          "fixed bottom-0 top-0 left-0 z-50 flex h-dvh max-h-dvh w-60 flex-shrink-0 flex-col bg-[var(--color-sidebar-bg)] transition-transform duration-300 ease-in-out border-r border-[var(--color-sidebar-border)] md:static md:z-auto md:translate-x-0 md:flex",
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -151,29 +217,47 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
               const isActive =
                 pathname === href ||
                 (href !== "/medico/dashboard" && pathname.startsWith(href));
+              const proLocked =
+                isProOnlyMedicoRoute(href) && !isPro;
+              const showCobrosBadge =
+                href === "/medico/cobros" && cobrosUnread > 0 && pathname !== href;
               return (
                 <Link
                   key={href}
-                  href={href}
+                  href={proLocked ? "/medico/dashboard" : href}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
                     "flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-brand text-[var(--color-primary-foreground,#fff)]"
-                      : "text-[var(--color-sidebar-text)] hover:bg-brand/10 hover:text-brand",
+                      ? "bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)]"
+                      : "text-[var(--color-sidebar-text)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]",
+                    proLocked && "opacity-50",
                   )}
+                  title={proLocked ? "Disponible en Plan Pro" : undefined}
                 >
                   <Icon className="h-4 w-4 flex-shrink-0" />
                   <span className="flex-1">{label}</span>
+                  {showCobrosBadge && (
+                    <span
+                      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white"
+                      aria-label={`${cobrosUnread} cobro${cobrosUnread === 1 ? "" : "s"} sin leer`}
+                    >
+                      {cobrosUnread > 9 ? "9+" : cobrosUnread}
+                    </span>
+                  )}
                 </Link>
               );
             })}
           </div>
         </nav>
 
-        <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] p-3">
+        <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] p-3 space-y-2">
+          <PlanBadge
+            fallbackPlan={doctor?.subscriptionPlan}
+            variant="sidebar"
+          />
           <div className="flex items-center gap-3 px-1 py-1">
-            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[var(--sidebar-primary)] text-xs font-bold text-[var(--sidebar-primary-foreground)]">
               {initials(displayName)}
             </div>
             <div className="min-w-0 flex-1">
@@ -194,9 +278,9 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                 router.push("/medico/configuracion");
               }}
               className={cn(
-                "flex-shrink-0 rounded-md p-1.5 transition-colors hover:text-brand",
+                "flex-shrink-0 rounded-md p-1.5 transition-colors hover:text-[var(--sidebar-accent-foreground)]",
                 pathname === "/medico/configuracion"
-                  ? "text-brand"
+                  ? "text-[var(--sidebar-primary)]"
                   : "text-[var(--color-sidebar-text)]",
               )}
             >
@@ -207,7 +291,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
           <Button
             variant="outline"
             onClick={handleLogout}
-            className="mt-2 w-full justify-center gap-2 border-[var(--color-sidebar-border)] bg-transparent text-[var(--color-sidebar-text)] hover:bg-brand/10 hover:text-brand hover:border-brand"
+            className="mt-2 w-full justify-center gap-2 border-[var(--color-sidebar-border)] bg-transparent text-[var(--color-sidebar-text)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] hover:border-[var(--sidebar-primary)]"
           >
             <LogOut className="h-4 w-4" />
             Cerrar sesión
@@ -215,12 +299,12 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex min-h-16 items-center justify-between gap-4 border-b border-border bg-[#EEF3F8] px-4 sm:px-6 py-3 shadow-sm flex-shrink-0">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <header className="flex min-h-16 flex-shrink-0 items-center justify-between gap-4 border-b border-border bg-[#EEF3F8] px-4 py-3 shadow-sm sm:px-6">
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
-              className="block md:hidden text-navy hover:text-brand"
+              className="block md:hidden text-[var(--color-navy)] hover:text-[var(--color-primary)]"
               onClick={() => setMobileMenuOpen(true)}
               aria-label="Abrir menú"
             >
@@ -237,15 +321,20 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           {doctor && (
-            <NodoChatBell
+            <div className="flex items-center gap-2">
+              <PlanBadge fallbackPlan={doctor.subscriptionPlan} />
+              <NodoChatBell
               isPro={isPro}
               chatEmbedded={chatEmbedded}
               onOpenChat={() => setChatOpen(true)}
             />
+            </div>
           )}
         </header>
 
-        <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] sm:p-6 sm:pb-6">
+          {children}
+        </main>
       </div>
 
       {doctor && !chatEmbedded && (

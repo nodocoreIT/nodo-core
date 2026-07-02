@@ -1,5 +1,7 @@
 import { readDb, writeDb } from "@/lib/clinic/local-db";
 import type { LocalAppointment, LocalDoctor } from "@/lib/clinic/local-db";
+import { notifyDoctorMercadoPagoPayment } from "@/lib/clinic/doctor-notifications";
+import { resolveMercadoPagoAccessToken } from "@/lib/clinic/payment";
 import { sendAppointmentConfirmationEmail } from "@/lib/email/resend";
 import { formatReminderLabel } from "@/lib/email/reminder-label";
 import { format } from "date-fns";
@@ -7,10 +9,10 @@ import { es } from "date-fns/locale";
 
 export function appBaseUrl() {
   return (
-    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
     (process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000")
+      : "http://localhost:3002")
   );
 }
 
@@ -35,6 +37,9 @@ export async function confirmAppointmentPaymentAndNotify(
     target.paymentStatus = "confirmed";
     target.paymentConfirmedAt = now;
     target.updatedAt = now;
+    if (target.status === "scheduled") {
+      target.status = "waiting";
+    }
     if (opts?.mercadopagoPaymentId) {
       target.mercadopagoPaymentId = opts.mercadopagoPaymentId;
     }
@@ -69,6 +74,17 @@ export async function confirmAppointmentPaymentAndNotify(
     reminderNote,
   }).catch((err) => console.error("[Email] confirmation after MP payment", err));
 
+  const fee = doctor.payment?.consultationFee;
+  await notifyDoctorMercadoPagoPayment({
+    doctorId: doctor.id,
+    appointmentId,
+    mercadopagoPaymentId:
+      opts?.mercadopagoPaymentId ?? `confirmed-${appointmentId}`,
+    patientName: patient.fullName,
+    amount: fee,
+    currency: doctor.payment?.currency ?? "ARS",
+  });
+
   await writeDb((d) => {
     const target = d.appointments.find((a) => a.id === appointmentId);
     if (target) target.confirmationEmailSentAt = new Date().toISOString();
@@ -78,5 +94,5 @@ export async function confirmAppointmentPaymentAndNotify(
 }
 
 export function doctorMercadoPagoToken(doctor: LocalDoctor): string | undefined {
-  return doctor.payment?.mercadopagoAccessToken?.trim() || undefined;
+  return resolveMercadoPagoAccessToken(doctor);
 }

@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readDb, writeDb } from "@/lib/clinic/local-db";
+
+export const dynamic = "force-dynamic";
 import type { DoctorPaymentSettings, DoctorReminderSettings } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
 import { mergeThemeSettings } from "@/lib/clinic/theme-settings";
 import {
   DEFAULT_AVAILABILITY,
+  getAvailableDateKeys,
   generateSlotsForDate,
-  getAvailableDates,
   normalizeAvailability,
-  parseLocalDate,
   localDateKeyFromIso,
+  formatDateKeyShortLabel,
   type DoctorAvailability,
 } from "@/lib/clinic/schedule";
+import { getMercadoPagoUser } from "@/lib/mercadopago/client";
 
 function getAvailability(doctor: { availability?: DoctorAvailability }) {
   const base = doctor.availability ?? DEFAULT_AVAILABILITY;
@@ -23,12 +26,23 @@ function getAvailability(doctor: { availability?: DoctorAvailability }) {
 
 function ownPaymentForDoctor(payment?: DoctorPaymentSettings) {
   if (!payment) return {};
-  const { mercadopagoAccessToken, ...rest } = payment;
+  const {
+    mercadopagoAccessToken,
+    mercadopagoRefreshToken,
+    mercadopagoOAuthPending,
+    ...rest
+  } = payment;
   const token = mercadopagoAccessToken?.trim();
   return {
     ...rest,
     mercadopagoAccessToken: token ? `····${token.slice(-4)}` : "",
-    hasMercadopagoToken: !!token,
+    hasMercadopagoToken: !!token || !!payment.mercadopagoRefreshToken,
+    mercadopagoConnected: !!(
+      payment.mercadopagoUserId || payment.mercadopagoRefreshToken || token
+    ),
+    mercadopagoUserId: payment.mercadopagoUserId
+      ? `···${payment.mercadopagoUserId.slice(-4)}`
+      : undefined,
   };
 }
 
@@ -42,6 +56,7 @@ function doctorOfficePayload(doctor: {
   reminderSettings?: DoctorReminderSettings;
   googleCalendarId?: string;
   themeSettings?: import("@/lib/clinic/theme-settings").DoctorThemeSettings;
+  customStudyLabels?: string[];
 }) {
   const availability = getAvailability(doctor);
   return {
@@ -55,6 +70,7 @@ function doctorOfficePayload(doctor: {
     googleCalendarId: doctor.googleCalendarId ?? "",
     blockedDates: availability.blockedDates ?? [],
     themeSettings: mergeThemeSettings(doctor.themeSettings),
+    customStudyLabels: doctor.customStudyLabels ?? [],
   };
 }
 
@@ -96,14 +112,12 @@ export async function GET(request: NextRequest) {
     .map((a) => a.scheduledAt);
 
   if (!dateStr) {
-    const dates = getAvailableDates(availability, 28, allBooked).map((d) => ({
-      date: d.toISOString().slice(0, 10),
-      label: d.toLocaleDateString("es-AR", {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
+    const dates = getAvailableDateKeys(availability, 28, allBooked).map(
+      (dateKey) => ({
+        date: dateKey,
+        label: formatDateKeyShortLabel(dateKey),
       }),
-    }));
+    );
     return NextResponse.json({
       dates,
       slotDurationMinutes: availability.slotDurationMinutes,
@@ -115,11 +129,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ slots: [], slotDurationMinutes: availability.slotDurationMinutes });
   }
 
-  const date = parseLocalDate(dateStr);
   const booked = allBooked.filter(
     (t) => localDateKeyFromIso(t) === dateStr
   );
-  const slots = generateSlotsForDate(date, availability, booked);
+  const slots = generateSlotsForDate(dateStr, availability, booked);
   return NextResponse.json({ slots, slotDurationMinutes: availability.slotDurationMinutes });
 }
 
@@ -141,6 +154,7 @@ export async function PUT(request: NextRequest) {
     googleCalendarId,
     reminderSettings,
     themeSettings,
+    customStudyLabels,
   } = body as {
     availability?: DoctorAvailability;
     signatureText?: string;
@@ -152,10 +166,23 @@ export async function PUT(request: NextRequest) {
     googleCalendarId?: string;
     reminderSettings?: DoctorReminderSettings;
     themeSettings?: import("@/lib/clinic/theme-settings").DoctorThemeSettings;
+    customStudyLabels?: string[];
   };
 
   try {
-    await writeDb((db) => {
+    const tokenToVerify =
+      payment?.mercadopagoAccessToken?.trim() &&
+      !payment.mercadopagoAccessToken.startsWith("····") &&
+      !payment.mercadopagoAccessToken.includes("····")
+        ? payment.mercadopagoAccessToken.trim()
+        : undefined;
+
+    let verifiedMpUser: { id: number } | undefined;
+    if (tokenToVerify) {
+      verifiedMpUser = await getMercadoPagoUser(tokenToVerify);
+    }
+
+    const saved = await writeDb((db) => {
       const doctor = db.doctors.find((d) => d.id === session.userId);
       if (!doctor) {
         throw new Error("Médico no encontrado");
@@ -176,15 +203,34 @@ export async function PUT(request: NextRequest) {
     if (profilePhotoData !== undefined) doctor.profilePhotoData = profilePhotoData;
     if (bio !== undefined) doctor.bio = bio;
     if (payment !== undefined) {
-      const existing = doctor.payment?.mercadopagoAccessToken;
-      const incoming = payment.mercadopagoAccessToken?.trim();
-      const keepExisting =
-        !incoming ||
-        incoming.startsWith("····") ||
-        incoming.includes("····");
+      const existing = doctor.payment ?? {};
+      const incoming = payment;
+      const tokenIncoming = incoming.mercadopagoAccessToken?.trim();
+      const keepExistingToken =
+        !tokenIncoming ||
+        tokenIncoming.startsWith("····") ||
+        tokenIncoming.includes("····");
+      const {
+        mercadopagoAccessToken: _at,
+        mercadopagoRefreshToken: _rt,
+        mercadopagoOAuthPending: _pending,
+        ...safeIncoming
+      } = incoming;
       doctor.payment = {
-        ...payment,
-        mercadopagoAccessToken: keepExisting ? existing : incoming,
+        ...existing,
+        ...safeIncoming,
+        mercadopagoAccessToken: keepExistingToken
+          ? existing.mercadopagoAccessToken
+          : tokenIncoming,
+        mercadopagoRefreshToken: existing.mercadopagoRefreshToken,
+        mercadopagoTokenExpiresAt: existing.mercadopagoTokenExpiresAt,
+        mercadopagoUserId: verifiedMpUser
+          ? String(verifiedMpUser.id)
+          : existing.mercadopagoUserId,
+        mercadopagoPublicKey: existing.mercadopagoPublicKey,
+        mercadopagoConnectedAt: verifiedMpUser
+          ? new Date().toISOString()
+          : existing.mercadopagoConnectedAt,
       };
     }
     if (reminderSettings !== undefined) doctor.reminderSettings = reminderSettings;
@@ -192,12 +238,21 @@ export async function PUT(request: NextRequest) {
     if (themeSettings !== undefined) {
       doctor.themeSettings = mergeThemeSettings(themeSettings);
     }
+    if (customStudyLabels !== undefined) {
+      doctor.customStudyLabels = customStudyLabels
+        .map((s) => String(s).trim())
+        .filter(Boolean);
+    }
     });
+
+    const doctor = saved.doctors.find((d) => d.id === session.userId);
+    if (!doctor) {
+      return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true, office: doctorOfficePayload(doctor) });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Error al guardar configuración";
     return NextResponse.json({ error: message }, { status: 400 });
   }
-
-  return NextResponse.json({ ok: true });
 }

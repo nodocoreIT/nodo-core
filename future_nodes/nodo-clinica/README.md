@@ -17,13 +17,19 @@ Plataforma HealthTech de telemedicina construida con **Next.js 16**, **Tailwind 
 
 ```bash
 npm install
-cp .env.example .env.local
+cp env.example .env.local   # Windows: copy env.example .env.local
 # Configurar variables de entorno
 
 npm run dev
 ```
 
-Abrir [http://localhost:3000](http://localhost:3000)
+Abrir [http://localhost:3002](http://localhost:3002)
+
+## Deploy personal (GitHub + Vercel)
+
+Ver **[SETUP-PERSONAL.md](./SETUP-PERSONAL.md)** — repo propio, Vercel Blob, Gemini para comprobantes.
+
+**Mercado Pago OAuth (cobro por médico):** ver **[MERCADOPAGO-OAUTH.md](./MERCADOPAGO-OAUTH.md)**.
 
 ## Configuración de Supabase
 

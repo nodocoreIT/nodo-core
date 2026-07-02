@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { SignJWT, jwtVerify } from "jose";
 import { readDb } from "@/lib/clinic/local-db";
 
 export type SessionRole = "doctor" | "patient";
@@ -20,55 +21,52 @@ const COOKIE_OPTIONS = {
   secure: process.env.NODE_ENV === "production",
 };
 
-export function jsonWithSession<T extends object>(
-  data: T,
-  session: ClinicSession | null
-): NextResponse {
-  const response = NextResponse.json(data);
-  if (session) {
-    response.cookies.set(COOKIE, JSON.stringify(session), COOKIE_OPTIONS);
-  } else {
-    response.cookies.delete(COOKIE);
-  }
-  return response;
+function sessionSecret(): Uint8Array {
+  const raw =
+    process.env.CLINIC_SESSION_SECRET ||
+    process.env.CLINIC_ADMIN_SECRET ||
+    "clinica-dev-session-secret-change-in-prod";
+  return new TextEncoder().encode(raw);
 }
 
-export async function setSession(session: ClinicSession) {
-  const cookieStore = await cookies();
-  cookieStore.set(COOKIE, JSON.stringify(session), COOKIE_OPTIONS);
+async function signSessionPayload(session: ClinicSession): Promise<string> {
+  return new SignJWT({ ...session })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("7d")
+    .sign(sessionSecret());
 }
 
-export async function getSession(): Promise<ClinicSession | null> {
-  const cookieStore = await cookies();
-  return parseSession(cookieStore.get(COOKIE)?.value);
-}
-
-export async function getSessionFromRequest(
-  request: NextRequest
+async function parseSignedSession(
+  raw: string | undefined,
 ): Promise<ClinicSession | null> {
-  const fromCookie = parseSession(request.cookies.get(COOKIE)?.value);
-  if (fromCookie) {
-    const db = await readDb();
-    if (fromCookie.role === "doctor") {
-      if (!db.doctors.some((d) => d.id === fromCookie.userId)) return null;
-    } else if (!db.patients.some((p) => p.id === fromCookie.userId)) {
+  if (!raw) return null;
+  try {
+    const { payload } = await jwtVerify(raw, sessionSecret());
+    const userId = payload.userId;
+    const role = payload.role;
+    const email = payload.email;
+    const fullName = payload.fullName;
+    if (
+      typeof userId !== "string" ||
+      (role !== "doctor" && role !== "patient") ||
+      typeof email !== "string" ||
+      typeof fullName !== "string"
+    ) {
       return null;
     }
-    return fromCookie;
-  }
-
-  const userId = request.headers.get("x-clinic-user-id");
-  const role = request.headers.get("x-clinic-role") as SessionRole | null;
-  const email = request.headers.get("x-clinic-email");
-  const fullName = request.headers.get("x-clinic-name");
-
-  if (!userId || (role !== "doctor" && role !== "patient")) {
+    return { userId, role, email, fullName };
+  } catch {
     return null;
   }
+}
 
+async function validateSessionUser(
+  session: ClinicSession,
+): Promise<ClinicSession | null> {
   const db = await readDb();
-  if (role === "doctor") {
-    const doctor = db.doctors.find((d) => d.id === userId);
+  if (session.role === "doctor") {
+    const doctor = db.doctors.find((d) => d.id === session.userId);
     if (!doctor) return null;
     return {
       userId: doctor.id,
@@ -77,8 +75,7 @@ export async function getSessionFromRequest(
       fullName: doctor.fullName,
     };
   }
-
-  const patient = db.patients.find((p) => p.id === userId);
+  const patient = db.patients.find((p) => p.id === session.userId);
   if (!patient) return null;
   return {
     userId: patient.id,
@@ -88,13 +85,41 @@ export async function getSessionFromRequest(
   };
 }
 
-function parseSession(raw: string | undefined): ClinicSession | null {
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as ClinicSession;
-  } catch {
-    return null;
+export async function jsonWithSession<T extends object>(
+  data: T,
+  session: ClinicSession | null,
+): Promise<NextResponse> {
+  const response = NextResponse.json(data);
+  if (session) {
+    const token = await signSessionPayload(session);
+    response.cookies.set(COOKIE, token, COOKIE_OPTIONS);
+  } else {
+    response.cookies.delete(COOKIE);
   }
+  return response;
+}
+
+export async function setSession(session: ClinicSession) {
+  const cookieStore = await cookies();
+  const token = await signSessionPayload(session);
+  cookieStore.set(COOKIE, token, COOKIE_OPTIONS);
+}
+
+export async function getSession(): Promise<ClinicSession | null> {
+  const cookieStore = await cookies();
+  const parsed = await parseSignedSession(cookieStore.get(COOKIE)?.value);
+  if (!parsed) return null;
+  return validateSessionUser(parsed);
+}
+
+export async function getSessionFromRequest(
+  request: NextRequest,
+): Promise<ClinicSession | null> {
+  const parsed = await parseSignedSession(
+    request.cookies.get(COOKIE)?.value,
+  );
+  if (!parsed) return null;
+  return validateSessionUser(parsed);
 }
 
 export async function clearSession() {

@@ -1,12 +1,11 @@
 import { readDb, writeDb } from "@/lib/clinic/local-db";
 import { doctorUsesMercadoPago } from "@/lib/clinic/payment";
-import {
-  appBaseUrl,
-  doctorMercadoPagoToken,
-} from "@/lib/clinic/appointment-payment";
+import { appBaseUrl } from "@/lib/clinic/appointment-payment";
+import { getDoctorMercadoPagoAccessToken } from "@/lib/mercadopago/tokens";
 import {
   checkoutUrl,
   createCheckoutPreference,
+  getMercadoPagoUser,
 } from "@/lib/mercadopago/client";
 
 export async function buildCheckoutForAppointment(appointmentId: string) {
@@ -18,9 +17,17 @@ export async function buildCheckoutForAppointment(appointmentId: string) {
   const patient = db.patients.find((p) => p.id === apt.patientId);
   if (!doctor || !patient || !doctorUsesMercadoPago(doctor)) return null;
 
-  const token = doctorMercadoPagoToken(doctor);
+  const token = await getDoctorMercadoPagoAccessToken(doctor);
   const fee = doctor.payment?.consultationFee ?? 0;
   if (!token || fee <= 0) return null;
+
+  try {
+    await getMercadoPagoUser(token);
+  } catch (err) {
+    const msg =
+      err instanceof Error ? err.message : "Token de Mercado Pago inválido";
+    throw new Error(msg);
+  }
 
   const base = appBaseUrl();
   const waitingPath = `/paciente/sala/${apt.accessToken}`;
@@ -32,7 +39,7 @@ export async function buildCheckoutForAppointment(appointmentId: string) {
     currency: doctor.payment?.currency,
     externalReference: apt.id,
     payerEmail: patient.email,
-    notificationUrl: `${base}/api/clinic/mercadopago/webhook`,
+    notificationUrl: `${base}/api/webhooks/mercadopago`,
     backUrls: {
       success: `${base}${waitingPath}?mp=success`,
       failure: `${base}${waitingPath}?mp=failure`,

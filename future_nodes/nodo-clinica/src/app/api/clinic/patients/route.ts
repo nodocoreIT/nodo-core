@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readDb, writeDb, publicPatient } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
+import {
+  doctorCanAccessPatient,
+  forbidden,
+  requireDoctorSession,
+  requirePatientSession,
+  requireSession,
+  unauthorized,
+} from "@/lib/clinic/access-control";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -12,6 +20,19 @@ export async function GET(request: NextRequest) {
   const db = await readDb();
 
   if (patientId) {
+    if (!requireSession(session)) {
+      return unauthorized();
+    }
+    if (session.role === "patient" && session.userId !== patientId) {
+      return forbidden();
+    }
+    if (
+      session.role === "doctor" &&
+      !doctorCanAccessPatient(db, session.userId, patientId)
+    ) {
+      return forbidden();
+    }
+
     const patient = db.patients.find((p) => p.id === patientId);
     if (!patient) {
       return NextResponse.json({ error: "Paciente no encontrado" }, { status: 404 });
@@ -24,7 +45,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ...publicPatient(patient, {
         includeHealth:
-          session?.role === "patient" && session.userId === patientId,
+          (session.role === "patient" && session.userId === patientId) ||
+          (session.role === "doctor" &&
+            db.appointments.some(
+              (a) =>
+                a.patientId === patientId &&
+                a.doctorId === session.userId &&
+                a.shareHealthProfile === true &&
+                a.status !== "cancelled",
+            )),
       }),
       stats: {
         appointments: appointments.length,
@@ -42,8 +71,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "doctorId requerido" }, { status: 400 });
   }
 
-  if (session?.role === "doctor" && session.userId !== doctorId) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  if (!requireDoctorSession(session, doctorId)) {
+    return unauthorized();
   }
 
   const patientIds = new Set(

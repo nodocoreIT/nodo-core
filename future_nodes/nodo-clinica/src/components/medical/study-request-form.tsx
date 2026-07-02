@@ -1,15 +1,19 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { FlaskConical, Search, Download, Check } from "lucide-react";
+import { FlaskConical, Search, Download, Check, Plus } from "lucide-react";
 import { MEDICAL_EXAMS } from "@/lib/constants";
-import { generateStudyOrderPdf, downloadPdf } from "@/lib/pdf/generator";
+import {
+  generateStudyOrderPdf,
+  downloadPdf,
+  pdfToBase64,
+} from "@/lib/pdf/generator";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { toast } from "sonner";
 
@@ -23,6 +27,8 @@ interface StudyRequestFormProps {
   doctorLicense?: string;
   onSaved?: () => void;
 }
+
+type ExamOption = { id: string; name: string; category: string };
 
 export function StudyRequestForm({
   appointmentId,
@@ -38,21 +44,69 @@ export function StudyRequestForm({
   const [selected, setSelected] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [signatureText, setSignatureText] = useState("");
+  const [signatureImageData, setSignatureImageData] = useState("");
+  const [customLabels, setCustomLabels] = useState<string[]>([]);
+
+  useEffect(() => {
+    clinicApi
+      .getDoctorSchedule(doctorId)
+      .then((data) => {
+        if (data.signatureText) setSignatureText(data.signatureText);
+        if (data.signatureImageData) setSignatureImageData(data.signatureImageData);
+        if (Array.isArray(data.customStudyLabels)) {
+          setCustomLabels(data.customStudyLabels);
+        }
+      })
+      .catch(() => undefined);
+  }, [doctorId]);
+
+  const allExams = useMemo((): ExamOption[] => {
+    const base = MEDICAL_EXAMS.map((e) => ({
+      id: e.id,
+      name: e.name,
+      category: e.category,
+    }));
+    const custom = customLabels
+      .filter((name) => !base.some((e) => e.name.toLowerCase() === name.toLowerCase()))
+      .map((name, i) => ({
+        id: `custom-${i}-${name}`,
+        name,
+        category: "Mis estudios",
+      }));
+    return [...custom, ...base];
+  }, [customLabels]);
 
   const filteredExams = useMemo(() => {
-    if (!search.trim()) return MEDICAL_EXAMS;
+    if (!search.trim()) return allExams;
     const q = search.toLowerCase();
-    return MEDICAL_EXAMS.filter(
+    return allExams.filter(
       (e) =>
         e.name.toLowerCase().includes(q) ||
-        e.category.toLowerCase().includes(q)
+        e.category.toLowerCase().includes(q),
     );
-  }, [search]);
+  }, [search, allExams]);
+
+  const canAddCustom =
+    search.trim().length >= 3 &&
+    !allExams.some((e) => e.name.toLowerCase() === search.trim().toLowerCase());
 
   const toggleExam = (name: string) => {
     setSelected((prev) =>
-      prev.includes(name) ? prev.filter((s) => s !== name) : [...prev, name]
+      prev.includes(name) ? prev.filter((s) => s !== name) : [...prev, name],
     );
+  };
+
+  const addCustomStudy = () => {
+    const label = search.trim();
+    if (!label) return;
+    if (!selected.includes(label)) {
+      setSelected((prev) => [...prev, label]);
+    }
+    if (!customLabels.some((c) => c.toLowerCase() === label.toLowerCase())) {
+      setCustomLabels((prev) => [...prev, label]);
+    }
+    setSearch("");
   };
 
   const handleGenerate = async () => {
@@ -72,9 +126,17 @@ export function StudyRequestForm({
         patientName,
         studies: selected,
         notes: notes || undefined,
+        signatureText: signatureText || `Dr/a. ${doctorName}`,
+        signatureImageData,
       });
 
       downloadPdf(doc, `orden-estudios-${patientName.replace(/\s/g, "-")}.pdf`);
+
+      const newStudyLabels = selected.filter(
+        (s) =>
+          !MEDICAL_EXAMS.some((e) => e.name.toLowerCase() === s.toLowerCase()) &&
+          !customLabels.some((c) => c.toLowerCase() === s.toLowerCase()),
+      );
 
       await clinicApi.saveStudyOrder({
         appointmentId,
@@ -82,7 +144,13 @@ export function StudyRequestForm({
         patientId,
         studies: selected,
         notes,
+        pdfBase64: pdfToBase64(doc),
+        newStudyLabels: newStudyLabels.length ? newStudyLabels : undefined,
       });
+
+      if (newStudyLabels.length) {
+        setCustomLabels((prev) => [...new Set([...prev, ...newStudyLabels])]);
+      }
 
       toast.success("Orden guardada en historial clínico del paciente");
       onSaved?.();
@@ -114,6 +182,19 @@ export function StudyRequestForm({
           />
         </div>
 
+        {canAddCustom && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full border-dashed text-xs"
+            onClick={addCustomStudy}
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Agregar &quot;{search.trim()}&quot; a la lista
+          </Button>
+        )}
+
         {selected.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {selected.map((s) => (
@@ -140,6 +221,7 @@ export function StudyRequestForm({
                     return (
                       <button
                         key={exam.id}
+                        type="button"
                         onClick={() => toggleExam(exam.name)}
                         className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-left text-sm transition-colors ${
                           isSelected
@@ -177,6 +259,12 @@ export function StudyRequestForm({
           />
         </div>
 
+        {!signatureText && !signatureImageData && (
+          <p className="text-xs text-amber-700">
+            Configurá tu firma en Consultorio → Perfil para que aparezca en documentos PDF.
+          </p>
+        )}
+
         <Button
           onClick={handleGenerate}
           disabled={isGenerating || selected.length === 0}
@@ -184,7 +272,7 @@ export function StudyRequestForm({
           size="sm"
         >
           <Download className="h-4 w-4 mr-1" />
-          Generar orden ({selected.length})
+          PDF + historial ({selected.length})
         </Button>
       </CardContent>
     </Card>
