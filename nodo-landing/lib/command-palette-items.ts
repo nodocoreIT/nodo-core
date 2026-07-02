@@ -181,7 +181,7 @@ export function buildCommandPaletteItems(): CommandPaletteItem[] {
     {
       id: "clinica-virtual",
       label: "Clínica Virtual",
-      href: "/nodo-salud/clinica-virtual",
+      href: "/nodo-clinica",
       group: "unidades",
       keywords: [
         "telemedicina",

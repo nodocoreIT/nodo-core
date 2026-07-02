@@ -21,6 +21,11 @@ import {
   isSamePasswordAuthError,
 } from "@nodocore/shared-components";
 import { createNodeBrowserClient } from "@/lib/supabase/nodo-browser";
+import {
+  getNodoAuthCode,
+  getNodoPublicAuthConfigError,
+} from "@/lib/supabase/nodo-auth-config";
+import { ClinicaLocalLoginEntry } from "@/components/ClinicaLocalLoginEntry";
 import { getNodeBySlug, getNodeMailLabel, getChildNodes, needsModulePicker } from "@/lib/nodes";
 import {
   submitDoctorRegistration,
@@ -221,11 +226,34 @@ export default function LoginPage() {
   );
 }
 
-function LoginForm() {
+export function LoginForm({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
+  const params = useParams();
+  const nodeParam = forcedNodeSlug ?? (params?.nodeSlug as string) ?? "";
+
+  const isClinicaNode =
+    nodeParam === "nodo-clinica" ||
+    nodeParam === "clinica-virtual" ||
+    nodeParam === "clinica";
+
+  const clinicaAuthError = useMemo(() => {
+    if (!isClinicaNode) return null;
+    const code = getNodoAuthCode(nodeParam);
+    if (!code) return "Auth no configurado para Clínica.";
+    return getNodoPublicAuthConfigError(code);
+  }, [isClinicaNode, nodeParam]);
+
+  if (isClinicaNode && clinicaAuthError) {
+    return <ClinicaLocalLoginEntry nodeParam={nodeParam} />;
+  }
+
+  return <LoginFormInner forcedNodeSlug={forcedNodeSlug} />;
+}
+
+function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const params = useParams();
-  const nodeSlug = params?.nodeSlug as string;
+  const nodeSlug = forcedNodeSlug ?? (params?.nodeSlug as string);
   const nodeParam = nodeSlug || "";
   const modeParam = searchParams.get("mode") || "login";
   const roleParam = searchParams.get("role") || "paciente";
@@ -1026,7 +1054,7 @@ function LoginForm() {
       <Link
         href={
           nodeParam === "nodo-clinica" || nodeParam === "clinica-virtual"
-            ? "/nodo-salud/clinica-virtual"
+            ? "/nodo-clinica"
             : matchedNode
               ? `/nodo-${matchedNode.slug}`
               : "/"
@@ -2129,7 +2157,7 @@ function LoginForm() {
                       type: "medico",
                       message: "",
                     });
-                    router.push("/nodo-salud/clinica-virtual");
+                    router.push("/nodo-clinica");
                   }}
                   className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
                 >
@@ -2254,7 +2282,7 @@ function LoginForm() {
                           ? "/nodo-autos"
                           : isFinanzasNode
                             ? "/nodo-finanzas"
-                            : "/nodo-salud/clinica-virtual",
+                            : "/nodo-clinica",
                     );
                   }}
                   className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"

@@ -199,7 +199,7 @@ export default function Page() {
                   </p>
                 </div>
                 <Link
-                  href="/nodo-salud/clinica-virtual"
+                  href="/nodo-clinica"
                   className="inline-flex items-center gap-2 text-teal-400 font-semibold text-[15px] hover:text-teal-300 transition-colors"
                 >
                   Acceder al módulo <ArrowRight className="h-4 w-4" />
