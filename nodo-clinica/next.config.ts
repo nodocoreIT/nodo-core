@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
-/** En Vercel/producción la app vive bajo /clinica (proxy desde nodo-landing). */
+/** En Vercel/producción la app vive bajo /nodo-clinica (proxy desde nodo-landing). */
 const basePath =
   process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, "") ||
-  (process.env.NODE_ENV === "production" ? "/clinica" : "");
+  (process.env.NODE_ENV === "production" ? "/nodo-clinica" : "");
 
 const nextConfig: NextConfig = {
   output: "standalone",
