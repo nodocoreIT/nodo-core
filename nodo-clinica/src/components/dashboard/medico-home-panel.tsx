@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { DashboardActionCard } from "@/components/dashboard/dashboard-action-card";
 import {
   MedicoHomeAgendaSidebar,
@@ -41,12 +40,6 @@ export function MedicoHomePanel({ doctorId, doctorName }: MedicoHomePanelProps) 
           </h2>
           <p className="mt-1 text-sm text-slate2">Hoy es {todayLabel()}</p>
         </div>
-        <Link
-          href="/medico/consultorio"
-          className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold text-navy shadow-sm hover:bg-mist"
-        >
-          Ir al consultorio
-        </Link>
       </div>
 
       {/* 4 cubos de acceso rápido */}
@@ -72,7 +65,7 @@ export function MedicoHomePanel({ doctorId, doctorName }: MedicoHomePanelProps) 
           title="Turnos y horarios"
           description="Agenda, perfil, cobros, recordatorios y apariencia del panel."
           buttonLabel="Abrir configuración"
-          href="/medico/configuracion"
+          onClick={() => window.dispatchEvent(new CustomEvent("nodo:open-settings", { detail: { section: "agenda" } }))}
           tone="amber"
         />
         <DashboardActionCard
@@ -106,7 +99,7 @@ export function MedicoHomePanel({ doctorId, doctorName }: MedicoHomePanelProps) 
           Clínica Virtual
         </p>
         <h3 className="mt-1 font-display text-lg font-bold text-navy">
-          Tu consultorio digital Nodo Salud
+          Tu consultorio digital Nodo Clínica
         </h3>
         <p className="mt-2 text-sm text-slate2 max-w-2xl">
           Los pacientes reservan turno online, se conectan por videollamada y vos

@@ -1054,7 +1054,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
       <Link
         href={
           nodeParam === "nodo-clinica" || nodeParam === "clinica-virtual"
-            ? "/nodo-salud/clinica-virtual"
+            ? "/nodo-clinica"
             : matchedNode
               ? `/nodo-${matchedNode.slug}`
               : "/"
@@ -2157,7 +2157,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                       type: "medico",
                       message: "",
                     });
-                    router.push("/nodo-salud/clinica-virtual");
+                    router.push("/nodo-clinica");
                   }}
                   className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
                 >
@@ -2282,7 +2282,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                           ? "/nodo-autos"
                           : isFinanzasNode
                             ? "/nodo-finanzas"
-                            : "/nodo-salud/clinica-virtual",
+                            : "/nodo-clinica",
                     );
                   }}
                   className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"

@@ -10,8 +10,8 @@ import {
 export const dynamic = "force-dynamic";
 
 function settingsRedirect(base: string, params: Record<string, string>) {
-  const q = new URLSearchParams({ tab: "cobros", ...params });
-  return NextResponse.redirect(`${base}/medico/configuracion?${q.toString()}`);
+  const q = new URLSearchParams(params);
+  return NextResponse.redirect(`${base}/medico/dashboard?${q.toString()}`);
 }
 
 /** Callback OAuth — intercambia `code` por tokens y los guarda en el médico. */

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Settings, Wallet } from "lucide-react";
 import { DoctorCobrosList } from "@/components/medical/doctor-cobros-list";
@@ -51,13 +50,14 @@ export function LocalMedicoCobros() {
             aprobarlos desde acá.
           </p>
         </div>
-        <Link
-          href="/medico/configuracion?tab=cobros"
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent("nodo:open-settings", { detail: { section: "cobros" } }))}
           className="inline-flex items-center justify-center gap-1.5 rounded-md border border-mist bg-white px-3 py-2 text-sm font-medium text-navy hover:bg-slate-50 transition-colors"
         >
           <Settings className="h-4 w-4" />
           Configurar honorarios
-        </Link>
+        </button>
       </div>
 
       <section className="rounded-xl border border-mist bg-white p-4 sm:p-5 shadow-sm">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -138,6 +138,8 @@ export function DoctorDashboard({
     useState<ConsultorioLayoutSettings>(DEFAULT_CONSULTORIO_LAYOUT);
   const [layoutEditorOpen, setLayoutEditorOpen] = useState(false);
   const { queue } = useConsultationStore();
+  const queueRef = useRef(queue);
+  useEffect(() => { queueRef.current = queue; }, [queue]);
 
   useEffect(() => {
     if (dataSource !== "local") return;
@@ -546,7 +548,7 @@ export function DoctorDashboard({
       .subscribe();
 
     const documentsChannel = supabase
-      .channel("doctor-documents")
+      .channel(`doctor-documents-${doctorId}`)
       .on(
         "postgres_changes",
         {
@@ -556,6 +558,10 @@ export function DoctorDashboard({
         },
         async (payload) => {
           const doc = payload.new as { appointment_id: string; file_name: string };
+          const belongsToDoctor = queueRef.current.some(
+            (p) => p.appointmentId === doc.appointment_id
+          );
+          if (!belongsToDoctor) return;
           addNotification({
             type: "document_upload",
             title: "Nuevo estudio subido",
@@ -851,13 +857,14 @@ export function DoctorDashboard({
                     Dr/a. {doctorName}
                   </p>
                   {dataSource === "local" && (
-                    <Link
-                      href="/medico/configuracion"
+                    <button
+                      type="button"
                       title="Configuración del consultorio"
+                      onClick={() => window.dispatchEvent(new CustomEvent("nodo:open-settings", { detail: { section: "agenda" } }))}
                       className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                     >
                       <Settings className="h-4 w-4" />
-                    </Link>
+                    </button>
                   )}
                 </div>
                 {doctorSpecialty && (
@@ -865,13 +872,14 @@ export function DoctorDashboard({
                 )}
               </div>
               {dataSource === "local" && (
-                <Link
-                  href="/medico/configuracion"
+                <button
+                  type="button"
                   title="Configuración del consultorio"
+                  onClick={() => window.dispatchEvent(new CustomEvent("nodo:open-settings", { detail: { section: "agenda" } }))}
                   className="sm:hidden inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100"
                 >
                   <Settings className="h-4 w-4" />
-                </Link>
+                </button>
               )}
             </div>
           </div>

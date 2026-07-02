@@ -2,32 +2,35 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Scan workspace packages so arbitrary Tailwind classes (e.g. max-w-[680px]) are generated */
+@source "../../../packages/shared-components/src/**/*.{tsx,ts}";
+@source "../../../packages/nodo-modules/src/**/*.{tsx,ts}";
+
 @custom-variant dark (&:is(.dark *));
 
-@theme inline {
-  /* Nodo brand palette */
+/* Dynamic theme colors — regular @theme so utilities compile to var() references
+   that can be overridden at runtime by applyThemeToDocument */
+@theme {
+  --color-brand: #0D9488;
+  --color-brand-600: #0F766E;
+  --color-brand-300: #5EEAD4;
   --color-navy: #1B2A41;
   --color-navy-700: #233650;
   --color-navy-900: #121E2F;
-  --color-brand: #DA5A0E;
-  --color-brand-600: #C04E0B;
-  --color-brand-300: #F0A877;
+  --color-ink: #16202E;
+}
+
+@theme inline {
+  /* Static palette — never changed at runtime */
   --color-paper: #F5F8FC;
   --color-slate2: #647890;
   --color-slate2-300: #9DACBE;
   --color-mist: #DEE7F1;
   --color-mist-200: #EBF1F7;
-  --color-ink: #16202E;
   --color-footer: #0D1722;
 
   --font-display: var(--font-sora), system-ui, sans-serif;
   --font-sans: var(--font-hanken), system-ui, sans-serif;
-
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 22px;
-  --radius-xl: 32px;
-  --radius-pill: 999px;
 
   --shadow-sm: 0 1px 2px rgba(18,30,47,.06), 0 2px 6px rgba(18,30,47,.05);
   --shadow-md: 0 8px 24px rgba(18,30,47,.08), 0 2px 6px rgba(18,30,47,.04);
@@ -67,6 +70,16 @@
   --color-card: var(--card);
 }
 
+/* Radius as regular @theme so rounded-* utilities compile to var() references
+   and can be overridden at runtime by applyThemeToDocument */
+@theme {
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-xl: 32px;
+  --radius-pill: 999px;
+}
+
 :root {
   --background: #F5F8FC;
   --foreground: #16202E;
@@ -74,7 +87,7 @@
   --card-foreground: #16202E;
   --popover: #ffffff;
   --popover-foreground: #16202E;
-  --primary: #DA5A0E;
+  --primary: #0D9488;
   --primary-foreground: #ffffff;
   --secondary: #EBF1F7;
   --secondary-foreground: #1B2A41;
@@ -85,7 +98,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: #DEE7F1;
   --input: #DEE7F1;
-  --ring: #DA5A0E;
+  --ring: #0D9488;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -94,18 +107,18 @@
   --radius: 14px;
   --sidebar: #121E2F;
   --sidebar-foreground: #ffffff;
-  --sidebar-primary: #DA5A0E;
+  --sidebar-primary: #0D9488;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #da5a0e1a;
-  --sidebar-accent-foreground: #DA5A0E;
+  --sidebar-accent: #0d94881a;
+  --sidebar-accent-foreground: #0D9488;
   --sidebar-border: rgba(255,255,255,0.1);
-  --sidebar-ring: #DA5A0E;
+  --sidebar-ring: #0D9488;
 
   --color-sidebar-bg: #121e2f;
   --color-sidebar-hover: #121e2fdd;
-  --color-sidebar-border: #121e2f40;
+  --color-sidebar-border: rgba(255,255,255,0.12);
   --color-sidebar-text: #9dacbe;
-  --color-sidebar-accent: #da5a0e1a;
+  --color-sidebar-accent: #0d94881a;
 }
 
 html {
