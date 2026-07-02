@@ -4,6 +4,179 @@ import { useState } from "react";
 import Link from "next/link";
 import { Stethoscope, User, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+
+function NodeTransitionOverlay({ isDoctor }: { isDoctor: boolean }) {
+  return (
+    <>
+      <style>{`
+        @keyframes nodo-ping {
+          75%, to { transform: scale(1.7); opacity: 0; }
+        }
+        @keyframes nodo-bounce {
+          0%, 80%, 100% { transform: translateY(0); opacity: .3; }
+          40% { transform: translateY(-6px); opacity: 1; }
+        }
+        @keyframes nodo-progress {
+          from { width: 0%; }
+          to { width: 100%; }
+        }
+      `}</style>
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 9999,
+          backgroundColor: "#0f172a",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "24px",
+        }}
+      >
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "none",
+            background:
+              "radial-gradient(60% 50% at 50% 50%, rgba(13,148,136,.20), transparent 70%)",
+          }}
+        />
+
+        {/* Icon with ping rings */}
+        <div style={{ position: "relative", width: 64, height: 64 }}>
+          <span
+            style={{
+              position: "absolute",
+              inset: 0,
+              borderRadius: "50%",
+              backgroundColor: "rgba(13,148,136,.25)",
+              animation: "nodo-ping 1.4s cubic-bezier(0,0,.2,1) infinite",
+            }}
+          />
+          <span
+            style={{
+              position: "absolute",
+              inset: "6px",
+              borderRadius: "50%",
+              backgroundColor: "rgba(13,148,136,.15)",
+              animation: "nodo-ping 1.4s cubic-bezier(0,0,.2,1) .3s infinite",
+            }}
+          />
+          <span
+            style={{
+              position: "relative",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 64,
+              height: 64,
+              borderRadius: "50%",
+              backgroundColor: "rgba(13,148,136,.18)",
+              border: "1px solid rgba(13,148,136,.4)",
+              color: "#0D9488",
+            }}
+          >
+            <Stethoscope style={{ width: 28, height: 28 }} strokeWidth={1.75} />
+          </span>
+        </div>
+
+        {/* Label + lockup */}
+        <div style={{ textAlign: "center" }}>
+          <p
+            style={{
+              fontSize: 11,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "rgba(234,240,247,.45)",
+              marginBottom: 10,
+            }}
+          >
+            ENTRANDO A
+          </p>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.35em",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-display, sans-serif)",
+                fontSize: 34,
+                fontWeight: 800,
+                color: "#0D9488",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              NODO
+            </span>
+            <span
+              style={{
+                fontSize: 34,
+                fontWeight: 300,
+                color: "rgba(234,240,247,.35)",
+                lineHeight: 1,
+              }}
+            >
+              |
+            </span>
+            <span
+              style={{
+                fontFamily: "var(--font-display, sans-serif)",
+                fontSize: 34,
+                fontWeight: 800,
+                color: "#ffffff",
+              }}
+            >
+              {isDoctor ? "Clínica" : "Portal"}
+            </span>
+          </div>
+        </div>
+
+        {/* Dots */}
+        <div style={{ display: "flex", gap: 6 }}>
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                backgroundColor: "#0D9488",
+                animation: `nodo-bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Progress bar */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            backgroundColor: "rgba(13,148,136,.15)",
+          }}
+        >
+          <div
+            style={{
+              height: "100%",
+              backgroundColor: "#0D9488",
+              animation: "nodo-progress 1.4s ease-out forwards",
+            }}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
 import { clinicApi } from "@/lib/clinic/client-api";
 import { DEMO_CREDENTIALS } from "@/lib/clinic/config";
 import {
@@ -22,6 +195,7 @@ export function LoginPortal() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [generalError, setGeneralError] = useState("");
+  const [showTransition, setShowTransition] = useState(false);
 
   const isDoctor = role === "doctor";
   const demo = isDoctor ? DEMO_CREDENTIALS.doctor : DEMO_CREDENTIALS.patient;
@@ -54,7 +228,10 @@ export function LoginPortal() {
     try {
       const data = await clinicApi.login(form.email.trim(), form.password, role);
       toast.success(`Bienvenido/a, ${data.user.fullName}`);
-      window.location.replace(isDoctor ? "/medico/dashboard" : "/paciente");
+      setShowTransition(true);
+      setTimeout(() => {
+        window.location.replace(isDoctor ? "/medico/dashboard" : "/paciente");
+      }, 1500);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al ingresar";
       setGeneralError(msg);
@@ -83,7 +260,10 @@ export function LoginPortal() {
         plan: "trial",
       });
       toast.success("¡Registro exitoso! Bienvenido/a.");
-      window.location.href = isDoctor ? "/medico/dashboard" : "/paciente";
+      setShowTransition(true);
+      setTimeout(() => {
+        window.location.href = isDoctor ? "/medico/dashboard" : "/paciente";
+      }, 1500);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al registrarse";
       setGeneralError(msg);
@@ -101,6 +281,7 @@ export function LoginPortal() {
 
   return (
     <>
+      {showTransition && <NodeTransitionOverlay isDoctor={isDoctor} />}
       <a
         href="https://www.nodocore.com.ar/nodo-clinica"
         className="fixed top-[22px] right-[22px] z-10 inline-flex items-center gap-2 px-4 py-2 text-[14px] font-semibold rounded-md bg-brand text-white shadow-sm hover:bg-brand-600 active:scale-[.98] transition-all duration-150"
