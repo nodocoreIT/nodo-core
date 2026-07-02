@@ -11,7 +11,7 @@ export interface DoctorThemeSettings {
 }
 
 export const DEFAULT_THEME_SETTINGS: DoctorThemeSettings = {
-  primaryColor: "#da5a0e",
+  primaryColor: "#0D9488",
   secondaryColor: "#121e2f",
   sidebarTextColor: "#9dacbe",
   fontColor: "#16202e",
@@ -24,7 +24,7 @@ export const DEFAULT_THEME_SETTINGS: DoctorThemeSettings = {
 
 /** Tema fijo del portal paciente — no hereda colores del médico. */
 export const PATIENT_THEME_SETTINGS: DoctorThemeSettings = {
-  primaryColor: "#047857",
+  primaryColor: "#0D9488",
   secondaryColor: "#0f172a",
   sidebarTextColor: "#cbd5e1",
   fontColor: "#1e293b",

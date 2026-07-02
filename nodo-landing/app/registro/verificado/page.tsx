@@ -13,7 +13,7 @@ function VerifiedContent() {
 
   const isPendingReview = status === "pending_review";
   const loginHref = role === "paciente"
-    ? `/nodo-salud/clinica-virtual/login?role=paciente`
+    ? `/nodo-clinica/login?role=paciente`
     : `/${node}/login`;
 
   return (
