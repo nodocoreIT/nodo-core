@@ -16,16 +16,9 @@ const NODO_FINANZAS_URL = process.env.NODO_FINANZAS_URL ?? "http://localhost:517
 
 const isDev = process.env.NODE_ENV !== "production";
 
-// /nodo-clinica (root) stays served by nodo-landing's marketing page (app/nodo-clinica/page.tsx).
-// Only paths with at least one segment (:path+) are proxied to the clinica app.
-const clinicaProxy = [
-  {
-    source: "/nodo-clinica/:path+",
-    destination: NODO_CLINICA_REMOTE_PREFIX
-      ? `${NODO_CLINICA_URL}${NODO_CLINICA_REMOTE_PREFIX}/:path+`
-      : `${NODO_CLINICA_URL}/:path+`,
-  },
-];
+// nodo-clinica is served via its own domain (clinica.nodocore.com.ar).
+// No rewrites needed — the marketing page links directly to the app domain.
+const clinicaProxy: { source: string; destination: string }[] = [];
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@nodocore/shared-components", "@nodocore/nodo-modules"],
