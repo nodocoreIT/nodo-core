@@ -243,7 +243,10 @@ export function LoginForm({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) 
   }, [isClinicaNode, nodeParam]);
 
   if (isClinicaNode && clinicaAuthError) {
-    return <ClinicaLocalLoginEntry nodeParam={nodeParam} />;
+    if (typeof window !== "undefined") {
+      window.location.replace("/clinica/login");
+    }
+    return null;
   }
 
   return <LoginFormInner forcedNodeSlug={forcedNodeSlug} />;

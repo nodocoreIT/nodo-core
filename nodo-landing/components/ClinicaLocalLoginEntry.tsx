@@ -27,15 +27,14 @@ export function ClinicaLocalLoginEntry({ nodeParam }: { nodeParam: string }) {
             className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em]"
             style={{ color: loginAccent.brand }}
           >
-            ◎ NODO SALUD · CLÍNICA VIRTUAL
+            ◎ NODO CLÍNICA
           </span>
 
           <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
             Ingresar al portal
           </h1>
           <p className="text-slate2 text-[14.5px] mb-6">
-            Elegí si sos profesional de la salud o paciente. Usá las mismas cuentas
-            demo que en desarrollo local.
+            Elegí si sos profesional de la salud o paciente.
           </p>
 
           <div className="flex flex-col gap-4">
