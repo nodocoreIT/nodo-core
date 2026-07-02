@@ -71,7 +71,7 @@ export default function HomePage() {
                     Ingresar al portal
                   </Link>
                   <Link
-                    href="/login"
+                    href="/login/paciente"
                     className="inline-flex items-center px-6 py-3 rounded-md border border-white/30 text-white font-semibold text-[15px] hover:bg-white/10 transition-all"
                   >
                     Pedir turno
@@ -151,7 +151,7 @@ export default function HomePage() {
                     Subí estudios previos antes de la consulta
                   </li>
                 </ul>
-                <Link href="/login" className="inline-block text-brand font-semibold text-sm mt-4 hover:underline">
+                <Link href="/login/paciente" className="inline-block text-brand font-semibold text-sm mt-4 hover:underline">
                   Ingresar como paciente →
                 </Link>
               </div>
@@ -173,7 +173,7 @@ export default function HomePage() {
                     Recetas, estudios e informes con dictado e IA
                   </li>
                 </ul>
-                <Link href="/login" className="inline-block text-brand font-semibold text-sm mt-4 hover:underline">
+                <Link href="/login/medico" className="inline-block text-brand font-semibold text-sm mt-4 hover:underline">
                   Ingresar como médico →
                 </Link>
               </div>

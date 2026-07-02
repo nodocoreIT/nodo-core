@@ -3,7 +3,7 @@ import type { ClinicDatabase } from "@/lib/clinic/local-db";
 import { DEFAULT_AVAILABILITY } from "@/lib/clinic/schedule";
 
 /** Incrementar para resetear clinic.json / Blob en deploy (cuentas demo limpias). */
-export const CLINIC_SEED_VERSION = 2;
+export const CLINIC_SEED_VERSION = 3;
 
 export const DEMO_PASSWORD = "Probando1";
 
@@ -28,7 +28,8 @@ export function buildClinicSeed(now = new Date()): ClinicDatabase {
         payment: {
           currency: "ARS",
           consultationFee: 25000,
-          requirePaymentBeforeBooking: false,
+          alias: "demo.salud.mp",
+          requirePaymentBeforeBooking: true,
         },
         reminderSettings: { enabled: false, minutesBefore: 1440 },
         themeSettings: DEFAULT_THEME_SETTINGS,
@@ -49,7 +50,8 @@ export function buildClinicSeed(now = new Date()): ClinicDatabase {
         payment: {
           currency: "ARS",
           consultationFee: 30000,
-          requirePaymentBeforeBooking: false,
+          alias: "demo2.salud.mp",
+          requirePaymentBeforeBooking: true,
         },
         reminderSettings: { enabled: false, minutesBefore: 1440 },
         createdAt: now.toISOString(),

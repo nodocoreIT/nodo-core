@@ -64,7 +64,7 @@ function MedicationNameField({
 
   return (
     <div className="relative">
-      <Label className="text-xs">Nombre (Vademécum local)</Label>
+      <Label className="text-xs">Nombre (Vademécum)</Label>
       <div className="relative">
         <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-slate-400" />
         <Input
@@ -93,7 +93,13 @@ function MedicationNameField({
                 }}
               >
                 <span className="font-medium">{s.name}</span>
-                <span className="text-xs text-slate-500 ml-1">({s.activeIngredient})</span>
+                <span className="text-xs text-slate-500 ml-1 block">
+                  {s.activeIngredient}
+                  {s.laboratorio ? ` · ${s.laboratorio}` : ""}
+                  {s.precio
+                    ? ` · $${s.precio.toLocaleString("es-AR")}`
+                    : ""}
+                </span>
               </button>
             </li>
           ))}
@@ -186,6 +192,7 @@ export function PrescriptionForm({
         doctorId,
         patientId,
         medications,
+        pdfBase64: pdfToBase64(doc),
       });
 
       if (sendEmail && patientEmail) {
@@ -304,7 +311,7 @@ export function PrescriptionForm({
 
         {!signatureText && (
           <p className="text-xs text-amber-700">
-            Configurá tu firma en Consultorio → Perfil para que aparezca en el PDF.
+            Configurá tu firma en Consultorio → Perfil para que aparezca en recetas y órdenes.
           </p>
         )}
 

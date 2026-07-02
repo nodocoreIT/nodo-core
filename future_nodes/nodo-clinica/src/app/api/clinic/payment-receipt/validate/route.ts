@@ -3,7 +3,9 @@ import { promises as fs } from "fs";
 import { readDb, writeDb } from "@/lib/clinic/local-db";
 import { validatePaymentReceipt } from "@/lib/ai/payment-receipt";
 import { getSessionFromRequest } from "@/lib/clinic/session";
-import { isStrictPaymentValidation } from "@/lib/clinic/payment-validation";
+import { buildPaymentReceiptAudit } from "@/lib/clinic/payment-receipt-audit";
+import { markTransferReceiptPendingReview } from "@/lib/clinic/transfer-receipt-pending";
+import { confirmAppointmentPaymentAndNotify } from "@/lib/clinic/appointment-payment";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -46,14 +48,18 @@ export async function POST(request: NextRequest) {
   }
 
   let imageBase64: string;
-  try {
-    const buffer = await fs.readFile(doc.filePath);
-    imageBase64 = buffer.toString("base64");
-  } catch {
-    return NextResponse.json(
-      { error: "No se pudo leer el archivo del comprobante" },
-      { status: 500 },
-    );
+  if (doc.inlineDataBase64) {
+    imageBase64 = doc.inlineDataBase64;
+  } else {
+    try {
+      const buffer = await fs.readFile(doc.filePath);
+      imageBase64 = buffer.toString("base64");
+    } catch {
+      return NextResponse.json(
+        { error: "No se pudo leer el archivo del comprobante" },
+        { status: 500 },
+      );
+    }
   }
 
   const fee = doctor.payment?.consultationFee ?? 0;
@@ -65,22 +71,39 @@ export async function POST(request: NextRequest) {
     doctorName: doctor.fullName,
     doctorAlias: doctor.payment?.alias,
     doctorCbu: doctor.payment?.cbu,
+    beneficiaryName: doctor.payment?.beneficiaryName,
     expectedAmount: fee,
     currency: doctor.payment?.currency ?? "ARS",
     appointmentDateIso: apt.scheduledAt,
     slotDurationMinutes: availability?.slotDurationMinutes,
   });
 
+  const audit = buildPaymentReceiptAudit(
+    result,
+    fee,
+    doctor.payment?.currency ?? "ARS",
+  );
+  const now = new Date().toISOString();
+
+  await writeDb((d) => {
+    const target = d.appointments.find((a) => a.id === apt.id);
+    if (!target) return;
+    target.paymentReceiptAudit = audit;
+    target.paymentProvider = target.paymentProvider ?? "transfer";
+    target.updatedAt = now;
+  });
+
   if (result.valid) {
-    const now = new Date().toISOString();
-    await writeDb((d) => {
-      const target = d.appointments.find((a) => a.id === apt.id);
-      if (!target) return;
-      target.paymentStatus = "confirmed";
-      target.paymentConfirmedAt = now;
-      target.updatedAt = now;
-    });
+    await confirmAppointmentPaymentAndNotify(apt.id);
+  } else {
+    const updated = (await readDb()).appointments.find((a) => a.id === apt.id);
+    if (updated) {
+      await markTransferReceiptPendingReview(updated, {
+        audit,
+        notifyDoctor: true,
+      });
+    }
   }
 
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, audit });
 }

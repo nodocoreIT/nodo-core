@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateClinicalReport } from "@/lib/ai/gemini";
+import { getSessionFromRequest } from "@/lib/clinic/session";
+import { forbidden, requireDoctorSession } from "@/lib/clinic/access-control";
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getSessionFromRequest(request);
+    if (!requireDoctorSession(session)) {
+      return forbidden("Solo médicos autenticados pueden generar informes");
+    }
+
     const body = await request.json();
     const {
       dictation,
@@ -21,19 +28,19 @@ export async function POST(request: NextRequest) {
 
     if (!source) {
       return NextResponse.json(
-        { error: "Dictá o escribí contenido clínico primero" },
-        { status: 400 }
+        { error: "Dictá o escribí el informe primero" },
+        { status: 400 },
       );
     }
 
     if (!patientName || !doctorName) {
       return NextResponse.json(
         { error: "Datos del paciente y médico requeridos" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const report = await generateClinicalReport({
+    const result = await generateClinicalReport({
       dictation: dictation || "",
       transcription,
       clinicalNotes,
@@ -43,9 +50,11 @@ export async function POST(request: NextRequest) {
       doctorLicense,
     });
 
-    return NextResponse.json({ report });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Error interno";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(result);
+  } catch {
+    return NextResponse.json(
+      { error: "No se pudo generar el informe. Reintentá en unos minutos." },
+      { status: 500 },
+    );
   }
 }

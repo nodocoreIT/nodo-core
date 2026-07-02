@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, FileText, Home, VideoOff } from "lucide-react";
+import { CheckCircle, FileText, Home, Video, VideoOff } from "lucide-react";
 import Link from "next/link";
 
 interface ConsultationEndScreenProps {
   role: "doctor" | "patient";
   doctorName?: string;
   onReturn?: () => void;
+  onRejoin?: () => void;
   onGenerateReport?: () => void;
   autoRedirectSeconds?: number;
 }
@@ -17,6 +18,7 @@ export function ConsultationEndScreen({
   role,
   doctorName,
   onReturn,
+  onRejoin,
   onGenerateReport,
   autoRedirectSeconds = 4,
 }: ConsultationEndScreenProps) {
@@ -46,11 +48,22 @@ export function ConsultationEndScreen({
       </h2>
       <p className="text-sm text-slate-500 mt-2 max-w-sm">
         {isDoctor
-          ? "Podés generar el informe clínico antes de volver al consultorio."
+          ? "Podés reingresar a la videollamada o finalizar la consulta cuando termines con el paciente."
           : doctorName
             ? `Gracias por su consulta con Dr/a. ${doctorName}.`
             : "Gracias por utilizar Clínica Virtual."}
       </p>
+      {onRejoin && (
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-4"
+          onClick={onRejoin}
+        >
+          <Video className="h-4 w-4 mr-2" />
+          Reingresar a la videollamada
+        </Button>
+      )}
       {autoRedirectSeconds > 0 && !redirectPaused && (
         <p className="text-xs text-slate-400 mt-2">
           Redirigiendo en unos segundos…

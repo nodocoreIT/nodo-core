@@ -4,6 +4,34 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
+export type EmailSendResult = {
+  id: string;
+  mock?: boolean;
+};
+
+function fromAddress() {
+  return (
+    process.env.RESEND_FROM_EMAIL ||
+    "Nodo Salud <onboarding@resend.dev>"
+  );
+}
+
+async function dispatchEmail(payload: Parameters<Resend["emails"]["send"]>[0]) {
+  if (!resend) {
+    console.log("[Email Mock]", {
+      to: payload.to,
+      subject: payload.subject,
+    });
+    return { id: "mock-email-id", mock: true } satisfies EmailSendResult;
+  }
+
+  const { data, error } = await resend.emails.send(payload);
+  if (error) {
+    throw new Error(error.message || "Error al enviar email con Resend");
+  }
+  return { id: data?.id ?? "sent" } satisfies EmailSendResult;
+}
+
 interface AppointmentEmailParams {
   patientEmail: string;
   patientName: string;
@@ -14,8 +42,8 @@ interface AppointmentEmailParams {
 }
 
 export async function sendAppointmentConfirmationEmail(
-  params: AppointmentEmailParams
-) {
+  params: AppointmentEmailParams,
+): Promise<EmailSendResult> {
   const {
     patientEmail,
     patientName,
@@ -70,13 +98,8 @@ export async function sendAppointmentConfirmationEmail(
     </html>
   `;
 
-  if (!resend) {
-    console.log("[Email Mock]", { to: patientEmail, waitingRoomUrl });
-    return { id: "mock-email-id" };
-  }
-
-  return resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL || "Clínica Virtual <noreply@clinicavirtual.com>",
+  return dispatchEmail({
+    from: fromAddress(),
     to: patientEmail,
     subject: `Turno confirmado — Dr/a. ${doctorName}`,
     html,
@@ -92,8 +115,8 @@ interface AppointmentReminderEmailParams {
 }
 
 export async function sendAppointmentReminderEmail(
-  params: AppointmentReminderEmailParams
-) {
+  params: AppointmentReminderEmailParams,
+): Promise<EmailSendResult> {
   const { patientEmail, patientName, doctorName, scheduledAt, waitingRoomUrl } =
     params;
 
@@ -128,13 +151,8 @@ export async function sendAppointmentReminderEmail(
     </html>
   `;
 
-  if (!resend) {
-    console.log("[Email Mock] Reminder", { to: patientEmail, scheduledAt });
-    return { id: "mock-reminder-email" };
-  }
-
-  return resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL || "Clínica Virtual <noreply@clinicavirtual.com>",
+  return dispatchEmail({
+    from: fromAddress(),
     to: patientEmail,
     subject: `Recordatorio: turno con Dr/a. ${doctorName}`,
     html,
@@ -148,16 +166,13 @@ interface PrescriptionEmailParams {
   pdfBase64: string;
 }
 
-export async function sendPrescriptionEmail(params: PrescriptionEmailParams) {
+export async function sendPrescriptionEmail(
+  params: PrescriptionEmailParams,
+): Promise<EmailSendResult> {
   const { patientEmail, patientName, doctorName, pdfBase64 } = params;
 
-  if (!resend) {
-    console.log("[Email Mock] Prescription sent to", patientEmail);
-    return { id: "mock-prescription-email" };
-  }
-
-  return resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL || "Clínica Virtual <noreply@clinicavirtual.com>",
+  return dispatchEmail({
+    from: fromAddress(),
     to: patientEmail,
     subject: `Receta médica — Dr/a. ${doctorName}`,
     html: `

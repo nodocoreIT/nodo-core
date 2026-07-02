@@ -13,6 +13,8 @@ import {
   Loader2,
   Video,
   ArrowLeft,
+  Clock,
+  XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -26,7 +28,10 @@ import { ConsultationEndScreen } from "@/components/consultation/consultation-en
 
 import { ConsultationPaymentPanel } from "@/components/patient/consultation-payment-panel";
 import { WaitingRoomIntake } from "@/components/patient/waiting-room-intake";
+import { ReceiptValidationCard } from "@/components/patient/receipt-validation-card";
 import { clinicApi } from "@/lib/clinic/client-api";
+import { clinicTimeLabelFromIso, formatDateKeyLabel, localDateKeyFromIso } from "@/lib/clinic/schedule";
+import type { PaymentReceiptAudit } from "@/lib/clinic/local-db";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
 interface WaitingRoomProps {
@@ -47,6 +52,7 @@ interface WaitingMeta {
     cbu?: string;
     paymentInstructions?: string;
     qrImageData?: string;
+    mercadopagoReady?: boolean;
   };
 }
 
@@ -64,10 +70,15 @@ export function WaitingRoom({
   const [isLoading, setIsLoading] = useState(true);
   const [meta, setMeta] = useState<WaitingMeta | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string | undefined>();
+  const [paymentProvider, setPaymentProvider] = useState<string | undefined>();
+  const [mpCheckoutLoading, setMpCheckoutLoading] = useState(false);
   const [confirmingPayment, setConfirmingPayment] = useState(false);
+  const [cancellingPending, setCancellingPending] = useState(false);
   const [validatingReceipt, setValidatingReceipt] = useState(false);
   const [paymentAck, setPaymentAck] = useState(false);
   const [strictPaymentValidation, setStrictPaymentValidation] = useState(false);
+  const [paymentReceiptAudit, setPaymentReceiptAudit] =
+    useState<PaymentReceiptAudit | null>(null);
   const [receiptValidation, setReceiptValidation] = useState<{
     valid: boolean;
     confidence: number;
@@ -81,6 +92,7 @@ export function WaitingRoom({
   } | null>(null);
   const [intakeReason, setIntakeReason] = useState("");
   const [videoEnded, setVideoEnded] = useState(false);
+  const [videoSessionKey, setVideoSessionKey] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastStatusRef = useRef<string | null>(null);
   const notifiedConsultationRef = useRef(false);
@@ -124,6 +136,8 @@ export function WaitingRoom({
         }
 
         setPaymentStatus(apt.paymentStatus);
+        setPaymentProvider(apt.paymentProvider);
+        setPaymentReceiptAudit(apt.paymentReceiptAudit ?? null);
         setIntakeReason(apt.intakeReason ?? "");
         setStrictPaymentValidation(!!data.strictPaymentValidation);
 
@@ -156,7 +170,14 @@ export function WaitingRoom({
           doctorName: data.doctor?.fullName || "Médico",
           doctorPhoto: data.doctor?.profilePhotoData,
           doctorSpecialty: data.doctor?.specialty,
-          doctorPayment: data.doctor?.payment,
+          doctorPayment: data.doctor?.payment
+            ? {
+                ...data.doctor.payment,
+                mercadopagoReady: (
+                  data.doctor.payment as { mercadopagoReady?: boolean }
+                ).mercadopagoReady,
+              }
+            : undefined,
         });
         setQueuePosition(data.queuePosition);
         setTotalWaiting(data.totalWaiting);
@@ -330,8 +351,15 @@ export function WaitingRoom({
     if (!mp || mpReturnHandled.current) return;
     mpReturnHandled.current = true;
     if (mp === "success") {
+      const paymentId =
+        searchParams.get("payment_id") ||
+        searchParams.get("collection_id") ||
+        undefined;
+      void clinicApi
+        .syncMercadoPagoPayment(accessToken, paymentId)
+        .then(() => loadAppointment())
+        .catch(() => loadAppointment());
       toast.success("Pago recibido. Tu turno queda confirmado.");
-      void loadAppointment();
     } else if (mp === "pending") {
       toast.message("Pago pendiente — te avisaremos cuando se acredite.");
     } else if (mp === "failure") {
@@ -347,6 +375,15 @@ export function WaitingRoom({
         try {
           const data = await clinicApi.getAppointmentByToken(accessToken);
           const apt = data.appointment;
+          if (
+            apt.paymentStatus === "confirmed" &&
+            apt.status === "scheduled"
+          ) {
+            await clinicApi.updateAppointmentStatus(apt.id, "waiting");
+            apt.status = "waiting";
+          }
+          setPaymentStatus(apt.paymentStatus);
+          setPaymentReceiptAudit(apt.paymentReceiptAudit ?? null);
           setAppointment((prev) =>
             prev
               ? {
@@ -426,21 +463,6 @@ export function WaitingRoom({
     };
   }, [accessToken, appointment, dataSource]);
 
-  const handlePatientVideoEnd = useCallback(async () => {
-    setVideoEnded(true);
-    if (dataSource !== "local") return;
-    try {
-      const data = await clinicApi.getAppointmentByToken(accessToken);
-      if (data.appointment.status === "completed") {
-        setAppointment((prev) =>
-          prev ? { ...prev, status: "completed" } : prev
-        );
-      }
-    } catch {
-      /* ignore */
-    }
-  }, [accessToken, dataSource]);
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -481,7 +503,7 @@ export function WaitingRoom({
   const doctorSpecialty = meta?.doctorSpecialty || doctorProfile?.specialty;
 
   const isInConsultation = appointment.status === "in_consultation";
-  const isCompleted = appointment.status === "completed" || videoEnded;
+  const isCompleted = appointment.status === "completed";
 
   const backLink = (
     <Link
@@ -507,6 +529,189 @@ export function WaitingRoom({
     }
   };
 
+  const handleCancelPending = async () => {
+    if (
+      !window.confirm(
+        "¿Cancelar este turno y liberar el horario? Podrás pedir otro con el mismo médico.",
+      )
+    ) {
+      return;
+    }
+    setCancellingPending(true);
+    try {
+      await clinicApi.cancelPendingAppointment(accessToken);
+      toast.success("Turno cancelado");
+      window.location.href = "/paciente";
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo cancelar");
+    } finally {
+      setCancellingPending(false);
+    }
+  };
+
+  if (paymentStatus === "rejected" || appointment.status === "cancelled") {
+    return (
+      <div className="min-h-screen bg-slate-50 p-4">
+        <div className="max-w-lg mx-auto">
+          {backLink}
+          <Card className="border-red-200">
+            <CardContent className="pt-6 text-center space-y-3">
+              <XCircle className="h-10 w-10 text-red-500 mx-auto" />
+              <h2 className="text-lg font-semibold text-slate-800">
+                Turno cancelado
+              </h2>
+              <p className="text-sm text-slate-600">
+                El médico no pudo confirmar tu comprobante de pago. Podés pedir
+                un nuevo turno desde el portal.
+              </p>
+              <Link href="/paciente">
+                <Button className="bg-emerald-600 hover:bg-emerald-700">
+                  Volver al portal
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (isInConsultation && videoEnded) {
+    return (
+      <div className="min-h-screen bg-slate-900 p-4">
+        <div className="max-w-4xl mx-auto">
+          {backLink}
+          <ConsultationEndScreen
+            role="patient"
+            doctorName={doctorName}
+            autoRedirectSeconds={0}
+            onRejoin={() => {
+              setVideoEnded(false);
+              setVideoSessionKey((k) => k + 1);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (isInConsultation && !videoEnded) {
+    return (
+      <div className="min-h-screen bg-slate-900 p-4">
+        <div className="max-w-4xl mx-auto">
+          {backLink}
+          <div className="text-center mb-4">
+            <Badge className="bg-emerald-600 text-white">
+              <Video className="h-3 w-3 mr-1" />
+              Consulta en curso
+            </Badge>
+            <p className="text-white/70 text-sm mt-2">
+              Con Dr/a. {doctorName}
+            </p>
+          </div>
+          <JitsiMeet
+            key={`${appointment.jitsi_room_id}-${videoSessionKey}`}
+            roomName={appointment.jitsi_room_id}
+            displayName={patientName}
+            accessToken={accessToken}
+            height={560}
+            onMeetingEnd={() => setVideoEnded(true)}
+            endScreen={
+              <ConsultationEndScreen
+                role="patient"
+                doctorName={doctorName}
+                autoRedirectSeconds={0}
+                onRejoin={() => {
+                  setVideoEnded(false);
+                  setVideoSessionKey((k) => k + 1);
+                }}
+              />
+            }
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const receiptAlreadySubmitted =
+    !!paymentReceiptAudit || uploadedFiles.length > 0;
+
+  if (paymentStatus === "pending" && receiptAlreadySubmitted) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-4">
+        <div className="max-w-lg mx-auto">
+          {backLink}
+          <Card className="border-amber-300 bg-amber-50/30">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Clock className="h-5 w-5 text-amber-600" />
+                Esperando aprobación del médico
+              </CardTitle>
+              <p className="text-sm text-slate-600">
+                Dr/a. {doctorName} — tu comprobante ya fue enviado
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-amber-900 bg-amber-100/80 border border-amber-200 rounded-lg px-3 py-2">
+                La validación automática no fue concluyente. El médico revisará
+                el pago manualmente. Te avisaremos cuando el turno quede
+                habilitado.
+              </p>
+
+              {paymentReceiptAudit && (
+                <ReceiptValidationCard
+                  audit={paymentReceiptAudit}
+                  title="Lectura del comprobante"
+                />
+              )}
+
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-1.5">
+                  {uploadedFiles.map((file) => (
+                    <div
+                      key={file.id ?? file.name + file.uploadedAt}
+                      className="flex items-center gap-2 text-xs text-slate-600 bg-white rounded-md px-3 py-2 border"
+                    >
+                      <FileText className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                      <span className="truncate flex-1">{file.name}</span>
+                      {file.downloadUrl && (
+                        <a
+                          href={file.downloadUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline shrink-0"
+                        >
+                          Ver
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-xs text-slate-500 text-center">
+                Esta página se actualiza sola cuando el médico aprueba el pago.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-red-200 text-red-700"
+                disabled={cancellingPending}
+                onClick={() => void handleCancelPending()}
+              >
+                {cancellingPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Cancelar turno y liberar horario"
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   if (paymentStatus === "pending") {
     return (
       <div className="min-h-screen bg-slate-50 p-4">
@@ -520,6 +725,50 @@ export function WaitingRoom({
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
+              {meta?.doctorPayment?.mercadopagoReady && (
+                <Button
+                  className="w-full bg-[#009ee3] hover:bg-[#008ecf] text-white"
+                  disabled={mpCheckoutLoading}
+                  onClick={async () => {
+                    setMpCheckoutLoading(true);
+                    try {
+                      const result = await clinicApi.getMercadoPagoCheckout({
+                        accessToken,
+                      });
+                      if (result.paid && result.waitingRoomUrl) {
+                        await loadAppointment();
+                        return;
+                      }
+                      if (result.checkoutUrl) {
+                        window.location.href = result.checkoutUrl;
+                        return;
+                      }
+                      toast.error("No se pudo abrir Mercado Pago");
+                    } catch (err) {
+                      toast.error(
+                        err instanceof Error
+                          ? err.message
+                          : "Error con Mercado Pago",
+                      );
+                    } finally {
+                      setMpCheckoutLoading(false);
+                    }
+                  }}
+                >
+                  {mpCheckoutLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Pagar con Mercado Pago"
+                  )}
+                </Button>
+              )}
+
+              {meta?.doctorPayment?.mercadopagoReady && (
+                <p className="text-xs text-center text-slate-400">
+                  — o transferencia manual —
+                </p>
+              )}
+
               <ConsultationPaymentPanel
                 doctorName={doctorName}
                 payment={meta?.doctorPayment}
@@ -673,40 +922,22 @@ export function WaitingRoom({
                   del comprobante o confirmación del médico.
                 </p>
               )}
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-red-200 text-red-700"
+                disabled={cancellingPending}
+                onClick={() => void handleCancelPending()}
+              >
+                {cancellingPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Cancelar turno y liberar horario"
+                )}
+              </Button>
             </CardContent>
           </Card>
-        </div>
-      </div>
-    );
-  }
-
-  if (isInConsultation && !videoEnded) {
-    return (
-      <div className="min-h-screen bg-slate-900 p-4">
-        <div className="max-w-4xl mx-auto">
-          {backLink}
-          <div className="text-center mb-4">
-            <Badge className="bg-emerald-600 text-white">
-              <Video className="h-3 w-3 mr-1" />
-              Consulta en curso
-            </Badge>
-            <p className="text-white/70 text-sm mt-2">
-              Con Dr/a. {doctorName}
-            </p>
-          </div>
-          <JitsiMeet
-            roomName={appointment.jitsi_room_id}
-            displayName={patientName}
-            height={560}
-            onMeetingEnd={handlePatientVideoEnd}
-            endScreen={
-              <ConsultationEndScreen
-                role="patient"
-                doctorName={doctorName}
-                autoRedirectSeconds={5}
-              />
-            }
-          />
         </div>
       </div>
     );
@@ -747,83 +978,87 @@ export function WaitingRoom({
       : 50;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-blue-50/30">
-      <div className="max-w-lg mx-auto px-4 py-8 space-y-6">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50/40 to-slate-50">
+      <div className="max-w-lg mx-auto px-4 py-8 space-y-5">
         {backLink}
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-4 mb-4">
+        <div className="text-center space-y-3">
+          <div className="flex items-center justify-center gap-4">
             <UserAvatar
               name={patientName}
               photoUrl={meta?.patientPhoto}
               size="lg"
             />
-            <div className="text-slate-300 text-xl">↔</div>
+            <div className="text-emerald-300 text-xl">↔</div>
             <UserAvatar
               name={doctorName}
               photoUrl={meta?.doctorPhoto}
               size="lg"
             />
           </div>
-          <h1 className="text-xl font-semibold text-slate-900">
-            Sala de Espera Virtual
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Hola, {patientName} — consulta con Dr/a. {doctorName}
-          </p>
+          <div>
+            <Badge className="bg-emerald-600 text-white mb-2">Turno confirmado</Badge>
+            <h1 className="text-xl font-semibold text-slate-900">
+              Sala de espera
+            </h1>
+            <p className="text-sm text-slate-600 mt-2 max-w-sm mx-auto">
+              Cuando el médico pulse <strong>Iniciar consulta</strong> en el
+              consultorio, vas a entrar automáticamente a la videollamada (sin
+              recargar).
+            </p>
+            <p className="text-sm text-slate-600 mt-1">
+              Hola, {patientName}
+            </p>
+            <p className="text-sm text-slate-500">
+              Dr/a. {doctorName}
+              {doctorSpecialty ? ` · ${doctorSpecialty}` : ""}
+            </p>
+            <p className="text-sm font-medium text-emerald-800 mt-2">
+              {formatDateKeyLabel(localDateKeyFromIso(appointment.scheduled_at))}{" "}
+              · {clinicTimeLabelFromIso(appointment.scheduled_at)} hs
+            </p>
+          </div>
         </div>
 
-        <Card className="border-slate-200 shadow-sm">
+        <Card className="border-emerald-100 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-700">
-              Su turno
+              Tu lugar en la fila
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-3xl font-bold text-blue-700">
+                <p className="text-3xl font-bold text-emerald-700">
                   #{queuePosition}
                 </p>
-                <p className="text-xs text-slate-400">Posición en la fila</p>
+                <p className="text-xs text-slate-400">Posición actual</p>
               </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-slate-700">
-                  Dr/a. {doctorName}
-                </p>
-                {doctorSpecialty && (
-                  <p className="text-xs text-slate-400">
-                    {doctorSpecialty}
-                  </p>
-                )}
-                <p className="text-xs text-slate-400 mt-1">
-                  {format(new Date(appointment.scheduled_at), "HH:mm 'hs'", {
-                    locale: es,
-                  })}
-                </p>
+              <div className="text-right text-xs text-slate-500">
+                <Users className="h-4 w-4 inline mr-1 text-emerald-600" />
+                {totalWaiting} en espera
               </div>
             </div>
-
-            <div>
-              <div className="flex justify-between text-xs text-slate-400 mb-1">
-                <span>Progreso de la fila</span>
-                <span className="flex items-center gap-1">
-                  <Users className="h-3 w-3" />
-                  {totalWaiting} en espera
-                </span>
-              </div>
-              <Progress value={progressPercent} className="h-2" />
-            </div>
+            <Progress value={progressPercent} className="h-2" />
           </CardContent>
         </Card>
+
+        {paymentReceiptAudit && (
+          <ReceiptValidationCard
+            audit={paymentReceiptAudit}
+            title="Pago registrado (lectura IA)"
+          />
+        )}
+
+        {!paymentReceiptAudit && meta?.doctorPayment && (
+          <ConsultationPaymentPanel
+            doctorName={doctorName}
+            payment={meta.doctorPayment}
+          />
+        )}
 
         <WaitingRoomIntake
           accessToken={accessToken}
           initialValue={intakeReason}
-        />
-
-        <ConsultationPaymentPanel
-          doctorName={doctorName}
-          payment={meta?.doctorPayment}
         />
 
         <Card className="border-slate-200 shadow-sm">

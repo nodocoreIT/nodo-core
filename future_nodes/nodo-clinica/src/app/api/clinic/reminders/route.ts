@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const settings = doctor.reminderSettings;
     const label = formatReminderLabel(settings?.minutesBefore ?? 1440);
 
-    await sendAppointmentReminderEmail({
+    const sendResult = await sendAppointmentReminderEmail({
       patientEmail: doctor.email,
       patientName: doctor.fullName,
       doctorName: doctor.fullName,
@@ -58,9 +58,19 @@ export async function POST(request: NextRequest) {
       waitingRoomUrl: `${baseUrl()}/medico/dashboard`,
     });
 
+    if (sendResult.mock) {
+      return NextResponse.json({
+        ok: true,
+        mock: true,
+        message:
+          `Modo demo: no hay RESEND_API_KEY en Vercel. Configurá RESEND_API_KEY y RESEND_FROM_EMAIL (dominio verificado) para enviar a ${doctor.email}.`,
+      });
+    }
+
     return NextResponse.json({
       ok: true,
       message: `Email de prueba enviado a ${doctor.email} (simula aviso ${label})`,
+      emailId: sendResult.id,
     });
   }
 

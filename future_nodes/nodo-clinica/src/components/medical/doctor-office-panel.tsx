@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ import {
   Palette,
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { clinicApi } from "@/lib/clinic/client-api";
 import {
   dayLabel,
@@ -43,12 +45,14 @@ import {
   type DoctorThemeSettings,
 } from "@/lib/clinic/theme-settings";
 import { useThemeSettings } from "@/hooks/use-theme-settings";
+import { DoctorPaymentsLedger } from "@/components/medical/doctor-payments-ledger";
 
 const ALL_DAYS = [1, 2, 3, 4, 5, 6, 0];
 
 interface DoctorOfficePanelProps {
   doctorId: string;
   fullPage?: boolean;
+  defaultTab?: string;
 }
 
 function readImageFile(file: File, maxKb = 400): Promise<string> {
@@ -64,7 +68,11 @@ function readImageFile(file: File, maxKb = 400): Promise<string> {
   });
 }
 
-export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePanelProps) {
+export function DoctorOfficePanel({
+  doctorId,
+  fullPage = false,
+  defaultTab = "agenda",
+}: DoctorOfficePanelProps) {
   const [availability, setAvailability] =
     useState<DoctorAvailability>(DEFAULT_AVAILABILITY);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
@@ -88,33 +96,107 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
   const [newBlockDate, setNewBlockDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [testingReminder, setTestingReminder] = useState(false);
+  const [mpOAuthConfigured, setMpOAuthConfigured] = useState<boolean | null>(
+    null,
+  );
+  const [mpOAuthRedirectUri, setMpOAuthRedirectUri] = useState("");
+  const [testingMpConnection, setTestingMpConnection] = useState(false);
+  const loadGen = useRef(0);
+  const searchParams = useSearchParams();
+
+  const mpErrorLabel = (code: string) => {
+    const labels: Record<string, string> = {
+      oauth_not_configured:
+        "OAuth no configurado en el servidor (CLIENT_ID / CLIENT_SECRET)",
+      invalid_state: "Sesión OAuth expirada — intentá conectar de nuevo",
+      expired_state: "El enlace de autorización venció — reconectá",
+      session_mismatch: "Iniciá sesión como el mismo médico que conectó",
+      missing_code: "Mercado Pago no devolvió el código de autorización",
+      token_exchange: "Error al intercambiar el código por tokens",
+    };
+    return labels[code] ?? code;
+  };
 
   useEffect(() => {
-    clinicApi.getDoctorSchedule(doctorId).then((data) => {
+    void clinicApi.getMercadoPagoOAuthConfig().then((cfg) => {
+      setMpOAuthConfigured(!!cfg.configured);
+      if (cfg.redirectUri) setMpOAuthRedirectUri(cfg.redirectUri);
+    });
+  }, []);
+
+  useEffect(() => {
+    const mp = searchParams.get("mp");
+    if (mp === "connected") {
+      toast.success("Tu cuenta de Mercado Pago quedó vinculada. Los cobros van directo a vos.");
+    } else if (mp === "error") {
+      const msg = searchParams.get("mp_msg") ?? "desconocido";
+      toast.error(`No se pudo conectar Mercado Pago: ${mpErrorLabel(msg)}`);
+    }
+  }, [searchParams]);
+
+  type OfficeData = Record<string, unknown>;
+
+  const applyOfficeData = useCallback(
+    (data: OfficeData) => {
       if (data.availability) {
-        setAvailability(normalizeAvailability(data.availability));
-        setBlockedDates(data.availability.blockedDates ?? data.blockedDates ?? []);
+        setAvailability(
+          normalizeAvailability(
+            data.availability as DoctorAvailability,
+          ),
+        );
+        const avail = data.availability as DoctorAvailability;
+        setBlockedDates(avail.blockedDates ?? (data.blockedDates as string[]) ?? []);
       }
-      if (data.signatureText) setSignatureText(data.signatureText);
-      if (data.signatureImageData) setSignatureImageData(data.signatureImageData);
-      if (data.profilePhotoData) setProfilePhotoData(data.profilePhotoData);
-      if (data.bio) setBio(data.bio);
-      if (data.payment) setPayment({ currency: "ARS", requirePaymentBeforeBooking: true, ...data.payment });
+      if (data.signatureText != null) setSignatureText(String(data.signatureText));
+      if (data.signatureImageData != null) {
+        setSignatureImageData(String(data.signatureImageData));
+      }
+      if (data.profilePhotoData != null) {
+        setProfilePhotoData(String(data.profilePhotoData));
+      }
+      if (data.bio != null) setBio(String(data.bio));
+      if (data.payment) {
+        setPayment({
+          currency: "ARS",
+          requirePaymentBeforeBooking: true,
+          ...(data.payment as DoctorPaymentSettings),
+        });
+      }
       if (data.reminderSettings) {
         setReminderSettings({
           enabled: false,
           minutesBefore: 1440,
-          ...data.reminderSettings,
+          ...(data.reminderSettings as DoctorReminderSettings),
         });
       }
-      if (data.googleCalendarId) setGoogleCalendarId(data.googleCalendarId);
+      if (data.googleCalendarId != null) {
+        setGoogleCalendarId(String(data.googleCalendarId));
+      }
       if (data.themeSettings) {
-        const merged = mergeThemeSettings(data.themeSettings);
+        const merged = mergeThemeSettings(
+          data.themeSettings as DoctorThemeSettings,
+        );
         setThemeSettings(merged);
         hydrateSettings(merged);
       }
-    });
-  }, [doctorId, hydrateSettings]);
+    },
+    [hydrateSettings],
+  );
+
+  useEffect(() => {
+    const gen = ++loadGen.current;
+    clinicApi
+      .getDoctorSchedule(doctorId)
+      .then((data) => {
+        if (gen !== loadGen.current) return;
+        applyOfficeData(data);
+      })
+      .catch(() => {
+        if (gen === loadGen.current) {
+          toast.error("No se pudo cargar la configuración del consultorio");
+        }
+      });
+  }, [doctorId, applyOfficeData]);
 
   const toggleDay = (dayOfWeek: number) => {
     setAvailability((prev) => {
@@ -190,7 +272,7 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
   const handleSave = async () => {
     setSaving(true);
     try {
-      await clinicApi.saveDoctorOffice({
+      const result = await clinicApi.saveDoctorOffice({
         availability: { ...availability, blockedDates },
         blockedDates,
         signatureText,
@@ -203,10 +285,30 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
           parseGoogleCalendarSrc(googleCalendarId) ?? googleCalendarId.trim(),
         themeSettings,
       });
+      if (result.office) {
+        loadGen.current += 1;
+        applyOfficeData(result.office);
+      }
       hydrateSettings(themeSettings);
       toast.success("Configuración guardada");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSavePayment = async () => {
+    setSaving(true);
+    try {
+      const result = await clinicApi.saveDoctorPayment(payment);
+      if (result.office) {
+        loadGen.current += 1;
+        applyOfficeData(result.office);
+      }
+      toast.success("Honorarios y cobros guardados");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al guardar cobros");
     } finally {
       setSaving(false);
     }
@@ -222,7 +324,11 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
     setTestingReminder(true);
     try {
       const result = await clinicApi.sendTestReminderEmail();
-      toast.success(result.message);
+      if (result.mock) {
+        toast.warning(result.message, { duration: 10_000 });
+      } else {
+        toast.success(result.message);
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo enviar el email");
     } finally {
@@ -244,7 +350,7 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
         )}
       </CardHeader>
       <CardContent className="p-0">
-        <Tabs defaultValue="agenda" className="w-full">
+        <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 rounded-none border-b bg-slate-50 h-auto p-1">
             <TabsTrigger value="agenda" className="text-xs">Agenda</TabsTrigger>
             <TabsTrigger value="perfil" className="text-xs">Perfil</TabsTrigger>
@@ -388,7 +494,16 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
                     const f = e.target.files?.[0];
                     if (!f) return;
                     try {
-                      setProfilePhotoData(await readImageFile(f));
+                      const photoData = await readImageFile(f);
+                      setProfilePhotoData(photoData);
+                      const result = await clinicApi.saveDoctorOffice({
+                        profilePhotoData: photoData,
+                      });
+                      if (result.office) {
+                        loadGen.current += 1;
+                        applyOfficeData(result.office);
+                      }
+                      toast.success("Foto de perfil guardada");
                     } catch (err) {
                       toast.error(err instanceof Error ? err.message : "Error");
                     }
@@ -451,7 +566,7 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
               </div>
             </div>
             <div>
-              <Label className="text-xs">Firma textual (informes y recetas)</Label>
+              <Label className="text-xs">Texto de firma en documentos</Label>
               <Input
                 value={signatureText}
                 onChange={(e) => setSignatureText(e.target.value)}
@@ -460,7 +575,7 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
               />
             </div>
             <div>
-              <Label className="text-xs">Imagen de firma (opcional)</Label>
+              <Label className="text-xs">Imagen de firma para documentos (opcional)</Label>
               <Input
                 type="file"
                 accept="image/*"
@@ -487,6 +602,18 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
           </TabsContent>
 
           <TabsContent value="cobros" className="p-4 space-y-4 mt-0">
+            <div className="rounded-lg border border-[#009ee3]/25 bg-sky-50/60 p-3 space-y-1.5">
+              <p className="text-sm font-medium text-sky-950">
+                Cobros directos a tu cuenta
+              </p>
+              <p className="text-[11px] text-sky-900/90 leading-relaxed">
+                Cada médico vincula <strong>su propia cuenta</strong> de Mercado
+                Pago. El paciente paga el honorario y el dinero{" "}
+                <strong>ingresa en tu cuenta</strong> — la plataforma no retiene
+                ni intermedia el cobro.
+              </p>
+            </div>
+
             <label className="flex items-start gap-2 rounded-md border border-emerald-100 bg-emerald-50/50 p-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -522,38 +649,208 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
                 </span>
               </label>
               {payment.mercadopagoEnabled && (
-                <>
-                  <div>
-                    <Label className="text-xs">Access Token de Mercado Pago</Label>
-                    <Input
-                      type="password"
-                      value={payment.mercadopagoAccessToken ?? ""}
-                      onChange={(e) =>
-                        setPayment((p) => ({
-                          ...p,
-                          mercadopagoAccessToken: e.target.value,
-                        }))
-                      }
-                      placeholder="TEST-... o APP_USR-..."
-                      className="mt-1 h-9 font-mono text-xs"
-                    />
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      Credenciales en{" "}
-                      <a
-                        href="https://www.mercadopago.com.ar/developers/panel/app"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 underline"
+                <div className="space-y-3 pl-1">
+                  {(payment as DoctorPaymentSettings & {
+                    mercadopagoConnected?: boolean;
+                    mercadopagoUserId?: string;
+                  }).mercadopagoConnected ? (
+                    <div className="rounded-md border border-emerald-200 bg-emerald-50/80 p-3 space-y-2">
+                      <p className="text-sm font-medium text-emerald-900">
+                        Cuenta conectada
+                        {(payment as { mercadopagoUserId?: string })
+                          .mercadopagoUserId && (
+                          <span className="font-normal text-emerald-700">
+                            {" "}
+                            · MP user{" "}
+                            {
+                              (payment as { mercadopagoUserId?: string })
+                                .mercadopagoUserId
+                            }
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-[11px] text-emerald-800">
+                        Los cobros usan el Access Token de tu cuenta (OAuth).
+                        No hace falta pegar credenciales.
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        disabled={testingMpConnection}
+                        onClick={async () => {
+                          setTestingMpConnection(true);
+                          try {
+                            const result =
+                              await clinicApi.testMercadoPagoConnection();
+                            toast.success(
+                              result.message ?? "Conexión con Mercado Pago OK",
+                            );
+                          } catch (e) {
+                            toast.error(
+                              e instanceof Error
+                                ? e.message
+                                : "Token de Mercado Pago inválido",
+                              { duration: 12_000 },
+                            );
+                          } finally {
+                            setTestingMpConnection(false);
+                          }
+                        }}
                       >
-                        developers.mercadopago.com
-                      </a>
-                      . Webhook:{" "}
-                      <code className="text-[10px] bg-white px-1 rounded">
-                        /api/clinic/mercadopago/webhook
-                      </code>
+                        {testingMpConnection ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          "Probar conexión"
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs border-red-200 text-red-700"
+                        onClick={async () => {
+                          try {
+                            await clinicApi.disconnectMercadoPago();
+                            toast.success("Mercado Pago desconectado");
+                            const data = await clinicApi.getDoctorSchedule(
+                              doctorId,
+                            );
+                            applyOfficeData(data);
+                          } catch (e) {
+                            toast.error(
+                              e instanceof Error
+                                ? e.message
+                                : "Error al desconectar",
+                            );
+                          }
+                        }}
+                      >
+                        Desconectar
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {mpOAuthConfigured === false && (
+                        <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                          OAuth de la plataforma sin configurar. El administrador
+                          debe definir{" "}
+                          <code className="text-[10px]">MERCADOPAGO_CLIENT_ID</code>{" "}
+                          y{" "}
+                          <code className="text-[10px]">MERCADOPAGO_CLIENT_SECRET</code>{" "}
+                          en el servidor. Mientras tanto podés pegar un Access
+                          Token de prueba abajo.
+                        </p>
+                      )}
+                      <Button
+                        type="button"
+                        className="w-full bg-[#009ee3] hover:bg-[#008ecf] text-white h-10"
+                        disabled={mpOAuthConfigured !== true}
+                        onClick={() => {
+                          window.location.href =
+                            "/api/clinic/mercadopago/oauth/connect";
+                        }}
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Vincular mi cuenta de Mercado Pago
+                      </Button>
+                      <details className="rounded-md border border-amber-200 bg-amber-50/80 p-3 text-[11px] text-amber-950">
+                        <summary className="cursor-pointer font-semibold">
+                          ¿OAuth falla? Modo prueba — pegar Access Token
+                        </summary>
+                        <p className="mt-2 text-amber-900/90 leading-relaxed">
+                          En Mercado Pago → Credenciales de prueba, copiá el{" "}
+                          <strong>Access Token</strong> (APP_USR-…) del vendedor
+                          de prueba y pegalo acá. No uses el Public Key ni el
+                          N.º de aplicación como secret en Vercel.
+                        </p>
+                        <Input
+                          value={payment.mercadopagoAccessToken ?? ""}
+                          onChange={(e) =>
+                            setPayment((p) => ({
+                              ...p,
+                              mercadopagoAccessToken: e.target.value,
+                            }))
+                          }
+                          placeholder="APP_USR-..."
+                          className="mt-2 h-9 font-mono text-[10px]"
+                        />
+                        <p className="mt-2 text-amber-800/80">
+                          Después tocá{" "}
+                          <strong>Guardar honorarios y alias</strong>. En local
+                          usá el Access Token del{" "}
+                          <strong>vendedor de prueba</strong> (empieza con{" "}
+                          <code className="text-[10px]">TEST-</code>), no el
+                          Public Key ni credenciales de producción. Diagnóstico:{" "}
+                          <a
+                            href="/api/clinic/mercadopago/oauth/diagnose"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline"
+                          >
+                            /api/clinic/mercadopago/oauth/diagnose
+                          </a>
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="mt-2 h-8 text-xs w-full"
+                          disabled={testingMpConnection}
+                          onClick={async () => {
+                            setTestingMpConnection(true);
+                            try {
+                              await clinicApi.saveDoctorPayment(payment);
+                              const result =
+                                await clinicApi.testMercadoPagoConnection();
+                              toast.success(
+                                result.message ?? "Token de Mercado Pago válido",
+                              );
+                              const data = await clinicApi.getDoctorSchedule(
+                                doctorId,
+                              );
+                              applyOfficeData(data);
+                            } catch (e) {
+                              toast.error(
+                                e instanceof Error
+                                  ? e.message
+                                  : "Token inválido",
+                                { duration: 12_000 },
+                              );
+                            } finally {
+                              setTestingMpConnection(false);
+                            }
+                          }}
+                        >
+                          {testingMpConnection ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            "Guardar y probar token"
+                          )}
+                        </Button>
+                      </details>
+                      <p className="text-[11px] text-slate-500">
+                        OAuth redirige a MP con PKCE. En sandbox, iniciá sesión
+                        con el usuario TESTUSER… de tu panel MP.
+                      </p>
+                    </div>
+                  )}
+
+                  <p className="text-[11px] text-slate-500">
+                    Webhook de pagos (configurarlo en el panel MP de la app):{" "}
+                    <code className="text-[10px] bg-white px-1 rounded break-all">
+                      {typeof window !== "undefined"
+                        ? `${window.location.origin}/api/webhooks/mercadopago`
+                        : "/api/webhooks/mercadopago"}
+                    </code>
+                  </p>
+                  {mpOAuthRedirectUri && (
+                    <p className="text-[10px] text-slate-400 break-all">
+                      Redirect OAuth activo: {mpOAuthRedirectUri}
                     </p>
-                  </div>
-                </>
+                  )}
+                </div>
               )}
             </div>
 
@@ -610,6 +907,20 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
               />
             </div>
             <div>
+              <Label className="text-xs">Titular de la cuenta (como figura en el banco)</Label>
+              <Input
+                value={payment.beneficiaryName ?? ""}
+                onChange={(e) =>
+                  setPayment((p) => ({ ...p, beneficiaryName: e.target.value }))
+                }
+                placeholder="Ej: Mendia Juan Esteban"
+                className="mt-1 h-9"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">
+                La IA compara este nombre con el destinatario del comprobante.
+              </p>
+            </div>
+            <div>
               <Label className="text-xs">Instrucciones de pago</Label>
               <Textarea
                 value={payment.paymentInstructions ?? ""}
@@ -652,6 +963,32 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
                 />
               )}
             </div>
+
+            <div className="pt-2 border-t border-slate-100">
+              <p className="text-xs font-medium text-slate-700 mb-2">
+                Comprobantes leídos por IA
+              </p>
+              <DoctorPaymentsLedger doctorId={doctorId} />
+            </div>
+
+            <Button
+              onClick={handleSavePayment}
+              disabled={saving}
+              className="w-full bg-emerald-700 hover:bg-emerald-800"
+              size="sm"
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-1" />
+                  Guardar honorarios y alias
+                </>
+              )}
+            </Button>
+            <p className="text-[10px] text-slate-500 text-center">
+              El paciente verá estos datos al pedir turno.
+            </p>
           </TabsContent>
 
           <TabsContent value="avisos" className="p-4 space-y-4 mt-0">
@@ -808,16 +1145,27 @@ export function DoctorOfficePanel({ doctorId, fullPage = false }: DoctorOfficePa
             </p>
             <ThemeSettingsPanel
               settings={themeSettings}
-              onChange={(patch) =>
-                setThemeSettings((prev) => mergeThemeSettings({ ...prev, ...patch }))
-              }
-              onReset={() => setThemeSettings(DEFAULT_THEME_SETTINGS)}
+              onChange={(patch) => {
+                const next = mergeThemeSettings({ ...themeSettings, ...patch });
+                setThemeSettings(next);
+                hydrateSettings(next);
+              }}
+              onReset={() => {
+                setThemeSettings(DEFAULT_THEME_SETTINGS);
+                hydrateSettings(DEFAULT_THEME_SETTINGS);
+              }}
               compact
             />
           </TabsContent>
         </Tabs>
 
-        <div className="p-4 border-t">
+        <div
+          className={cn(
+            "border-t p-4",
+            fullPage &&
+              "pb-[max(1rem,env(safe-area-inset-bottom,0px))]",
+          )}
+        >
           <Button
             onClick={handleSave}
             disabled={saving}

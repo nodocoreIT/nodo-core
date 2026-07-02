@@ -39,6 +39,9 @@ export async function attachDocumentToAppointment(
     filePath: absPath,
     mimeType,
     uploadedAt: new Date().toISOString(),
+    ...(process.env.VERCEL === "1"
+      ? { inlineDataBase64: buffer.toString("base64") }
+      : {}),
   };
 
   await writeDb((d) => {

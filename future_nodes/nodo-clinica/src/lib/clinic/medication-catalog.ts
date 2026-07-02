@@ -4,11 +4,14 @@ export interface MedicationCatalogEntry {
   id: string;
   name: string;
   activeIngredient: string;
-  presentations?: string[];
+  presentations: string[];
   defaultDosage: string;
   defaultFrequency: string;
   defaultDuration: string;
   category: string;
+  laboratorio?: string;
+  precio?: number;
+  tipoVenta?: string;
 }
 
 export const MEDICATION_CATALOG: MedicationCatalogEntry[] = [
@@ -134,6 +137,12 @@ export const MEDICATION_CATALOG: MedicationCatalogEntry[] = [
   },
 ];
 
+export type MedicationSearchResponse = {
+  results: MedicationCatalogEntry[];
+  source: string;
+  hint?: string;
+};
+
 export function searchMedications(query: string, limit = 12): MedicationCatalogEntry[] {
   const q = query.trim().toLowerCase();
   if (!q || q.length < 2) return [];
@@ -165,4 +174,41 @@ export function formatPrescriptionRecordContent(
       return lines.join("\n");
     })
     .join("\n\n");
+}
+
+export function parsePrescriptionRecordContent(content: string): Array<{
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions?: string;
+}> {
+  const blocks = content.split(/\n\n+/).filter(Boolean);
+  const meds: Array<{
+    name: string;
+    dosage: string;
+    frequency: string;
+    duration: string;
+    instructions?: string;
+  }> = [];
+
+  for (const block of blocks) {
+    const lines = block.split("\n").map((l) => l.trim());
+    const title = lines[0]?.replace(/^\d+\.\s*/, "") ?? "";
+    if (!title) continue;
+    const doseLine = lines.find((l) => l.startsWith("Dosis:")) ?? "";
+    const doseMatch = doseLine.match(
+      /Dosis:\s*(.+?)\s*\|\s*Frecuencia:\s*(.+?)\s*\|\s*Duración:\s*(.+)$/i,
+    );
+    const instrLine = lines.find((l) => l.startsWith("Indicaciones:"));
+    meds.push({
+      name: title,
+      dosage: doseMatch?.[1]?.trim() ?? "",
+      frequency: doseMatch?.[2]?.trim() ?? "",
+      duration: doseMatch?.[3]?.trim() ?? "",
+      instructions: instrLine?.replace(/^Indicaciones:\s*/i, "").trim(),
+    });
+  }
+
+  return meds;
 }

@@ -1,4 +1,5 @@
 import { isLocalMode } from "@/lib/clinic/config";
+import { localDateKeyFromIso, parseLocalDate } from "@/lib/clinic/schedule";
 
 /** Producción: OCR obligatorio; local: permisivo salvo override. */
 export function isStrictPaymentValidation(): boolean {
@@ -60,17 +61,22 @@ export function recipientMatches(
     doctorName: string;
     doctorAlias?: string;
     doctorCbu?: string;
+    beneficiaryName?: string;
   },
   recipient: string | null | undefined,
+  extraText?: string | null,
 ): boolean {
-  const target = normalizeMatchText(recipient ?? "");
+  const combined = [recipient, extraText].filter(Boolean).join(" ");
+  const target = normalizeMatchText(combined);
   if (!target || target.length < 4) return false;
 
   const candidates = [
+    hints.beneficiaryName,
     hints.doctorAlias,
     hints.doctorCbu,
     hints.doctorName,
     ...hints.doctorName.split(/\s+/).filter((p) => p.length >= 4),
+    ...(hints.beneficiaryName?.split(/\s+/).filter((p) => p.length >= 4) ?? []),
   ]
     .filter(Boolean)
     .map((s) => normalizeMatchText(String(s)));
@@ -83,19 +89,47 @@ export function recipientMatches(
   });
 }
 
+const ES_MONTHS: Record<string, number> = {
+  enero: 1,
+  febrero: 2,
+  marzo: 3,
+  abril: 4,
+  mayo: 5,
+  junio: 6,
+  julio: 7,
+  agosto: 8,
+  septiembre: 9,
+  setiembre: 9,
+  octubre: 10,
+  noviembre: 11,
+  diciembre: 12,
+};
+
 export function parseReceiptDate(
   dateStr: string | null | undefined,
 ): Date | null {
   if (!dateStr?.trim()) return null;
   const iso = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
   if (iso) {
-    const d = new Date(`${iso[1]}-${iso[2]}-${iso[3]}T12:00:00`);
+    const d = parseLocalDate(`${iso[1]}-${iso[2]}-${iso[3]}`);
     return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const es = dateStr.toLowerCase().match(/(\d{1,2})\s+de\s+([a-záéíóú]+)\s+(\d{4})/i);
+  if (es) {
+    const month = ES_MONTHS[es[2].normalize("NFD").replace(/\p{M}/gu, "")];
+    if (month) {
+      const d = parseLocalDate(
+        `${es[3]}-${String(month).padStart(2, "0")}-${es[1].padStart(2, "0")}`,
+      );
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
   }
   const ar = dateStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
   if (ar) {
     const year = ar[3].length === 2 ? `20${ar[3]}` : ar[3];
-    const d = new Date(`${year}-${ar[2].padStart(2, "0")}-${ar[1].padStart(2, "0")}T12:00:00`);
+    const d = parseLocalDate(
+      `${year}-${ar[2].padStart(2, "0")}-${ar[1].padStart(2, "0")}`,
+    );
     return Number.isNaN(d.getTime()) ? null : d;
   }
   const parsed = new Date(dateStr);
@@ -114,33 +148,28 @@ export function parseReceiptTime(
   return h * 60 + min;
 }
 
-/** Fecha/hora del pago compatible con el turno reservado. */
+/** Fecha del pago compatible con el turno (pago por adelantado, mismo día u hasta 30 días antes). */
 export function scheduleMatchesAppointmentSlot(
   appointmentIso: string,
   receiptDate: Date | null,
-  receiptTimeMinutes: number | null,
-  slotDurationMinutes = 30,
+  _receiptTimeMinutes: number | null = null,
+  _slotDurationMinutes = 30,
 ): boolean {
   if (!receiptDate) return false;
 
-  const apt = new Date(appointmentIso);
-  const aptDay = new Date(apt);
-  aptDay.setHours(0, 0, 0, 0);
-  const payDay = new Date(receiptDate);
-  payDay.setHours(0, 0, 0, 0);
+  const aptDayKey = localDateKeyFromIso(appointmentIso);
+  const payDayKey = [
+    receiptDate.getFullYear(),
+    String(receiptDate.getMonth() + 1).padStart(2, "0"),
+    String(receiptDate.getDate()).padStart(2, "0"),
+  ].join("-");
 
-  if (payDay.getTime() > aptDay.getTime()) return false;
+  if (payDayKey > aptDayKey) return false;
 
-  const earliest = new Date(aptDay);
-  earliest.setDate(earliest.getDate() - 30);
-  if (payDay < earliest) return false;
-
-  const sameDay = payDay.getTime() === aptDay.getTime();
-  if (sameDay && receiptTimeMinutes != null) {
-    const slotStart = apt.getHours() * 60 + apt.getMinutes();
-    const slotEnd = slotStart + slotDurationMinutes;
-    return receiptTimeMinutes >= 300 && receiptTimeMinutes <= slotEnd + 180;
-  }
+  const aptDay = parseLocalDate(aptDayKey);
+  const payDay = parseLocalDate(payDayKey);
+  const diffDays = (aptDay.getTime() - payDay.getTime()) / (24 * 60 * 60 * 1000);
+  if (diffDays > 30) return false;
 
   return true;
 }
@@ -162,6 +191,7 @@ export interface GeminiReceiptParse {
   date?: string | null;
   time?: string | null;
   recipient?: string | null;
+  cbu?: string | null;
   doctorMentioned?: boolean;
   amountMatches?: boolean;
   scheduleMatches?: boolean;
@@ -177,6 +207,7 @@ export function evaluatePaymentReceiptChecks(
     doctorName: string;
     doctorAlias?: string;
     doctorCbu?: string;
+    beneficiaryName?: string;
     expectedAmount: number;
     currency: string;
     appointmentDateIso: string;
@@ -186,7 +217,6 @@ export function evaluatePaymentReceiptChecks(
   parsed: GeminiReceiptParse,
 ): { checks: PaymentReceiptChecks; valid: boolean; confidence: number } {
   const strict = isStrictPaymentValidation();
-  const minConfidence = strict ? 85 : 70;
 
   const amountPass = amountWithinTolerance(input.expectedAmount, parsed.amount);
   const recipientPass =
@@ -195,8 +225,10 @@ export function evaluatePaymentReceiptChecks(
         doctorName: input.doctorName,
         doctorAlias: input.doctorAlias,
         doctorCbu: input.doctorCbu,
+        beneficiaryName: input.beneficiaryName,
       },
       parsed.recipient,
+      parsed.cbu,
     ) ||
     !!parsed.recipientMatches ||
     (!!parsed.doctorMentioned && strict === false);
@@ -238,8 +270,8 @@ export function evaluatePaymentReceiptChecks(
     schedule: {
       pass: schedulePass,
       detail: schedulePass
-        ? `Horario compatible con el turno (${slotLabel})`
-        : `El comprobante no coincide con el turno reservado (${slotLabel})`,
+        ? `Fecha del pago compatible con el turno (${slotLabel})`
+        : `La fecha del comprobante no coincide con el turno (${slotLabel}). El pago puede ser el mismo día o hasta 30 días antes.`,
     },
     receiptType: {
       pass: receiptTypePass,
@@ -254,8 +286,7 @@ export function evaluatePaymentReceiptChecks(
     checks.amount.pass &&
     checks.recipient.pass &&
     checks.schedule.pass &&
-    checks.receiptType.pass &&
-    confidence >= minConfidence;
+    checks.receiptType.pass;
 
   return { checks, valid, confidence };
 }

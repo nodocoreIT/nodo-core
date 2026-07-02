@@ -11,6 +11,8 @@ import {
 
 interface UseSpeechTranscriptionOptions {
   enabled: boolean;
+  /** Si false, no agrega segmentos al store global de la consulta (solo onSegment). */
+  syncToConsultationStore?: boolean;
   onSegment?: (segment: TranscriptionSegment) => void;
   /** Texto provisional mientras hablás (antes del resultado final). */
   onInterim?: (text: string) => void;
@@ -31,18 +33,21 @@ function stopRecognitionInstance(rec: SpeechRecognition | null) {
 
 export function useSpeechTranscription({
   enabled,
+  syncToConsultationStore = true,
   onSegment,
   onInterim,
   onError,
 }: UseSpeechTranscriptionOptions) {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const enabledRef = useRef(enabled);
+  const syncToStoreRef = useRef(syncToConsultationStore);
   const onSegmentRef = useRef(onSegment);
   const onInterimRef = useRef(onInterim);
   const onErrorRef = useRef(onError);
   const [isSupported] = useState(() => getSpeechRecognitionCtor() != null);
 
   enabledRef.current = enabled;
+  syncToStoreRef.current = syncToConsultationStore;
   onSegmentRef.current = onSegment;
   onInterimRef.current = onInterim;
   onErrorRef.current = onError;
@@ -52,26 +57,26 @@ export function useSpeechTranscription({
       stopRecognitionInstance(recognitionRef.current);
       recognitionRef.current = null;
       onInterimRef.current?.("");
-      const { isTranscribing, setIsTranscribing } =
-        useConsultationStore.getState();
-      if (isTranscribing) setIsTranscribing(false);
+      if (syncToStoreRef.current) {
+        const { isTranscribing, setIsTranscribing } =
+          useConsultationStore.getState();
+        if (isTranscribing) setIsTranscribing(false);
+      }
       return;
     }
 
     const SpeechRecognition = getSpeechRecognitionCtor();
     if (!SpeechRecognition) {
       onErrorRef.current?.(
-        "Dictado por voz no disponible. Usá Chrome o Edge en escritorio.",
+        "Dictado por voz no disponible. Usá Chrome o Edge (también en Android).",
       );
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const recognition = new SpeechRecognition() as any;
+    const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = SPEECH_LANG;
-    recognition.maxAlternatives = 1;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = "";
@@ -95,7 +100,9 @@ export function useSpeechTranscription({
           text: finalTranscript.trim(),
           timestamp: new Date().toISOString(),
         };
-        useConsultationStore.getState().appendTranscription(segment);
+        if (syncToStoreRef.current) {
+          useConsultationStore.getState().appendTranscription(segment);
+        }
         onSegmentRef.current?.(segment);
       }
     };
@@ -104,7 +111,9 @@ export function useSpeechTranscription({
       if (recognitionRef.current !== recognition) return;
       const message = speechErrorMessage(event.error);
       onErrorRef.current?.(message);
-      useConsultationStore.getState().setIsTranscribing(false);
+      if (syncToStoreRef.current) {
+        useConsultationStore.getState().setIsTranscribing(false);
+      }
       onInterimRef.current?.("");
     };
 
@@ -113,7 +122,9 @@ export function useSpeechTranscription({
       try {
         recognition.start();
       } catch {
-        useConsultationStore.getState().setIsTranscribing(false);
+        if (syncToStoreRef.current) {
+          useConsultationStore.getState().setIsTranscribing(false);
+        }
         onInterimRef.current?.("");
       }
     };
@@ -121,7 +132,9 @@ export function useSpeechTranscription({
     try {
       recognition.start();
       recognitionRef.current = recognition;
-      useConsultationStore.getState().setIsTranscribing(true);
+      if (syncToStoreRef.current) {
+        useConsultationStore.getState().setIsTranscribing(true);
+      }
     } catch {
       recognitionRef.current = null;
       onErrorRef.current?.("No se pudo iniciar el micrófono. Reintentá en unos segundos.");

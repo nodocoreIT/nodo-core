@@ -6,7 +6,6 @@ import { es } from "date-fns/locale";
 import { clinicApi } from "@/lib/clinic/client-api";
 import {
   DEFAULT_AVAILABILITY,
-  getNextAttendanceDateKey,
   getScheduleBlocksForDate,
   localDateKeyFromDate,
   localDateKeyFromIso,
@@ -39,8 +38,7 @@ export interface TodayTask {
 export function useMedicoHomeAgenda(doctorId: string) {
   const [loading, setLoading] = useState(true);
   const [todayAppts, setTodayAppts] = useState<AppointmentRow[]>([]);
-  const [nextDayAppts, setNextDayAppts] = useState<AppointmentRow[]>([]);
-  const [nextDayKey, setNextDayKey] = useState<string | null>(null);
+  const [upcomingAppts, setUpcomingAppts] = useState<AppointmentRow[]>([]);
   const [availability, setAvailability] =
     useState<DoctorAvailability>(DEFAULT_AVAILABILITY);
   const [googleCalendarId, setGoogleCalendarId] = useState("");
@@ -70,22 +68,23 @@ export function useMedicoHomeAgenda(doctorId: string) {
         })),
       );
 
-      const nextKey = getNextAttendanceDateKey(avail);
-      setNextDayKey(nextKey);
-
-      const rows = (upcoming as AppointmentRow[]).filter(
-        (a) =>
-          a.status !== "cancelled" &&
-          appointmentMatchesScheduleGrid(a.scheduledAt, avail),
-      );
+      const rows = (upcoming as AppointmentRow[])
+        .filter(
+          (a) =>
+            a.status !== "cancelled" &&
+            appointmentMatchesScheduleGrid(a.scheduledAt, avail),
+        )
+        .sort(
+          (a, b) =>
+            new Date(a.scheduledAt).getTime() -
+            new Date(b.scheduledAt).getTime(),
+        );
 
       setTodayAppts(
         rows.filter((a) => localDateKeyFromIso(a.scheduledAt) === todayKey),
       );
-      setNextDayAppts(
-        nextKey
-          ? rows.filter((a) => localDateKeyFromIso(a.scheduledAt) === nextKey)
-          : [],
+      setUpcomingAppts(
+        rows.filter((a) => localDateKeyFromIso(a.scheduledAt) > todayKey),
       );
     } finally {
       setLoading(false);
@@ -98,7 +97,7 @@ export function useMedicoHomeAgenda(doctorId: string) {
     return () => clearInterval(interval);
   }, [load]);
 
-  const todayBlocks = getScheduleBlocksForDate(availability, new Date());
+  const todayBlocks = getScheduleBlocksForDate(availability, todayKey);
   const calendarSrc = googleCalendarId
     ? parseGoogleCalendarSrc(googleCalendarId)
     : null;
@@ -129,26 +128,42 @@ export function useMedicoHomeAgenda(doctorId: string) {
         id: `block-${block.startTime}`,
         label: `Franja de atención ${block.startTime} — ${block.endTime}`,
         done: false,
-        sortKey: block.startTime,
+        sortKey: `0-${block.startTime}`,
       });
     }
 
-    const sortedAppts = [...todayAppts].sort(
+    const sortedToday = [...todayAppts].sort(
       (a, b) =>
         new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime(),
     );
 
-    for (const apt of sortedAppts) {
+    for (const apt of sortedToday) {
       const lifecycle = mapAppointmentStatusToLifecycle(
         apt.status as "scheduled",
       );
       const time = format(new Date(apt.scheduledAt), "HH:mm");
       items.push({
         id: apt.id,
-        label: `Consulta — ${apt.patient?.fullName ?? "Paciente"}`,
+        label: `Consulta hoy — ${apt.patient?.fullName ?? "Paciente"}`,
         time,
         done: lifecycle === "finalizada",
-        sortKey: time,
+        sortKey: `1-${time}`,
+      });
+    }
+
+    for (const apt of upcomingAppts) {
+      const lifecycle = mapAppointmentStatusToLifecycle(
+        apt.status as "scheduled",
+      );
+      const when = new Date(apt.scheduledAt);
+      const dateLabel = format(when, "EEE d MMM", { locale: es });
+      const time = format(when, "HH:mm");
+      items.push({
+        id: `up-${apt.id}`,
+        label: `Turno ${dateLabel} — ${apt.patient?.fullName ?? "Paciente"}`,
+        time,
+        done: lifecycle === "finalizada",
+        sortKey: `2-${apt.scheduledAt}`,
       });
     }
 
@@ -157,20 +172,19 @@ export function useMedicoHomeAgenda(doctorId: string) {
         id: task.id,
         label: task.title,
         done: task.done,
-        sortKey: "99:99",
+        sortKey: "9-manual",
       });
     }
 
     items.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 
     return items.map(({ sortKey: _sortKey, ...task }) => task);
-  }, [todayAppts, todayBlocks, manualTasks]);
+  }, [todayAppts, upcomingAppts, todayBlocks, manualTasks]);
 
   return {
     loading,
     todayAppts,
-    nextDayAppts,
-    nextDayKey,
+    upcomingAppts,
     todayBlocks,
     calendarSrc,
     stats,

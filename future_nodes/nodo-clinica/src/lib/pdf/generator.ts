@@ -3,6 +3,40 @@ import type { Medication, Profile } from "@/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
+function signatureImageFormat(dataUrl: string): "PNG" | "JPEG" | "WEBP" {
+  if (
+    dataUrl.startsWith("data:image/jpeg") ||
+    dataUrl.startsWith("data:image/jpg")
+  ) {
+    return "JPEG";
+  }
+  if (dataUrl.startsWith("data:image/webp")) return "WEBP";
+  return "PNG";
+}
+
+function addSignatureImage(
+  doc: jsPDF,
+  signatureImageData: string | undefined,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  if (!signatureImageData?.startsWith("data:image")) return;
+  try {
+    doc.addImage(
+      signatureImageData,
+      signatureImageFormat(signatureImageData),
+      x,
+      y,
+      width,
+      height,
+    );
+  } catch {
+    /* ignore invalid image */
+  }
+}
+
 interface PrescriptionPdfOptions {
   doctor: Pick<Profile, "full_name" | "specialty" | "license_number">;
   patientName: string;
@@ -73,15 +107,9 @@ export function generatePrescriptionPdf(options: PrescriptionPdfOptions): jsPDF 
 
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
-  doc.text("Firma digital del profesional:", 20, 248);
+  doc.text("Firma en documentos del profesional:", 20, 248);
 
-  if (signatureImageData?.startsWith("data:image")) {
-    try {
-      doc.addImage(signatureImageData, "PNG", 20, 250, 40, 18);
-    } catch {
-      /* ignore invalid image */
-    }
-  }
+  addSignatureImage(doc, signatureImageData, 20, 250, 40, 18);
 
   doc.setFontSize(11);
   doc.setTextColor(30, 64, 110);
@@ -108,11 +136,20 @@ interface StudyOrderPdfOptions {
   patientName: string;
   studies: string[];
   notes?: string;
+  signatureText?: string;
+  signatureImageData?: string;
 }
 
 export function generateStudyOrderPdf(options: StudyOrderPdfOptions): jsPDF {
   const doc = new jsPDF();
-  const { doctor, patientName, studies, notes } = options;
+  const {
+    doctor,
+    patientName,
+    studies,
+    notes,
+    signatureText,
+    signatureImageData,
+  } = options;
 
   doc.setFillColor(240, 247, 255);
   doc.rect(0, 0, 210, 40, "F");
@@ -169,10 +206,17 @@ export function generateStudyOrderPdf(options: StudyOrderPdfOptions): jsPDF {
   doc.line(20, 240, 190, 240);
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
-  doc.text("Firma del profesional solicitante:", 20, 252);
+  doc.text("Firma en documentos del profesional:", 20, 248);
+
+  addSignatureImage(doc, signatureImageData, 20, 250, 40, 18);
+
   doc.setFontSize(11);
   doc.setTextColor(30, 64, 110);
-  doc.text(`Dr/a. ${doctor.full_name}`, 20, 260);
+  const sigY = signatureImageData ? 272 : 256;
+  doc.text(signatureText || `Dr/a. ${doctor.full_name}`, 20, sigY);
+  if (doctor.license_number) {
+    doc.text(`Mat. ${doctor.license_number}`, 20, sigY + 7);
+  }
 
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
@@ -281,15 +325,9 @@ export function generateClinicalReportPdf(
   doc.line(20, 240, 190, 240);
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
-  doc.text("Firma digital del profesional:", 20, 248);
+  doc.text("Firma en documentos del profesional:", 20, 248);
 
-  if (signatureImageData?.startsWith("data:image")) {
-    try {
-      doc.addImage(signatureImageData, "PNG", 20, 250, 40, 18);
-    } catch {
-      /* ignore */
-    }
-  }
+  addSignatureImage(doc, signatureImageData, 20, 250, 40, 18);
 
   doc.setFontSize(11);
   doc.setTextColor(30, 64, 110);
