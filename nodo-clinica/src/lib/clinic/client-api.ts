@@ -1,7 +1,8 @@
-import type { ClinicSession } from "@/lib/clinic/session";
-import type { AppointmentStatus } from "@/lib/clinic/local-db";
+import type { ClinicSession } from "@/lib/clinic/types";
+import type { AppointmentStatus } from "@/lib/clinic/types";
 import type { MedicationSearchResponse } from "@/lib/clinic/medication-catalog";
 
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const SESSION_KEY = "clinica_local_session";
 
 export function saveClientSession(session: ClinicSession) {
@@ -35,7 +36,7 @@ function parseJsonResponse(res: Response) {
   const contentType = res.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
     throw new Error(
-      `El servidor no respondió JSON (HTTP ${res.status}). Reiniciá pnpm dev en nodo-clinica.`,
+      `El servidor no respondió JSON (HTTP ${res.status}). Reiniciá npm run dev en future_nodes/nodo-clinica.`,
     );
   }
   return res.json();
@@ -43,14 +44,14 @@ function parseJsonResponse(res: Response) {
 
 export const clinicApi = {
   async getSession() {
-    const res = await fetch("/api/clinic/account/session", {
+    const res = await fetch(`${BASE}/api/clinic/account/session`, {
       credentials: "include",
     });
     return parseJsonResponse(res);
   },
 
   async login(email: string, password: string, role: "doctor" | "patient") {
-    const res = await fetch("/api/clinic/account/login", {
+    const res = await fetch(`${BASE}/api/clinic/account/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -72,7 +73,7 @@ export const clinicApi = {
   },
 
   async register(payload: Record<string, unknown>) {
-    const res = await fetch("/api/clinic/account/register", {
+    const res = await fetch(`${BASE}/api/clinic/account/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -86,42 +87,14 @@ export const clinicApi = {
 
   async logout() {
     clearClientSession();
-    if (
-      typeof window !== "undefined" &&
-      process.env.NEXT_PUBLIC_CLINIC_MODE !== "local" &&
-      process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("your-project")
-    ) {
-      try {
-        const { getSupabaseBrowserClient } = await import("@/lib/supabase/browser");
-        await getSupabaseBrowserClient().auth.signOut();
-      } catch {
-        /* ignore */
-      }
-    }
-    await fetch("/api/clinic/account/session", {
+    await fetch(`${BASE}/api/clinic/account/session`, {
       method: "POST",
       credentials: "include",
     });
-  },
-
-  async syncPlatformSession() {
-    const res = await fetch("/api/clinic/account/platform-sync", {
-      method: "POST",
-      credentials: "include",
-    });
-    const data = await parseJsonResponse(res);
-    if (!res.ok) throw new Error(data.error || "Error al sincronizar sesión");
-    if (data.session) saveClientSession(data.session);
-    return data as {
-      user: { id: string; fullName: string; email: string; subscriptionPlan?: string };
-      session: ClinicSession;
-      platform?: { orgId?: string; plan?: string };
-    };
   },
 
   async getDoctors() {
-    const res = await fetch("/api/clinic/doctors", {
+    const res = await fetch(`${BASE}/api/clinic/doctors`, {
       credentials: "include",
       cache: "no-store",
     });
@@ -136,7 +109,7 @@ export const clinicApi = {
 
   async getDoctorForBooking(doctorId: string) {
     const res = await fetch(
-      `/api/clinic/doctors?doctorId=${encodeURIComponent(doctorId)}`,
+      `${BASE}/api/clinic/doctors?doctorId=${encodeURIComponent(doctorId)}`,
       { credentials: "include", cache: "no-store" },
     );
     const data = await res.json();
@@ -148,7 +121,7 @@ export const clinicApi = {
     return data as {
       id: string;
       fullName: string;
-      payment?: import("@/lib/clinic/local-db").DoctorPaymentSettings & {
+      payment?: import("@/lib/clinic/types").DoctorPaymentSettings & {
         requirePaymentBeforeBooking?: boolean;
         mercadopagoEnabled?: boolean;
       };
@@ -181,7 +154,7 @@ export const clinicApi = {
       intakeReason,
       studyFiles,
     } = payload;
-    const res = await fetch("/api/clinic/appointments", {
+    const res = await fetch(`${BASE}/api/clinic/appointments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -224,7 +197,7 @@ export const clinicApi = {
     const q = new URLSearchParams();
     if (params.accessToken) q.set("accessToken", params.accessToken);
     if (params.appointmentId) q.set("appointmentId", params.appointmentId);
-    const res = await fetch(`/api/clinic/mercadopago?${q}`, {
+    const res = await fetch(`${BASE}/api/clinic/mercadopago?${q}`, {
       credentials: "include",
     });
     const data = await res.json();
@@ -237,7 +210,7 @@ export const clinicApi = {
   },
 
   async syncMercadoPagoPayment(accessToken: string, paymentId?: string) {
-    const res = await fetch("/api/clinic/mercadopago/sync", {
+    const res = await fetch(`${BASE}/api/clinic/mercadopago/sync`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -249,7 +222,7 @@ export const clinicApi = {
   },
 
   async disconnectMercadoPago() {
-    const res = await fetch("/api/clinic/mercadopago/oauth/disconnect", {
+    const res = await fetch(`${BASE}/api/clinic/mercadopago/oauth/disconnect`, {
       method: "POST",
       credentials: "include",
     });
@@ -258,39 +231,8 @@ export const clinicApi = {
     return data as { ok: boolean };
   },
 
-  async getMercadoPagoOAuthConfig() {
-    const res = await fetch("/api/clinic/mercadopago/oauth/config", {
-      cache: "no-store",
-    });
-    return res.json() as Promise<{
-      configured: boolean;
-      redirectUri?: string;
-      clientId?: string;
-      oauthTestToken?: boolean;
-      secretHint?: string;
-      error?: string;
-    }>;
-  },
-
-  async testMercadoPagoConnection() {
-    const res = await fetch("/api/clinic/mercadopago/test/connection", {
-      credentials: "include",
-      cache: "no-store",
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || "Error al probar Mercado Pago");
-    }
-    return data as {
-      ok: boolean;
-      tokenKind?: string;
-      message?: string;
-      userId?: number;
-    };
-  },
-
   async testMercadoPagoQr(amount?: number) {
-    const res = await fetch("/api/clinic/mercadopago/test/qr", {
+    const res = await fetch(`${BASE}/api/clinic/mercadopago/test/qr`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -307,7 +249,7 @@ export const clinicApi = {
   },
 
   async confirmAppointmentPayment(accessToken: string) {
-    const res = await fetch("/api/clinic/appointments", {
+    const res = await fetch(`${BASE}/api/clinic/appointments`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -319,7 +261,7 @@ export const clinicApi = {
   },
 
   async saveIntakeReason(accessToken: string, intakeReason: string) {
-    const res = await fetch("/api/clinic/appointments", {
+    const res = await fetch(`${BASE}/api/clinic/appointments`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -334,7 +276,7 @@ export const clinicApi = {
     appointmentId?: string;
     accessToken?: string;
   }) {
-    const res = await fetch("/api/clinic/reminders", {
+    const res = await fetch(`${BASE}/api/clinic/reminders`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -346,7 +288,7 @@ export const clinicApi = {
   },
 
   async sendTestReminderEmail() {
-    const res = await fetch("/api/clinic/reminders", {
+    const res = await fetch(`${BASE}/api/clinic/reminders`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -358,7 +300,7 @@ export const clinicApi = {
   },
 
   async cancelPendingAppointment(accessToken: string) {
-    const res = await fetch("/api/clinic/appointments", {
+    const res = await fetch(`${BASE}/api/clinic/appointments`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -371,7 +313,7 @@ export const clinicApi = {
 
   async getPatientAppointments(patientId: string) {
     const res = await fetch(
-      `/api/clinic/appointments?patientId=${patientId}`,
+      `${BASE}/api/clinic/appointments?patientId=${patientId}`,
       clinicFetchOpts()
     );
     return res.json();
@@ -382,7 +324,7 @@ export const clinicApi = {
     scope: "today" | "upcoming" | "active" = "today",
   ) {
     const res = await fetch(
-      `/api/clinic/appointments?doctorId=${doctorId}&scope=${scope}`,
+      `${BASE}/api/clinic/appointments?doctorId=${doctorId}&scope=${scope}`,
       clinicFetchOpts(),
     );
     const data = await res.json();
@@ -396,7 +338,7 @@ export const clinicApi = {
 
   async getPendingPaymentAppointments(doctorId: string) {
     const res = await fetch(
-      `/api/clinic/appointments?doctorId=${doctorId}&scope=pending_payment`,
+      `${BASE}/api/clinic/appointments?doctorId=${doctorId}&scope=pending_payment`,
       clinicFetchOpts(),
     );
     const data = await res.json();
@@ -404,7 +346,7 @@ export const clinicApi = {
     return data as Array<{
       id: string;
       scheduledAt: string;
-      paymentReceiptAudit?: import("@/lib/clinic/local-db").PaymentReceiptAudit;
+      paymentReceiptAudit?: import("@/lib/clinic/types").PaymentReceiptAudit;
       patient?: { fullName: string; email?: string };
       documentCount?: number;
       documents?: Array<{ id: string; fileName: string; downloadUrl: string }>;
@@ -412,7 +354,7 @@ export const clinicApi = {
   },
 
   async doctorConfirmPayment(appointmentId: string) {
-    const res = await fetch("/api/clinic/appointments", {
+    const res = await fetch(`${BASE}/api/clinic/appointments`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -424,7 +366,7 @@ export const clinicApi = {
   },
 
   async doctorRejectPayment(appointmentId: string) {
-    const res = await fetch("/api/clinic/appointments", {
+    const res = await fetch(`${BASE}/api/clinic/appointments`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -437,7 +379,7 @@ export const clinicApi = {
 
   async getAppointmentByToken(token: string) {
     const res = await fetch(
-      `/api/clinic/appointments?token=${token}`,
+      `${BASE}/api/clinic/appointments?token=${token}`,
       clinicFetchOpts()
     );
     const data = await res.json();
@@ -450,7 +392,7 @@ export const clinicApi = {
     status: AppointmentStatus,
     extras?: { transcription?: string; clinicalNotes?: string },
   ) {
-    const res = await fetch("/api/clinic/appointments", {
+    const res = await fetch(`${BASE}/api/clinic/appointments`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -467,7 +409,7 @@ export const clinicApi = {
   },
 
   async clearStuckConsultations(doctorId: string) {
-    const res = await fetch("/api/clinic/appointments", {
+    const res = await fetch(`${BASE}/api/clinic/appointments`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -480,7 +422,7 @@ export const clinicApi = {
 
   async getClinicalRecords(patientId: string) {
     const res = await fetch(
-      `/api/clinic/clinical-records?patientId=${patientId}`,
+      `${BASE}/api/clinic/clinical-records?patientId=${patientId}`,
       clinicFetchOpts()
     );
     return res.json();
@@ -491,7 +433,7 @@ export const clinicApi = {
     doctorId: string,
     content: string
   ) {
-    await fetch("/api/clinic/notes", {
+    await fetch(`${BASE}/api/clinic/notes`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -501,7 +443,7 @@ export const clinicApi = {
 
   async getNotes(appointmentId: string) {
     const res = await fetch(
-      `/api/clinic/notes?appointmentId=${appointmentId}`,
+      `${BASE}/api/clinic/notes?appointmentId=${appointmentId}`,
       clinicFetchOpts()
     );
     return res.json();
@@ -509,7 +451,7 @@ export const clinicApi = {
 
   async getAvailableDates(doctorId: string) {
     const res = await fetch(
-      `/api/clinic/schedule?doctorId=${doctorId}`,
+      `${BASE}/api/clinic/schedule?doctorId=${doctorId}`,
       clinicFetchOpts()
     );
     return res.json();
@@ -517,14 +459,14 @@ export const clinicApi = {
 
   async getSlots(doctorId: string, date: string) {
     const res = await fetch(
-      `/api/clinic/schedule?doctorId=${doctorId}&date=${date}`,
+      `${BASE}/api/clinic/schedule?doctorId=${doctorId}&date=${date}`,
       clinicFetchOpts()
     );
     return res.json();
   },
 
   async getDoctorSchedule(doctorId: string) {
-    const res = await fetch(`/api/clinic/schedule?own=true`, clinicFetchOpts());
+    const res = await fetch(`${BASE}/api/clinic/schedule?own=true`, clinicFetchOpts());
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.error || "Error al cargar agenda");
@@ -539,13 +481,12 @@ export const clinicApi = {
     signatureImageData?: string;
     profilePhotoData?: string;
     bio?: string;
-    payment?: import("@/lib/clinic/local-db").DoctorPaymentSettings;
-    reminderSettings?: import("@/lib/clinic/local-db").DoctorReminderSettings;
+    payment?: import("@/lib/clinic/types").DoctorPaymentSettings;
+    reminderSettings?: import("@/lib/clinic/types").DoctorReminderSettings;
     googleCalendarId?: string;
     themeSettings?: import("@/lib/clinic/theme-settings").DoctorThemeSettings;
-    consultorioLayout?: import("@/lib/clinic/consultorio-layout").ConsultorioLayoutSettings;
   }) {
-    const res = await fetch("/api/clinic/schedule", {
+    const res = await fetch(`${BASE}/api/clinic/schedule`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -564,7 +505,7 @@ export const clinicApi = {
   },
 
   async saveDoctorPayment(
-    payment: import("@/lib/clinic/local-db").DoctorPaymentSettings,
+    payment: import("@/lib/clinic/types").DoctorPaymentSettings,
   ) {
     return this.saveDoctorOffice({ payment });
   },
@@ -579,7 +520,7 @@ export const clinicApi = {
     const form = new FormData();
     form.append("file", file);
     form.append("accessToken", accessToken);
-    const res = await fetch("/api/clinic/documents", {
+    const res = await fetch(`${BASE}/api/clinic/documents`, {
       method: "POST",
       credentials: "include",
       body: form,
@@ -598,7 +539,7 @@ export const clinicApi = {
     if (params.patientId) q.set("patientId", params.patientId);
     if (params.appointmentId) q.set("appointmentId", params.appointmentId);
     if (params.token) q.set("token", params.token);
-    const res = await fetch(`/api/clinic/documents?${q}`, clinicFetchOpts());
+    const res = await fetch(`${BASE}/api/clinic/documents?${q}`, clinicFetchOpts());
     return res.json();
   },
 
@@ -606,7 +547,7 @@ export const clinicApi = {
     const params = new URLSearchParams({ patientId });
     if (doctorId) params.set("doctorId", doctorId);
     const res = await fetch(
-      `/api/clinic/patient-history?${params}`,
+      `${BASE}/api/clinic/patient-history?${params}`,
       clinicFetchOpts()
     );
     const data = await res.json();
@@ -625,7 +566,7 @@ export const clinicApi = {
     doctorSpecialty?: string;
     doctorLicense?: string;
   }) {
-    const res = await fetch("/api/clinic/clinical-report/generate", {
+    const res = await fetch(`${BASE}/api/clinic/clinical-report/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -633,12 +574,7 @@ export const clinicApi = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al generar informe");
-    return data as {
-      report: string;
-      localDraft?: boolean;
-      localDraftReason?: "no_api_key" | "quota_exceeded";
-      quotaFallback?: boolean;
-    };
+    return data as { report: string; quotaFallback?: boolean };
   },
 
   async saveClinicalRecord(payload: {
@@ -649,7 +585,7 @@ export const clinicApi = {
     content: string;
     recordType?: string;
   }) {
-    const res = await fetch("/api/clinic/clinical-records", {
+    const res = await fetch(`${BASE}/api/clinic/clinical-records`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -662,7 +598,7 @@ export const clinicApi = {
 
   async searchMedications(query: string): Promise<MedicationSearchResponse> {
     const res = await fetch(
-      `/api/clinic/medications/search?q=${encodeURIComponent(query)}`,
+      `${BASE}/api/clinic/medications/search?q=${encodeURIComponent(query)}`,
       clinicFetchOpts(),
     );
     const data = (await parseJsonResponse(res)) as MedicationSearchResponse;
@@ -682,7 +618,7 @@ export const clinicApi = {
     }>;
     pdfBase64?: string;
   }) {
-    const res = await fetch("/api/clinic/prescriptions", {
+    const res = await fetch(`${BASE}/api/clinic/prescriptions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -702,7 +638,7 @@ export const clinicApi = {
     pdfBase64?: string;
     newStudyLabels?: string[];
   }) {
-    const res = await fetch("/api/clinic/study-orders", {
+    const res = await fetch(`${BASE}/api/clinic/study-orders`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -716,15 +652,15 @@ export const clinicApi = {
   async searchPatients(doctorId: string, q = "") {
     const params = new URLSearchParams({ doctorId });
     if (q) params.set("q", q);
-    const res = await fetch(`/api/clinic/patients?${params}`, clinicFetchOpts());
+    const res = await fetch(`${BASE}/api/clinic/patients?${params}`, clinicFetchOpts());
     return res.json();
   },
 
   async updatePatientProfile(payload: {
     profilePhotoData?: string;
-    healthProfile?: import("@/lib/clinic/local-db").PatientHealthProfile;
+    healthProfile?: import("@/lib/clinic/types").PatientHealthProfile;
   }) {
-    const res = await fetch("/api/clinic/patients", {
+    const res = await fetch(`${BASE}/api/clinic/patients`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -740,7 +676,7 @@ export const clinicApi = {
     scheduledAt: string;
     receipt: { fileName: string; mimeType: string; dataBase64: string };
   }) {
-    const res = await fetch("/api/clinic/payment-receipt/preview", {
+    const res = await fetch(`${BASE}/api/clinic/payment-receipt/preview`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -758,7 +694,7 @@ export const clinicApi = {
         schedule: { pass: boolean; detail: string };
         receiptType: { pass: boolean; detail: string };
       };
-      audit?: import("@/lib/clinic/local-db").PaymentReceiptAudit;
+      audit?: import("@/lib/clinic/types").PaymentReceiptAudit;
     };
   },
 
@@ -776,7 +712,7 @@ export const clinicApi = {
     if (params.accessToken) {
       qs.set("accessToken", params.accessToken);
     }
-    const res = await fetch(`/api/clinic/jitsi-token?${qs}`, clinicFetchOpts());
+    const res = await fetch(`${BASE}/api/clinic/jitsi-token?${qs}`, clinicFetchOpts());
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al obtener token de video");
     return data as { jwt: string; roomName: string; domain: string };
@@ -784,7 +720,7 @@ export const clinicApi = {
 
   async getCobrosReceived(doctorId: string) {
     const res = await fetch(
-      `/api/clinic/appointments?doctorId=${encodeURIComponent(doctorId)}&scope=cobros_received`,
+      `${BASE}/api/clinic/appointments?doctorId=${encodeURIComponent(doctorId)}&scope=cobros_received`,
       clinicFetchOpts(),
     );
     const data = await res.json();
@@ -815,7 +751,7 @@ export const clinicApi = {
 
   async getPaymentLedger(doctorId: string) {
     const res = await fetch(
-      `/api/clinic/appointments?doctorId=${encodeURIComponent(doctorId)}&scope=payment_ledger`,
+      `${BASE}/api/clinic/appointments?doctorId=${encodeURIComponent(doctorId)}&scope=payment_ledger`,
       clinicFetchOpts(),
     );
     const data = await res.json();
@@ -827,13 +763,13 @@ export const clinicApi = {
         patientName: string;
         paymentStatus?: string;
         paymentProvider?: string;
-        audit?: import("@/lib/clinic/local-db").PaymentReceiptAudit;
+        audit?: import("@/lib/clinic/types").PaymentReceiptAudit;
       }>;
     };
   },
 
   async validatePaymentReceipt(accessToken: string, documentId: string) {
-    const res = await fetch("/api/clinic/payment-receipt/validate", {
+    const res = await fetch(`${BASE}/api/clinic/payment-receipt/validate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -858,7 +794,7 @@ export const clinicApi = {
 
   async getInterconsultMessages(peerId: string | null = null) {
     const params = peerId ? `?peerId=${encodeURIComponent(peerId)}` : "";
-    const res = await fetch(`/api/clinic/interconsult/messages${params}`, clinicFetchOpts());
+    const res = await fetch(`${BASE}/api/clinic/interconsult/messages${params}`, clinicFetchOpts());
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al cargar mensajes");
     return data as {
@@ -874,7 +810,7 @@ export const clinicApi = {
   },
 
   async sendInterconsultMessage(content: string, toDoctorId: string | null = null) {
-    const res = await fetch("/api/clinic/interconsult/messages", {
+    const res = await fetch(`${BASE}/api/clinic/interconsult/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -886,7 +822,7 @@ export const clinicApi = {
   },
 
   async getInterconsultPresence() {
-    const res = await fetch("/api/clinic/interconsult/presence", clinicFetchOpts());
+    const res = await fetch(`${BASE}/api/clinic/interconsult/presence`, clinicFetchOpts());
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al cargar presencia");
     return data as {
@@ -901,7 +837,7 @@ export const clinicApi = {
   },
 
   async pingInterconsultPresence() {
-    await fetch("/api/clinic/interconsult/presence", {
+    await fetch(`${BASE}/api/clinic/interconsult/presence`, {
       method: "POST",
       credentials: "include",
     });
@@ -909,7 +845,7 @@ export const clinicApi = {
 
   async searchNodoChatDirectory(q = "") {
     const params = q ? `?q=${encodeURIComponent(q)}` : "";
-    const res = await fetch(`/api/clinic/interconsult/directory${params}`, clinicFetchOpts());
+    const res = await fetch(`${BASE}/api/clinic/interconsult/directory${params}`, clinicFetchOpts());
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al buscar contactos");
     return data as {
@@ -927,7 +863,7 @@ export const clinicApi = {
   },
 
   async getNodoChatUnread() {
-    const res = await fetch("/api/clinic/interconsult/unread", clinicFetchOpts());
+    const res = await fetch(`${BASE}/api/clinic/interconsult/unread`, clinicFetchOpts());
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al cargar notificaciones");
     return data as {
@@ -944,7 +880,7 @@ export const clinicApi = {
   },
 
   async markNodoChatRead() {
-    const res = await fetch("/api/clinic/interconsult/read", {
+    const res = await fetch(`${BASE}/api/clinic/interconsult/read`, {
       method: "POST",
       credentials: "include",
     });
@@ -955,7 +891,7 @@ export const clinicApi = {
 
   async getDoctorTasks(due?: string) {
     const params = due ? `?due=${encodeURIComponent(due)}` : "";
-    const res = await fetch(`/api/clinic/tasks${params}`, clinicFetchOpts());
+    const res = await fetch(`${BASE}/api/clinic/tasks${params}`, clinicFetchOpts());
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al cargar tareas");
     return data as {
@@ -974,7 +910,7 @@ export const clinicApi = {
     title: string;
     dueDate?: string;
   }) {
-    const res = await fetch("/api/clinic/tasks", {
+    const res = await fetch(`${BASE}/api/clinic/tasks`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -991,7 +927,7 @@ export const clinicApi = {
     dueDate?: string;
     done?: boolean;
   }) {
-    const res = await fetch("/api/clinic/tasks", {
+    const res = await fetch(`${BASE}/api/clinic/tasks`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -1004,7 +940,7 @@ export const clinicApi = {
 
   async getCobrosUnreadCount() {
     const res = await fetch(
-      "/api/clinic/notifications?scope=unread_count",
+      `${BASE}/api/clinic/notifications?scope=unread_count`,
       clinicFetchOpts(),
     );
     const data = await res.json();
@@ -1013,7 +949,7 @@ export const clinicApi = {
   },
 
   async markCobrosNotificationsRead() {
-    const res = await fetch("/api/clinic/notifications", {
+    const res = await fetch(`${BASE}/api/clinic/notifications`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",

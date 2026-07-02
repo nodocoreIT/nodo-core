@@ -1,6 +1,5 @@
 import { DEFAULT_THEME_SETTINGS } from "@/lib/clinic/theme-settings";
-import { DEFAULT_CONSULTORIO_LAYOUT } from "@/lib/clinic/consultorio-layout";
-import type { ClinicDatabase } from "@/lib/clinic/local-db";
+import type { ClinicDatabase } from "@/lib/clinic/types";
 import { DEFAULT_AVAILABILITY } from "@/lib/clinic/schedule";
 
 /** Incrementar para resetear clinic.json / Blob en deploy (cuentas demo limpias). */
@@ -34,7 +33,6 @@ export function buildClinicSeed(now = new Date()): ClinicDatabase {
         },
         reminderSettings: { enabled: false, minutesBefore: 1440 },
         themeSettings: DEFAULT_THEME_SETTINGS,
-        consultorioLayout: DEFAULT_CONSULTORIO_LAYOUT,
         createdAt: now.toISOString(),
       },
       {

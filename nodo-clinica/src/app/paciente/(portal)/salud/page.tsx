@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { PatientHealthProfileSection } from "@/components/patient/patient-health-profile-section";
-import type { PatientHealthProfile } from "@/lib/clinic/local-db";
+import type { PatientHealthProfile } from "@/lib/clinic/types";
 import { Loader2 } from "lucide-react";
 
 export default function PacienteSaludPage() {

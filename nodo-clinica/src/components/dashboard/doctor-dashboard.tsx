@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useCallback, useState, useRef } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Stethoscope, Pill, FlaskConical, Brain, LogOut, CheckCircle, Settings, LayoutGrid } from "lucide-react";
+import { Stethoscope, Pill, FlaskConical, Brain, LogOut, CheckCircle, Settings } from "lucide-react";
 import { PatientQueue } from "@/components/dashboard/patient-queue";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { JitsiMeet } from "@/components/consultation/jitsi-meet";
@@ -13,23 +13,13 @@ import { ImmediateActionPanel } from "@/components/consultation/immediate-action
 import { PrescriptionForm } from "@/components/medical/prescription-form";
 import { StudyRequestForm } from "@/components/medical/study-request-form";
 import { SoapSummaryPanel } from "@/components/medical/soap-summary-panel";
+import { DoctorOfficeSidebar } from "@/components/dashboard/doctor-office-sidebar";
 import { DoctorPendingPaymentsPanel } from "@/components/dashboard/doctor-pending-payments-panel";
-import { ConsultorioWorkspace } from "@/components/dashboard/consultorio-workspace";
-import { ConsultorioLayoutEditor } from "@/components/dashboard/consultorio-layout-editor";
-import {
-  ConsultorioCalendarWidget,
-  ConsultorioDaySummaryWidget,
-} from "@/components/dashboard/consultorio-widgets";
-import {
-  DEFAULT_CONSULTORIO_LAYOUT,
-  mergeConsultorioLayout,
-  type ConsultorioLayoutSettings,
-} from "@/lib/clinic/consultorio-layout";
 import { PatientPreviewPanel } from "@/components/dashboard/patient-preview-panel";
 import { PatientSearchHeader } from "@/components/dashboard/patient-search-header";
 import { MedicalReportPanel } from "@/components/medical/medical-report-panel";
 import { ClinicalAlertsBanner } from "@/components/medical/clinical-alerts-banner";
-import type { PatientHealthProfile } from "@/lib/clinic/local-db";
+import type { PatientHealthProfile } from "@/lib/clinic/types";
 import { useConsultationStore } from "@/store/consultation-store";
 import { createClient } from "@/lib/supabase/client";
 import { clinicApi } from "@/lib/clinic/client-api";
@@ -134,21 +124,13 @@ export function DoctorDashboard({
   const [activeHealthProfile, setActiveHealthProfile] =
     useState<PatientHealthProfile | null>(null);
   const [videoSessionKey, setVideoSessionKey] = useState(0);
-  const [consultorioLayout, setConsultorioLayout] =
-    useState<ConsultorioLayoutSettings>(DEFAULT_CONSULTORIO_LAYOUT);
-  const [layoutEditorOpen, setLayoutEditorOpen] = useState(false);
   const { queue } = useConsultationStore();
-  const queueRef = useRef(queue);
-  useEffect(() => { queueRef.current = queue; }, [queue]);
 
   useEffect(() => {
     if (dataSource !== "local") return;
     clinicApi.getDoctorSchedule(doctorId).then((data) => {
       if (data.profilePhotoData) setDoctorPhoto(data.profilePhotoData);
       if (data.googleCalendarId) setGoogleCalendarId(data.googleCalendarId);
-      if (data.consultorioLayout) {
-        setConsultorioLayout(mergeConsultorioLayout(data.consultorioLayout));
-      }
     });
   }, [doctorId, dataSource]);
 
@@ -548,7 +530,7 @@ export function DoctorDashboard({
       .subscribe();
 
     const documentsChannel = supabase
-      .channel(`doctor-documents-${doctorId}`)
+      .channel("doctor-documents")
       .on(
         "postgres_changes",
         {
@@ -558,10 +540,6 @@ export function DoctorDashboard({
         },
         async (payload) => {
           const doc = payload.new as { appointment_id: string; file_name: string };
-          const belongsToDoctor = queueRef.current.some(
-            (p) => p.appointmentId === doc.appointment_id
-          );
-          if (!belongsToDoctor) return;
           addNotification({
             type: "document_upload",
             title: "Nuevo estudio subido",
@@ -592,201 +570,6 @@ export function DoctorDashboard({
   const patientProfile = activeAppointment?.patient as
     | { profile?: { full_name: string; email: string } }
     | undefined;
-
-  const consultationCenter = (
-    <div className="space-y-4 min-h-[500px]">
-      {hasActiveSession() && activeAppointment ? (
-        <>
-          <ClinicalAlertsBanner
-            healthProfile={activeHealthProfile}
-            patientName={patientProfile?.profile?.full_name || "Paciente"}
-          />
-          <JitsiMeet
-            key={`${activeAppointment.jitsi_room_id}-${videoSessionKey}`}
-            roomName={activeAppointment.jitsi_room_id}
-            displayName={doctorName}
-            isModerator
-            showProviderBanner
-            enableConsultorioBackground
-            height={520}
-            onMeetingEnd={() => {
-              toast.message(
-                "Saliste de la videollamada. Reingresá o usá «Finalizar consulta» cuando termines.",
-              );
-            }}
-            endScreen={
-              <ConsultationEndScreen
-                role="doctor"
-                autoRedirectSeconds={0}
-                onRejoin={() => setVideoSessionKey((k) => k + 1)}
-                onReturn={handleDismissConsultation}
-                onGenerateReport={() =>
-                  openReportForPatient({
-                    appointmentId: activeAppointment.id,
-                    patientId: activeAppointment.patient_id,
-                    patientName:
-                      patientProfile?.profile?.full_name || "Paciente",
-                    patientEmail: patientProfile?.profile?.email,
-                  })
-                }
-              />
-            }
-          />
-
-          <Tabs
-            value={consultationToolsTab}
-            onValueChange={setConsultationToolsTab}
-            className="w-full"
-          >
-            <TabsList className="grid w-full grid-cols-4 bg-white border border-slate-200">
-              <TabsTrigger value="prescription" className="text-xs gap-1">
-                <Pill className="h-3.5 w-3.5" />
-                Receta
-              </TabsTrigger>
-              <TabsTrigger value="studies" className="text-xs gap-1">
-                <FlaskConical className="h-3.5 w-3.5" />
-                Estudios
-              </TabsTrigger>
-              <TabsTrigger value="soap" className="text-xs gap-1">
-                <Brain className="h-3.5 w-3.5" />
-                SOAP
-              </TabsTrigger>
-              <TabsTrigger value="report" className="text-xs gap-1">
-                <Stethoscope className="h-3.5 w-3.5" />
-                Informe
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="prescription">
-              <PrescriptionForm
-                appointmentId={activeAppointment.id}
-                doctorId={doctorId}
-                patientId={activeAppointment.patient_id}
-                patientName={
-                  patientProfile?.profile?.full_name || "Paciente"
-                }
-                doctorName={doctorName}
-                doctorSpecialty={doctorSpecialty}
-                doctorLicense={doctorLicense}
-                patientEmail={patientProfile?.profile?.email}
-                onSaved={() =>
-                  loadClinicalHistory(activeAppointment.patient_id)
-                }
-              />
-            </TabsContent>
-            <TabsContent value="studies">
-              <StudyRequestForm
-                appointmentId={activeAppointment.id}
-                doctorId={doctorId}
-                patientId={activeAppointment.patient_id}
-                patientName={
-                  patientProfile?.profile?.full_name || "Paciente"
-                }
-                doctorName={doctorName}
-                doctorSpecialty={doctorSpecialty}
-                doctorLicense={doctorLicense}
-                onSaved={() =>
-                  loadClinicalHistory(activeAppointment.patient_id)
-                }
-              />
-            </TabsContent>
-            <TabsContent value="soap">
-              <SoapSummaryPanel
-                appointmentId={activeAppointment.id}
-                doctorId={doctorId}
-                dataSource={dataSource}
-                onConsultationEnd={() =>
-                  finishConsultation(activeAppointment.id)
-                }
-              />
-            </TabsContent>
-            <TabsContent value="report">
-              <MedicalReportPanel
-                appointmentId={activeAppointment.id}
-                patientId={activeAppointment.patient_id}
-                patientName={
-                  patientProfile?.profile?.full_name || "Paciente"
-                }
-                patientEmail={patientProfile?.profile?.email}
-                doctorId={doctorId}
-                doctorName={doctorName}
-                doctorSpecialty={doctorSpecialty}
-                doctorLicense={doctorLicense}
-                onSaved={() => loadClinicalHistory(activeAppointment.patient_id)}
-              />
-            </TabsContent>
-          </Tabs>
-
-          <ImmediateActionPanel
-            appointmentId={activeAppointment.id}
-            doctorId={doctorId}
-            patientId={activeAppointment.patient_id}
-            patientName={patientProfile?.profile?.full_name || "Paciente"}
-            patientEmail={patientProfile?.profile?.email}
-            doctorName={doctorName}
-            doctorSpecialty={doctorSpecialty}
-            doctorLicense={doctorLicense}
-            dataSource={dataSource}
-            onReportSaved={() =>
-              loadClinicalHistory(activeAppointment.patient_id)
-            }
-          />
-        </>
-      ) : dataSource === "local" ? (
-        inlineReport ? (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 min-h-[500px]">
-            <MedicalReportPanel
-              appointmentId={inlineReport.appointmentId}
-              patientId={inlineReport.patientId}
-              patientName={inlineReport.patientName}
-              patientEmail={inlineReport.patientEmail}
-              patientPhone={inlineReport.patientPhone}
-              doctorId={doctorId}
-              doctorName={doctorName}
-              doctorSpecialty={doctorSpecialty}
-              doctorLicense={doctorLicense}
-              compact
-              postConsult={inlineReport.postConsult}
-              onClose={() => setInlineReport(null)}
-              onSaved={() => {
-                loadClinicalHistory(inlineReport.patientId);
-                setInlineReport(null);
-                setPreviewPatient((p) =>
-                  p?.patientId === inlineReport.patientId ? p : previewPatient
-                );
-              }}
-            />
-          </div>
-        ) : (
-          <PatientPreviewPanel
-            patient={previewPatient}
-            doctorId={doctorId}
-            onStartConsultation={(id) => {
-              if (id) startConsultation(id);
-            }}
-            onGenerateReport={(patient) =>
-              openReportForPatient({
-                appointmentId: patient.appointmentId || undefined,
-                patientId: patient.patientId,
-                patientName: patient.patientName,
-                patientEmail: patient.patientEmail,
-                patientPhone: patient.patientPhone,
-              })
-            }
-          />
-        )
-      ) : (
-        <div className="flex flex-col items-center justify-center h-[500px] bg-white rounded-xl border border-slate-200 border-dashed">
-          <Stethoscope className="h-12 w-12 text-slate-200 mb-4" />
-          <p className="text-slate-500 font-medium">
-            Seleccione un paciente para iniciar la consulta
-          </p>
-          <p className="text-sm text-slate-400 mt-1">
-            El video y las herramientas se cargarán automáticamente
-          </p>
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <div className={embedded ? "bg-paper" : "min-h-screen bg-slate-50"}>
@@ -839,7 +622,7 @@ export function DoctorDashboard({
                 onViewPatient={handleSelectSearchedPatient}
               />
             )}
-            {dataSource !== "local" && <NotificationBell />}
+            <NotificationBell />
             {dataSource === "local" && (
               <Button variant="ghost" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
@@ -857,14 +640,13 @@ export function DoctorDashboard({
                     Dr/a. {doctorName}
                   </p>
                   {dataSource === "local" && (
-                    <button
-                      type="button"
+                    <Link
+                      href="/medico/configuracion"
                       title="Configuración del consultorio"
-                      onClick={() => window.dispatchEvent(new CustomEvent("nodo:open-settings", { detail: { section: "agenda" } }))}
                       className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                     >
                       <Settings className="h-4 w-4" />
-                    </button>
+                    </Link>
                   )}
                 </div>
                 {doctorSpecialty && (
@@ -872,14 +654,13 @@ export function DoctorDashboard({
                 )}
               </div>
               {dataSource === "local" && (
-                <button
-                  type="button"
+                <Link
+                  href="/medico/configuracion"
                   title="Configuración del consultorio"
-                  onClick={() => window.dispatchEvent(new CustomEvent("nodo:open-settings", { detail: { section: "agenda" } }))}
                   className="sm:hidden inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100"
                 >
                   <Settings className="h-4 w-4" />
-                </button>
+                </Link>
               )}
             </div>
           </div>
@@ -933,71 +714,21 @@ export function DoctorDashboard({
                 onViewPatient={handleSelectSearchedPatient}
               />
             )}
-            {dataSource === "local" && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-brand/30 text-brand hover:bg-brand/5"
-                onClick={() => setLayoutEditorOpen(true)}
-              >
-                <LayoutGrid className="h-4 w-4 mr-1" />
-                Personalizar
-              </Button>
-            )}
-            {dataSource !== "local" && <NotificationBell />}
+            <NotificationBell />
           </div>
         </div>
       )}
 
-      {dataSource === "local" ? (
-        <div className={embedded ? "" : "p-4 max-w-[1600px] mx-auto"}>
-          <ConsultorioWorkspace
-            layout={consultorioLayout}
-            welcomeName={doctorName}
-            widgets={{
-              pending_payments: (
-                <DoctorPendingPaymentsPanel
-                  doctorId={doctorId}
-                  onConfirmed={() => loadQueue()}
-                />
-              ),
-              patient_queue: (
-                <PatientQueue
-                  onStartConsultation={startConsultation}
-                  onFinishConsultation={finishConsultation}
-                  onResetConsultation={resetConsultation}
-                  onClearStuck={clearStuckConsultations}
-                  onPreviewPatient={selectPreviewPatient}
-                  selectedPreviewId={previewPatient?.appointmentId}
-                  viewMode={consultorioLayout.queueViewMode}
-                  doctorId={doctorId}
-                  onGenerateReport={(patient) =>
-                    openReportForPatient({
-                      appointmentId: patient.appointmentId,
-                      patientId: patient.patientId,
-                      patientName: patient.patientName,
-                    })
-                  }
-                />
-              ),
-              consultation_center: consultationCenter,
-              day_summary: <ConsultorioDaySummaryWidget queue={queue} />,
-              personal_calendar: (
-                <ConsultorioCalendarWidget
-                  googleCalendarId={googleCalendarId}
-                />
-              ),
-            }}
-          />
-          <ConsultorioLayoutEditor
-            open={layoutEditorOpen}
-            onOpenChange={setLayoutEditorOpen}
-            layout={consultorioLayout}
-            onLayoutChange={setConsultorioLayout}
-          />
-        </div>
-      ) : (
       <div className={`grid grid-cols-12 gap-4 ${embedded ? "" : "p-4 max-w-[1600px] mx-auto"}`}>
+        {dataSource === "local" && (
+          <div className="col-span-12">
+            <DoctorPendingPaymentsPanel
+              doctorId={doctorId}
+              onConfirmed={() => loadQueue()}
+            />
+          </div>
+        )}
+        {/* Cola de pacientes */}
         <div className="col-span-12 lg:col-span-3 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px]">
           <PatientQueue
             onStartConsultation={startConsultation}
@@ -1006,15 +737,220 @@ export function DoctorDashboard({
             onClearStuck={clearStuckConsultations}
             onPreviewPatient={selectPreviewPatient}
             selectedPreviewId={previewPatient?.appointmentId}
+            onGenerateReport={
+              dataSource === "local"
+                ? (patient) =>
+                    openReportForPatient({
+                      appointmentId: patient.appointmentId,
+                      patientId: patient.patientId,
+                      patientName: patient.patientName,
+                    })
+                : undefined
+            }
           />
         </div>
 
-        <div className="col-span-12 lg:col-span-6">
-          {consultationCenter}
+        {/* Centro: ficha del paciente / video consulta */}
+        <div className="col-span-12 lg:col-span-6 space-y-4 min-h-[500px]">
+          {hasActiveSession() && activeAppointment ? (
+            <>
+              <ClinicalAlertsBanner
+                healthProfile={activeHealthProfile}
+                patientName={patientProfile?.profile?.full_name || "Paciente"}
+              />
+              <JitsiMeet
+                key={`${activeAppointment.jitsi_room_id}-${videoSessionKey}`}
+                roomName={activeAppointment.jitsi_room_id}
+                displayName={doctorName}
+                isModerator
+                enableConsultorioBackground
+                height={520}
+                onMeetingEnd={() => {
+                  toast.message(
+                    "Saliste de la videollamada. Reingresá o usá «Finalizar consulta» cuando termines.",
+                  );
+                }}
+                endScreen={
+                  <ConsultationEndScreen
+                    role="doctor"
+                    autoRedirectSeconds={0}
+                    onRejoin={() => setVideoSessionKey((k) => k + 1)}
+                    onReturn={handleDismissConsultation}
+                    onGenerateReport={() =>
+                      openReportForPatient({
+                        appointmentId: activeAppointment.id,
+                        patientId: activeAppointment.patient_id,
+                        patientName:
+                          patientProfile?.profile?.full_name || "Paciente",
+                        patientEmail: patientProfile?.profile?.email,
+                      })
+                    }
+                  />
+                }
+              />
+
+              <Tabs
+                value={consultationToolsTab}
+                onValueChange={setConsultationToolsTab}
+                className="w-full"
+              >
+                <TabsList className="grid w-full grid-cols-4 bg-white border border-slate-200">
+                  <TabsTrigger value="prescription" className="text-xs gap-1">
+                    <Pill className="h-3.5 w-3.5" />
+                    Receta
+                  </TabsTrigger>
+                  <TabsTrigger value="studies" className="text-xs gap-1">
+                    <FlaskConical className="h-3.5 w-3.5" />
+                    Estudios
+                  </TabsTrigger>
+                  <TabsTrigger value="soap" className="text-xs gap-1">
+                    <Brain className="h-3.5 w-3.5" />
+                    SOAP
+                  </TabsTrigger>
+                  <TabsTrigger value="report" className="text-xs gap-1">
+                    <Stethoscope className="h-3.5 w-3.5" />
+                    Informe
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="prescription">
+                  <PrescriptionForm
+                    appointmentId={activeAppointment.id}
+                    doctorId={doctorId}
+                    patientId={activeAppointment.patient_id}
+                    patientName={
+                      patientProfile?.profile?.full_name || "Paciente"
+                    }
+                    doctorName={doctorName}
+                    doctorSpecialty={doctorSpecialty}
+                    doctorLicense={doctorLicense}
+                    patientEmail={patientProfile?.profile?.email}
+                    onSaved={() =>
+                      loadClinicalHistory(activeAppointment.patient_id)
+                    }
+                  />
+                </TabsContent>
+                <TabsContent value="studies">
+                  <StudyRequestForm
+                    appointmentId={activeAppointment.id}
+                    doctorId={doctorId}
+                    patientId={activeAppointment.patient_id}
+                    patientName={
+                      patientProfile?.profile?.full_name || "Paciente"
+                    }
+                    doctorName={doctorName}
+                    doctorSpecialty={doctorSpecialty}
+                    doctorLicense={doctorLicense}
+                    onSaved={() =>
+                      loadClinicalHistory(activeAppointment.patient_id)
+                    }
+                  />
+                </TabsContent>
+                <TabsContent value="soap">
+                  <SoapSummaryPanel
+                    appointmentId={activeAppointment.id}
+                    doctorId={doctorId}
+                    dataSource={dataSource}
+                    onConsultationEnd={() =>
+                      finishConsultation(activeAppointment.id)
+                    }
+                  />
+                </TabsContent>
+                <TabsContent value="report">
+                  <MedicalReportPanel
+                    appointmentId={activeAppointment.id}
+                    patientId={activeAppointment.patient_id}
+                    patientName={
+                      patientProfile?.profile?.full_name || "Paciente"
+                    }
+                    patientEmail={patientProfile?.profile?.email}
+                    doctorId={doctorId}
+                    doctorName={doctorName}
+                    doctorSpecialty={doctorSpecialty}
+                    doctorLicense={doctorLicense}
+                    onSaved={() => loadClinicalHistory(activeAppointment.patient_id)}
+                  />
+                </TabsContent>
+              </Tabs>
+
+              <ImmediateActionPanel
+                appointmentId={activeAppointment.id}
+                doctorId={doctorId}
+                patientId={activeAppointment.patient_id}
+                patientName={patientProfile?.profile?.full_name || "Paciente"}
+                patientEmail={patientProfile?.profile?.email}
+                doctorName={doctorName}
+                doctorSpecialty={doctorSpecialty}
+                doctorLicense={doctorLicense}
+                dataSource={dataSource}
+                onReportSaved={() =>
+                  loadClinicalHistory(activeAppointment.patient_id)
+                }
+              />
+            </>
+          ) : dataSource === "local" ? (
+            inlineReport ? (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 min-h-[500px]">
+                <MedicalReportPanel
+                  appointmentId={inlineReport.appointmentId}
+                  patientId={inlineReport.patientId}
+                  patientName={inlineReport.patientName}
+                  patientEmail={inlineReport.patientEmail}
+                  patientPhone={inlineReport.patientPhone}
+                  doctorId={doctorId}
+                  doctorName={doctorName}
+                  doctorSpecialty={doctorSpecialty}
+                  doctorLicense={doctorLicense}
+                  compact
+                  postConsult={inlineReport.postConsult}
+                  onClose={() => setInlineReport(null)}
+                  onSaved={() => {
+                    loadClinicalHistory(inlineReport.patientId);
+                    setInlineReport(null);
+                    setPreviewPatient((p) =>
+                      p?.patientId === inlineReport.patientId ? p : previewPatient
+                    );
+                  }}
+                />
+              </div>
+            ) : (
+              <PatientPreviewPanel
+                patient={previewPatient}
+                doctorId={doctorId}
+                onStartConsultation={(id) => {
+                  if (id) startConsultation(id);
+                }}
+                onGenerateReport={(patient) =>
+                  openReportForPatient({
+                    appointmentId: patient.appointmentId || undefined,
+                    patientId: patient.patientId,
+                    patientName: patient.patientName,
+                    patientEmail: patient.patientEmail,
+                    patientPhone: patient.patientPhone,
+                  })
+                }
+              />
+            )
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[500px] bg-white rounded-xl border border-slate-200 border-dashed">
+              <Stethoscope className="h-12 w-12 text-slate-200 mb-4" />
+              <p className="text-slate-500 font-medium">
+                Seleccione un paciente para iniciar la consulta
+              </p>
+              <p className="text-sm text-slate-400 mt-1">
+                El video y las herramientas se cargarán automáticamente
+              </p>
+            </div>
+          )}
         </div>
 
+        {/* Derecha: Mi consultorio + calendario */}
         <div className="col-span-12 lg:col-span-3 min-h-[500px]">
-          {hasActiveSession() && activeAppointment ? (
+          {dataSource === "local" ? (
+            <DoctorOfficeSidebar
+              queue={queue}
+              googleCalendarId={googleCalendarId}
+            />
+          ) : hasActiveSession() && activeAppointment ? (
             <ImmediateActionPanel
               appointmentId={activeAppointment.id}
               doctorId={doctorId}
@@ -1038,7 +974,6 @@ export function DoctorDashboard({
           )}
         </div>
       </div>
-      )}
     </div>
   );
 }

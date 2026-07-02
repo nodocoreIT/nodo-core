@@ -1,49 +1,38 @@
 import { NextResponse } from "next/server";
-import { readDb } from "@/lib/clinic/local-db";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-/** Diagnóstico de persistencia (sin exponer secretos). */
+/** Diagnóstico de conectividad Supabase (sin exponer secretos). */
 export async function GET() {
-  const hasToken = !!process.env.BLOB_READ_WRITE_TOKEN?.trim();
-  const hasStoreId = !!process.env.BLOB_STORE_ID?.trim();
-  const onVercel = !!process.env.VERCEL;
-
-  let blobMode: "token" | "oidc" | "missing" = "missing";
-  if (hasToken) blobMode = "token";
-  else if (hasStoreId && onVercel) blobMode = "oidc";
-
-  const configured = blobMode !== "missing";
-
   let dbReadOk = false;
-  let doctorCount = 0;
+  let professionalCount = 0;
   let dbError: string | undefined;
 
-  if (configured) {
-    try {
-      const db = await readDb();
+  try {
+    const supabase = await createClient();
+    const { count, error } = await supabase
+      .from("professionals")
+      .select("*", { count: "exact", head: true });
+
+    if (error) {
+      dbError = error.message;
+    } else {
       dbReadOk = true;
-      doctorCount = db.doctors.length;
-    } catch (err) {
-      dbError = err instanceof Error ? err.message : "readDb failed";
+      professionalCount = count ?? 0;
     }
+  } catch (err) {
+    dbError = err instanceof Error ? err.message : "Supabase client error";
   }
 
-  const ok = configured && dbReadOk;
+  const ok = dbReadOk;
 
   return NextResponse.json({
     ok,
-    blobMode,
-    vercel: onVercel,
+    backend: "supabase",
     dbReadOk,
-    doctorCount,
+    professionalCount,
     dbError,
-    hint: ok
-      ? "Blob y lectura OK."
-      : dbError?.includes("suspended")
-        ? "El Blob store está suspendido en Vercel → Storage → reactivar o crear uno nuevo y redeploy."
-        : dbError
-          ? "Blob conectado pero no se pudo leer clinic.json — redeploy tras el fix."
-          : "Conectá nodo-salud-blob al proyecto y redeploy.",
+    hint: ok ? "Supabase OK." : `Error: ${dbError}`,
   });
 }

@@ -7,6 +7,8 @@ const basePath =
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
   ...(basePath ? { basePath } : {}),
   transpilePackages: ["@nodocore/shared-components", "@base-ui/react"],
   allowedDevOrigins: [

@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { clinicApi } from "@/lib/clinic/client-api";
-import type { PaymentReceiptAudit } from "@/lib/clinic/local-db";
+import type { PaymentReceiptAudit } from "@/lib/clinic/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ReceiptValidationCard } from "@/components/patient/receipt-validation-card";

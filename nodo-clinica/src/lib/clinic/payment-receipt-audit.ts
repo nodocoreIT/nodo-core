@@ -1,4 +1,4 @@
-import type { PaymentReceiptAudit } from "@/lib/clinic/local-db";
+import type { PaymentReceiptAudit } from "@/lib/clinic/transfer-receipt-pending";
 import type { PaymentReceiptValidationResult } from "@/lib/ai/payment-receipt";
 
 export function buildPaymentReceiptAudit(

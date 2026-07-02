@@ -1,4 +1,4 @@
-import type { InterconsultMessage } from "@/lib/clinic/local-db";
+import type { InterconsultMessage } from "@/lib/clinic/types";
 
 export interface NodoChatUnreadPreview {
   id: string;

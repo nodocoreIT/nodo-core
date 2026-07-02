@@ -54,7 +54,7 @@ export function PatientPreviewPanel({
       createdAt: string;
       doctorName?: string;
     }>;
-    healthProfile?: import("@/lib/clinic/local-db").PatientHealthProfile | null;
+    healthProfile?: import("@/lib/clinic/types").PatientHealthProfile | null;
   } | null>(null);
 
   useEffect(() => {

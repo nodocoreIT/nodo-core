@@ -16,7 +16,7 @@ import {
 import { HeartPulse, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
-import type { PatientHealthProfile } from "@/lib/clinic/local-db";
+import type { PatientHealthProfile } from "@/lib/clinic/types";
 
 const EMPTY: PatientHealthProfile = {
   sex: "",

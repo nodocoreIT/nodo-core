@@ -1,47 +1,85 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readDb, writeDb, newId } from "@/lib/clinic/local-db";
-import { getSessionFromRequest } from "@/lib/clinic/session";
-import { attachPdfToClinicalRecord } from "@/lib/clinic/clinical-record-document";
-import {
-  doctorCanAccessPatient,
-  doctorOwnsAppointment,
-  forbidden,
-  requireDoctorSession,
-} from "@/lib/clinic/access-control";
+import { requireAuth } from "@/lib/supabase/auth-guard";
+import { createStudyOrder, createRecord } from "@/lib/clinic/db/clinical-records";
 
 export async function POST(request: NextRequest) {
-  try {
-    const session = await getSessionFromRequest(request);
-    const { appointmentId, doctorId, patientId, studies, notes, pdfBase64, newStudyLabels } =
-      await request.json();
+  const authResult = await requireAuth(request);
+  if (authResult instanceof NextResponse) return authResult;
+  const { user, supabase } = authResult;
 
-    if (!doctorId || !patientId || !Array.isArray(studies) || studies.length === 0) {
+  try {
+    const {
+      appointmentId,
+      doctorId,
+      patientId,
+      studies,
+      notes,
+      pdfBase64,
+      newStudyLabels,
+    } = await request.json();
+
+    if (
+      !doctorId ||
+      !patientId ||
+      !Array.isArray(studies) ||
+      studies.length === 0
+    ) {
       return NextResponse.json(
         { error: "doctorId, patientId y studies requeridos" },
         { status: 400 },
       );
     }
 
-    if (!requireDoctorSession(session, doctorId)) {
-      return forbidden("Solo el médico autenticado puede emitir órdenes");
+    if (!user.org_id) {
+      return NextResponse.json({ error: "org_id requerido" }, { status: 403 });
     }
 
-    const db = await readDb();
-    if (!doctorCanAccessPatient(db, session.userId, patientId)) {
-      return forbidden("Sin relación clínica con este paciente");
+    const [{ data: patient }, { data: professional }] = await Promise.all([
+      supabase
+        .from("patients")
+        .select("id, full_name")
+        .eq("id", patientId)
+        .eq("org_id", user.org_id)
+        .maybeSingle(),
+      supabase
+        .from("professionals")
+        .select("id, full_name, office_settings(*)")
+        .eq("id", doctorId)
+        .eq("org_id", user.org_id)
+        .maybeSingle(),
+    ]);
+
+    if (!patient || !professional) {
+      return NextResponse.json(
+        { error: "Paciente o médico no encontrado" },
+        { status: 404 },
+      );
     }
 
-    if (appointmentId && !doctorOwnsAppointment(db, session.userId, appointmentId)) {
-      return forbidden("Turno no asignado a este médico");
+    const { data: studyOrder, error: orderError } = await createStudyOrder(
+      supabase,
+      {
+        org_id: user.org_id,
+        appointment_id: appointmentId,
+        doctor_id: doctorId,
+        patient_id: patientId,
+        studies,
+        notes: notes?.trim() || null,
+        pdf_url: null,
+      },
+    );
+
+    if (orderError || !studyOrder) {
+      return NextResponse.json(
+        { error: orderError?.message ?? "Error al crear orden" },
+        { status: 500 },
+      );
     }
 
-    const patient = db.patients.find((p) => p.id === patientId);
-    const doctor = db.doctors.find((d) => d.id === doctorId);
-    if (!patient || !doctor) {
-      return NextResponse.json({ error: "Paciente o médico no encontrado" }, { status: 404 });
-    }
-
-    const studyList = studies.map((s: string, i: number) => `${i + 1}. ${s}`).join("\n");
+    // Build clinical record content for PDF generation
+    const studyList = studies
+      .map((s: string, i: number) => `${i + 1}. ${s}`)
+      .join("\n");
     const content = [
       "Estudios solicitados:",
       studyList,
@@ -50,46 +88,40 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join("\n");
 
-    const fileName = `orden-estudios-${patient.fullName.replace(/\s+/g, "-")}.pdf`;
-    const record = {
-      id: newId("rec"),
-      patientId,
-      doctorId,
-      appointmentId: appointmentId || undefined,
-      title: `Orden de estudios — ${patient.fullName} — ${new Date().toLocaleDateString("es-AR")}`,
+    const { data: record } = await createRecord(supabase, {
+      org_id: user.org_id,
+      patient_id: patientId,
+      doctor_id: doctorId,
+      appointment_id: appointmentId || null,
+      title: `Orden de estudios — ${patient.full_name} — ${new Date().toLocaleDateString("es-AR")}`,
       content,
-      recordType: "estudio",
-      createdAt: new Date().toISOString(),
-    };
-
-    await writeDb((d) => {
-      const doc = d.doctors.find((x) => x.id === doctorId);
-      if (doc && Array.isArray(newStudyLabels) && newStudyLabels.length > 0) {
-        const existing = new Set(doc.customStudyLabels ?? []);
-        for (const label of newStudyLabels) {
-          const trimmed = String(label).trim();
-          if (trimmed) existing.add(trimmed);
-        }
-        doc.customStudyLabels = [...existing];
-      }
-      d.clinicalRecords.push(record);
-      if (pdfBase64) {
-        attachPdfToClinicalRecord(d, record.id, {
-          patientId,
-          appointmentId,
-          fileName,
-          pdfBase64,
-        });
-      }
+      record_type: "estudio",
     });
 
+    // Persist new custom study labels to office_settings
+    if (
+      Array.isArray(newStudyLabels) &&
+      newStudyLabels.length > 0
+    ) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const officeSettings = (professional as any).office_settings;
+      const existing: string[] = officeSettings?.custom_study_labels ?? [];
+      const merged = [...new Set([...existing, ...newStudyLabels.map(String).map((s) => s.trim()).filter(Boolean)])];
+      await supabase
+        .from("office_settings")
+        .update({ custom_study_labels: merged })
+        .eq("professional_id", professional.id);
+    }
+
+    void pdfBase64; // PDF storage handled separately via documents route
+
     return NextResponse.json({
-      id: record.id,
+      id: studyOrder.id,
       appointment_id: appointmentId,
       studies,
       notes,
-      clinical_record_id: record.id,
-      downloadUrl: `/api/clinic/clinical-records/pdf?id=${record.id}`,
+      clinical_record_id: record?.id,
+      downloadUrl: record ? `/api/clinic/clinical-records/pdf?id=${record.id}` : null,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error interno";

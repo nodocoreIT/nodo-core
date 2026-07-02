@@ -17,7 +17,7 @@ export function LocalMedicoDashboard({ embedded = false }: { embedded?: boolean 
 
   useEffect(() => {
     clinicApi.getSession().then(({ session, user }) => {
-      if (!session || session.role !== "doctor") {
+      if (!session || !["doctor", "admin", "super_admin"].includes(session.role)) {
         router.push("/login/medico");
         return;
       }

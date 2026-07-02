@@ -318,13 +318,12 @@ export function MedicoHomeTasks({
           <div className="p-4 flex items-center justify-center text-center shrink-0">
             <p className="text-xs text-slate2 max-w-sm">
               Vinculá tu Google Calendar en{" "}
-              <button
-                type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent("nodo:open-settings", { detail: { section: "agenda" } }))}
+              <Link
+                href="/medico/configuracion"
                 className="text-brand font-semibold hover:underline"
               >
                 Configuración
-              </button>{" "}
+              </Link>{" "}
               para ver eventos personales del día acá.
             </p>
           </div>

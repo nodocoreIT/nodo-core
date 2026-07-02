@@ -36,7 +36,7 @@ interface Doctor {
   };
 }
 
-import type { PaymentReceiptAudit } from "@/lib/clinic/local-db";
+import type { PaymentReceiptAudit } from "@/lib/clinic/types";
 
 interface Appointment {
   id: string;

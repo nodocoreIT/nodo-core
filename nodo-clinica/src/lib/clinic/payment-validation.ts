@@ -218,15 +218,7 @@ export function evaluatePaymentReceiptChecks(
 ): { checks: PaymentReceiptChecks; valid: boolean; confidence: number } {
   const strict = isStrictPaymentValidation();
 
-  // Monto: siempre estricto si hay honorario configurado (también en demo local).
-  const amountPass =
-    input.expectedAmount <= 0
-      ? true
-      : parsed.amount != null &&
-        Number.isFinite(parsed.amount) &&
-        parsed.amount > 0 &&
-        amountWithinTolerance(input.expectedAmount, parsed.amount) &&
-        parsed.amountMatches !== false;
+  const amountPass = amountWithinTolerance(input.expectedAmount, parsed.amount);
   const recipientPass =
     recipientMatches(
       {

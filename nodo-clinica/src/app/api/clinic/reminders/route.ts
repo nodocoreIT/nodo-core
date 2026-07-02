@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readDb } from "@/lib/clinic/local-db";
-import { getSessionFromRequest } from "@/lib/clinic/session";
+import { requireAuth } from "@/lib/supabase/auth-guard";
 import {
   sendAppointmentConfirmationEmail,
   sendAppointmentReminderEmail,
@@ -18,12 +17,11 @@ function baseUrl() {
   );
 }
 
-/** Envía email de prueba al médico o reenvía confirmación al paciente. */
+/** Sends a test email to the doctor or resends a confirmation to a patient. */
 export async function POST(request: NextRequest) {
-  const session = await getSessionFromRequest(request);
-  if (!session) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  const authResult = await requireAuth(request);
+  if (authResult instanceof NextResponse) return authResult;
+  const { user, supabase } = authResult;
 
   const body = await request.json();
   const { action, appointmentId, accessToken } = body as {
@@ -32,28 +30,37 @@ export async function POST(request: NextRequest) {
     accessToken?: string;
   };
 
-  const db = await readDb();
-
   if (action === "testReminder") {
-    if (session.role !== "doctor") {
+    if (user.role !== "admin" && user.role !== "super_admin") {
       return NextResponse.json({ error: "Solo médicos" }, { status: 403 });
     }
-    const doctor = db.doctors.find((d) => d.id === session.userId);
-    if (!doctor) {
-      return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+
+    const { data: professional } = await supabase
+      .from("professionals")
+      .select("*, office_settings(*)")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!professional) {
+      return NextResponse.json(
+        { error: "Médico no encontrado" },
+        { status: 404 },
+      );
     }
 
-    const settings = doctor.reminderSettings;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const officeSettings = (professional as any).office_settings;
+    const settings = officeSettings?.reminder_settings;
     const label = formatReminderLabel(settings?.minutesBefore ?? 1440);
 
     const sendResult = await sendAppointmentReminderEmail({
-      patientEmail: doctor.email,
-      patientName: doctor.fullName,
-      doctorName: doctor.fullName,
+      patientEmail: professional.email,
+      patientName: professional.full_name,
+      doctorName: professional.full_name,
       scheduledAt: format(
         new Date(Date.now() + (settings?.minutesBefore ?? 1440) * 60 * 1000),
         "EEEE d 'de' MMMM 'a las' HH:mm 'hs'",
-        { locale: es }
+        { locale: es },
       ),
       waitingRoomUrl: `${baseUrl()}/medico/dashboard`,
     });
@@ -62,56 +69,81 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         ok: true,
         mock: true,
-        message:
-          `Modo demo: no hay RESEND_API_KEY en Vercel. Configurá RESEND_API_KEY y RESEND_FROM_EMAIL (dominio verificado) para enviar a ${doctor.email}.`,
+        message: `Modo demo: no hay RESEND_API_KEY en Vercel. Configurá RESEND_API_KEY y RESEND_FROM_EMAIL (dominio verificado) para enviar a ${professional.email}.`,
       });
     }
 
     return NextResponse.json({
       ok: true,
-      message: `Email de prueba enviado a ${doctor.email} (simula aviso ${label})`,
+      message: `Email de prueba enviado a ${professional.email} (simula aviso ${label})`,
       emailId: sendResult.id,
     });
   }
 
   if (action === "resendConfirmation") {
-    const apt = appointmentId
-      ? db.appointments.find((a) => a.id === appointmentId)
-      : db.appointments.find((a) => a.accessToken === accessToken);
+    const { data: apt } = appointmentId
+      ? await supabase
+          .from("appointments")
+          .select("*")
+          .eq("id", appointmentId)
+          .maybeSingle()
+      : await supabase
+          .from("appointments")
+          .select("*")
+          .eq("access_token", accessToken ?? "")
+          .maybeSingle();
 
     if (!apt) {
-      return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Turno no encontrado" },
+        { status: 404 },
+      );
     }
 
-    if (session.role === "patient" && session.userId !== apt.patientId) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    if (user.role === "patient") {
+      const { data: patientRow } = await supabase
+        .from("patients")
+        .select("id")
+        .eq("profile_id", user.id)
+        .maybeSingle();
+      if (patientRow && patientRow.id !== apt.patient_id) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
     }
 
-    const patient = db.patients.find((p) => p.id === apt.patientId);
-    const doctor = db.doctors.find((d) => d.id === apt.doctorId);
-    if (!patient || !doctor) {
-      return NextResponse.json({ error: "Datos incompletos" }, { status: 404 });
+    const [{ data: patient }, { data: professional }] = await Promise.all([
+      supabase.from("patients").select("*").eq("id", apt.patient_id).maybeSingle(),
+      supabase.from("professionals").select("*, office_settings(*)").eq("id", apt.doctor_id).maybeSingle(),
+    ]);
+
+    if (!patient || !professional) {
+      return NextResponse.json(
+        { error: "Datos incompletos" },
+        { status: 404 },
+      );
     }
 
     const scheduledLabel = format(
-      new Date(apt.scheduledAt),
+      new Date(apt.scheduled_at),
       "EEEE d 'de' MMMM 'a las' HH:mm 'hs'",
-      { locale: es }
+      { locale: es },
     );
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const reminderSettings = (professional as any).office_settings?.reminder_settings;
     let reminderNote: string | undefined;
-    if (doctor.reminderSettings?.enabled) {
+    if (reminderSettings?.enabled) {
       reminderNote = `Te enviaremos un recordatorio ${formatReminderLabel(
-        doctor.reminderSettings.minutesBefore ?? 1440
+        reminderSettings.minutesBefore ?? 1440,
       )} del turno a ${patient.email}.`;
     }
 
     await sendAppointmentConfirmationEmail({
       patientEmail: patient.email,
-      patientName: patient.fullName,
-      doctorName: doctor.fullName,
+      patientName: patient.full_name,
+      doctorName: professional.full_name,
       scheduledAt: scheduledLabel,
-      waitingRoomUrl: `${baseUrl()}/paciente/sala/${apt.accessToken}`,
+      waitingRoomUrl: `${baseUrl()}/paciente/sala/${apt.access_token}`,
       reminderNote,
     });
 

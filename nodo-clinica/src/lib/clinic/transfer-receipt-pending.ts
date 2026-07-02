@@ -1,14 +1,31 @@
-import {
-  readDb,
-  writeDb,
-  type LocalAppointment,
-  type PaymentReceiptAudit,
-} from "@/lib/clinic/local-db";
+import { createServiceClient } from "@/lib/supabase/server";
 import { notifyDoctorTransferPendingReview } from "@/lib/clinic/doctor-notifications";
 
-/** Marca el turno como pendiente de revisión médica tras subir comprobante. */
+export interface PaymentReceiptAudit {
+  validatedAt: string;
+  valid: boolean;
+  confidence: number;
+  expectedAmount?: number;
+  currency?: string;
+  amount?: number;
+  recipient?: string;
+  payerName?: string;
+  transferDate?: string;
+  transferTime?: string;
+  operationId?: string;
+  summary?: string;
+  checks?: {
+    amount: { pass: boolean; detail: string };
+    recipient: { pass: boolean; detail: string };
+    schedule: { pass: boolean; detail: string };
+    receiptType: { pass: boolean; detail: string };
+  };
+  reasons?: string[];
+}
+
+/** Marks an appointment as pending doctor review after a payment receipt is uploaded. */
 export async function markTransferReceiptPendingReview(
-  appointment: LocalAppointment,
+  appointment: { id: string; payment_status?: string; payment_provider?: string; patient_id: string; doctor_id: string; org_id: string },
   opts?: {
     audit?: PaymentReceiptAudit;
     fileName?: string;
@@ -16,14 +33,16 @@ export async function markTransferReceiptPendingReview(
   },
 ): Promise<void> {
   if (
-    appointment.paymentStatus === "confirmed" ||
-    appointment.paymentStatus === "waived" ||
-    appointment.paymentProvider === "mercadopago"
+    appointment.payment_status === "confirmed" ||
+    appointment.payment_status === "waived" ||
+    appointment.payment_provider === "mercadopago"
   ) {
     return;
   }
 
+  const supabase = await createServiceClient();
   const now = new Date().toISOString();
+
   const placeholderAudit: PaymentReceiptAudit =
     opts?.audit ?? {
       validatedAt: now,
@@ -35,35 +54,53 @@ export async function markTransferReceiptPendingReview(
       reasons: ["Pendiente de revisión por el médico"],
     };
 
-  await writeDb((d) => {
-    const target = d.appointments.find((a) => a.id === appointment.id);
-    if (!target) return;
-    target.paymentProvider = target.paymentProvider ?? "transfer";
-    if (!target.paymentReceiptAudit || opts?.audit) {
-      target.paymentReceiptAudit = placeholderAudit;
-    }
-    target.updatedAt = now;
-  });
+  await supabase
+    .from("appointments")
+    .update({
+      payment_provider: appointment.payment_provider ?? "transfer",
+      payment_receipt_audit: placeholderAudit,
+      updated_at: now,
+    })
+    .eq("id", appointment.id);
 
   if (opts?.notifyDoctor === false) return;
 
-  const db = await readDb();
-  const patient = db.patients.find((p) => p.id === appointment.patientId);
-  const doctor = db.doctors.find((d) => d.id === appointment.doctorId);
-  if (!patient || !doctor) return;
+  const { data: patient } = await supabase
+    .from("patients")
+    .select("full_name")
+    .eq("id", appointment.patient_id)
+    .maybeSingle();
 
-  const alreadyNotified = (db.doctorNotifications ?? []).some(
+  if (!patient) return;
+
+  // Skip if already notified (unread transfer_pending for same appointment)
+  const { data: existingNotification } = await supabase
+    .from("doctor_notifications")
+    .select("id")
+    .eq("professional_id", appointment.doctor_id)
+    .eq("type", "transfer_pending")
+    .eq("read", false)
+    .maybeSingle();
+
+  // Check payload appointmentId match
+  const { data: allPending } = await supabase
+    .from("doctor_notifications")
+    .select("id, payload")
+    .eq("professional_id", appointment.doctor_id)
+    .eq("type", "transfer_pending")
+    .eq("read", false);
+
+  const alreadyNotified = (allPending ?? []).some(
     (n) =>
-      n.doctorId === doctor.id &&
-      n.type === "transfer_pending" &&
-      n.meta?.appointmentId === appointment.id &&
-      !n.read,
+      (n.payload as Record<string, unknown> | null)?.appointmentId === appointment.id,
   );
+
   if (alreadyNotified) return;
 
   await notifyDoctorTransferPendingReview({
-    doctorId: doctor.id,
+    doctorId: appointment.doctor_id,
+    orgId: appointment.org_id,
     appointmentId: appointment.id,
-    patientName: patient.fullName,
+    patientName: patient.full_name,
   });
 }

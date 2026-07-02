@@ -1,68 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readDb, writeDb } from "@/lib/clinic/local-db";
-import { getSessionFromRequest } from "@/lib/clinic/session";
-import {
-  doctorOwnsAppointment,
-  forbidden,
-  requireDoctorSession,
-  requirePatientSession,
-  requireSession,
-  unauthorized,
-} from "@/lib/clinic/access-control";
+import { requireAuth } from "@/lib/supabase/auth-guard";
+import { getNotes, createNote } from "@/lib/clinic/db/clinical-records";
 
 export async function GET(request: NextRequest) {
   const appointmentId = new URL(request.url).searchParams.get("appointmentId");
   if (!appointmentId) {
-    return NextResponse.json({ error: "appointmentId requerido" }, { status: 400 });
+    return NextResponse.json(
+      { error: "appointmentId requerido" },
+      { status: 400 },
+    );
   }
 
-  const session = await getSessionFromRequest(request);
-  if (!requireSession(session)) {
-    return unauthorized();
-  }
+  const authResult = await requireAuth(request);
+  if (authResult instanceof NextResponse) return authResult;
+  const { supabase } = authResult;
 
-  const db = await readDb();
-  const apt = db.appointments.find((a) => a.id === appointmentId);
-  if (!apt) {
-    return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
-  }
-
-  if (session.role === "patient") {
-    if (!requirePatientSession(session, apt.patientId)) {
-      return forbidden();
-    }
-  } else if (!doctorOwnsAppointment(db, session.userId, appointmentId)) {
-    return forbidden("Solo el médico del turno puede ver las notas clínicas");
-  }
-
-  const note = db.clinicalNotes[appointmentId];
-  return NextResponse.json(note || { content: "" });
+  const { data: note } = await getNotes(supabase, appointmentId);
+  return NextResponse.json(note ?? { content: "" });
 }
 
 export async function PUT(request: NextRequest) {
-  const session = await getSessionFromRequest(request);
+  const authResult = await requireAuth(request);
+  if (authResult instanceof NextResponse) return authResult;
+  const { user, supabase } = authResult;
+
   const { appointmentId, doctorId, content } = await request.json();
 
-  if (!appointmentId || !doctorId) {
-    return NextResponse.json({ error: "appointmentId y doctorId requeridos" }, { status: 400 });
+  if (!user.org_id) {
+    return NextResponse.json({ error: "org_id requerido" }, { status: 403 });
   }
 
-  if (!requireDoctorSession(session, doctorId)) {
-    return forbidden("Solo el médico autenticado puede guardar notas");
-  }
-
-  const db = await readDb();
-  if (!doctorOwnsAppointment(db, session.userId, appointmentId)) {
-    return forbidden("Turno no asignado a este médico");
-  }
-
-  await writeDb((d) => {
-    d.clinicalNotes[appointmentId] = {
-      appointmentId,
-      doctorId,
-      content,
-      updatedAt: new Date().toISOString(),
-    };
+  await createNote(supabase, {
+    appointment_id: appointmentId,
+    org_id: user.org_id,
+    doctor_id: doctorId,
+    content,
   });
 
   return NextResponse.json({ ok: true });

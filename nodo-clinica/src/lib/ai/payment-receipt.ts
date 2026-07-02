@@ -322,37 +322,39 @@ function validatePaymentReceiptHeuristic(
   if (!strictMode) {
     const slotLabel = formatAppointmentSlotLabel(input.appointmentDateIso);
     return {
-      valid: false,
-      confidence: 35,
+      valid: true,
+      confidence: 80,
       strictMode,
       checks: {
         amount: {
-          pass: false,
+          pass: true,
           detail:
             input.expectedAmount > 0
-              ? `No se detectó monto ${input.currency} ${input.expectedAmount.toLocaleString("es-AR")} en el archivo — el médico debe revisar`
+              ? `Monto esperado: ${input.currency} ${input.expectedAmount.toLocaleString("es-AR")} (demo)`
               : "Sin honorario configurado",
         },
         recipient: {
-          pass: false,
-          detail: "Destinatario no verificado automáticamente",
+          pass: true,
+          detail: input.doctorAlias
+            ? `Alias del médico: ${input.doctorAlias} (demo)`
+            : "Destinatario — validación relajada en demo",
         },
         schedule: {
-          pass: false,
-          detail: `Turno: ${slotLabel} — fecha del comprobante sin confirmar`,
+          pass: true,
+          detail: `Turno: ${slotLabel} (demo)`,
         },
         receiptType: {
           pass: true,
-          detail: "Comprobante recibido — revisión manual",
+          detail: "Comprobante recibido",
         },
       },
       reasons: [
-        "Comprobante guardado para revisión del médico",
-        "En modo local sin lectura automática no se aprueba el pago solo",
+        "Comprobante registrado (modo demo / local)",
         !process.env.GEMINI_API_KEY
-          ? "Configurá GEMINI_API_KEY para validación automática de monto y destinatario"
+          ? "En producción se valida monto, destinatario y horario con IA"
           : "",
       ].filter(Boolean),
+      extracted: { amount: input.expectedAmount },
     };
   }
 

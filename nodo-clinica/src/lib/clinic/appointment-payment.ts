@@ -1,103 +1,138 @@
-import { readDb, writeDb } from "@/lib/clinic/local-db";
-import type { LocalAppointment, LocalDoctor } from "@/lib/clinic/local-db";
+import { createServiceClient } from "@/lib/supabase/server";
 import { notifyDoctorMercadoPagoPayment } from "@/lib/clinic/doctor-notifications";
-import { resolveMercadoPagoAccessToken } from "@/lib/clinic/payment";
 import { sendAppointmentConfirmationEmail } from "@/lib/email/resend";
 import { formatReminderLabel } from "@/lib/email/reminder-label";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 export function appBaseUrl() {
-  const origin = (
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
+  return (
+    process.env.NEXT_PUBLIC_APP_URL ||
     (process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3002")
+      : "http://localhost:3000")
   );
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, "") || "";
-  if (basePath && !origin.endsWith(basePath)) {
-    return `${origin}${basePath}`;
-  }
-  return origin;
 }
 
 export async function confirmAppointmentPaymentAndNotify(
   appointmentId: string,
-  opts?: { mercadopagoPaymentId?: string }
-): Promise<LocalAppointment | null> {
-  const db = await readDb();
-  const apt = db.appointments.find((a) => a.id === appointmentId);
-  if (!apt) return null;
+  opts?: { mercadopagoPaymentId?: string },
+): Promise<Record<string, unknown> | null> {
+  const supabase = await createServiceClient();
 
-  if (apt.paymentStatus === "confirmed" || apt.paymentStatus === "waived") {
+  const { data: apt, error: aptError } = await supabase
+    .from("appointments")
+    .select("*, patients(full_name, email), professionals(full_name, org_id)")
+    .eq("id", appointmentId)
+    .maybeSingle();
+
+  if (aptError || !apt) return null;
+
+  if (
+    apt.payment_status === "confirmed" ||
+    apt.payment_status === "waived"
+  ) {
     return apt;
   }
 
   const now = new Date().toISOString();
-  const wasPending = apt.paymentStatus === "pending";
+  const wasPending = apt.payment_status === "pending";
 
-  await writeDb((d) => {
-    const target = d.appointments.find((a) => a.id === appointmentId);
-    if (!target) return;
-    target.paymentStatus = "confirmed";
-    target.paymentConfirmedAt = now;
-    target.updatedAt = now;
-    if (target.status === "scheduled") {
-      target.status = "waiting";
-    }
-    if (opts?.mercadopagoPaymentId) {
-      target.mercadopagoPaymentId = opts.mercadopagoPaymentId;
-    }
-  });
+  const { data: updated, error: updateError } = await supabase
+    .from("appointments")
+    .update({
+      payment_status: "confirmed",
+      payment_confirmed_at: now,
+      updated_at: now,
+      ...(opts?.mercadopagoPaymentId
+        ? { mercadopago_payment_id: opts.mercadopagoPaymentId }
+        : {}),
+    })
+    .eq("id", appointmentId)
+    .select()
+    .single();
 
-  const updated = (await readDb()).appointments.find((a) => a.id === appointmentId);
-  if (!updated || !wasPending) return updated ?? null;
+  if (updateError || !updated) return null;
+  if (!wasPending) return updated;
 
-  const patient = db.patients.find((p) => p.id === apt.patientId);
-  const doctor = db.doctors.find((d) => d.id === apt.doctorId);
-  if (!patient || !doctor) return updated;
+  // Fetch related data for notifications/email
+  const { data: patient } = await supabase
+    .from("patients")
+    .select("full_name, email")
+    .eq("id", apt.patient_id)
+    .maybeSingle();
+
+  const { data: officeSettings } = await supabase
+    .from("office_settings")
+    .select("payment, reminder_settings")
+    .eq("org_id", apt.org_id)
+    .maybeSingle();
+
+  const { data: professional } = await supabase
+    .from("professionals")
+    .select("full_name, auth_user_id")
+    .eq("id", apt.doctor_id)
+    .maybeSingle();
+
+  if (!patient || !professional) return updated;
+
+  const payment = (officeSettings?.payment as Record<string, unknown>) ?? {};
+  const reminderSettings = (officeSettings?.reminder_settings as {
+    enabled?: boolean;
+    minutesBefore?: number;
+  } | null) ?? {};
 
   const scheduledLabel = format(
-    new Date(apt.scheduledAt),
+    new Date(apt.scheduled_at),
     "EEEE d 'de' MMMM 'a las' HH:mm 'hs'",
-    { locale: es }
+    { locale: es },
   );
 
   let reminderNote: string | undefined;
-  if (doctor.reminderSettings?.enabled) {
+  if (reminderSettings.enabled) {
     reminderNote = `Te enviaremos un recordatorio ${formatReminderLabel(
-      doctor.reminderSettings.minutesBefore ?? 1440
+      reminderSettings.minutesBefore ?? 1440,
     )} del turno a ${patient.email}.`;
   }
 
   sendAppointmentConfirmationEmail({
     patientEmail: patient.email,
-    patientName: patient.fullName,
-    doctorName: doctor.fullName,
+    patientName: patient.full_name,
+    doctorName: professional.full_name,
     scheduledAt: scheduledLabel,
-    waitingRoomUrl: `${appBaseUrl()}/paciente/sala/${apt.accessToken}`,
+    waitingRoomUrl: `${appBaseUrl()}/paciente/sala/${apt.access_token}`,
     reminderNote,
   }).catch((err) => console.error("[Email] confirmation after MP payment", err));
 
-  const fee = doctor.payment?.consultationFee;
+  const fee = typeof payment.consultationFee === "number" ? payment.consultationFee : undefined;
   await notifyDoctorMercadoPagoPayment({
-    doctorId: doctor.id,
+    doctorId: apt.doctor_id,
+    orgId: apt.org_id,
     appointmentId,
     mercadopagoPaymentId:
       opts?.mercadopagoPaymentId ?? `confirmed-${appointmentId}`,
-    patientName: patient.fullName,
+    patientName: patient.full_name,
     amount: fee,
-    currency: doctor.payment?.currency ?? "ARS",
+    currency: (payment.currency as string | undefined) ?? "ARS",
   });
 
-  await writeDb((d) => {
-    const target = d.appointments.find((a) => a.id === appointmentId);
-    if (target) target.confirmationEmailSentAt = new Date().toISOString();
-  });
+  await supabase
+    .from("appointments")
+    .update({ confirmation_email_sent_at: new Date().toISOString() })
+    .eq("id", appointmentId);
 
-  return (await readDb()).appointments.find((a) => a.id === appointmentId) ?? updated;
+  const { data: final } = await supabase
+    .from("appointments")
+    .select("*")
+    .eq("id", appointmentId)
+    .maybeSingle();
+
+  return final ?? updated;
 }
 
-export function doctorMercadoPagoToken(doctor: LocalDoctor): string | undefined {
-  return resolveMercadoPagoAccessToken(doctor);
+/** @deprecated — no longer needed, tokens come from payment_credentials table */
+export function doctorMercadoPagoToken(
+  _doctor: unknown,
+): string | undefined {
+  return undefined;
 }
