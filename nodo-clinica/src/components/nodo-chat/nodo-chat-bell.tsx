@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, MessageSquare } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { cn } from "@/lib/utils";
@@ -99,18 +99,19 @@ export function NodoChatBell({
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "relative flex h-10 w-10 items-center justify-center rounded-full border border-mist bg-white text-navy shadow-sm transition-colors hover:border-brand/40 hover:text-brand",
-          open && "border-brand/40 text-brand",
+          "relative inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center overflow-visible rounded-full text-navy transition-colors hover:bg-navy/5 hover:text-brand focus:outline-none",
+          open && "text-brand",
         )}
         aria-label={
           count > 0
             ? `${count} mensajes nuevos en Nodo Chat`
             : "Notificaciones de Nodo Chat"
         }
+        title="Nodo Chat"
       >
-        <Bell className="h-5 w-5" />
+        <MessageSquare className="h-5 w-5" />
         {count > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-bold text-white ring-2 ring-[#EEF3F8]">
             {count > 9 ? "9+" : count}
           </span>
         )}
