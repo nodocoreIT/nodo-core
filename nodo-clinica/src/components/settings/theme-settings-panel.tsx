@@ -13,6 +13,7 @@ function ColorField({
   placeholder,
   resetLabel,
   resetValue,
+  primaryColor,
   onChange,
   onReset,
 }: {
@@ -22,6 +23,7 @@ function ColorField({
   placeholder: string;
   resetLabel: string;
   resetValue: string;
+  primaryColor: string;
   onChange: (v: string) => void;
   onReset: () => void;
 }) {
@@ -56,7 +58,8 @@ function ColorField({
           <button
             type="button"
             onClick={onReset}
-            className="text-left text-xs text-brand hover:underline font-semibold"
+            className="text-left text-xs hover:underline font-semibold"
+            style={{ color: primaryColor }}
           >
             {resetLabel}
           </button>
@@ -82,93 +85,136 @@ export function ThemeSettingsPanel({
   return (
     <div className={compact ? "space-y-2" : "space-y-2 py-2"}>
       <ColorField
-        label="Color primario"
-        description="Botones, enlaces activos y acentos de marca."
+        label="Color Primario"
+        description="Elegí el color de marca que representa el panel (botones, enlaces activos y acentos). Podés elegirlo con el selector o ingresar su código hexadecimal."
         value={settings.primaryColor}
         placeholder="#DA5A0E"
-        resetLabel="Restablecer naranja Nodo"
+        resetLabel="Restablecer Naranja Nodo Original"
         resetValue={DEFAULT_THEME_SETTINGS.primaryColor}
+        primaryColor={settings.primaryColor}
         onChange={(v) => onChange({ primaryColor: v })}
         onReset={() => onChange({ primaryColor: DEFAULT_THEME_SETTINGS.primaryColor })}
       />
 
       <ColorField
-        label="Color del menú lateral"
-        description="Fondo de la barra de navegación."
+        label="Color Secundario (Menú Lateral)"
+        description="Elegí el color de fondo para la barra de navegación lateral. Podés elegirlo con el selector o ingresar su código hexadecimal."
         value={settings.secondaryColor}
         placeholder="#121E2F"
-        resetLabel="Restablecer azul marino"
+        resetLabel="Restablecer Azul Marino Original"
         resetValue={DEFAULT_THEME_SETTINGS.secondaryColor}
+        primaryColor={settings.primaryColor}
         onChange={(v) => onChange({ secondaryColor: v })}
         onReset={() => onChange({ secondaryColor: DEFAULT_THEME_SETTINGS.secondaryColor })}
       />
 
       <ColorField
-        label="Texto del menú"
-        description="Ítems del menú sin seleccionar."
+        label="Color del Texto del Menú Lateral (Sin Seleccionar)"
+        description="Elegí el color de fuente para los elementos del menú que no estén seleccionados."
         value={settings.sidebarTextColor}
         placeholder="#9DACBE"
-        resetLabel="Restablecer gris azulado"
+        resetLabel="Restablecer Gris Azulado Original"
         resetValue={DEFAULT_THEME_SETTINGS.sidebarTextColor}
+        primaryColor={settings.primaryColor}
         onChange={(v) => onChange({ sidebarTextColor: v })}
         onReset={() => onChange({ sidebarTextColor: DEFAULT_THEME_SETTINGS.sidebarTextColor })}
       />
 
       <ColorField
-        label="Color de textos"
-        description="Títulos y contenido del panel."
+        label="Color de Fuente (Textos)"
+        description="Elegí el color para los textos y títulos del panel."
         value={settings.fontColor}
         placeholder="#16202E"
-        resetLabel="Restablecer color de texto"
+        resetLabel="Restablecer Color de Texto Original"
         resetValue={DEFAULT_THEME_SETTINGS.fontColor}
+        primaryColor={settings.primaryColor}
         onChange={(v) => onChange({ fontColor: v })}
         onReset={() => onChange({ fontColor: DEFAULT_THEME_SETTINGS.fontColor })}
       />
 
-      <div className="space-y-2 border-t border-border pt-6">
-        <Label className="text-base font-bold text-navy">Estilo de bordes</Label>
+      <div className="space-y-3 border-t border-border pt-6">
+        <div>
+          <Label className="text-base font-bold text-navy">Estilo de Bordes</Label>
+          <p className="text-xs text-slate2 mt-0.5">Ajustá la redondez de los botones, inputs y tarjetas.</p>
+        </div>
         <div className="grid grid-cols-3 gap-3">
           {(
             [
-              { id: "none" as const, label: "Rectos" },
-              { id: "md" as const, label: "Redondeados" },
-              { id: "full" as const, label: "Muy redondeados" },
+              { id: "none" as const, label: "Rectos / Cuadrados", cardRadius: "0px",  previewRadius: "0px"   },
+              { id: "md"   as const, label: "Redondeados",         cardRadius: "10px", previewRadius: "10px"  },
+              { id: "full" as const, label: "Curvos / Orgánicos",  cardRadius: "18px", previewRadius: "999px" },
             ] as const
-          ).map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => onChange({ borderRadius: option.id })}
-              className={`p-3 border text-center text-sm font-semibold rounded-md transition-all ${
-                settings.borderRadius === option.id
-                  ? "border-brand bg-brand/5 text-brand"
-                  : "border-border hover:bg-paper text-slate2"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
+          ).map((option) => {
+            const isActive = settings.borderRadius === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => onChange({ borderRadius: option.id })}
+                className="p-4 border text-left transition-all hover:shadow-sm"
+                style={{
+                  borderRadius: option.cardRadius,
+                  ...(isActive
+                    ? { borderColor: settings.primaryColor, borderWidth: "2px" }
+                    : { borderColor: "var(--color-border)" }),
+                }}
+              >
+                <p
+                  className="text-sm font-bold mb-4"
+                  style={{ color: isActive ? settings.primaryColor : "var(--color-navy)" }}
+                >
+                  {option.label}
+                </p>
+                <div
+                  className="w-full py-3 bg-slate-100 text-center text-xs text-slate-400"
+                  style={{ borderRadius: option.previewRadius }}
+                >
+                  Vista previa
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="space-y-2 border-t border-border pt-6">
-        <Label className="text-base font-bold text-navy">Tipografía</Label>
-        <div className="grid grid-cols-3 gap-2">
-          {(["Inter", "Roboto", "Montserrat"] as const).map((font) => (
-            <button
-              key={font}
-              type="button"
-              onClick={() => onChange({ fontFamily: font })}
-              className={`p-2 border text-sm font-semibold rounded-md transition-all ${
-                settings.fontFamily === font
-                  ? "border-brand bg-brand/5 text-brand"
-                  : "border-border hover:bg-paper text-slate2"
-              }`}
-              style={{ fontFamily: font }}
-            >
-              {font}
-            </button>
-          ))}
+      <div className="space-y-3 border-t border-border pt-6">
+        <div>
+          <Label className="text-base font-bold text-navy">Tipografía del Sistema</Label>
+          <p className="text-xs text-slate2 mt-0.5">Seleccioná una tipografía segura para maximizar la legibilidad.</p>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {(["Inter", "Roboto", "Montserrat"] as const).map((font) => {
+            const isActive = settings.fontFamily === font;
+            return (
+              <button
+                key={font}
+                type="button"
+                onClick={() => onChange({ fontFamily: font })}
+                className="p-3 border text-left transition-all rounded-md hover:shadow-sm"
+                style={
+                  isActive
+                    ? { borderColor: settings.primaryColor, borderWidth: "2px" }
+                    : { borderColor: "var(--color-border)" }
+                }
+              >
+                <p
+                  className="text-sm font-bold mb-2"
+                  style={{
+                    fontFamily: font,
+                    color: isActive ? settings.primaryColor : "var(--color-navy)",
+                  }}
+                >
+                  {font}
+                </p>
+                <p
+                  className="text-xs text-slate2 leading-relaxed"
+                  style={{ fontFamily: font }}
+                >
+                  El veloz murciélago hindú comía feliz cardillo y kiwi.
+                </p>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -177,23 +223,33 @@ export function ThemeSettingsPanel({
         <div className="grid grid-cols-2 gap-2">
           {(
             [
-              { id: "default" as const, label: "Nodo Salud" },
+              { id: "default" as const, label: "Nodo Clínica" },
               { id: "text" as const, label: "Texto personalizado" },
             ] as const
-          ).map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => onChange({ logoType: option.id })}
-              className={`p-3 border text-center text-sm font-semibold rounded-md transition-all ${
-                settings.logoType === option.id
-                  ? "border-brand bg-brand/5 text-brand"
-                  : "border-border hover:bg-paper text-slate2"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
+          ).map((option) => {
+            const isActive = settings.logoType === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => onChange({ logoType: option.id })}
+                className={`p-3 border text-center text-sm font-semibold rounded-md transition-all ${
+                  isActive ? "" : "border-border hover:bg-paper text-slate2"
+                }`}
+                style={
+                  isActive
+                    ? {
+                        borderColor: settings.primaryColor,
+                        backgroundColor: settings.primaryColor + "14",
+                        color: settings.primaryColor,
+                      }
+                    : undefined
+                }
+              >
+                {option.label}
+              </button>
+            );
+          })}
         </div>
         {settings.logoType === "text" && (
           <div className="space-y-2 bg-paper p-4 rounded-md border border-border mt-3">
@@ -205,25 +261,12 @@ export function ThemeSettingsPanel({
               onChange={(e) => onChange({ brandText: e.target.value })}
             />
             <p className="text-[11px] text-slate2">
-              La última palabra se muestra con el color primario (como &quot;salud&quot; en Nodo Salud).
+              La última palabra se muestra con el color primario (como &quot;clínica&quot; en Nodo Clínica).
             </p>
           </div>
         )}
       </div>
 
-      {onReset && (
-        <div className="flex justify-center pt-4 border-t border-border">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 px-4 text-xs border-slate-300 text-slate-600"
-            onClick={onReset}
-          >
-            Restablecer apariencia por defecto
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
