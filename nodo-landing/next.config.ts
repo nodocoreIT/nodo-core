@@ -6,28 +6,24 @@ import type { NextConfig } from "next";
 // and in Vercel environment variables for production.
 const NODO_INMO_URL = process.env.NODO_INMO_URL ?? "http://localhost:5173";
 const NODO_CLINICA_URL = process.env.NODO_CLINICA_URL ?? "http://localhost:3002";
-/** En el deploy nuevo la app usa basePath /clinica. En legacy (nodo-clinica.vercel.app raíz) dejá vacío. */
+/** En el deploy nuevo la app usa basePath /nodo-clinica. */
 const NODO_CLINICA_REMOTE_PREFIX =
   process.env.NODO_CLINICA_REMOTE_PREFIX === ""
     ? ""
-    : (process.env.NODO_CLINICA_REMOTE_PREFIX ?? "/clinica").replace(/\/$/, "");
+    : (process.env.NODO_CLINICA_REMOTE_PREFIX ?? "/nodo-clinica").replace(/\/$/, "");
 const NODO_AUTOS_URL = process.env.NODO_AUTOS_URL ?? "http://localhost:5175";
 const NODO_FINANZAS_URL = process.env.NODO_FINANZAS_URL ?? "http://localhost:5176";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+// /nodo-clinica (root) stays served by nodo-landing's marketing page (app/nodo-clinica/page.tsx).
+// Only paths with at least one segment (:path+) are proxied to the clinica app.
 const clinicaProxy = [
   {
-    source: "/clinica",
+    source: "/nodo-clinica/:path+",
     destination: NODO_CLINICA_REMOTE_PREFIX
-      ? `${NODO_CLINICA_URL}${NODO_CLINICA_REMOTE_PREFIX}`
-      : NODO_CLINICA_URL,
-  },
-  {
-    source: "/clinica/:path*",
-    destination: NODO_CLINICA_REMOTE_PREFIX
-      ? `${NODO_CLINICA_URL}${NODO_CLINICA_REMOTE_PREFIX}/:path*`
-      : `${NODO_CLINICA_URL}/:path*`,
+      ? `${NODO_CLINICA_URL}${NODO_CLINICA_REMOTE_PREFIX}/:path+`
+      : `${NODO_CLINICA_URL}/:path+`,
   },
 ];
 
