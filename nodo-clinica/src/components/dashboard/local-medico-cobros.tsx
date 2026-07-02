@@ -1,24 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Settings, Wallet } from "lucide-react";
 import { DoctorCobrosList } from "@/components/medical/doctor-cobros-list";
+import { DoctorPaymentsLedger } from "@/components/medical/doctor-payments-ledger";
 import { clinicApi } from "@/lib/clinic/client-api";
 
 export function LocalMedicoCobros() {
   const router = useRouter();
   const [doctorId, setDoctorId] = useState<string | null>(null);
-  const [pendingRefresh, setPendingRefresh] = useState(0);
-
-  const refreshSidebarBadge = useCallback(() => {
-    setPendingRefresh((n) => n + 1);
-    window.dispatchEvent(new CustomEvent("cobros-notifications-read"));
-  }, []);
 
   useEffect(() => {
     clinicApi.getSession().then(({ session, user }) => {
-      if (!session || session.role !== "doctor") {
+      if (!session || !["doctor", "admin", "super_admin"].includes(session.role)) {
         router.push("/login/medico");
         return;
       }
@@ -35,7 +31,7 @@ export function LocalMedicoCobros() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-brand mb-1">
@@ -45,27 +41,29 @@ export function LocalMedicoCobros() {
             </h2>
           </div>
           <p className="text-sm text-slate2 max-w-xl">
-            Un renglón por paciente: nombre, fecha del comprobante, si coincide
-            con el honorario, monto y enlace al archivo. Los pendientes podés
-            aprobarlos desde acá.
+            Resumen de pagos recibidos. Los comprobantes de transferencia
+            pendientes de revisión aparecen abajo.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => window.dispatchEvent(new CustomEvent("nodo:open-settings", { detail: { section: "cobros" } }))}
+        <Link
+          href="/medico/configuracion?tab=cobros"
           className="inline-flex items-center justify-center gap-1.5 rounded-md border border-mist bg-white px-3 py-2 text-sm font-medium text-navy hover:bg-slate-50 transition-colors"
         >
           <Settings className="h-4 w-4" />
           Configurar honorarios
-        </button>
+        </Link>
       </div>
 
-      <section className="rounded-xl border border-mist bg-white p-4 sm:p-5 shadow-sm">
-        <DoctorCobrosList
-          key={pendingRefresh}
-          doctorId={doctorId}
-          onPendingChange={refreshSidebarBadge}
-        />
+      <section className="rounded-xl border border-mist bg-white p-4 sm:p-5 shadow-sm space-y-4">
+        <h3 className="text-sm font-semibold text-navy">Cobros recibidos</h3>
+        <DoctorCobrosList doctorId={doctorId} />
+      </section>
+
+      <section className="rounded-xl border border-mist bg-white p-4 sm:p-5 shadow-sm space-y-4">
+        <h3 className="text-sm font-semibold text-navy">
+          Comprobantes pendientes de revisión
+        </h3>
+        <DoctorPaymentsLedger doctorId={doctorId} pendingOnly />
       </section>
     </div>
   );

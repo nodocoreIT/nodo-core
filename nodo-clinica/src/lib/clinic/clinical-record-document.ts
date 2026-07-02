@@ -1,4 +1,4 @@
-import { newId, type LocalClinicalRecord, type LocalDocument } from "@/lib/clinic/local-db";
+import { newId, type LocalClinicalRecord, type LocalDocument } from "@/lib/clinic/types";
 
 /** Guarda el PDF emitido junto al registro clínico para descarga del paciente. */
 export function attachPdfToClinicalRecord(

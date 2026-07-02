@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateClinicalReport } from "@/lib/ai/gemini";
-import { getSessionFromRequest } from "@/lib/clinic/session";
-import { forbidden, requireDoctorSession } from "@/lib/clinic/access-control";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSessionFromRequest(request);
-    if (!requireDoctorSession(session)) {
-      return forbidden("Solo médicos autenticados pueden generar informes");
-    }
-
     const body = await request.json();
     const {
       dictation,

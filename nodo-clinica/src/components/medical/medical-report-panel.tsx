@@ -108,18 +108,11 @@ export function MedicalReportPanel({
         doctorLicense,
       });
       setReport(data.report);
-      if (data.localDraft) {
-        if (data.localDraftReason === "quota_exceeded") {
-          toast.message(
-            "Cuota diaria de Gemini agotada. Se armó un borrador local — revisalo y guardalo.",
-            { duration: 10_000 },
-          );
-        } else {
-          toast.message(
-            "Informe redactado localmente (sin IA en la nube). Revisalo y guardalo.",
-            { duration: 8_000 },
-          );
-        }
+      if (data.quotaFallback) {
+        toast.warning(
+          "Se generó un borrador local (límite de Gemini alcanzado). Revisalo y guardalo.",
+          { duration: 12_000 },
+        );
       } else {
         toast.success("Informe generado con IA — podés editarlo antes de guardar");
       }
@@ -296,24 +289,6 @@ export function MedicalReportPanel({
             className={`text-sm ${compact ? "min-h-[160px]" : "min-h-[220px]"}`}
             disabled={isGenerating}
           />
-          {(signatureImageData || signatureText) && (
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 flex items-center gap-3">
-              <p className="text-[10px] text-slate-500 shrink-0">
-                Firma en PDF:
-              </p>
-              {signatureImageData ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={signatureImageData}
-                  alt="Firma"
-                  className="h-8 object-contain"
-                />
-              ) : null}
-              {signatureText && (
-                <span className="text-xs text-slate-700">{signatureText}</span>
-              )}
-            </div>
-          )}
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"

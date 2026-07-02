@@ -8,12 +8,6 @@ import { toast } from "sonner";
 import { EcosystemDiagram } from "@/components/nodo/ecosystem-diagram";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { DEMO_CREDENTIALS } from "@/lib/clinic/config";
-import {
-  CLINICA_REGISTRATION_URL,
-  isOpenRegistrationAllowed,
-  isPlatformMode,
-} from "@/lib/clinic/platform-config";
-import { PlatformMedicoLoginFields } from "@/components/auth/platform-medico-login";
 
 interface LoginFormProps {
   defaultRole: "doctor" | "patient";
@@ -25,8 +19,6 @@ type AuthMode = "login" | "register";
 export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
   const isDoctor = defaultRole === "doctor";
   const demo = isDoctor ? DEMO_CREDENTIALS.doctor : DEMO_CREDENTIALS.patient;
-  const platformDoctor = isDoctor && isPlatformMode();
-  const showRegister = isOpenRegistrationAllowed() && !platformDoctor;
 
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [registerRole, setRegisterRole] = useState<"doctor" | "patient">(
@@ -210,31 +202,20 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
               >
                 Iniciar sesión
               </button>
-              {showRegister ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode("register");
-                    setGeneralError("");
-                  }}
-                  className={`flex-1 pb-3 text-[15px] font-bold transition-colors border-b-2 ${
-                    authMode === "register"
-                      ? "border-brand text-brand"
-                      : "border-transparent text-slate2 hover:text-navy"
-                  }`}
-                >
-                  Registrarse
-                </button>
-              ) : platformDoctor ? (
-                <a
-                  href={CLINICA_REGISTRATION_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 pb-3 text-center text-[15px] font-bold text-slate2 hover:text-brand transition-colors"
-                >
-                  Suscribirme
-                </a>
-              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode("register");
+                  setGeneralError("");
+                }}
+                className={`flex-1 pb-3 text-[15px] font-bold transition-colors border-b-2 ${
+                  authMode === "register"
+                    ? "border-brand text-brand"
+                    : "border-transparent text-slate2 hover:text-navy"
+                }`}
+              >
+                Registrarse
+              </button>
             </div>
 
             {authMode === "login" ? (
@@ -252,31 +233,6 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
                     : "Ingresá tus credenciales para pedir turno y conectarte por videollamada."}
                 </p>
 
-                {platformDoctor ? (
-                  <>
-                    {generalError && (
-                      <p className="text-[13px] text-[#C0392B] mb-3 text-center">
-                        {generalError}
-                      </p>
-                    )}
-                    <PlatformMedicoLoginFields
-                      email={form.email}
-                      password={form.password}
-                      loading={loading}
-                      setLoading={setLoading}
-                      setGeneralError={setGeneralError}
-                      inputBase={inputBase}
-                      inputNormal={inputNormal}
-                      inputFocus={inputFocus}
-                      showPassword={showPassword}
-                      setShowPassword={setShowPassword}
-                      onEmailChange={(email) => setForm({ ...form, email })}
-                      onPasswordChange={(password) =>
-                        setForm({ ...form, password })
-                      }
-                    />
-                  </>
-                ) : (
                 <form onSubmit={handleLogin} noValidate>
                   <div className="mb-4">
                     <label
@@ -360,13 +316,10 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
                     )}
                   </button>
                 </form>
-                )}
 
-                {!platformDoctor && (
                 <p className="text-xs text-center text-slate2 mt-4">
                   Demo: {demo.email} / {demo.password}
                 </p>
-                )}
                 {!unified && (
                 <p className="text-xs text-center text-slate2 mt-2">
                   ¿Sos {isDoctor ? "paciente" : "médico"}?{" "}
@@ -379,7 +332,7 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
                 </p>
                 )}
               </div>
-            ) : showRegister ? (
+            ) : (
               <div>
                 <div className="flex rounded-lg bg-mist/50 p-1 mb-6 border border-mist">
                   <button
@@ -519,25 +472,6 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
                     )}
                   </button>
                 </form>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <h2 className="font-display font-bold text-ink text-[22px] mb-2">
-                  Registro vía NodoCore
-                </h2>
-                <p className="text-slate2 text-[14px] mb-6">
-                  {isDoctor
-                    ? "Los médicos se suscriben desde nodocore.com.ar, igual que en Nodo Inmo."
-                    : "Creá tu cuenta de paciente desde el portal de registro de Nodo."}
-                </p>
-                <a
-                  href={CLINICA_REGISTRATION_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex py-3 px-6 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600"
-                >
-                  Ir a registrarme
-                </a>
               </div>
             )}
           </div>

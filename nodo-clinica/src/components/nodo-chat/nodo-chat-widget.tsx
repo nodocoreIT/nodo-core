@@ -83,7 +83,7 @@ export function NodoChatWidget({
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const firstName = doctorName.trim().split(/\s+/)[0] || "Colega";
+  const firstName = (doctorName ?? "").trim().split(/\s+/)[0] || "Colega";
 
   const loadMessages = useCallback(async () => {
     if (!isPro) return;
@@ -194,7 +194,7 @@ export function NodoChatWidget({
           <p className="font-display font-bold text-navy">Nodo Chat — Plan Pro</p>
           <p className="text-sm text-slate2 mt-2 max-w-md mx-auto">
             El chat interno del ecosistema está disponible para usuarios Pro de
-            Nodo Clínica, Inmo y otros nodos. Actualizá tu plan para chatear con
+            Nodo Salud, Inmo y otros nodos. Actualizá tu plan para chatear con
             colegas de todo el ecosistema.
           </p>
         </div>

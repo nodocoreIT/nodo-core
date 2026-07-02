@@ -1,4 +1,4 @@
-import type { LocalDoctor } from "@/lib/clinic/local-db";
+import type { LocalDoctor } from "@/lib/clinic/types";
 
 /** Token manual legacy o OAuth guardado (sin refrescar). */
 export function readStoredAccessToken(doctor: LocalDoctor): string | undefined {

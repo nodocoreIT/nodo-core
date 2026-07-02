@@ -196,7 +196,8 @@ export function PrescriptionForm({
       });
 
       if (sendEmail && patientEmail) {
-        await fetch("/api/prescriptions/send", {
+        const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+        await fetch(`${basePath}/api/prescriptions/send`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

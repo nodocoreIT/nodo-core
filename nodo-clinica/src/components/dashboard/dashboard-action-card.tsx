@@ -15,8 +15,7 @@ export interface DashboardActionCardProps {
   title: string;
   description: string;
   buttonLabel: string;
-  href?: string;
-  onClick?: () => void;
+  href: string;
   tone?: ActionTone;
 }
 
@@ -26,14 +25,8 @@ export function DashboardActionCard({
   description,
   buttonLabel,
   href,
-  onClick,
   tone = "brand",
 }: DashboardActionCardProps) {
-  const btnClass = cn(
-    "inline-flex w-full items-center justify-center rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors shadow-sm",
-    TONE_BUTTON[tone],
-  );
-
   return (
     <div className="flex h-full flex-col rounded-md border border-border bg-card px-5 py-4 shadow-sm">
       {badge ? (
@@ -46,15 +39,15 @@ export function DashboardActionCard({
       <p className="mt-1 flex-1 text-sm text-slate2">{description}</p>
 
       <div className="mt-4">
-        {onClick ? (
-          <button type="button" onClick={onClick} className={btnClass}>
-            {buttonLabel}
-          </button>
-        ) : (
-          <Link href={href ?? "#"} className={btnClass}>
-            {buttonLabel}
-          </Link>
-        )}
+        <Link
+          href={href}
+          className={cn(
+            "inline-flex w-full items-center justify-center rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors shadow-sm",
+            TONE_BUTTON[tone],
+          )}
+        >
+          {buttonLabel}
+        </Link>
       </div>
     </div>
   );

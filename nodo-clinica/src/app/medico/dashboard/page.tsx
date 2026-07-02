@@ -14,7 +14,7 @@ export default function MedicoDashboardPage() {
 
   useEffect(() => {
     clinicApi.getSession().then(({ session, user }) => {
-      if (!session || session.role !== "doctor") {
+      if (!session || !["doctor", "admin", "super_admin"].includes(session.role)) {
         router.push("/login");
         return;
       }

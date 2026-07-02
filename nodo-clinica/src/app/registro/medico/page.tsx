@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,10 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Stethoscope, Loader2, ArrowLeft, CreditCard, Check } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
-import {
-  CLINICA_REGISTRATION_URL,
-  isOpenRegistrationAllowed,
-} from "@/lib/clinic/platform-config";
 
 const PLANS = [
   {
@@ -41,13 +37,6 @@ const PLANS = [
 
 export default function RegistroMedicoPage() {
   const router = useRouter();
-
-  useEffect(() => {
-    if (!isOpenRegistrationAllowed()) {
-      window.location.replace(CLINICA_REGISTRATION_URL);
-    }
-  }, []);
-
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState("trial");
   const [form, setForm] = useState({

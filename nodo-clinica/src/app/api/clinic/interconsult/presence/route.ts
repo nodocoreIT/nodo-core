@@ -1,39 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  readDb,
-  writeDb,
-  ONLINE_THRESHOLD_MS,
-  publicDoctorSummary,
-} from "@/lib/clinic/local-db";
-import { getSessionFromRequest } from "@/lib/clinic/session";
-import { isProPlan } from "@/lib/nodo-chat/is-pro-plan";
+import { requireAuth } from "@/lib/supabase/auth-guard";
+
+const ONLINE_THRESHOLD_MS = 90_000;
 
 export async function GET(request: NextRequest) {
-  const session = await getSessionFromRequest(request);
-  if (!session || session.role !== "doctor") {
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const { user, supabase } = auth;
+
+  if (user.role === "patient" || !user.org_id) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const db = await readDb();
-  const me = db.doctors.find((d) => d.id === session.userId);
-  if (!me || !isProPlan(me.subscriptionPlan)) {
-    return NextResponse.json({ error: "Plan Pro requerido" }, { status: 403 });
+  const { data: me } = await supabase
+    .from("professionals")
+    .select("id")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+
+  if (!me) {
+    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
   }
 
   const now = Date.now();
 
-  const doctors = db.doctors
-    .filter((d) => d.id !== session.userId)
-    .map((d) => {
-      const presence = db.doctorPresence?.[d.id];
-      const lastSeen = presence?.lastSeen
-        ? new Date(presence.lastSeen).getTime()
-        : 0;
-      const online = now - lastSeen < ONLINE_THRESHOLD_MS;
+  const { data: professionals } = await supabase
+    .from("professionals")
+    .select("id, full_name, specialty")
+    .eq("org_id", user.org_id)
+    .neq("id", me.id);
+
+  const { data: presenceRows } = await supabase
+    .from("doctor_presence")
+    .select("professional_id, last_seen")
+    .eq("org_id", user.org_id);
+
+  const presenceMap = new Map(
+    (presenceRows ?? []).map((p) => [
+      p.professional_id,
+      p.last_seen as string | null,
+    ]),
+  );
+
+  const doctors = (professionals ?? [])
+    .map((p) => {
+      const lastSeen = presenceMap.get(p.id) ?? null;
+      const lastSeenMs = lastSeen ? new Date(lastSeen).getTime() : 0;
       return {
-        ...publicDoctorSummary(d),
-        online,
-        lastSeen: presence?.lastSeen ?? null,
+        id: p.id,
+        fullName: p.full_name,
+        specialty: p.specialty ?? null,
+        online: now - lastSeenMs < ONLINE_THRESHOLD_MS,
+        lastSeen,
       };
     })
     .sort((a, b) => Number(b.online) - Number(a.online));
@@ -42,18 +60,32 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getSessionFromRequest(request);
-  if (!session || session.role !== "doctor") {
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const { user, supabase } = auth;
+
+  if (user.role === "patient" || !user.org_id) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  await writeDb((db) => {
-    if (!db.doctorPresence) db.doctorPresence = {};
-    db.doctorPresence[session.userId] = {
-      doctorId: session.userId,
-      lastSeen: new Date().toISOString(),
-    };
-  });
+  const { data: me } = await supabase
+    .from("professionals")
+    .select("id")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+
+  if (!me) {
+    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+  }
+
+  const now = new Date().toISOString();
+
+  await supabase
+    .from("doctor_presence")
+    .upsert(
+      { professional_id: me.id, org_id: user.org_id, last_seen: now },
+      { onConflict: "professional_id,org_id" },
+    );
 
   return NextResponse.json({ ok: true });
 }

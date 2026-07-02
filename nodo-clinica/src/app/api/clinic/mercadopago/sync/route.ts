@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readDb } from "@/lib/clinic/local-db";
+import { createClient } from "@/lib/supabase/server";
+import { getAppointmentByToken } from "@/lib/clinic/db/appointments";
 import { processMercadoPagoPaymentId } from "@/lib/mercadopago/handle-payment-webhook";
 
 export const dynamic = "force-dynamic";
@@ -16,13 +17,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "accessToken requerido" }, { status: 400 });
   }
 
-  const db = await readDb();
-  const apt = db.appointments.find((a) => a.accessToken === accessToken);
+  const supabase = await createClient();
+  const { data: apt } = await getAppointmentByToken(supabase, accessToken);
   if (!apt) {
     return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
   }
 
-  if (apt.paymentStatus === "confirmed" || apt.paymentStatus === "waived") {
+  const row = apt as Record<string, unknown>;
+  const paymentStatus = row.payment_status as string | null;
+  if (paymentStatus === "confirmed" || paymentStatus === "waived") {
     return NextResponse.json({ ok: true, alreadyConfirmed: true });
   }
 
@@ -33,13 +36,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const result = await processMercadoPagoPaymentId(paymentId, {
-    appointmentIdHint: apt.id,
-  });
-  const updated = (await readDb()).appointments.find((a) => a.id === apt.id);
+  const result = await processMercadoPagoPaymentId(paymentId);
+
+  const { data: updated } = await supabase
+    .from("appointments")
+    .select("payment_status")
+    .eq("id", row.id as string)
+    .maybeSingle();
 
   return NextResponse.json({
     ...result,
-    paymentStatus: updated?.paymentStatus,
+    paymentStatus: (updated as Record<string, unknown> | null)?.payment_status,
   });
 }

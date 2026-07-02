@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Sora, Hanken_Grotesk } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/providers/theme-provider";
-import { AppProviders } from "@/components/providers/app-providers";
 import "./globals.css";
 
 const sora = Sora({
@@ -48,12 +47,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col font-sans" suppressHydrationWarning>
-        <AppProviders>
-          <ThemeProvider>
-            {children}
-            <Toaster position="top-right" richColors />
-          </ThemeProvider>
-        </AppProviders>
+        <ThemeProvider>
+          {children}
+          <Toaster position="top-right" richColors />
+        </ThemeProvider>
       </body>
     </html>
   );

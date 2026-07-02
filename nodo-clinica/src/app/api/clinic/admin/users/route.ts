@@ -1,267 +1,155 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  readDb,
-  writeDb,
-  newId,
-  publicDoctor,
-  publicPatient,
-} from "@/lib/clinic/local-db";
-import { hashPassword } from "@/lib/clinic/password";
+import { requireAuth } from "@/lib/supabase/auth-guard";
+import { createServiceClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-function assertAdmin(
-  request: NextRequest,
-): { ok: true } | { ok: false; error: string; status: number } {
-  const secret = process.env.CLINIC_ADMIN_SECRET?.trim();
-  if (!secret) {
-    return {
-      ok: false,
-      status: 503,
-      error:
-        "CLINIC_ADMIN_SECRET no está en Vercel. Settings → Environment Variables → agregalo y redeploy.",
-    };
-  }
-  const header = request.headers.get("x-clinic-admin-secret");
-  if (header !== secret) {
-    return {
-      ok: false,
-      status: 401,
-      error:
-        "x-clinic-admin-secret incorrecto. Debe ser el valor de CLINIC_ADMIN_SECRET en Vercel (no la contraseña de login).",
-    };
-  }
-  return { ok: true };
-}
-
 /**
- * Crear usuarios de prueba sin UI (solo con CLINIC_ADMIN_SECRET).
- * POST { role: "doctor"|"patient", fullName, email, password, specialty?, licenseNumber?, phone? }
+ * Admin user management — requires role = 'super_admin' from JWT claims.
+ * No request-body or header secret; role is verified from Supabase JWT app_metadata.
  */
-export async function POST(request: NextRequest) {
-  const auth = assertAdmin(request);
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+function requireSuperAdmin(role: string): NextResponse | null {
+  if (role !== "super_admin") {
+    return NextResponse.json({ error: "Acceso denegado — se requiere super_admin" }, { status: 403 });
   }
-
-  const body = await request.json();
-  const { role, fullName, email, password, specialty, licenseNumber, phone } =
-    body;
-
-  if (!role || !fullName || !email || !password) {
-    return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
-  }
-
-  const db = await readDb();
-  const emailLower = String(email).toLowerCase().trim();
-
-  if (role === "doctor") {
-    if (db.doctors.some((d) => d.email === emailLower)) {
-      return NextResponse.json({ error: "Email ya registrado" }, { status: 409 });
-    }
-
-    const doctor = {
-      id: newId("doc"),
-      fullName: String(fullName).trim(),
-      email: emailLower,
-      password: hashPassword(String(password)),
-      specialty: specialty || "Medicina General",
-      licenseNumber: licenseNumber || "Pendiente",
-      subscriptionStatus: "active" as const,
-      subscriptionPlan: "trial",
-      payment: {
-        requirePaymentBeforeBooking: true,
-        consultationFee: 100,
-        currency: "ARS",
-        mercadopagoEnabled: true,
-      },
-      createdAt: new Date().toISOString(),
-    };
-
-    await writeDb((d) => {
-      d.doctors.push(doctor);
-    });
-
-    return NextResponse.json({
-      ok: true,
-      role: "doctor",
-      user: publicDoctor(doctor),
-      loginUrl: "/login/medico",
-    });
-  }
-
-  if (role === "patient") {
-    if (db.patients.some((p) => p.email === emailLower)) {
-      return NextResponse.json({ error: "Email ya registrado" }, { status: 409 });
-    }
-
-    const patient = {
-      id: newId("pat"),
-      fullName: String(fullName).trim(),
-      email: emailLower,
-      password: hashPassword(String(password)),
-      phone,
-      createdAt: new Date().toISOString(),
-    };
-
-    await writeDb((d) => {
-      d.patients.push(patient);
-    });
-
-    return NextResponse.json({
-      ok: true,
-      role: "patient",
-      user: publicPatient(patient),
-      loginUrl: "/login/paciente",
-    });
-  }
-
-  return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
+  return null;
 }
 
-/** Listar médicos/pacientes (sin contraseñas) — solo admin. */
+/** List users in the org. */
 export async function GET(request: NextRequest) {
-  const auth = assertAdmin(request);
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
+  const forbidden = requireSuperAdmin(auth.user.role);
+  if (forbidden) return forbidden;
+
+  if (!auth.user.org_id) {
+    return NextResponse.json({ error: "Org no encontrada" }, { status: 403 });
   }
 
-  const db = await readDb();
+  const supabase = await createServiceClient();
+
+  const { data: professionals } = await supabase
+    .from("professionals")
+    .select("id, full_name, email, specialty, auth_user_id")
+    .eq("org_id", auth.user.org_id);
+
+  const { data: patients } = await supabase
+    .from("patients")
+    .select("id, full_name, email")
+    .eq("org_id", auth.user.org_id);
+
   return NextResponse.json({
-    doctors: db.doctors.map((d) => ({
-      id: d.id,
-      fullName: d.fullName,
-      email: d.email,
-      mercadopagoConnected: !!d.payment?.mercadopagoUserId,
-    })),
-    patients: db.patients.map((p) => ({
+    doctors: (professionals ?? []).map((p) => ({
       id: p.id,
-      fullName: p.fullName,
+      fullName: p.full_name,
+      email: p.email,
+      specialty: p.specialty,
+    })),
+    patients: (patients ?? []).map((p) => ({
+      id: p.id,
+      fullName: p.full_name,
       email: p.email,
     })),
   });
 }
 
 /**
- * Resetear contraseña o crear usuario si no existe.
- * PATCH { action: "upsert", role, email, password, fullName?, specialty?, licenseNumber? }
+ * Create a new doctor or patient user.
+ * POST { role: "doctor"|"patient", fullName, email, password, specialty?, licenseNumber?, phone? }
  */
-export async function PATCH(request: NextRequest) {
-  const auth = assertAdmin(request);
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
+  const forbidden = requireSuperAdmin(auth.user.role);
+  if (forbidden) return forbidden;
+
+  if (!auth.user.org_id) {
+    return NextResponse.json({ error: "Org no encontrada" }, { status: 403 });
   }
 
   const body = await request.json();
-  const { action, role, email, password, fullName, specialty, licenseNumber } =
-    body;
+  const { role, fullName, email, password, specialty, licenseNumber, phone } = body;
 
-  if (action !== "upsert" || !role || !email || !password) {
-    return NextResponse.json(
-      { error: "PATCH requiere action=upsert, role, email y password" },
-      { status: 400 },
-    );
+  if (!role || !fullName || !email || !password) {
+    return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
   }
 
+  const supabase = await createServiceClient();
   const emailLower = String(email).toLowerCase().trim();
-  const db = await readDb();
+
+  // Create auth user
+  const { data: authData, error: signUpError } = await supabase.auth.admin.createUser({
+    email: emailLower,
+    password: String(password),
+    email_confirm: true,
+  });
+
+  if (signUpError) {
+    if (signUpError.message?.includes("already")) {
+      return NextResponse.json({ error: "Email ya registrado" }, { status: 409 });
+    }
+    return NextResponse.json({ error: signUpError.message }, { status: 400 });
+  }
+
+  const authUserId = authData.user.id;
 
   if (role === "doctor") {
-    const existing = db.doctors.find((d) => d.email === emailLower);
-    if (existing) {
-      await writeDb((d) => {
-        const target = d.doctors.find((x) => x.email === emailLower);
-        if (!target) return;
-        target.password = hashPassword(String(password));
-        if (fullName) target.fullName = String(fullName).trim();
-        if (specialty) target.specialty = String(specialty);
-        if (licenseNumber) target.licenseNumber = String(licenseNumber);
-      });
-      const updated = (await readDb()).doctors.find((d) => d.email === emailLower)!;
-      return NextResponse.json({
-        ok: true,
-        action: "password_reset",
-        user: publicDoctor(updated),
-      });
+    const { data: professional, error: profError } = await supabase
+      .from("professionals")
+      .insert({
+        auth_user_id: authUserId,
+        org_id: auth.user.org_id,
+        full_name: String(fullName).trim(),
+        email: emailLower,
+        specialty: specialty || "Medicina General",
+        license_number: licenseNumber || "Pendiente",
+      })
+      .select()
+      .single();
+
+    if (profError) {
+      return NextResponse.json({ error: profError.message }, { status: 400 });
     }
 
-    if (!fullName) {
-      return NextResponse.json(
-        { error: "Usuario no encontrado. Enviá fullName para crearlo." },
-        { status: 404 },
-      );
-    }
-
-    const doctor = {
-      id: newId("doc"),
-      fullName: String(fullName).trim(),
-      email: emailLower,
-      password: hashPassword(String(password)),
-      specialty: specialty || "Medicina General",
-      licenseNumber: licenseNumber || "Pendiente",
-      subscriptionStatus: "active" as const,
-      subscriptionPlan: "trial",
-      payment: {
-        requirePaymentBeforeBooking: true,
-        consultationFee: 100,
-        currency: "ARS",
-        mercadopagoEnabled: true,
-      },
-      createdAt: new Date().toISOString(),
-    };
-
-    await writeDb((d) => {
-      d.doctors.push(doctor);
-    });
+    // Add to org_members with admin role
+    await supabase.from("org_members").insert({
+      user_id: authUserId,
+      org_id: auth.user.org_id,
+      role: "admin",
+    }).select();
 
     return NextResponse.json({
       ok: true,
-      action: "created",
-      user: publicDoctor(doctor),
+      role: "doctor",
+      user: { id: professional.id, fullName: professional.full_name, email: professional.email },
       loginUrl: "/login/medico",
     });
   }
 
   if (role === "patient") {
-    const existing = db.patients.find((p) => p.email === emailLower);
-    if (existing) {
-      await writeDb((d) => {
-        const target = d.patients.find((x) => x.email === emailLower);
-        if (!target) return;
-        target.password = hashPassword(String(password));
-        if (fullName) target.fullName = String(fullName).trim();
-      });
-      const updated = (await readDb()).patients.find((p) => p.email === emailLower)!;
-      return NextResponse.json({
-        ok: true,
-        action: "password_reset",
-        user: publicPatient(updated),
-      });
+    const { data: patient, error: patError } = await supabase
+      .from("patients")
+      .insert({
+        profile_id: authUserId,
+        org_id: auth.user.org_id,
+        full_name: String(fullName).trim(),
+        email: emailLower,
+        phone: phone ?? null,
+      })
+      .select()
+      .single();
+
+    if (patError) {
+      return NextResponse.json({ error: patError.message }, { status: 400 });
     }
-
-    if (!fullName) {
-      return NextResponse.json(
-        { error: "Usuario no encontrado. Enviá fullName para crearlo." },
-        { status: 404 },
-      );
-    }
-
-    const patient = {
-      id: newId("pat"),
-      fullName: String(fullName).trim(),
-      email: emailLower,
-      password: hashPassword(String(password)),
-      createdAt: new Date().toISOString(),
-    };
-
-    await writeDb((d) => {
-      d.patients.push(patient);
-    });
 
     return NextResponse.json({
       ok: true,
-      action: "created",
-      user: publicPatient(patient),
+      role: "patient",
+      user: { id: patient.id, fullName: patient.full_name, email: patient.email },
       loginUrl: "/login/paciente",
     });
   }

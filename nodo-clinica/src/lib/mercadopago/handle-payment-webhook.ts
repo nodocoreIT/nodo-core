@@ -1,45 +1,28 @@
-import { readDb } from "@/lib/clinic/local-db";
-import type { LocalDoctor } from "@/lib/clinic/local-db";
+import { createServiceClient } from "@/lib/supabase/server";
 import { confirmAppointmentPaymentAndNotify } from "@/lib/clinic/appointment-payment";
-import { getDoctorMercadoPagoAccessToken } from "@/lib/mercadopago/tokens";
 import { getPayment, type MpPaymentInfo } from "@/lib/mercadopago/client";
-
-async function fetchPaymentWithDoctorToken(
-  doctor: LocalDoctor,
-  paymentId: string,
-): Promise<MpPaymentInfo | null> {
-  const token = await getDoctorMercadoPagoAccessToken(doctor);
-  if (!token) return null;
-  try {
-    return await getPayment(token, paymentId);
-  } catch {
-    return null;
-  }
-}
+import { getOrgMercadoPagoAccessToken } from "@/lib/clinic/db/payments";
 
 export async function processMercadoPagoPaymentId(
   paymentId: string,
-  opts?: { appointmentIdHint?: string },
 ): Promise<{ ok: boolean; appointmentId?: string; skipped?: string }> {
-  const db = await readDb();
+  const supabase = await createServiceClient();
 
-  const doctorsToTry: LocalDoctor[] = [];
-  if (opts?.appointmentIdHint) {
-    const apt = db.appointments.find((a) => a.id === opts.appointmentIdHint);
-    if (apt) {
-      const doctor = db.doctors.find((d) => d.id === apt.doctorId);
-      if (doctor) doctorsToTry.push(doctor);
-    }
-  }
-  for (const doctor of db.doctors) {
-    if (!doctorsToTry.some((d) => d.id === doctor.id)) {
-      doctorsToTry.push(doctor);
-    }
-  }
+  // Get all orgs that have payment credentials
+  const { data: orgs } = await supabase
+    .from("office_settings")
+    .select("org_id");
 
-  for (const doctor of doctorsToTry) {
-    const payment = await fetchPaymentWithDoctorToken(doctor, paymentId);
-    if (!payment) continue;
+  for (const org of orgs ?? []) {
+    const token = await getOrgMercadoPagoAccessToken(org.org_id);
+    if (!token) continue;
+
+    let payment: MpPaymentInfo;
+    try {
+      payment = await getPayment(token, paymentId);
+    } catch {
+      continue;
+    }
 
     if (payment.status !== "approved") {
       return { ok: true, skipped: `status:${payment.status}` };
@@ -50,8 +33,14 @@ export async function processMercadoPagoPaymentId(
       return { ok: true, skipped: "no_external_reference" };
     }
 
-    const apt = db.appointments.find((a) => a.id === appointmentId);
-    if (!apt || apt.doctorId !== doctor.id) continue;
+    const { data: apt } = await supabase
+      .from("appointments")
+      .select("id, doctor_id, org_id")
+      .eq("id", appointmentId)
+      .eq("org_id", org.org_id)
+      .maybeSingle();
+
+    if (!apt) continue;
 
     await confirmAppointmentPaymentAndNotify(appointmentId, {
       mercadopagoPaymentId: String(payment.id),
