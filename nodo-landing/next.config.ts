@@ -2,7 +2,7 @@ import path from "path";
 import type { NextConfig } from "next";
 
 // Multi-Zone URLs — each remote app has its own deployment.
-// Set NODO_INMO_URL in nodo-landing/.env.local for dev,
+// Set app URLs in .env.local for dev,
 // and in Vercel environment variables for production.
 const NODO_INMO_URL = process.env.NODO_INMO_URL ?? "http://localhost:5173";
 const NODO_CLINICA_URL = process.env.NODO_CLINICA_URL ?? "http://localhost:3002";
