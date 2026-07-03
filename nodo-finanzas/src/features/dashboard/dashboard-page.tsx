@@ -1,10 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, TrendingDown, HandCoins, CheckCircle, Bell, Plus } from 'lucide-react';
+import { TrendingUp, TrendingDown, CheckCircle, Bell, Plus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { useNotifications } from '@/hooks/use-notifications';
-import { formatearMoneda, formatearFecha, esFechaDelMesActual } from '@/utils/formatters';
+import { formatearMoneda, formatearFecha } from '@/utils/formatters';
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -43,15 +43,6 @@ export function DashboardPage() {
   const gastosMes = finanzas.gastosDiarios
     .filter((g) => g.fecha.startsWith(mesActualStr) && !g.esSilencioso)
     .reduce((s, g) => s + g.monto, 0);
-
-  // Obligaciones pendientes (gastos fijos activos no pagados este mes)
-  const obligacionesPendientes = finanzas.gastosFijos.filter((gf) => {
-    if (!gf.activo) return false;
-    const estaPagado = finanzas.gastosDiarios.some(
-      (g) => g.gastoFijoId === gf.id && esFechaDelMesActual(g.fecha)
-    );
-    return !estaPagado;
-  }).length;
 
   // Últimos 5 gastos diarios
   const ultimosGastos = [...finanzas.gastosDiarios]
@@ -93,32 +84,27 @@ export function DashboardPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-brand/20">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Total ARS</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Dinero disponible en cuentas</p>
           <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(totalARS)}</p>
         </Card>
 
-        <Card className="border-brand/20">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Gastos del Día</p>
-          <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(gastosDelDia)}</p>
+        <Card className="border-orange-200 bg-orange-50/40">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-orange-500">Gastos del Día</p>
+          <p className="text-sm sm:text-lg lg:text-xl font-black text-orange-600 mt-1 leading-tight">{formatearMoneda(gastosDelDia)}</p>
         </Card>
 
-        <Card>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Gastos del mes</p>
-          <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(gastosMes)}</p>
-          <p className="text-[10px] text-slate2 mt-0.5">{mesActualStr}</p>
+        <Card className="border-red-200 bg-red-50/40">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-red-400">Gastos del Mes</p>
+          <p className="text-sm sm:text-lg lg:text-xl font-black text-red-600 mt-1 leading-tight">{formatearMoneda(gastosMes)}</p>
+          <p className="text-[10px] text-red-300 mt-0.5">{mesActualStr}</p>
         </Card>
 
-        <Card className={obligacionesPendientes > 0 ? 'border-amber-300 bg-amber-50/40' : ''}>
-          <div className="flex items-center gap-2">
-            <div className={`p-1.5 rounded-lg ${obligacionesPendientes > 0 ? 'bg-amber-100' : 'bg-mist'}`}>
-              <HandCoins className={`h-4 w-4 ${obligacionesPendientes > 0 ? 'text-amber-600' : 'text-brand'}`} />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Obligaciones</p>
-              <p className="text-xl font-black text-ink">{obligacionesPendientes}</p>
-              <p className="text-[10px] text-slate2">pendientes</p>
-            </div>
-          </div>
+        <Card className="border-emerald-200 bg-emerald-50/40">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Saldo</p>
+          <p className="text-sm sm:text-lg lg:text-xl font-black text-emerald-700 mt-1 leading-tight">
+            {formatearMoneda(totalARS - gastosMes)}
+          </p>
+          <p className="text-[10px] text-emerald-500 mt-0.5">disponible este mes</p>
         </Card>
       </div>
 
