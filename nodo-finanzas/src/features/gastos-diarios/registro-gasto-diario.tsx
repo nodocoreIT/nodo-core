@@ -109,21 +109,23 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
 
   // Compute auto-selections inline — instant, no effect delay
   const autoTarjetaId = useMemo(() => {
-    if (gastoEditando) return '';
+    // When editing, field.value takes priority (field.value || autoTarjetaId).
+    // This fallback only applies when field.value is empty (e.g. older records without tarjetaId stored).
     const visibles = tarjetasActivas.filter((t) => !t.banco?.toLowerCase().includes('pampa'));
     return (
       visibles.find((t) => { const n = t.nombre.toLowerCase(); return n.includes('visa') || n.includes('santander'); })
       ?? visibles[0]
     )?.id ?? '';
-  }, [tarjetasActivas, gastoEditando]);
+  }, [tarjetasActivas]);
 
   const autoCuentaId = useMemo(() => {
-    if (gastoEditando) return '';
+    // Fallback only when field.value is empty (new records or old records without cuentaId).
+    // Uses saldo IDs — same as gastos_diarios.cuenta_id FK references cuentas table.
     if (formaPago === 'EFECTIVO') return cuentasActivas.find((c) => norm(c.nombre).includes('efectivo'))?.id ?? '';
     if (formaPago === 'MERCADO_PAGO') return cuentasActivas.find((c) => { const n = norm(c.nombre); return n.includes('mercadopago') && !n.includes('reserva'); })?.id ?? '';
     if (formaPago === 'DEBITO' || formaPago === 'TRANSFERENCIA BANCO') return cuentasActivas.find((c) => { const n = norm(c.nombre); return n.includes('santander') && !n.includes('pampa'); })?.id ?? '';
     return '';
-  }, [cuentasActivas, formaPago, gastoEditando, norm]);
+  }, [cuentasActivas, formaPago, norm]);
   const opcionesCuotas = Array.from({ length: 24 }, (_, i) => ({
     value: i + 1,
     label: i === 0 ? '1 cuota (contado)' : `${i + 1} cuotas`,
