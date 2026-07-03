@@ -8,6 +8,7 @@ import type {
   Tarjeta,
   ConsumoTarjeta,
   Prestamo,
+  PrestamoComprobante,
   CuotaProgramada,
   CuentaBancaria,
   ConfiguracionCategoria,
@@ -803,6 +804,122 @@ export class FinanzasService {
       .getPublicUrl(fileName);
 
     return data.publicUrl;
+  }
+
+  // === COMPROBANTES DE PRÉSTAMOS ===
+
+  static async subirComprobantePrestamo(
+    prestamoId: string,
+    file: File,
+  ): Promise<PrestamoComprobante | null> {
+    const userId = await requireUserId();
+    const ext = file.name.split('.').pop() ?? 'jpg';
+    const storagePath = `${userId}/${prestamoId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('loan-receipts')
+      .upload(storagePath, file, { upsert: false });
+
+    if (uploadError) {
+      console.error('Error subiendo comprobante:', uploadError);
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .schema('nodo_finanzas_personales')
+      .from('prestamo_comprobantes')
+      .insert([{
+        prestamo_id: prestamoId,
+        user_id: userId,
+        storage_path: storagePath,
+        nombre: file.name,
+        tipo: file.type,
+        tamanio: file.size,
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error guardando metadata de comprobante:', error);
+      // Clean up the uploaded file if DB insert fails
+      await supabase.storage.from('loan-receipts').remove([storagePath]);
+      return null;
+    }
+
+    const { data: signedData } = await supabase.storage
+      .from('loan-receipts')
+      .createSignedUrl(storagePath, 3600);
+
+    return {
+      id: data.id,
+      prestamoId: data.prestamo_id,
+      userId: data.user_id,
+      storagePath: data.storage_path,
+      nombre: data.nombre,
+      tipo: data.tipo ?? undefined,
+      tamanio: data.tamanio ?? undefined,
+      createdAt: data.created_at,
+      url: signedData?.signedUrl,
+    };
+  }
+
+  static async obtenerComprobantes(prestamoId: string): Promise<PrestamoComprobante[]> {
+    const { data, error } = await supabase
+      .schema('nodo_finanzas_personales')
+      .from('prestamo_comprobantes')
+      .select('*')
+      .eq('prestamo_id', prestamoId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error obteniendo comprobantes:', error);
+      return [];
+    }
+
+    // Get signed URLs for all files in one batch
+    const paths = data.map((r) => r.storage_path);
+    const { data: signed } = await supabase.storage
+      .from('loan-receipts')
+      .createSignedUrls(paths, 3600);
+
+    const urlMap = new Map(
+      (signed ?? []).map((s) => [s.path, s.signedUrl]),
+    );
+
+    return data.map((r) => ({
+      id: r.id,
+      prestamoId: r.prestamo_id,
+      userId: r.user_id,
+      storagePath: r.storage_path,
+      nombre: r.nombre,
+      tipo: r.tipo ?? undefined,
+      tamanio: r.tamanio ?? undefined,
+      createdAt: r.created_at,
+      url: urlMap.get(r.storage_path) ?? undefined,
+    }));
+  }
+
+  static async eliminarComprobante(comprobante: PrestamoComprobante): Promise<boolean> {
+    const { error: dbError } = await supabase
+      .schema('nodo_finanzas_personales')
+      .from('prestamo_comprobantes')
+      .delete()
+      .eq('id', comprobante.id);
+
+    if (dbError) {
+      console.error('Error eliminando comprobante de DB:', dbError);
+      return false;
+    }
+
+    const { error: storageError } = await supabase.storage
+      .from('loan-receipts')
+      .remove([comprobante.storagePath]);
+
+    if (storageError) {
+      console.error('Error eliminando archivo de storage:', storageError);
+    }
+
+    return true;
   }
 
   // === CUENTAS BANCARIAS ===

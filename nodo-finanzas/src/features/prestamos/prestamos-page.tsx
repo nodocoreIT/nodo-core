@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Search,
   X,
+  Paperclip,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/ui/money-input';
@@ -19,8 +20,10 @@ import { FormSelect } from '@nodocore/shared-components';
 import { Spinner } from '@/components/ui/spinner';
 import { useLocation } from 'react-router-dom';
 import { useFinanzas } from '@/hooks/use-finanzas';
+import { useRubros } from '@/hooks/use-rubros';
 import { formatearMoneda, formatearFecha, getFechaHoy } from '@/utils/formatters';
 import { GestionCuotasProgramadas } from './gestion-cuotas-programadas';
+import { ModalComprobantes } from './modal-comprobantes';
 import toast from 'react-hot-toast';
 import type { Prestamo, Moneda } from '@/types';
 
@@ -108,6 +111,7 @@ const defaultForm = (): FormState => ({
 
 export function PrestamosPage() {
   const finanzas = useFinanzas();
+  const { rubrosActivos } = useRubros();
   const location = useLocation();
   const mesActual = new Date().toISOString().slice(0, 7);
 
@@ -116,6 +120,7 @@ export function PrestamosPage() {
   const [mostrarFinalizados, setMostrarFinalizados] = useState(false);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [prestamoParaCuotas, setPrestamoParaCuotas] = useState<Prestamo | null>(null);
+  const [prestamoParaComprobantes, setPrestamoParaComprobantes] = useState<Prestamo | null>(null);
   const [prestamoParaPago, setPrestamoParaPago] = useState<Prestamo | null>(null);
   const [cuentaPagoId, setCuentaPagoId] = useState('');
   const [procesandoPago, setProcesandoPago] = useState(false);
@@ -240,6 +245,8 @@ export function PrestamosPage() {
     else if (cuenta.tipo === 'VIRTUAL') formaPago = 'MERCADO_PAGO';
 
     setProcesandoPago(true);
+    const rubroCreditos = rubrosActivos.find((r) => r.codigo === 'CREDITOS');
+
     try {
       await finanzas.agregarGastoDiario({
         descripcion: 'Préstamo',
@@ -249,6 +256,8 @@ export function PrestamosPage() {
         formaPago,
         cuentaId: cuentaPagoId,
         prestamoId: prestamoParaPago.id,
+        rubroId: rubroCreditos?.id,
+        rubro: rubroCreditos ? 'CREDITOS' : undefined,
       });
 
       const cambios: Partial<Prestamo> = {
@@ -542,6 +551,13 @@ export function PrestamosPage() {
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           Ver Cuotas
                         </Button>
+                        <button
+                          onClick={() => setPrestamoParaComprobantes(prestamo)}
+                          className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"
+                          title="Comprobantes"
+                        >
+                          <Paperclip className="h-3.5 w-3.5" />
+                        </button>
                         <button
                           onClick={() => abrirFormulario(prestamo)}
                           className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"
@@ -879,6 +895,13 @@ export function PrestamosPage() {
         <GestionCuotasProgramadas
           prestamo={prestamoParaCuotas}
           onClose={() => setPrestamoParaCuotas(null)}
+        />
+      )}
+
+      {prestamoParaComprobantes && (
+        <ModalComprobantes
+          prestamo={prestamoParaComprobantes}
+          onClose={() => setPrestamoParaComprobantes(null)}
         />
       )}
     </div>

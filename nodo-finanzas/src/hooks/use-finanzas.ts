@@ -21,31 +21,39 @@ import type {
 } from '@/types';
 import { TASA_INTERES_TARJETA } from '@/types';
 
+// Module-level cache: survives component unmounts within the same page session.
+// Allows secondary hook instances (e.g. child forms) to start with already-loaded
+// data instead of empty arrays, eliminating the visible flash on edit open.
+const EMPTY_STATE: AppState = {
+  cuentas: [],
+  gastosFijos: [],
+  gastosDiarios: [],
+  tarjetas: [],
+  consumosTarjetas: [],
+  prestamos: [],
+  planesAhorro: [],
+  cotizacionDolar: null,
+  configuracion: {
+    tipoDolarSeleccionado: 'blue',
+    cuentasBancarias: [],
+    categorias: [],
+    formasDePago: [],
+    sueldos: [],
+  },
+};
+let _moduleCache: AppState = EMPTY_STATE;
+
 export const useFinanzas = () => {
   const { session } = useAuth();
   const userId = session?.user?.id;
-  const [estado, setEstado] = useState<AppState>({
-    cuentas: [],
-    gastosFijos: [],
-    gastosDiarios: [],
-    tarjetas: [],
-    consumosTarjetas: [],
-    prestamos: [],
-    planesAhorro: [],
-    cotizacionDolar: null,
-    configuracion: {
-      tipoDolarSeleccionado: 'blue',
-      cuentasBancarias: [],
-      categorias: [],
-      formasDePago: [],
-      sueldos: [],
-    },
-  });
-  const [loading, setLoading] = useState(true);
+  const [estado, setEstado] = useState<AppState>(_moduleCache);
+  const [loading, setLoading] = useState(_moduleCache === EMPTY_STATE);
 
   // Cargar datos cuando hay sesión (multi-tenant por user_id)
   useEffect(() => {
     if (!userId) {
+      // Clear cache on logout so the next user starts fresh
+      _moduleCache = EMPTY_STATE;
       setLoading(false);
       return;
     }
@@ -54,16 +62,19 @@ export const useFinanzas = () => {
       try {
         setLoading(true);
 
-        // Kick off the full load and an independent tarjetas fetch simultaneously.
-        // Tarjetas resolve fast (small table) so the registration form can
-        // render its card selector without waiting for all 10+ queries to finish.
+        // Kick off the full load and independent fast fetches simultaneously.
+        // Tarjetas and cuentas resolve fast (small tables) so the registration
+        // form can render its selectors without waiting for all 10+ queries.
         const fullLoadPromise = FinanzasService.cargarEstadoCompleto();
         const tarjetasPromise = FinanzasService.obtenerTarjetas();
+        const cuentasPromise = FinanzasService.obtenerCuentas();
 
-        const tarjetas = await tarjetasPromise;
-        setEstado(prev => ({ ...prev, tarjetas }));
+        const [tarjetas, cuentas] = await Promise.all([tarjetasPromise, cuentasPromise]);
+        _moduleCache = { ..._moduleCache, tarjetas, cuentas };
+        setEstado(prev => ({ ...prev, tarjetas, cuentas }));
 
         const estadoCompleto = await fullLoadPromise;
+        _moduleCache = estadoCompleto;
         setEstado(estadoCompleto);
       } catch (error) {
         console.error('Error cargando datos:', error);
@@ -93,6 +104,7 @@ export const useFinanzas = () => {
     try {
       if (!silent) setLoading(true);
       const estadoCompleto = await FinanzasService.cargarEstadoCompleto();
+      _moduleCache = estadoCompleto;
       setEstado(estadoCompleto);
     } catch (error) {
       console.error('Error recargando datos:', error);

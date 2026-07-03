@@ -255,6 +255,19 @@ export interface Prestamo {
   diaPago?: number;
 }
 
+export interface PrestamoComprobante {
+  id: string;
+  prestamoId: string;
+  userId: string;
+  storagePath: string;
+  nombre: string;
+  tipo?: string;
+  tamanio?: number;
+  createdAt: string;
+  /** Signed URL — populated on fetch, not persisted */
+  url?: string;
+}
+
 export interface CuotaProgramada {
   id: string;
   prestamoId: string;
