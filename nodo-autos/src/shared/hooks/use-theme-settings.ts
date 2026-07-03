@@ -11,6 +11,7 @@ export interface ThemeSettings {
   fontFamily: "Inter" | "Roboto" | "Montserrat";
   logoType: "default" | "custom" | "text";
   brandText: string;
+  backgroundColor: string;
 }
 
 export const DEFAULT_SETTINGS: ThemeSettings = {
@@ -23,6 +24,7 @@ export const DEFAULT_SETTINGS: ThemeSettings = {
   fontFamily: "Inter",
   logoType: "default",
   brandText: "nodo autos",
+  backgroundColor: "#f0fdf4",
 };
 
 interface ThemeStore {

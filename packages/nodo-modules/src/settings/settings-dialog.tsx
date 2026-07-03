@@ -1214,6 +1214,48 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
                 </div>
               </div>
 
+              {/* Color de Fondo */}
+              <div className="space-y-2 border-t border-border pt-6">
+                <Label className="text-base font-bold text-navy">
+                  Color de Fondo
+                </Label>
+                <p className="text-xs text-slate2">
+                  Elegí el color del área de contenido (el panel a la derecha del menú). Podés elegirlo o ingresar su código hexadecimal.
+                </p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={/^#[0-9A-Fa-f]{6}$/.test(settings.backgroundColor ?? "#f0fdf4") ? (settings.backgroundColor ?? "#f0fdf4") : "#f0fdf4"}
+                    onChange={(e) =>
+                      setSettings({ backgroundColor: e.target.value })
+                    }
+                    className="h-10 w-12 cursor-pointer rounded border border-border p-1 bg-white flex-shrink-0"
+                  />
+                  <div className="flex flex-col gap-1">
+                    <Input
+                      type="text"
+                      placeholder="#F0FDF4"
+                      value={settings.backgroundColor ?? "#f0fdf4"}
+                      onChange={(e) => {
+                        let val = e.target.value;
+                        if (val && !val.startsWith("#") && /^[0-9A-Fa-f]/.test(val)) {
+                          val = "#" + val;
+                        }
+                        setSettings({ backgroundColor: val });
+                      }}
+                      className="h-9 w-28 text-xs font-mono uppercase"
+                      maxLength={7}
+                    />
+                    <button
+                      onClick={() => setSettings({ backgroundColor: "#f0fdf4" })}
+                      className="text-left text-xs text-brand hover:underline font-semibold"
+                    >
+                      Restablecer Verde Original
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* Logo del Panel */}
               <div className="space-y-2 border-t border-border pt-6">
                 <Label className="text-base font-bold text-navy">

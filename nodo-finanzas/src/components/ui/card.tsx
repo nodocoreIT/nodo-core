@@ -7,6 +7,7 @@ interface CardProps {
   title?: string;
   collapsible?: boolean;
   defaultOpen?: boolean;
+  storageKey?: string;
 }
 
 export function Card({
@@ -15,8 +16,23 @@ export function Card({
   title,
   collapsible = false,
   defaultOpen = true,
+  storageKey,
 }: CardProps) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useState(() => {
+    if (storageKey) {
+      const stored = sessionStorage.getItem(`card-open:${storageKey}`);
+      if (stored !== null) return stored === 'true';
+    }
+    return defaultOpen;
+  });
+
+  function handleToggle() {
+    setOpen((prev) => {
+      const next = !prev;
+      if (storageKey) sessionStorage.setItem(`card-open:${storageKey}`, String(next));
+      return next;
+    });
+  }
 
   return (
     <div className={`bg-white rounded-xl shadow-sm border border-mist p-5 ${className}`}>
@@ -24,7 +40,7 @@ export function Card({
         (collapsible ? (
           <button
             type="button"
-            onClick={() => setOpen((current) => !current)}
+            onClick={handleToggle}
             className={`flex w-full items-center justify-between gap-3 text-left ${open ? 'mb-6' : ''}`}
             aria-expanded={open}
           >

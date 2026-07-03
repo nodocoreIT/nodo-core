@@ -36,6 +36,7 @@ export interface ThemeSettings {
   sidebarTextColor: string;
   fontColor: string;
   buttonFontColor: string;
+  backgroundColor: string;
   borderRadius: "none" | "md" | "full";
   fontFamily: "Inter" | "Roboto" | "Montserrat";
   logoType: "default" | "custom" | "text";

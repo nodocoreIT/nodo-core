@@ -43,3 +43,5 @@ pnpm-debug.log*
 supabase/.branches/
 supabase/.temp/
 .cursor/mcp.json
+.vercel
+.env*

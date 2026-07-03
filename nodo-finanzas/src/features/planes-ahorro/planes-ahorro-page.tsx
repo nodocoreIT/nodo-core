@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/ui/money-input';
 import { FormSelect } from '@nodocore/shared-components';
 import { Spinner } from '@/components/ui/spinner';
+import { useLocation } from 'react-router-dom';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { formatearMoneda, formatearFecha, getFechaHoy } from '@/utils/formatters';
 import { GestionCuotasPlan } from './gestion-cuotas-plan';
@@ -90,6 +91,8 @@ function calcularDiasRestantes(fecha: string): number | null {
 
 export function PlanesAhorroPage() {
   const finanzas = useFinanzas();
+  const location = useLocation();
+  const openId = (location.state as { openId?: string } | null)?.openId;
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [planEditando, setPlanEditando] = useState<PlanAhorro | null>(null);
@@ -156,6 +159,13 @@ export function PlanesAhorroPage() {
     setPlanEditando(null);
     setForm(defaultForm());
   };
+
+  useEffect(() => {
+    if (!openId || finanzas.loading) return;
+    const plan = finanzas.planesAhorro.find((p) => p.id === openId);
+    if (plan) abrirFormulario(plan);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId, finanzas.loading]);
 
   const handleGuardar = async () => {
     if (!form.detalle.trim()) {

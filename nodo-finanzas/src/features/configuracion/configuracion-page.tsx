@@ -14,6 +14,7 @@ import {
   Search,
   X,
   Banknote,
+  DollarSign,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,8 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { ModalConfirmacion } from '@/components/ui/modal-confirmacion';
 import { RubroGestion } from '@/components/rubros/rubro-gestion';
 import { useFinanzas } from '@/hooks/use-finanzas';
+import { getFechaHoy } from '@/utils/formatters';
+import toast from 'react-hot-toast';
 import type {
   CuentaBancaria,
   Tarjeta,
@@ -89,6 +92,10 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
   const [tarjetaEditando, setTarjetaEditando] = useState<Tarjeta | null>(null);
   const [categoriaEditando, setCategoriaEditando] = useState<ConfiguracionCategoria | null>(null);
   const [sueldoEditando, setSueldoEditando] = useState<Sueldo | null>(null);
+  const [sueldoACobrar, setSueldoACobrar] = useState<Sueldo | null>(null);
+  const [cuentaCobroId, setCuentaCobroId] = useState('');
+  const [fechaCobro, setFechaCobro] = useState(getFechaHoy());
+  const [cobrando, setCobrando] = useState(false);
   const [medioEditando, setMedioEditando] = useState<{ codigo: string; nombre: string; activa: boolean; cuentaSaldoId?: string } | null>(null);
 
   // delete modal state
@@ -139,6 +146,29 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
       .replace(/[^A-Z0-9_]/g, '')
       .replace(/_+/g, '_')
       .replace(/^_|_$/g, '');
+  }
+
+  async function handleCobrar() {
+    if (!sueldoACobrar || !cuentaCobroId) return;
+    try {
+      setCobrando(true);
+      await finanzas.registrarMovimientoManual({
+        cuentaId: cuentaCobroId,
+        fecha: fechaCobro,
+        descripcion: `Cobro sueldo — ${sueldoACobrar.nombre}`,
+        monto: sueldoACobrar.monto,
+        tipo: 'entrada',
+        origen: 'transferencia_sueldo',
+      });
+      toast.success(`Sueldo de ${sueldoACobrar.nombre} cobrado correctamente`);
+      setSueldoACobrar(null);
+      setCuentaCobroId('');
+      setFechaCobro(getFechaHoy());
+    } catch {
+      toast.error('Error al registrar el cobro');
+    } finally {
+      setCobrando(false);
+    }
   }
 
   function cerrarForm() {
@@ -792,6 +822,20 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
                     ≈ ${Math.round(sueldo.monto * finanzas.cotizacionDolar.venta).toLocaleString()} ARS
                   </p>
                 )}
+                <div className="mt-4">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setSueldoACobrar(sueldo);
+                      setCuentaCobroId('');
+                      setFechaCobro(getFechaHoy());
+                    }}
+                    className="w-full"
+                  >
+                    <DollarSign className="w-3.5 h-3.5 mr-1" />
+                    Cobrar
+                  </Button>
+                </div>
                 <div className={`absolute left-0 top-0 bottom-0 w-1 ${sueldo.moneda === 'USD' ? 'bg-green-500' : 'bg-brand'}`} />
               </Card>
             ))}
@@ -1144,6 +1188,60 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
         confirmText="Sí, eliminar"
         cancelText="Cancelar"
       />
+
+      {/* Modal cobrar sueldo */}
+      {sueldoACobrar && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-sm">
+            <div className="flex items-center justify-between p-5 border-b border-mist">
+              <div>
+                <h3 className="text-lg font-bold text-ink">Cobrar sueldo</h3>
+                <p className="text-xs text-slate2 mt-0.5">{sueldoACobrar.nombre} · {sueldoACobrar.moneda === 'USD' ? 'US$' : '$'} {sueldoACobrar.monto.toLocaleString()}</p>
+              </div>
+              <button onClick={() => setSueldoACobrar(null)} className="p-1 rounded hover:bg-mist transition-colors">
+                <X className="w-5 h-5 text-slate2" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-ink">¿A qué cuenta acreditar? *</label>
+                <select
+                  value={cuentaCobroId}
+                  onChange={(e) => setCuentaCobroId(e.target.value)}
+                  className="border border-mist rounded-lg px-3 py-2 text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-brand"
+                >
+                  <option value="">Seleccioná una cuenta</option>
+                  {finanzas.cuentas.filter((c) => c.activa !== false).map((cuenta) => (
+                    <option key={cuenta.id} value={cuenta.id}>
+                      {cuenta.nombre} {cuenta.banco ? `— ${cuenta.banco}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-ink">Fecha de cobro</label>
+                <input
+                  type="date"
+                  value={fechaCobro}
+                  onChange={(e) => setFechaCobro(e.target.value)}
+                  className="border border-mist rounded-lg px-3 py-2 text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-brand"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 p-5 border-t border-mist">
+              <Button variant="outline" onClick={() => setSueldoACobrar(null)} className="flex-1" disabled={cobrando}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCobrar} className="flex-1" disabled={cobrando || !cuentaCobroId}>
+                {cobrando ? 'Registrando...' : 'Confirmar cobro'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

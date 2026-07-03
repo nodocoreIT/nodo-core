@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Plus,
   Edit,
@@ -17,11 +17,52 @@ import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/ui/money-input';
 import { FormSelect } from '@nodocore/shared-components';
 import { Spinner } from '@/components/ui/spinner';
+import { useLocation } from 'react-router-dom';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { formatearMoneda, formatearFecha, getFechaHoy } from '@/utils/formatters';
 import { GestionCuotasProgramadas } from './gestion-cuotas-programadas';
 import toast from 'react-hot-toast';
 import type { Prestamo, Moneda } from '@/types';
+
+function proximaFechaDesdiaDia(dia: number): { iso: string; display: string } {
+  const hoy = new Date();
+  const year = hoy.getFullYear();
+  const month = hoy.getMonth() + 1;
+  const maxDayActual = new Date(year, month, 0).getDate();
+  const dayActual = Math.min(dia, maxDayActual);
+  const fechaActual = new Date(year, month - 1, dayActual);
+
+  const hoyMedianoche = new Date(year, hoy.getMonth(), hoy.getDate());
+  if (fechaActual >= hoyMedianoche) {
+    const iso = `${year}-${String(month).padStart(2, '0')}-${String(dayActual).padStart(2, '0')}`;
+    return { iso, display: `${String(dayActual).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}` };
+  }
+
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  const maxDayNext = new Date(nextYear, nextMonth, 0).getDate();
+  const dayNext = Math.min(dia, maxDayNext);
+  const iso = `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(dayNext).padStart(2, '0')}`;
+  return { iso, display: `${String(dayNext).padStart(2, '0')}/${String(nextMonth).padStart(2, '0')}/${nextYear}` };
+}
+
+function avanzarMes(fechaISO: string, diaPago: number): string {
+  const [year, month] = fechaISO.split('-').map(Number);
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  const maxDay = new Date(nextYear, nextMonth, 0).getDate();
+  const day = Math.min(diaPago, maxDay);
+  return `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function retrocederMes(fechaISO: string, diaPago: number): string {
+  const [year, month] = fechaISO.split('-').map(Number);
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const maxDay = new Date(prevYear, prevMonth, 0).getDate();
+  const day = Math.min(diaPago, maxDay);
+  return `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
 
 interface FormState {
   concepto: string;
@@ -41,6 +82,7 @@ interface FormState {
   cuotaAbonada: boolean;
   noCobrarCuota: boolean;
   esSalvataje: boolean;
+  diaPago: string;
 }
 
 const defaultForm = (): FormState => ({
@@ -61,10 +103,12 @@ const defaultForm = (): FormState => ({
   cuotaAbonada: false,
   noCobrarCuota: false,
   esSalvataje: false,
+  diaPago: '',
 });
 
 export function PrestamosPage() {
   const finanzas = useFinanzas();
+  const location = useLocation();
   const mesActual = new Date().toISOString().slice(0, 7);
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
@@ -72,9 +116,51 @@ export function PrestamosPage() {
   const [mostrarFinalizados, setMostrarFinalizados] = useState(false);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [prestamoParaCuotas, setPrestamoParaCuotas] = useState<Prestamo | null>(null);
+  const [prestamoParaPago, setPrestamoParaPago] = useState<Prestamo | null>(null);
+  const [cuentaPagoId, setCuentaPagoId] = useState('');
+  const [procesandoPago, setProcesandoPago] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [form, setForm] = useState<FormState>(defaultForm());
   const [guardando, setGuardando] = useState(false);
+
+  const openId = (location.state as { openId?: string } | null)?.openId;
+
+  const abrirFormulario = (prestamo?: Prestamo) => {
+    if (prestamo) {
+      setPrestamoEditando(prestamo);
+      setForm({
+        concepto: prestamo.concepto,
+        montoOriginal: String(prestamo.montoOriginal),
+        moneda: prestamo.moneda,
+        saldoPendiente: String(prestamo.saldoPendiente),
+        tasaInteres: prestamo.tasaInteres ? String(prestamo.tasaInteres) : '',
+        fechaInicio: prestamo.fechaInicio,
+        fechaVencimiento: prestamo.fechaVencimiento || '',
+        cuotasTotales: prestamo.cuotasTotales ? String(prestamo.cuotasTotales) : '',
+        cuotasPagas: prestamo.cuotasPagas != null ? String(prestamo.cuotasPagas) : '0',
+        importeCuota: prestamo.importeCuota ? String(prestamo.importeCuota) : '',
+        saldoCancelacion: prestamo.saldoCancelacion ? String(prestamo.saldoCancelacion) : '',
+        prestamista: prestamo.prestamista || '',
+        notas: prestamo.notas || '',
+        pagado: prestamo.pagado || false,
+        cuotaAbonada: prestamo.cuotaAbonada || false,
+        noCobrarCuota: prestamo.noCobrarCuota || false,
+        esSalvataje: !prestamo.cuotasTotales,
+        diaPago: prestamo.diaPago ? String(prestamo.diaPago) : '',
+      });
+    } else {
+      setPrestamoEditando(null);
+      setForm(defaultForm());
+    }
+    setMostrarFormulario(true);
+  };
+
+  useEffect(() => {
+    if (!openId || finanzas.loading) return;
+    const prestamo = finanzas.prestamos.find((p) => p.id === openId);
+    if (prestamo) abrirFormulario(prestamo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId, finanzas.loading]);
 
   if (finanzas.loading) {
     return (
@@ -114,39 +200,78 @@ export function PrestamosPage() {
     });
   };
 
-  const abrirFormulario = (prestamo?: Prestamo) => {
-    if (prestamo) {
-      setPrestamoEditando(prestamo);
-      setForm({
-        concepto: prestamo.concepto,
-        montoOriginal: String(prestamo.montoOriginal),
-        moneda: prestamo.moneda,
-        saldoPendiente: String(prestamo.saldoPendiente),
-        tasaInteres: prestamo.tasaInteres ? String(prestamo.tasaInteres) : '',
-        fechaInicio: prestamo.fechaInicio,
-        fechaVencimiento: prestamo.fechaVencimiento || '',
-        cuotasTotales: prestamo.cuotasTotales ? String(prestamo.cuotasTotales) : '',
-        cuotasPagas: prestamo.cuotasPagas != null ? String(prestamo.cuotasPagas) : '0',
-        importeCuota: prestamo.importeCuota ? String(prestamo.importeCuota) : '',
-        saldoCancelacion: prestamo.saldoCancelacion ? String(prestamo.saldoCancelacion) : '',
-        prestamista: prestamo.prestamista || '',
-        notas: prestamo.notas || '',
-        pagado: prestamo.pagado || false,
-        cuotaAbonada: prestamo.cuotaAbonada || false,
-        noCobrarCuota: prestamo.noCobrarCuota || false,
-        esSalvataje: !prestamo.cuotasTotales,
-      });
-    } else {
-      setPrestamoEditando(null);
-      setForm(defaultForm());
-    }
-    setMostrarFormulario(true);
-  };
-
   const cerrarFormulario = () => {
     setMostrarFormulario(false);
     setPrestamoEditando(null);
     setForm(defaultForm());
+  };
+
+  const handleDesmarcarCuota = async (prestamo: Prestamo) => {
+    const cuotasPagasActual = prestamo.cuotasPagas ?? 0;
+    const cambios: Partial<Prestamo> = {
+      cuotaAbonada: false,
+      cuotasPagas: Math.max(0, cuotasPagasActual - 1),
+      ultimoPagoMes: undefined,
+    };
+    if (prestamo.diaPago && prestamo.fechaVencimiento) {
+      cambios.fechaVencimiento = retrocederMes(prestamo.fechaVencimiento, prestamo.diaPago);
+    }
+    if (prestamo.importeCuota) {
+      cambios.saldoPendiente = prestamo.saldoPendiente + prestamo.importeCuota;
+    }
+    try {
+      await finanzas.actualizarPrestamo(prestamo.id, cambios);
+      toast.success('Pago desmarcado');
+    } catch {
+      toast.error('Error al actualizar el préstamo');
+    }
+  };
+
+  const handleConfirmarPago = async () => {
+    if (!prestamoParaPago || !cuentaPagoId) return;
+    const cuenta = finanzas.cuentas.find((c) => c.id === cuentaPagoId);
+    if (!cuenta) return;
+
+    const cuotasPagasActual = prestamoParaPago.cuotasPagas ?? 0;
+    const numeroCuota = cuotasPagasActual + 1;
+
+    let formaPago: import('@/types').FormaDePago = 'TRANSFERENCIA BANCO';
+    if (cuenta.tipo === 'EFECTIVO') formaPago = 'EFECTIVO';
+    else if (cuenta.tipo === 'VIRTUAL') formaPago = 'MERCADO_PAGO';
+
+    setProcesandoPago(true);
+    try {
+      await finanzas.agregarGastoDiario({
+        descripcion: 'Préstamo',
+        detalle: `${prestamoParaPago.concepto} - Cuota ${numeroCuota} de ${prestamoParaPago.cuotasTotales ?? '?'}`,
+        monto: prestamoParaPago.importeCuota || 0,
+        fecha: getFechaHoy(),
+        formaPago,
+        cuentaId: cuentaPagoId,
+        prestamoId: prestamoParaPago.id,
+      });
+
+      const cambios: Partial<Prestamo> = {
+        cuotaAbonada: true,
+        cuotasPagas: numeroCuota,
+        ultimoPagoMes: mesActual,
+      };
+      if (prestamoParaPago.diaPago && prestamoParaPago.fechaVencimiento) {
+        cambios.fechaVencimiento = avanzarMes(prestamoParaPago.fechaVencimiento, prestamoParaPago.diaPago);
+      }
+      if (prestamoParaPago.importeCuota) {
+        cambios.saldoPendiente = Math.max(0, prestamoParaPago.saldoPendiente - prestamoParaPago.importeCuota);
+      }
+
+      await finanzas.actualizarPrestamo(prestamoParaPago.id, cambios);
+      toast.success('Cuota registrada como pagada');
+      setPrestamoParaPago(null);
+      setCuentaPagoId('');
+    } catch {
+      toast.error('Error al registrar el pago');
+    } finally {
+      setProcesandoPago(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -170,6 +295,7 @@ export function PrestamosPage() {
         pagado: form.pagado,
         cuotaAbonada: form.cuotaAbonada,
         noCobrarCuota: form.noCobrarCuota,
+        diaPago: form.diaPago ? parseInt(form.diaPago) : undefined,
       };
 
       if (prestamoEditando) {
@@ -291,10 +417,6 @@ export function PrestamosPage() {
       {/* List */}
       <div className="bg-white rounded-xl border border-mist">
         <div className="p-5">
-          <h2 className="text-base font-semibold text-ink mb-4">
-            {mostrarFinalizados ? 'Finalizados' : 'Activos'} ({prestamosMostrar.length})
-          </h2>
-
           {prestamosMostrar.length === 0 ? (
             <div className="text-center py-10">
               <TrendingDown className="w-12 h-12 text-slate2 mx-auto mb-3" />
@@ -323,10 +445,14 @@ export function PrestamosPage() {
                     key={prestamo.id}
                     className="p-4 rounded-xl border border-mist bg-white hover:border-brand/30 transition-colors"
                   >
-                    <div className="flex flex-col lg:flex-row justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex flex-wrap items-center gap-2 mb-3">
-                          <h3 className="font-bold text-lg text-ink">{prestamo.concepto}</h3>
+                    <div className="flex items-start justify-between gap-4">
+                      {/* Left: title + badges */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-lg text-ink leading-tight">{prestamo.concepto}</h3>
+                        {prestamo.prestamista && (
+                          <p className="text-xs text-slate2 mt-0.5">{prestamo.prestamista}</p>
+                        )}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                           {!prestamo.cuotasTotales && (
                             <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full font-medium">
                               Salvataje
@@ -348,42 +474,65 @@ export function PrestamosPage() {
                             </span>
                           )}
                         </div>
+                      </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                      {/* Center: compact stats */}
+                      <div className="flex items-start justify-around flex-1">
+                        <div>
+                          <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Cuota</p>
+                          <p className="font-bold text-ink text-sm">
+                            {prestamo.cuotasTotales
+                              ? formatearMoneda(prestamo.importeCuota || 0, prestamo.moneda as Moneda)
+                              : <span className="text-slate2 font-normal">—</span>}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Saldo</p>
+                          <p className="font-bold text-red-600 text-sm">
+                            {formatearMoneda(prestamo.saldoPendiente, prestamo.moneda as Moneda)}
+                          </p>
+                        </div>
+                        {prestamo.cuotasTotales && (
                           <div>
-                            <p className="text-xs text-slate2 uppercase font-bold mb-1">Valor Cuota</p>
-                            <p className="font-bold text-ink">
-                              {prestamo.cuotasTotales
-                                ? formatearMoneda(prestamo.importeCuota || 0, prestamo.moneda as Moneda)
-                                : <span className="text-slate2 font-normal">Sin cuota</span>}
-                            </p>
+                            <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Cuotas</p>
+                            <p className="font-medium text-ink text-sm">{cuotasPagadas}/{prestamo.cuotasTotales}</p>
                           </div>
-                          <div>
-                            <p className="text-xs text-slate2 uppercase font-bold mb-1">Saldo Pendiente</p>
-                            <p className="font-bold text-red-600">
-                              {formatearMoneda(prestamo.saldoPendiente, prestamo.moneda as Moneda)}
-                            </p>
-                          </div>
-                          {prestamo.cuotasTotales && (
-                            <div>
-                              <p className="text-xs text-slate2 uppercase font-bold mb-1">Cuotas</p>
-                              <p className="font-medium text-ink">
-                                {cuotasPagadas} / {prestamo.cuotasTotales}
-                              </p>
-                            </div>
-                          )}
-                          <div>
-                            <p className="text-xs text-slate2 uppercase font-bold mb-1">Vencimiento</p>
-                            <p className="font-medium text-ink">
-                              {prestamo.fechaVencimiento
-                                ? formatearFecha(prestamo.fechaVencimiento)
-                                : 'Flexible'}
-                            </p>
-                          </div>
+                        )}
+                        <div>
+                          <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Vto.</p>
+                          <p className="font-medium text-ink text-sm">
+                            {prestamo.fechaVencimiento ? formatearFecha(prestamo.fechaVencimiento) : '—'}
+                          </p>
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap gap-1.5 lg:flex-col justify-end">
+                      {/* Right: buttons */}
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {prestamo.cuotasTotales && !prestamo.pagado && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={`text-xs font-bold ${
+                              prestamo.cuotaAbonada
+                                ? 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
+                                : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                            }`}
+                            onClick={() => {
+                              if (prestamo.cuotaAbonada) {
+                                handleDesmarcarCuota(prestamo);
+                              } else {
+                                const cuentasCompatibles = finanzas.cuentas.filter(
+                                  (c) => c.activa && c.moneda === prestamo.moneda
+                                );
+                                setCuentaPagoId(cuentasCompatibles[0]?.id || '');
+                                setPrestamoParaPago(prestamo);
+                              }
+                            }}
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {prestamo.cuotaAbonada ? 'Desmarcar pago' : 'Pagar cuota'}
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
@@ -393,24 +542,20 @@ export function PrestamosPage() {
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           Ver Cuotas
                         </Button>
-                        <div className="flex gap-1.5">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => abrirFormulario(prestamo)}
-                            className="h-8 w-8 p-0 border-brand/20 bg-brand/5 text-brand"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEliminar(prestamo.id)}
-                            className="h-8 w-8 p-0 border-red-200 bg-red-50 text-red-600"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
+                        <button
+                          onClick={() => abrirFormulario(prestamo)}
+                          className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"
+                          title="Editar"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleEliminar(prestamo.id)}
+                          className="p-1.5 text-slate2 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </div>
 
@@ -468,6 +613,58 @@ export function PrestamosPage() {
           )}
         </div>
       </div>
+
+      {/* Modal: selección de cuenta para pagar cuota */}
+      {prestamoParaPago && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-sm p-6 space-y-4">
+            <h3 className="text-base font-bold text-ink">Pagar cuota</h3>
+            <div className="bg-mist/50 rounded-lg p-3 space-y-1">
+              <p className="text-sm font-semibold text-ink">{prestamoParaPago.concepto}</p>
+              <p className="text-xs text-slate2">
+                Cuota {(prestamoParaPago.cuotasPagas ?? 0) + 1} de {prestamoParaPago.cuotasTotales ?? '?'}
+                {prestamoParaPago.importeCuota
+                  ? ` — ${formatearMoneda(prestamoParaPago.importeCuota, prestamoParaPago.moneda as Moneda)}`
+                  : ''}
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-ink">¿Desde qué cuenta realizás el pago?</label>
+              <select
+                value={cuentaPagoId}
+                onChange={(e) => setCuentaPagoId(e.target.value)}
+                className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand bg-white"
+              >
+                <option value="">Seleccioná una cuenta</option>
+                {finanzas.cuentas
+                  .filter((c) => c.activa && c.moneda === prestamoParaPago.moneda)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre} — {formatearMoneda(c.saldoActual, c.moneda)}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => { setPrestamoParaPago(null); setCuentaPagoId(''); }}
+                disabled={procesandoPago}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleConfirmarPago}
+                disabled={!cuentaPagoId || procesandoPago}
+              >
+                {procesandoPago ? 'Registrando...' : 'Confirmar pago'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Formulario modal */}
       {mostrarFormulario && (
@@ -546,13 +743,34 @@ export function PrestamosPage() {
                 {!form.esSalvataje && (
                   <>
                     <div className="flex flex-col gap-1">
-                      <label className="text-sm font-medium text-ink">Fecha Vencimiento</label>
+                      <label className="text-sm font-medium text-ink">Día de vencimiento</label>
                       <input
-                        type="date"
-                        value={form.fechaVencimiento}
-                        onChange={(e) => setForm((f) => ({ ...f, fechaVencimiento: e.target.value }))}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={2}
+                        value={form.diaPago}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 2);
+                          const diaNum = parseInt(val);
+                          let nuevaFecha = form.fechaVencimiento;
+                          if (val && diaNum >= 1 && diaNum <= 31) {
+                            nuevaFecha = proximaFechaDesdiaDia(diaNum).iso;
+                          }
+                          setForm((f) => ({ ...f, diaPago: val, fechaVencimiento: nuevaFecha }));
+                        }}
+                        placeholder="Ej: 15"
                         className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
                       />
+                      {(() => {
+                        const diaNum = parseInt(form.diaPago);
+                        if (!form.diaPago || diaNum < 1 || diaNum > 31) return null;
+                        const { display } = proximaFechaDesdiaDia(diaNum);
+                        return (
+                          <p className="text-xs text-brand font-medium">
+                            Próximo vencimiento: {display}
+                          </p>
+                        );
+                      })()}
                     </div>
                     <div className="flex flex-col gap-1">
                       <label className="text-sm font-medium text-ink">Cuotas Totales</label>

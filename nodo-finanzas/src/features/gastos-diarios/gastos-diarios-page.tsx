@@ -160,8 +160,8 @@ export function GastosDiariosPage() {
         case 'fecha':       cmp = a.fecha.localeCompare(b.fecha); break;
         case 'descripcion': cmp = a.descripcion.localeCompare(b.descripcion, 'es'); break;
         case 'rubro': {
-          const stripEmoji = (s: string) => s.replace(/^\p{Emoji}\s*/u, '');
-          cmp = stripEmoji(a.rubro ?? '').localeCompare(stripEmoji(b.rubro ?? ''), 'es');
+          const textOnly = (s: string) => s.replace(/^[^\p{L}]+/u, '');
+          cmp = textOnly(a.rubro ?? '').localeCompare(textOnly(b.rubro ?? ''), 'es');
           break;
         }
         case 'monto':       cmp = a.monto - b.monto; break;
@@ -220,12 +220,18 @@ export function GastosDiariosPage() {
     }
   }
 
+  // g.cuentaId is a saldo ID (FK to cuentas table). Look up the Cuenta by that ID.
+  function resolverCuenta(g: GastoDiario) {
+    if (!g.cuentaId) return null;
+    return finanzas.cuentas.find((c) => c.id === g.cuentaId) ?? null;
+  }
+
   function obtenerEtiquetaFormaPago(g: GastoDiario): string {
     if (g.formaPago === 'TARJETA' && g.tarjetaId) {
       const t = finanzas.tarjetas.find((t) => t.id === g.tarjetaId);
       return t ? `T. ${t.nombre}` : 'Tarjeta';
     }
-    const cuenta = g.cuentaId ? finanzas.cuentas.find((c) => c.id === g.cuentaId) : null;
+    const cuenta = resolverCuenta(g);
     const n = cuenta ? cuenta.nombre.toLowerCase().replace(/\s+/g, '') : '';
     const banco = n.includes('santander') ? ' Santander' : n.includes('pampa') ? ' Pampa' : '';
     const esMPReserva = n.includes('mercadopago') && n.includes('reserva');
@@ -234,6 +240,18 @@ export function GastosDiariosPage() {
     if (g.formaPago === 'TRANSFERENCIA BANCO') return `Transfer.${banco}`;
     if (g.formaPago === 'EFECTIVO') return 'Efectivo';
     return g.formaPago;
+  }
+
+  function obtenerPillClass(g: GastoDiario): string {
+    if (g.formaPago === 'TARJETA' && g.tarjetaId) {
+      const t = finanzas.tarjetas.find((t) => t.id === g.tarjetaId);
+      return t ? cuentaPillClass(t.banco || t.nombre) : 'bg-mist text-slate2';
+    }
+    const cuenta = resolverCuenta(g);
+    if (cuenta) return cuentaPillClass(cuenta.nombre);
+    if (g.formaPago === 'EFECTIVO') return 'bg-emerald-100 text-emerald-800';
+    if (g.formaPago === 'MERCADO_PAGO') return 'bg-[#009ee3] text-white';
+    return 'bg-mist text-slate2';
   }
 
   if (finanzas.loading && finanzas.gastosDiarios.length === 0) {
@@ -258,12 +276,24 @@ export function GastosDiariosPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Receipt className="h-7 w-7 text-brand" />
-        <div>
-          <h1 className="text-2xl font-bold text-ink">Gastos Diarios</h1>
-          <p className="text-sm text-slate2">Gestioná tus gastos del día a día</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Receipt className="h-7 w-7 text-brand" />
+          <div>
+            <h1 className="text-2xl font-bold text-ink">Gastos Diarios</h1>
+            <p className="text-sm text-slate2">Gestioná tus gastos del día a día</p>
+          </div>
         </div>
+
+        {totalMes > 0 && (
+          <div className="bg-brand/5 px-4 py-2 rounded-xl border border-brand/20 text-right">
+            <p className="text-xs text-brand font-bold uppercase tracking-wider">Total Mes</p>
+            <p className="text-xl font-black text-brand">{formatearMoneda(totalMes)}</p>
+            {totalUSD > 0 && (
+              <p className="text-xs text-slate2 mt-0.5">{formatearMoneda(totalUSD, 'USD')}</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -305,7 +335,7 @@ export function GastosDiariosPage() {
         <div className="relative">
           <Button
             type="button"
-            variant="success"
+            variant="primary"
             onClick={handleVoiceClick}
             disabled={voiceState === 'extracting'}
             title={
@@ -349,7 +379,7 @@ export function GastosDiariosPage() {
           )}
         </div>
 
-        <Button variant="secondary" onClick={() => abrirFormulario()} className="shrink-0 whitespace-nowrap mr-4 !bg-green-100 !text-green-800 hover:!bg-green-200 !border-transparent">
+        <Button variant="secondary" onClick={() => abrirFormulario()} className="shrink-0 whitespace-nowrap mr-4">
           <Plus className="h-4 w-4" />
           Gasto Diario
         </Button>
@@ -422,15 +452,9 @@ export function GastosDiariosPage() {
                       }
                     </td>
                     <td className="hidden lg:table-cell py-3 px-2 text-center">
-                      {(() => {
-                        const cuenta = g.cuentaId ? finanzas.cuentas.find((c) => c.id === g.cuentaId) : null;
-                        const pillClass = cuenta ? cuentaPillClass(cuenta.nombre) : 'bg-mist text-slate2';
-                        return (
-                          <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md ${pillClass}`}>
-                            {obtenerEtiquetaFormaPago(g)}
-                          </span>
-                        );
-                      })()}
+                      <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md ${obtenerPillClass(g)}`}>
+                        {obtenerEtiquetaFormaPago(g)}
+                      </span>
                     </td>
                     <td className="py-3 px-2">
                       <div className="flex items-center justify-end gap-1">

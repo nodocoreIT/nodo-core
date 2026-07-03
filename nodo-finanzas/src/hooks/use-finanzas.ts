@@ -53,7 +53,17 @@ export const useFinanzas = () => {
     const cargarDatos = async () => {
       try {
         setLoading(true);
-        const estadoCompleto = await FinanzasService.cargarEstadoCompleto();
+
+        // Kick off the full load and an independent tarjetas fetch simultaneously.
+        // Tarjetas resolve fast (small table) so the registration form can
+        // render its card selector without waiting for all 10+ queries to finish.
+        const fullLoadPromise = FinanzasService.cargarEstadoCompleto();
+        const tarjetasPromise = FinanzasService.obtenerTarjetas();
+
+        const tarjetas = await tarjetasPromise;
+        setEstado(prev => ({ ...prev, tarjetas }));
+
+        const estadoCompleto = await fullLoadPromise;
         setEstado(estadoCompleto);
       } catch (error) {
         console.error('Error cargando datos:', error);
@@ -832,34 +842,10 @@ export const useFinanzas = () => {
 
   const actualizarGastoDiario = useCallback(async (id: string, cambios: Partial<GastoDiario>) => {
     try {
-      console.log(`[actualizarGastoDiario] Iniciando update para ID: ${id}`, cambios);
-
       const gastoOriginal = estado.gastosDiarios.find(g => g.id === id);
-      if (!gastoOriginal) {
-        console.error(`[actualizarGastoDiario] Gasto no encontrado: ${id}`);
-        return false;
-      }
+      if (!gastoOriginal) return false;
 
-      const montoNuevo = cambios.monto !== undefined ? cambios.monto : gastoOriginal.monto;
-      const formaPagoNueva = cambios.formaPago || gastoOriginal.formaPago;
-      const idCuentaForm = cambios.cuentaId || gastoOriginal.cuentaId;
-
-      const cuentaOrig = resolverCuentaDeSaldo(gastoOriginal.cuentaId, gastoOriginal.formaPago);
-      const cuentaNueva = resolverCuentaDeSaldo(idCuentaForm, formaPagoNueva);
-
-      if (cambios.cuentaId) {
-        const esConfig = estado.configuracion.cuentasBancarias.some(cb => cb.id === cambios.cuentaId);
-        if (!esConfig) {
-          const config = estado.configuracion.cuentasBancarias.find(cb => cb.cuentaSaldoId === cambios.cuentaId);
-          if (config) {
-            console.log(`[actualizarGastoDiario] Mapeando Saldo ID -> Config ID para DB: ${cambios.cuentaId} -> ${config.id}`);
-            cambios.cuentaId = config.id;
-          } else {
-            console.warn(`[actualizarGastoDiario] El ID ${cambios.cuentaId} no tiene configuración vinculada. Enviando NULL al DB.`);
-            (cambios as any).cuentaId = null;
-          }
-        }
-      }
+      // cuentaId already comes as a config ID from the form — no translation needed.
 
       const success = await FinanzasService.actualizarGastoDiario(id, cambios);
       if (!success) return false;
@@ -869,74 +855,12 @@ export const useFinanzas = () => {
         gastosDiarios: prev.gastosDiarios.map(g => (g.id === id ? { ...g, ...cambios } : g)),
       }));
 
-      console.log(`[actualizarGastoDiario] Logica de saldos:
-        - Original: ${gastoOriginal.monto} (${gastoOriginal.formaPago}) -> Cuenta: ${cuentaOrig?.nombre || 'N/A'}
-        - Nuevo: ${montoNuevo} (${formaPagoNueva}) -> Cuenta: ${cuentaNueva?.nombre || 'N/A'}`);
-
-      const fueEfectivo = gastoOriginal.formaPago !== 'TARJETA';
-      const esEfectivoAhora = formaPagoNueva !== 'TARJETA';
-
-      if (fueEfectivo && cuentaOrig) {
-        if (esEfectivoAhora && cuentaNueva && cuentaOrig.id === cuentaNueva.id) {
-          const diff = gastoOriginal.monto - montoNuevo;
-          if (diff !== 0) {
-            console.log(`[actualizarGastoDiario] Ajuste NETO en ${cuentaOrig.nombre}: ${diff}`);
-            await actualizarCuenta(cuentaOrig.id, { saldoActual: cuentaOrig.saldoActual + diff });
-
-            await FinanzasService.eliminarMovimientosPorReferencia(id);
-            await FinanzasService.registrarMovimiento({
-              cuentaId: cuentaOrig.id,
-              fecha: cambios.fecha || gastoOriginal.fecha || getFechaHoy(),
-              descripcion: cambios.descripcion || gastoOriginal.descripcion,
-              monto: montoNuevo,
-              tipo: 'salida',
-              origen: 'gasto_diario',
-              referenciaId: id,
-              detalle: cambios.detalle || gastoOriginal.detalle || undefined,
-            });
-          }
-        } else {
-          console.log(`[actualizarGastoDiario] Revirtiendo ${gastoOriginal.monto} en ${cuentaOrig.nombre}`);
-          await actualizarCuenta(cuentaOrig.id, { saldoActual: cuentaOrig.saldoActual + gastoOriginal.monto });
-          await FinanzasService.eliminarMovimientosPorReferencia(id);
-
-          if (esEfectivoAhora && cuentaNueva) {
-            console.log(`[actualizarGastoDiario] Aplicando nuevo monto ${montoNuevo} en ${cuentaNueva.nombre}`);
-            await actualizarCuenta(cuentaNueva.id, { saldoActual: cuentaNueva.saldoActual - montoNuevo });
-            await FinanzasService.registrarMovimiento({
-              cuentaId: cuentaNueva.id,
-              fecha: cambios.fecha || gastoOriginal.fecha || getFechaHoy(),
-              descripcion: cambios.descripcion || gastoOriginal.descripcion,
-              monto: montoNuevo,
-              tipo: 'salida',
-              origen: 'gasto_diario',
-              referenciaId: id,
-              detalle: cambios.detalle || gastoOriginal.detalle || undefined,
-            });
-          }
-        }
-      }
-      else if (!fueEfectivo && esEfectivoAhora && cuentaNueva) {
-        console.log(`[actualizarGastoDiario] Cambio Tarjeta -> Efectivo. Descontando ${montoNuevo} de ${cuentaNueva.nombre}`);
-        await actualizarCuenta(cuentaNueva.id, { saldoActual: cuentaNueva.saldoActual - montoNuevo });
-        await FinanzasService.registrarMovimiento({
-          cuentaId: cuentaNueva.id,
-          fecha: cambios.fecha || gastoOriginal.fecha || getFechaHoy(),
-          descripcion: cambios.descripcion || gastoOriginal.descripcion,
-          monto: montoNuevo,
-          tipo: 'salida',
-          origen: 'gasto_diario',
-          referenciaId: id,
-          detalle: cambios.detalle || gastoOriginal.detalle || undefined,
-        });
-      }
-
       return true;
     } catch (error) {
       console.error('Error actualizando gasto diario:', error);
       throw error;
     }
-  }, [estado.gastosDiarios, estado.cuentas, resolverCuentaDeSaldo, actualizarCuenta]);
+  }, [estado.gastosDiarios, estado.configuracion]);
 
   const eliminarGastoDiario = useCallback(async (id: string) => {
     try {

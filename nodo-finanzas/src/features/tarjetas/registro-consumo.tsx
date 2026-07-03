@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Receipt, CreditCard } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Receipt, CreditCard, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/ui/money-input';
 import { FormSelect, SearchableSelect } from '@nodocore/shared-components';
@@ -34,8 +34,27 @@ export function RegistroConsumo({
   const [moneda, setMoneda] = useState<'ARS' | 'USD'>('ARS');
   const [cuotas, setCuotas] = useState(1);
   const [gastoFijo, setGastoFijo] = useState(false);
+  const [cuotasDetalle, setCuotasDetalle] = useState<{ fecha: string; monto: number }[]>([]);
 
   const tarjetasActivas = finanzas.tarjetas.filter((t) => t.activa);
+
+  // Recalculate installment preview whenever cuotas, fecha, or monto change
+  useEffect(() => {
+    if (cuotas <= 1) {
+      setCuotasDetalle([]);
+      return;
+    }
+    const montoPorCuota = monto > 0 ? monto / cuotas : 0;
+    const detalle = Array.from({ length: cuotas }, (_, i) => {
+      const d = new Date(`${fecha}T12:00:00`);
+      d.setMonth(d.getMonth() + i);
+      return {
+        fecha: d.toISOString().slice(0, 10),
+        monto: montoPorCuota,
+      };
+    });
+    setCuotasDetalle(detalle);
+  }, [cuotas, fecha, monto]);
 
   const opcionesCuotas = Array.from({ length: 24 }, (_, i) => ({
     value: i + 1,
@@ -51,52 +70,46 @@ export function RegistroConsumo({
 
     try {
       setProcesando(true);
-      const montoNum = monto;
-      const montoPorCuota = montoNum / cuotas;
       const codigoOperacion = crypto.randomUUID();
 
-      await finanzas.agregarConsumo({
-        tarjetaId,
-        fecha: new Date(`${fecha}T12:00:00`).toISOString(),
-        fechaCompra,
-        lugar,
-        rubro: (rubroCodigo || 'OTROS') as RubroConsumo,
-        rubroId,
-        detalle,
-        importeARS: moneda === 'ARS' ? montoPorCuota : 0,
-        importeUSD: moneda === 'USD' ? montoPorCuota : 0,
-        cuotas: cuotas > 1 ? `1 de ${cuotas}` : '1 de 1',
-        cuotaActual: 1,
-        totalCuotas: cuotas,
-        gastoFijo,
-        codigoOperacion,
-      });
-
-      if (cuotas > 1) {
-        const promesas = [];
-        for (let i = 2; i <= cuotas; i++) {
-          const fechaCuota = new Date(fecha);
-          fechaCuota.setMonth(fechaCuota.getMonth() + (i - 1));
-          promesas.push(
-            finanzas.agregarConsumo({
-              tarjetaId,
-              fecha: fechaCuota.toISOString(),
-              fechaCompra,
-              lugar,
-              rubro: (rubroCodigo || 'OTROS') as RubroConsumo,
-              rubroId,
-              detalle,
-              importeARS: moneda === 'ARS' ? montoPorCuota : 0,
-              importeUSD: moneda === 'USD' ? montoPorCuota : 0,
-              cuotas: `${i} de ${cuotas}`,
-              cuotaActual: i,
-              totalCuotas: cuotas,
-              gastoFijo,
-              codigoOperacion,
-            })
-          );
-        }
+      if (cuotas > 1 && cuotasDetalle.length === cuotas) {
+        // Use the (potentially edited) installment detail
+        const promesas = cuotasDetalle.map((c, i) =>
+          finanzas.agregarConsumo({
+            tarjetaId,
+            fecha: new Date(`${c.fecha}T12:00:00`).toISOString(),
+            fechaCompra,
+            lugar,
+            rubro: (rubroCodigo || 'OTROS') as RubroConsumo,
+            rubroId,
+            detalle,
+            importeARS: moneda === 'ARS' ? c.monto : 0,
+            importeUSD: moneda === 'USD' ? c.monto : 0,
+            cuotas: `${i + 1} de ${cuotas}`,
+            cuotaActual: i + 1,
+            totalCuotas: cuotas,
+            gastoFijo,
+            codigoOperacion,
+          })
+        );
         await Promise.all(promesas);
+      } else {
+        await finanzas.agregarConsumo({
+          tarjetaId,
+          fecha: new Date(`${fecha}T12:00:00`).toISOString(),
+          fechaCompra,
+          lugar,
+          rubro: (rubroCodigo || 'OTROS') as RubroConsumo,
+          rubroId,
+          detalle,
+          importeARS: moneda === 'ARS' ? monto : 0,
+          importeUSD: moneda === 'USD' ? monto : 0,
+          cuotas: '1 de 1',
+          cuotaActual: 1,
+          totalCuotas: 1,
+          gastoFijo,
+          codigoOperacion,
+        });
       }
 
       toast.success('Consumo registrado correctamente');
@@ -108,6 +121,15 @@ export function RegistroConsumo({
       setProcesando(false);
     }
   };
+
+  if (finanzas.loading && tarjetasActivas.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-20 gap-3 text-slate2">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        <span className="text-sm">Cargando tarjetas…</span>
+      </div>
+    );
+  }
 
   if (tarjetasActivas.length === 0 && !finanzas.loading) {
     return (
@@ -263,13 +285,70 @@ export function RegistroConsumo({
                   label: option.label,
                 }))}
               />
-              {cuotas > 1 && monto > 0 && (
-                <p className="text-xs text-slate2 mt-1">
-                  Se registrarán {cuotas} cuotas de{' '}
-                  {formatearMoneda(monto / cuotas, moneda)}
-                </p>
-              )}
             </div>
+
+            {/* Installment preview */}
+            {cuotas > 1 && cuotasDetalle.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-ink">Detalle de cuotas</label>
+                  {monto > 0 && (
+                    <span className="text-xs text-slate2">
+                      Total: {formatearMoneda(monto, moneda)}
+                    </span>
+                  )}
+                </div>
+                <div className="rounded-lg border border-mist overflow-hidden">
+                  <div className="grid grid-cols-[2rem_1fr_1fr] gap-0 bg-mist/40 px-3 py-2 text-xs font-medium text-slate2">
+                    <span>#</span>
+                    <span>Fecha de cobro</span>
+                    <span>Monto</span>
+                  </div>
+                  <div className="divide-y divide-mist max-h-72 overflow-y-auto">
+                    {cuotasDetalle.map((c, i) => (
+                      <div
+                        key={i}
+                        className="grid grid-cols-[2rem_1fr_1fr] gap-0 items-center px-3 py-2"
+                      >
+                        <span className="text-xs text-slate2 font-medium">{i + 1}</span>
+                        <input
+                          type="date"
+                          value={c.fecha}
+                          onChange={(e) => {
+                            const next = [...cuotasDetalle];
+                            next[i] = { ...next[i], fecha: e.target.value };
+                            setCuotasDetalle(next);
+                          }}
+                          className="border border-mist rounded px-2 py-1 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-brand mr-2"
+                        />
+                        <MoneyInput
+                          compact
+                          value={c.monto}
+                          onChange={(v) => {
+                            const next = [...cuotasDetalle];
+                            next[i] = { ...next[i], monto: v };
+                            setCuotasDetalle(next);
+                          }}
+                          moneda={moneda}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {monto > 0 && (() => {
+                  const sumaDetalle = cuotasDetalle.reduce((acc, c) => acc + c.monto, 0);
+                  const diff = Math.abs(sumaDetalle - monto);
+                  if (diff > 0.01) {
+                    return (
+                      <p className="text-xs text-amber-600">
+                        La suma de las cuotas ({formatearMoneda(sumaDetalle, moneda)}) difiere del total ({formatearMoneda(monto, moneda)}).
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+            )}
 
             {/* Gasto fijo */}
             <label className="flex items-start gap-3 p-4 bg-brand/5 rounded-lg border border-brand/20 cursor-pointer">
