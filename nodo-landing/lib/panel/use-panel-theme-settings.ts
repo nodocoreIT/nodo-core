@@ -11,6 +11,7 @@ export const PANEL_DEFAULT_THEME: ThemeSettings = {
   fontFamily: "Inter",
   logoType: "default",
   brandText: "nodo dashboard",
+  backgroundColor: "#f0fdf4",
 };
 
 const STORAGE_KEY = "nodo-panel-theme-settings";
