@@ -500,7 +500,7 @@ export function PrestamosPage() {
                           )}
                           {proximoVencimiento && !estaPagadoEsteMes && (
                             <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-                              <Calendar className="w-3 h-3" /> Vence pronto
+                              <Calendar className="w-3 h-3" /> Vence pronto · {formatearFecha(prestamo.fechaVencimiento!)}
                             </span>
                           )}
                         </div>
