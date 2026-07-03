@@ -27,6 +27,10 @@ export function DashboardPage() {
   const mesActualIdx = hoy.getMonth();
   const anioActual = hoy.getFullYear();
   const mesActualStr = `${anioActual}-${String(mesActualIdx + 1).padStart(2, '0')}`;
+  const mesLabel = (() => {
+    const s = new Date(anioActual, mesActualIdx, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  })();
 
   // Total ARS (cuentas activas en ARS)
   const totalARS = finanzas.cuentas
@@ -84,28 +88,28 @@ export function DashboardPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="rounded-xl shadow-sm border border-brand/30 bg-brand p-5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-white/70">Dinero disponible</p>
+          <p className="text-[10px] font-extrabold uppercase tracking-wider text-white">Dinero disponible</p>
           <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">{formatearMoneda(totalARS)}</p>
-          <p className="text-[10px] text-white/60 mt-0.5">en cuentas ARS</p>
+          <p className="text-[10px] font-bold text-white/80 mt-0.5">en cuentas ARS</p>
         </div>
 
         <div className="rounded-xl shadow-sm border border-orange-400 bg-orange-500 p-5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-white/70">Gastos del Día</p>
+          <p className="text-[10px] font-extrabold uppercase tracking-wider text-white">Gastos del Día</p>
           <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">{formatearMoneda(gastosDelDia)}</p>
         </div>
 
         <div className="rounded-xl shadow-sm border border-red-600 bg-red-500 p-5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-white/70">Gastos del Mes</p>
+          <p className="text-[10px] font-extrabold uppercase tracking-wider text-white">Gastos del Mes</p>
           <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">{formatearMoneda(gastosMes)}</p>
-          <p className="text-[10px] text-white/60 mt-0.5">{mesActualStr}</p>
+          <p className="text-[10px] font-bold text-white/80 mt-0.5">{mesLabel}</p>
         </div>
 
         <div className="rounded-xl shadow-sm border border-emerald-600 bg-emerald-500 p-5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-white/70">Saldo</p>
+          <p className="text-[10px] font-extrabold uppercase tracking-wider text-white">Saldo</p>
           <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">
             {formatearMoneda(totalARS - gastosMes)}
           </p>
-          <p className="text-[10px] text-white/60 mt-0.5">disponible este mes</p>
+          <p className="text-[10px] font-bold text-white/80 mt-0.5">disponible este mes</p>
         </div>
       </div>
 
