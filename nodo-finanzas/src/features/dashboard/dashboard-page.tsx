@@ -83,29 +83,30 @@ export function DashboardPage() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-brand/20">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Dinero disponible en cuentas</p>
-          <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(totalARS)}</p>
-        </Card>
+        <div className="rounded-xl shadow-sm border border-brand/30 bg-brand p-5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-white/70">Dinero disponible</p>
+          <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">{formatearMoneda(totalARS)}</p>
+          <p className="text-[10px] text-white/60 mt-0.5">en cuentas ARS</p>
+        </div>
 
-        <Card className="border-orange-200 bg-orange-50/40">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-orange-500">Gastos del Día</p>
-          <p className="text-sm sm:text-lg lg:text-xl font-black text-orange-600 mt-1 leading-tight">{formatearMoneda(gastosDelDia)}</p>
-        </Card>
+        <div className="rounded-xl shadow-sm border border-orange-400 bg-orange-500 p-5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-white/70">Gastos del Día</p>
+          <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">{formatearMoneda(gastosDelDia)}</p>
+        </div>
 
-        <Card className="border-red-200 bg-red-50/40">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-red-400">Gastos del Mes</p>
-          <p className="text-sm sm:text-lg lg:text-xl font-black text-red-600 mt-1 leading-tight">{formatearMoneda(gastosMes)}</p>
-          <p className="text-[10px] text-red-300 mt-0.5">{mesActualStr}</p>
-        </Card>
+        <div className="rounded-xl shadow-sm border border-red-600 bg-red-500 p-5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-white/70">Gastos del Mes</p>
+          <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">{formatearMoneda(gastosMes)}</p>
+          <p className="text-[10px] text-white/60 mt-0.5">{mesActualStr}</p>
+        </div>
 
-        <Card className="border-emerald-200 bg-emerald-50/40">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Saldo</p>
-          <p className="text-sm sm:text-lg lg:text-xl font-black text-emerald-700 mt-1 leading-tight">
+        <div className="rounded-xl shadow-sm border border-emerald-600 bg-emerald-500 p-5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-white/70">Saldo</p>
+          <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">
             {formatearMoneda(totalARS - gastosMes)}
           </p>
-          <p className="text-[10px] text-emerald-500 mt-0.5">disponible este mes</p>
-        </Card>
+          <p className="text-[10px] text-white/60 mt-0.5">disponible este mes</p>
+        </div>
       </div>
 
       {/* Two-column layout */}
