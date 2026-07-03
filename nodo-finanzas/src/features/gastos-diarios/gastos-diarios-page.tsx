@@ -314,7 +314,7 @@ export function GastosDiariosPage() {
       {gastosFiltrados.length > 0 && (
         <div className="flex flex-wrap gap-3">
           {/* Total principal */}
-          <Card className="border-red-100 min-w-[160px] flex-shrink-0">
+          <Card className="border-red-100 min-w-[160px] md:min-w-[200px] flex-shrink-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">
               {esMesActual ? 'Total hasta hoy' : 'Total del mes'}
             </p>
@@ -333,7 +333,7 @@ export function GastosDiariosPage() {
 
           {/* Breakdown por cuenta / forma de pago */}
           {resumenPorCuenta.map(({ label, total, pillClass }) => (
-            <Card key={label} className="min-w-[140px] flex-shrink-0">
+            <Card key={label} className="min-w-[140px] md:min-w-[190px] flex-shrink-0">
               <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mb-2 ${pillClass}`}>
                 {label}
               </span>
