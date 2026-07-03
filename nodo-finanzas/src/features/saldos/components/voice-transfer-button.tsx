@@ -157,8 +157,8 @@ export function VoiceTransferButton({
         type="button"
         variant={
           isListening ? "danger" :
-          state === "error" ? (compact ? "danger" : "success") :
-          compact ? "outline" : "success"
+          state === "error" ? (compact ? "danger" : "primary") :
+          compact ? "outline" : "primary"
         }
         size={compact ? "sm" : undefined}
         onClick={handleClick}
