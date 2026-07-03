@@ -523,7 +523,7 @@ export function PrestamosPage() {
                       {/* Center: compact stats */}
                       <div className="flex items-start justify-around flex-1">
                         <div>
-                          <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Cuota</p>
+                          <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Importe</p>
                           <p className="font-bold text-ink text-sm">
                             {prestamo.cuotasTotales
                               ? formatearMoneda(prestamo.importeCuota || 0, prestamo.moneda as Moneda)
@@ -538,7 +538,7 @@ export function PrestamosPage() {
                         </div>
                         {prestamo.cuotasTotales && (
                           <div>
-                            <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Cuotas</p>
+                            <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Cuotas pagas</p>
                             <p className="font-medium text-ink text-sm">{cuotasPagadas}/{prestamo.cuotasTotales}</p>
                           </div>
                         )}
