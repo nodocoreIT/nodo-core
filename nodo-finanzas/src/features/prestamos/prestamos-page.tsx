@@ -287,6 +287,18 @@ export function PrestamosPage() {
     e.preventDefault();
     try {
       setGuardando(true);
+      const cuotasPagasNum = form.esSalvataje ? undefined : (form.cuotasPagas ? parseInt(form.cuotasPagas) : 0);
+      const cuotasTotalesNum = form.esSalvataje ? undefined : (form.cuotasTotales ? parseInt(form.cuotasTotales) : undefined);
+
+      // If cuotas paid < total, the loan is no longer complete — override pagado/activo
+      // regardless of what the checkboxes say. Prevents accidental "finalizado" state.
+      const cuotasComplete =
+        cuotasTotalesNum !== undefined &&
+        cuotasPagasNum !== undefined &&
+        cuotasPagasNum >= cuotasTotalesNum;
+      const pagado = cuotasTotalesNum !== undefined ? (form.pagado && cuotasComplete) : form.pagado;
+      const activo = pagado ? (prestamoEditando?.activo ?? true) : true;
+
       const datos = {
         concepto: form.concepto,
         montoOriginal: parseFloat(form.montoOriginal) || 0,
@@ -295,13 +307,14 @@ export function PrestamosPage() {
         tasaInteres: form.tasaInteres ? parseFloat(form.tasaInteres) : undefined,
         fechaInicio: form.fechaInicio,
         fechaVencimiento: form.esSalvataje ? undefined : (form.fechaVencimiento || undefined),
-        cuotasTotales: form.esSalvataje ? undefined : (form.cuotasTotales ? parseInt(form.cuotasTotales) : undefined),
-        cuotasPagas: form.esSalvataje ? undefined : (form.cuotasPagas ? parseInt(form.cuotasPagas) : 0),
+        cuotasTotales: cuotasTotalesNum,
+        cuotasPagas: cuotasPagasNum,
         importeCuota: form.esSalvataje ? undefined : (form.importeCuota ? parseFloat(form.importeCuota) : undefined),
         saldoCancelacion: form.esSalvataje ? undefined : (form.saldoCancelacion ? parseFloat(form.saldoCancelacion) : undefined),
         prestamista: form.prestamista || undefined,
         notas: form.notas || undefined,
-        pagado: form.pagado,
+        pagado,
+        activo,
         cuotaAbonada: form.cuotaAbonada,
         noCobrarCuota: form.noCobrarCuota,
         diaPago: form.diaPago ? parseInt(form.diaPago) : undefined,
