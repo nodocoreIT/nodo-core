@@ -10,10 +10,11 @@ type TabId = "pending" | "closed";
 
 function formatDismissedDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString("es-AR", {
-      day: "numeric",
-      month: "short",
-    });
+    const d = new Date(iso);
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
   } catch {
     return "";
   }
@@ -39,6 +40,7 @@ export function NotificationsDropdown({
 
   const activeItems = filterActive(items);
   const count = activeItems.length;
+  const hasToday = activeItems.some((i) => i.duesToday);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -100,7 +102,11 @@ export function NotificationsDropdown({
         aria-expanded={isOpen}
         badge={
           !loading && count > 0 ? (
-            <NotificationBellBadge count={count} ringClassName={headerRingClass} />
+            <NotificationBellBadge
+              count={count}
+              ringClassName={headerRingClass}
+              variant={hasToday ? "danger" : "brand"}
+            />
           ) : undefined
         }
       >
@@ -240,8 +246,19 @@ function PendingNotificationRow({
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="mb-1 text-xs font-semibold leading-none text-navy">{notif.title}</p>
-          <p className="text-[11px] leading-relaxed text-slate2">{notif.description}</p>
+          <div className="mb-1 flex items-center gap-1.5">
+            <p className={cn("text-xs font-semibold leading-none", notif.duesToday ? "text-red-600" : "text-navy")}>
+              {notif.title}
+            </p>
+            {notif.duesToday && (
+              <span className="shrink-0 rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none text-white">
+                Hoy
+              </span>
+            )}
+          </div>
+          <p className={cn("text-[11px] leading-relaxed", notif.duesToday ? "text-red-500" : "text-slate2")}>
+            {notif.description}
+          </p>
         </div>
         <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate2" />
       </button>

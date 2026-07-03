@@ -309,7 +309,7 @@ export function AdminLayout() {
         {/* Main */}
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Header */}
-          <header className="flex min-h-16 flex-col gap-3 border-b border-border bg-[#e8faf0] px-4 py-3 shadow-sm flex-shrink-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
+          <header className="flex min-h-16 flex-col gap-3 border-b border-border bg-paper px-4 py-3 shadow-sm flex-shrink-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
             <div className="flex items-center justify-between gap-3 sm:justify-start">
               <div className="flex items-center gap-3">
                 <button

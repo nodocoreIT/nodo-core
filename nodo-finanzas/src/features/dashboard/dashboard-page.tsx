@@ -154,9 +154,18 @@ export function DashboardPage() {
           ) : (
             <div className="space-y-2">
               {notifications.slice(0, 5).map((n) => (
-                <div
+                <button
                   key={n.id}
-                  className={`flex items-start justify-between p-3 rounded-lg border-l-4 ${urgenciaColor[n.urgencia]}`}
+                  onClick={() => {
+                    if (n.tipo === 'tarjeta') {
+                      navigate(`/admin/tarjetas/${n.entityId}`);
+                    } else if (n.tipo === 'prestamo') {
+                      navigate('/admin/prestamos', { state: { openId: n.entityId } });
+                    } else {
+                      navigate('/admin/planes-ahorro', { state: { openId: n.entityId } });
+                    }
+                  }}
+                  className={`w-full flex items-center justify-between p-3 rounded-lg border-l-4 gap-2 text-left transition-opacity hover:opacity-80 cursor-pointer ${urgenciaColor[n.urgencia]}`}
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <Bell className="h-3.5 w-3.5 text-slate2 flex-shrink-0" />
@@ -165,12 +174,19 @@ export function DashboardPage() {
                       <p className="text-xs text-slate2">{formatearFecha(n.fecha)}</p>
                     </div>
                   </div>
-                  {n.urgencia === 'alta' && (
-                    <span className="ml-2 text-[9px] font-black uppercase text-red-600 bg-red-100 px-1.5 py-0.5 rounded flex-shrink-0">
-                      Urgente
-                    </span>
-                  )}
-                </div>
+                  <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                    {n.monto != null && (
+                      <span className="text-sm font-bold text-ink">
+                        {formatearMoneda(n.monto, n.moneda ?? 'ARS')}
+                      </span>
+                    )}
+                    {n.urgencia === 'alta' && (
+                      <span className="text-[9px] font-black uppercase text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
+                        Urgente
+                      </span>
+                    )}
+                  </div>
+                </button>
               ))}
             </div>
           )}

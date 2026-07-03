@@ -6,14 +6,23 @@ import type { Tarjeta, Prestamo, PlanAhorro } from '@/types';
 export interface Notification {
   id: string;
   tipo: 'tarjeta' | 'prestamo' | 'plan';
+  entityId: string;
   titulo: string;
   mensaje: string;
   fecha: string;
   urgencia: 'baja' | 'media' | 'alta';
+  venceHoy: boolean;
+  monto?: number;
+  moneda?: 'ARS' | 'USD';
+}
+
+function isoAFecha(iso: string): string {
+  const [y, m, d] = iso.slice(0, 10).split('-');
+  return `${d}/${m}/${y}`;
 }
 
 export const useNotifications = () => {
-  const { tarjetas, prestamos, planesAhorro, gastosDiarios } = useFinanzas();
+  const { tarjetas, prestamos, planesAhorro, gastosDiarios, consumosTarjetas } = useFinanzas();
 
   const notifications = useMemo(() => {
     const list: Notification[] = [];
@@ -56,13 +65,28 @@ export const useNotifications = () => {
       const diffDays = Math.ceil(diff / (1000 * 60 * 60 * 24));
 
       if (diffDays >= -5 && diffDays <= 10) {
+        const venceHoy = diffDays <= 0;
+        const montoPeriodo = consumosTarjetas
+          .filter(
+            (c) =>
+              c.tarjetaId === tarjeta.id &&
+              c.fecha > fechas.previousClosingDate &&
+              c.fecha <= fechas.currentClosingDate,
+          )
+          .reduce((sum, c) => sum + (c.importeARS ?? 0), 0);
         list.push({
           id,
           tipo: 'tarjeta',
+          entityId: tarjeta.id,
           titulo: `Vencimiento ${tarjeta.nombre}`,
-          mensaje: `El pago de tu tarjeta ${tarjeta.nombre} vence el ${vtoStr}.`,
+          mensaje: venceHoy
+            ? `El pago de tu tarjeta ${tarjeta.nombre} vence hoy.`
+            : `El pago de tu tarjeta ${tarjeta.nombre} vence el ${isoAFecha(vtoStr)}.`,
           fecha: vtoStr,
           urgencia: diffDays <= 2 ? 'alta' : 'media',
+          venceHoy,
+          monto: montoPeriodo > 0 ? montoPeriodo : undefined,
+          moneda: 'ARS',
         });
       }
     });
@@ -79,13 +103,20 @@ export const useNotifications = () => {
       const diffDays = Math.ceil(diff / (1000 * 60 * 60 * 24));
 
       if (diffDays <= 10) {
+        const venceHoy = diffDays <= 0;
         list.push({
           id,
           tipo: 'prestamo',
+          entityId: prestamo.id,
           titulo: `Cuota de ${prestamo.concepto}`,
-          mensaje: `La cuota de "${prestamo.concepto}" vence el ${prestamo.fechaVencimiento}.`,
+          mensaje: venceHoy
+            ? `La cuota de "${prestamo.concepto}" vence hoy.`
+            : `La cuota de "${prestamo.concepto}" vence el ${isoAFecha(prestamo.fechaVencimiento)}.`,
           fecha: prestamo.fechaVencimiento,
           urgencia: diffDays <= 2 ? 'alta' : 'media',
+          venceHoy,
+          monto: prestamo.importeCuota,
+          moneda: prestamo.moneda,
         });
       }
     });
@@ -102,19 +133,26 @@ export const useNotifications = () => {
       const diffDays = Math.ceil(diff / (1000 * 60 * 60 * 24));
 
       if (diffDays <= 10) {
+        const venceHoy = diffDays <= 0;
         list.push({
           id,
           tipo: 'plan',
+          entityId: plan.id,
           titulo: `Cuota de Plan: ${plan.detalle}`,
-          mensaje: `La cuota del plan "${plan.detalle}" vence el ${plan.fechaVencimiento}.`,
+          mensaje: venceHoy
+            ? `La cuota del plan "${plan.detalle}" vence hoy.`
+            : `La cuota del plan "${plan.detalle}" vence el ${isoAFecha(plan.fechaVencimiento)}.`,
           fecha: plan.fechaVencimiento,
           urgencia: diffDays <= 2 ? 'alta' : 'media',
+          venceHoy,
+          monto: plan.importeCuota,
+          moneda: plan.moneda,
         });
       }
     });
 
     return list.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
-  }, [tarjetas, prestamos, planesAhorro, gastosDiarios]);
+  }, [tarjetas, prestamos, planesAhorro, gastosDiarios, consumosTarjetas]);
 
   return {
     notifications,

@@ -987,6 +987,11 @@ export class FinanzasService {
 
   // === ESTADO COMPLETO ===
   static async cargarEstadoCompleto(): Promise<AppState> {
+    // Fetch config first (single fast query) so we know which dolar type to request
+    const tipoDolarConfig = await this.obtenerConfiguracion('tipo_dolar_seleccionado');
+    const tipoDolarSeleccionado: TipoDolar = (tipoDolarConfig as TipoDolar) || 'blue';
+
+    // Run all DB queries AND the external dolar API in parallel
     const [
       cuentas,
       gastosFijos,
@@ -997,7 +1002,8 @@ export class FinanzasService {
       cuentasBancarias,
       categorias,
       sueldos,
-      planesAhorro
+      planesAhorro,
+      cotizacionDolar,
     ] = await Promise.all([
       this.obtenerCuentas(),
       this.obtenerGastosFijos(),
@@ -1008,7 +1014,8 @@ export class FinanzasService {
       this.obtenerCuentasBancarias(),
       this.obtenerCategorias(),
       this.obtenerSueldos(),
-      this.obtenerPlanesAhorro()
+      this.obtenerPlanesAhorro(),
+      this.obtenerCotizacionDolar(tipoDolarSeleccionado),
     ]);
 
     const formasDePago = [
@@ -1018,10 +1025,6 @@ export class FinanzasService {
       { id: '4', nombre: 'Transferencia Bancaria', codigo: 'TRANSFERENCIA BANCO' as const, activa: true },
       { id: '5', nombre: 'Mercado Pago', codigo: 'MERCADO_PAGO' as const, activa: true },
     ];
-
-    const tipoDolarConfig = await this.obtenerConfiguracion('tipo_dolar_seleccionado');
-    const tipoDolarSeleccionado: TipoDolar = (tipoDolarConfig as TipoDolar) || 'blue';
-    const cotizacionDolar = await this.obtenerCotizacionDolar(tipoDolarSeleccionado);
 
     return {
       cuentas,
@@ -1273,6 +1276,7 @@ export class FinanzasService {
       notas: data.notas,
       comprobanteUrl: data.comprobante_url,
       ultimoPagoMes: data.ultimo_pago_mes,
+      diaPago: data.dia_pago ? Number(data.dia_pago) : undefined,
     };
   }
 
@@ -1301,6 +1305,7 @@ export class FinanzasService {
     if (prestamo.notas !== undefined) dbData.notas = prestamo.notas;
     if (prestamo.comprobanteUrl !== undefined) dbData.comprobante_url = prestamo.comprobanteUrl;
     if (prestamo.ultimoPagoMes !== undefined) dbData.ultimo_pago_mes = prestamo.ultimoPagoMes;
+    if (prestamo.diaPago !== undefined) dbData.dia_pago = prestamo.diaPago;
 
     return dbData;
   }

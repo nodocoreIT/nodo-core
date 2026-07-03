@@ -18,6 +18,7 @@ interface MoneyInputProps {
   required?: boolean;
   className?: string;
   disabled?: boolean;
+  compact?: boolean;
 }
 
 function contarDigitosAntes(valor: string, posicion: number): number {
@@ -51,6 +52,7 @@ export function MoneyInput({
   required,
   className = '',
   disabled = false,
+  compact = false,
 }: MoneyInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const cursorRef = useRef<number | null>(null);
@@ -70,16 +72,31 @@ export function MoneyInput({
 
   function aplicarEntrada(texto: string, posicionCursor: number) {
     const digitosAntes = contarDigitosAntes(texto, posicionCursor);
+    const cursorJustAfterComma = posicionCursor > 0 && texto[posicionCursor - 1] === ',';
     const sanitizado = sanitizarEntradaMonto(texto);
     const formateado = formatearMontoInputEnVivo(sanitizado);
 
-    cursorRef.current = posicionCursorTrasFormato(formateado, digitosAntes);
+    let pos = posicionCursorTrasFormato(formateado, digitosAntes);
+    if (cursorJustAfterComma && formateado[pos] === ',') pos++;
+
+    cursorRef.current = pos;
     setRaw(formateado);
     onChange(parsearMontoInput(formateado));
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     aplicarEntrada(e.target.value, e.target.selectionStart ?? e.target.value.length);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === '.') {
+      e.preventDefault();
+      const input = inputRef.current!;
+      const start = input.selectionStart ?? raw.length;
+      const end = input.selectionEnd ?? raw.length;
+      const newValue = raw.slice(0, start) + ',' + raw.slice(end);
+      aplicarEntrada(newValue, start + 1);
+    }
   }
 
   function handleBlur() {
@@ -90,6 +107,36 @@ export function MoneyInput({
   }
 
   const symbol = simboloMoneda(moneda);
+
+  if (compact) {
+    const symbolWidth = moneda === 'USD' ? 'pl-9' : 'pl-7';
+    return (
+      <div className={`relative ${className}`}>
+        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate2 pointer-events-none">
+          {symbol}
+        </span>
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="decimal"
+          value={raw}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setFocused(true)}
+          onBlur={handleBlur}
+          placeholder={placeholder ?? '0'}
+          disabled={disabled}
+          className={`w-full ${symbolWidth} pr-2 py-1 rounded border bg-white text-xs transition-colors outline-none
+            ${error
+              ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-400'
+              : 'border-mist focus:border-brand focus:ring-1 focus:ring-brand'
+            }
+            ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+        />
+      </div>
+    );
+  }
+
   const symbolWidth = moneda === 'USD' ? 'pl-11' : 'pl-10';
 
   return (
@@ -110,6 +157,7 @@ export function MoneyInput({
           inputMode="decimal"
           value={raw}
           onChange={handleChange}
+          onKeyDown={handleKeyDown}
           onFocus={() => setFocused(true)}
           onBlur={handleBlur}
           placeholder={placeholder ?? '0'}

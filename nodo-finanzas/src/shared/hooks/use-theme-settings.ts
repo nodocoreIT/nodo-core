@@ -1,12 +1,32 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 
+function blendWithWhite(hex: string, ratio: number): string {
+  if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return "#dcfce7";
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const br = Math.round(r * ratio + 255 * (1 - ratio));
+  const bg = Math.round(g * ratio + 255 * (1 - ratio));
+  const bb = Math.round(b * ratio + 255 * (1 - ratio));
+  return `#${br.toString(16).padStart(2, "0")}${bg.toString(16).padStart(2, "0")}${bb.toString(16).padStart(2, "0")}`;
+}
+
+function darkenColor(hex: string, factor: number = 0.82): string {
+  if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return hex;
+  const r = Math.min(255, Math.round(parseInt(hex.slice(1, 3), 16) * factor));
+  const g = Math.min(255, Math.round(parseInt(hex.slice(3, 5), 16) * factor));
+  const b = Math.min(255, Math.round(parseInt(hex.slice(5, 7), 16) * factor));
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+}
+
 export interface ThemeSettings {
   primaryColor: string;
   secondaryColor: string;
   sidebarTextColor: string;
   fontColor: string;
   buttonFontColor: string;
+  backgroundColor: string;
   borderRadius: "none" | "md" | "full";
   fontFamily: "Inter" | "Roboto" | "Montserrat";
   logoType: "default" | "custom" | "text";
@@ -19,6 +39,7 @@ export const DEFAULT_SETTINGS: ThemeSettings = {
   sidebarTextColor: "#9dbdb4",
   fontColor: "#0a1a14",
   buttonFontColor: "#ffffff",
+  backgroundColor: "#f0fdf4",
   borderRadius: "md",
   fontFamily: "Inter",
   logoType: "default",
@@ -75,6 +96,7 @@ export function useThemeSettings() {
 
     // Apply primary color
     root.style.setProperty("--color-brand", settings.primaryColor);
+    root.style.setProperty("--color-brand-dark", darkenColor(settings.primaryColor, 0.82));
     root.style.setProperty("--color-brand-600", settings.primaryColor + "e0");
     root.style.setProperty("--color-brand-300", settings.primaryColor + "60");
     root.style.setProperty("--color-ring", settings.primaryColor);
@@ -97,6 +119,15 @@ export function useThemeSettings() {
     // Apply font color (body text)
     root.style.setProperty("--color-ink", settings.fontColor);
     root.style.setProperty("--color-foreground", settings.fontColor);
+
+    // Apply background color
+    const bg = settings.backgroundColor ?? "#f0fdf4";
+    root.style.setProperty("--color-paper", bg);
+    root.style.setProperty("--color-background", bg);
+
+    // Derive mist and mist-200 from primary color
+    root.style.setProperty("--color-mist", blendWithWhite(settings.primaryColor, 0.15));
+    root.style.setProperty("--color-mist-200", blendWithWhite(settings.primaryColor, 0.08));
 
     // Apply border radius
     let radiusValue = "14px"; // md / default
