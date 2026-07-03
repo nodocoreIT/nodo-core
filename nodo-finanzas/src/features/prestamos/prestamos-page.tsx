@@ -299,6 +299,13 @@ export function PrestamosPage() {
       const pagado = cuotasTotalesNum !== undefined ? (form.pagado && cuotasComplete) : form.pagado;
       const activo = pagado ? (prestamoEditando?.activo ?? true) : true;
 
+      // If the user reduced cuotasPagas, also clear monthly payment state so the
+      // loan stops showing "Mes Abonado" and correctly reflects pending status.
+      const cuotasReduced =
+        prestamoEditando !== null &&
+        cuotasPagasNum !== undefined &&
+        (prestamoEditando.cuotasPagas ?? 0) > cuotasPagasNum;
+
       const datos = {
         concepto: form.concepto,
         montoOriginal: parseFloat(form.montoOriginal) || 0,
@@ -315,7 +322,8 @@ export function PrestamosPage() {
         notas: form.notas || undefined,
         pagado,
         activo,
-        cuotaAbonada: form.cuotaAbonada,
+        cuotaAbonada: cuotasReduced ? false : form.cuotaAbonada,
+        ultimoPagoMes: cuotasReduced ? undefined : prestamoEditando?.ultimoPagoMes,
         noCobrarCuota: form.noCobrarCuota,
         diaPago: form.diaPago ? parseInt(form.diaPago) : undefined,
       };
