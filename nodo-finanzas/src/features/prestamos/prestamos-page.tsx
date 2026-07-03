@@ -388,17 +388,6 @@ export function PrestamosPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-mist p-5">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <DollarSign className="w-5 h-5 text-red-600" />
-            </div>
-            <div>
-              <p className="text-sm text-slate2">Saldo pendiente</p>
-              <p className="text-xl font-bold text-red-600">{formatearMoneda(totales.ARS)}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-mist p-5">
-          <div className="flex items-center gap-3">
             <div className="p-2 bg-orange-100 rounded-lg">
               <DollarSign className="w-5 h-5 text-orange-600" />
             </div>
@@ -418,6 +407,17 @@ export function PrestamosPage() {
               <p className="text-sm text-slate2">Saldo cancelación</p>
               <p className="text-xl font-bold text-indigo-600">{formatearMoneda(totalCancelacion)}</p>
               <p className="text-xs text-slate2 mt-0.5">para cancelar todo hoy</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-mist p-5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-red-100 rounded-lg">
+              <DollarSign className="w-5 h-5 text-red-600" />
+            </div>
+            <div>
+              <p className="text-sm text-slate2">Saldo pendiente</p>
+              <p className="text-xl font-bold text-red-600">{formatearMoneda(totales.ARS)}</p>
             </div>
           </div>
         </div>
