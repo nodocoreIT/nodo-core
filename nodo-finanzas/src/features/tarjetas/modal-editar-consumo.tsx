@@ -197,13 +197,6 @@ export function ModalEditarConsumo({
 
   const missingCount = cuotasDetalle.filter((r) => !r.existing).length;
   const sumaDetalle = cuotasDetalle.reduce((acc, r) => acc + r.monto, 0);
-  const totalOriginal = cuotasDetalle
-    .filter((r) => r.existing)
-    .reduce(
-      (acc, r) =>
-        acc + (moneda === 'ARS' ? (r.existing!.importeARS ?? 0) : (r.existing!.importeUSD ?? 0)),
-      0
-    );
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
