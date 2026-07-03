@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, TrendingDown, CheckCircle, Bell, Plus } from 'lucide-react';
+import { CheckCircle, Bell, Plus, Wallet, ShoppingCart, CalendarRange, PiggyBank } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { useFinanzas } from '@/hooks/use-finanzas';
@@ -87,29 +87,49 @@ export function DashboardPage() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-xl shadow-sm border border-brand/30 bg-brand p-5">
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-white">Dinero disponible</p>
-          <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">{formatearMoneda(totalARS)}</p>
-          <p className="text-[10px] font-bold text-white/80 mt-0.5">en cuentas ARS</p>
+        <div className="rounded-xl shadow-sm border border-brand/30 bg-brand p-5 flex items-start gap-3">
+          <div className="p-2 bg-white/20 rounded-lg shrink-0">
+            <Wallet className="h-5 w-5 text-white" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-white">Dinero disponible</p>
+            <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">{formatearMoneda(totalARS)}</p>
+            <p className="text-[10px] font-bold text-white/80 mt-0.5">en cuentas ARS</p>
+          </div>
         </div>
 
-        <div className="rounded-xl shadow-sm border border-orange-400 bg-orange-500 p-5">
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-white">Gastos del Día</p>
-          <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">{formatearMoneda(gastosDelDia)}</p>
+        <div className="rounded-xl shadow-sm border border-orange-400 bg-orange-500 p-5 flex items-start gap-3">
+          <div className="p-2 bg-white/20 rounded-lg shrink-0">
+            <ShoppingCart className="h-5 w-5 text-white" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-white">Gastos del Día</p>
+            <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">{formatearMoneda(gastosDelDia)}</p>
+          </div>
         </div>
 
-        <div className="rounded-xl shadow-sm border border-red-600 bg-red-500 p-5">
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-white">Gastos del Mes</p>
-          <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">{formatearMoneda(gastosMes)}</p>
-          <p className="text-[10px] font-bold text-white/80 mt-0.5">{mesLabel}</p>
+        <div className="rounded-xl shadow-sm border border-red-600 bg-red-500 p-5 flex items-start gap-3">
+          <div className="p-2 bg-white/20 rounded-lg shrink-0">
+            <CalendarRange className="h-5 w-5 text-white" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-white">Gastos del Mes</p>
+            <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">{formatearMoneda(gastosMes)}</p>
+            <p className="text-[10px] font-bold text-white/80 mt-0.5">{mesLabel}</p>
+          </div>
         </div>
 
-        <div className="rounded-xl shadow-sm border border-emerald-600 bg-emerald-500 p-5">
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-white">Saldo</p>
-          <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">
-            {formatearMoneda(totalARS - gastosMes)}
-          </p>
-          <p className="text-[10px] font-bold text-white/80 mt-0.5">disponible este mes</p>
+        <div className="rounded-xl shadow-sm border border-emerald-600 bg-emerald-500 p-5 flex items-start gap-3">
+          <div className="p-2 bg-white/20 rounded-lg shrink-0">
+            <PiggyBank className="h-5 w-5 text-white" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-white">Saldo</p>
+            <p className="text-sm sm:text-lg lg:text-xl font-black text-white mt-1 leading-tight">
+              {formatearMoneda(totalARS - gastosMes)}
+            </p>
+            <p className="text-[10px] font-bold text-white/80 mt-0.5">disponible este mes</p>
+          </div>
         </div>
       </div>
 
@@ -184,25 +204,6 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      {/* Net balance card */}
-      {(totalARS - gastosMes) !== 0 && (
-        <Card className={`${(totalARS - gastosMes) >= 0 ? 'bg-brand/5 border-brand/30' : 'bg-red-50 border-red-200'}`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${(totalARS - gastosMes) >= 0 ? 'bg-brand/10' : 'bg-red-100'}`}>
-              {(totalARS - gastosMes) >= 0
-                ? <TrendingUp className="h-5 w-5 text-brand" />
-                : <TrendingDown className="h-5 w-5 text-red-600" />
-              }
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Balance estimado del mes</p>
-              <p className={`text-xl font-black ${(totalARS - gastosMes) >= 0 ? 'text-brand' : 'text-red-600'}`}>
-                {formatearMoneda(totalARS - gastosMes)}
-              </p>
-            </div>
-          </div>
-        </Card>
-      )}
     </div>
   );
 }
