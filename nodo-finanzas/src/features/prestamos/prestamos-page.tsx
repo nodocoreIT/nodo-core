@@ -185,16 +185,19 @@ export function PrestamosPage() {
       (p.prestamista || '').toLowerCase().includes(busqueda.toLowerCase())
   );
 
-  const totales = prestamos
-    .filter((p) => p.activo && !p.pagado)
-    .reduce(
-      (acc, p) => {
-        if (p.moneda === 'USD') acc.USD += p.saldoPendiente;
-        else acc.ARS += p.saldoPendiente;
-        return acc;
-      },
-      { ARS: 0, USD: 0 }
-    );
+  const activos = prestamos.filter((p) => p.activo && !p.pagado);
+
+  const totales = activos.reduce(
+    (acc, p) => {
+      if (p.moneda === 'USD') acc.USD += p.saldoPendiente;
+      else acc.ARS += p.saldoPendiente;
+      return acc;
+    },
+    { ARS: 0, USD: 0 }
+  );
+
+  const totalCuotas = activos.reduce((s, p) => s + (p.importeCuota ?? 0), 0);
+  const totalCancelacion = activos.reduce((s, p) => s + (p.saldoCancelacion ?? 0), 0);
 
   const toggleExpansion = (id: string) => {
     setExpandidos((prev) => {
@@ -382,28 +385,39 @@ export function PrestamosPage() {
       </div>
 
       {/* Totales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-mist p-5">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-100 rounded-lg">
               <DollarSign className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <p className="text-sm text-slate2">Saldo pendiente ARS</p>
+              <p className="text-sm text-slate2">Saldo pendiente</p>
               <p className="text-xl font-bold text-red-600">{formatearMoneda(totales.ARS)}</p>
             </div>
           </div>
         </div>
         <div className="bg-white rounded-xl border border-mist p-5">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <DollarSign className="w-5 h-5 text-blue-600" />
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <DollarSign className="w-5 h-5 text-orange-600" />
             </div>
             <div>
-              <p className="text-sm text-slate2">Saldo pendiente USD</p>
-              <p className="text-xl font-bold text-blue-600">
-                US$ {totales.USD.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-              </p>
+              <p className="text-sm text-slate2">Total cuotas a pagar</p>
+              <p className="text-xl font-bold text-orange-600">{formatearMoneda(totalCuotas)}</p>
+              <p className="text-xs text-slate2 mt-0.5">suma mensual de cuotas</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-mist p-5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-100 rounded-lg">
+              <DollarSign className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <p className="text-sm text-slate2">Saldo cancelación</p>
+              <p className="text-xl font-bold text-indigo-600">{formatearMoneda(totalCancelacion)}</p>
+              <p className="text-xs text-slate2 mt-0.5">para cancelar todo hoy</p>
             </div>
           </div>
         </div>
