@@ -38,6 +38,7 @@ function toAppNotification(notification: Notification) {
     description: notification.mensaje,
     href,
     priority: notification.urgencia === "alta" ? 1 : notification.urgencia === "media" ? 2 : 3,
+    duesToday: notification.venceHoy,
   };
 }
 

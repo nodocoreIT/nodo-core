@@ -78,6 +78,29 @@ export function GastosFijosPage() {
     });
   }, [finanzas.gastosFijos, busqueda, rubroFiltro, mostrarInactivos, rubrosMap]);
 
+  function getFormaPagoDisplay(gasto: GastoFijo): { mainLabel: string; subLabel?: string; pillClass: string } {
+    if (gasto.formaDePago === 'TARJETA') {
+      const tarjeta = finanzas.tarjetas.find((t) => t.id === gasto.tarjetaId);
+      return {
+        mainLabel: 'Tarjeta',
+        subLabel: tarjeta?.nombre,
+        pillClass: 'bg-brand/10 text-brand',
+      };
+    }
+    const cuenta = gasto.cuentaBancariaId
+      ? finanzas.cuentas.find((c) => c.id === gasto.cuentaBancariaId)
+      : null;
+    const pillClass = cuenta ? cuentaPillClass(cuenta.nombre) : 'bg-mist text-slate2';
+    const subLabel = cuenta?.nombre;
+    switch (gasto.formaDePago) {
+      case 'DEBITO':             return { mainLabel: 'Débito',        subLabel, pillClass };
+      case 'TRANSFERENCIA BANCO': return { mainLabel: 'Transferencia', subLabel, pillClass };
+      case 'MERCADO_PAGO':       return { mainLabel: 'Mercado Pago',  subLabel, pillClass };
+      case 'EFECTIVO':           return { mainLabel: 'Efectivo',      pillClass: 'bg-emerald-100 text-emerald-800' };
+      default:                   return { mainLabel: gasto.formaDePago, subLabel, pillClass };
+    }
+  }
+
   function estaPagadoEsteMes(gastoId: string): boolean {
     return finanzas.gastosDiarios.some(
       (gd) => gd.gastoFijoId === gastoId && esFechaDelMesActual(gd.fecha)
@@ -338,7 +361,7 @@ export function GastosFijosPage() {
         <div className="flex items-center gap-2">
           <div className="relative">
             <Button
-              variant="success"
+              variant="primary"
               onClick={handleVoiceClick}
               disabled={voiceState === 'extracting'}
               className={`shrink-0 whitespace-nowrap ${voiceState === 'listening' ? 'animate-pulse !bg-red-500 !border-red-500' : ''}`}
@@ -389,7 +412,7 @@ export function GastosFijosPage() {
           <Button
             variant="secondary"
             onClick={() => abrirFormulario()}
-            className="shrink-0 whitespace-nowrap mr-4 !bg-green-100 !text-green-800 hover:!bg-green-200 !border-transparent"
+            className="shrink-0 whitespace-nowrap mr-4"
           >
             <Plus className="h-4 w-4" />
             Gasto Fijo
@@ -417,14 +440,16 @@ export function GastosFijosPage() {
                 return (
                   <div
                     key={gasto.id}
-                    className={`py-3 ${!gasto.activo ? 'opacity-50' : ''}`}
+                    className={`py-3 px-2 rounded-lg transition-colors ${!gasto.activo ? 'opacity-50' : ''} ${isPagado ? 'bg-emerald-50' : ''}`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <RubroDisplay rubro={rubro} />
                       <button
                         onClick={() => finanzas.actualizarGastoFijo(gasto.id, { activo: !gasto.activo })}
                         className={`inline-flex px-2 py-0.5 text-[10px] font-bold uppercase rounded-md border tracking-wider transition-all shrink-0 ${
-                          gasto.activo
+                          isPagado
+                            ? 'bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200'
+                            : gasto.activo
                             ? 'bg-mist text-brand border-brand/30 hover:bg-brand/10'
                             : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
                         }`}
@@ -450,35 +475,39 @@ export function GastosFijosPage() {
                         </p>
                       )}
                       {(() => {
-                        const cuenta = gasto.cuentaBancariaId ? finanzas.cuentas.find((c) => c.id === gasto.cuentaBancariaId) : null;
-                        const pillClass = cuenta ? cuentaPillClass(cuenta.nombre) : 'bg-mist text-slate2';
-                        const n = cuenta ? cuenta.nombre.toLowerCase().replace(/\s+/g, '') : '';
-                        const banco = n.includes('santander') ? ' Santander' : n.includes('pampa') ? ' Pampa' : '';
-                        const esMPReserva = n.includes('mercadopago') && n.includes('reserva');
-                        const label =
-                          gasto.formaDePago === 'MERCADO_PAGO' ? (esMPReserva ? 'MP Reservas' : 'Mercado Pago') :
-                          gasto.formaDePago === 'DEBITO' ? `Débito${banco}` :
-                          gasto.formaDePago === 'TRANSFERENCIA BANCO' ? `Transfer.${banco}` :
-                          gasto.formaDePago === 'EFECTIVO' ? 'Efectivo' :
-                          gasto.formaDePago;
+                        const { mainLabel, subLabel, pillClass } = getFormaPagoDisplay(gasto);
                         return (
-                          <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md ${pillClass}`}>
-                            {label}
-                          </span>
+                          <div className="flex flex-col items-start gap-0.5">
+                            <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md ${pillClass}`}>
+                              {mainLabel}
+                            </span>
+                            {subLabel && (
+                              <span className="text-[9px] text-slate2 leading-tight max-w-[100px] truncate">{subLabel}</span>
+                            )}
+                          </div>
                         );
                       })()}
                     </div>
 
                     <div className="flex items-center justify-end gap-1">
-                      <Button
-                        size="sm"
-                        variant={isPagado ? 'primary' : 'danger'}
-                        onClick={() => abrirModalPago(gasto)}
-                        disabled={!gasto.activo || cargandoPago}
-                        className="text-[10px] px-2 h-7"
-                      >
-                        {isPagado ? 'Pagado' : 'Pagar'}
-                      </Button>
+                      {isPagado ? (
+                        <span
+                          onClick={() => abrirModalPago(gasto)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold border border-emerald-300 cursor-pointer hover:bg-emerald-200 transition-colors select-none"
+                        >
+                          ✓ Pagado
+                        </span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => abrirModalPago(gasto)}
+                          disabled={!gasto.activo || cargandoPago}
+                          className="text-[10px] px-2 h-7"
+                        >
+                          Pagar
+                        </Button>
+                      )}
                       <button
                         onClick={() => abrirFormulario(gasto)}
                         className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"
@@ -520,7 +549,7 @@ export function GastosFijosPage() {
                 return (
                   <tr
                     key={gasto.id}
-                    className={`hover:bg-paper/50 transition-colors ${!gasto.activo ? 'opacity-50' : ''}`}
+                    className={`transition-colors ${!gasto.activo ? 'opacity-50' : ''} ${isPagado ? 'bg-emerald-50 hover:bg-emerald-100/60' : 'hover:bg-paper/50'}`}
                   >
                     <td className="py-3 px-2">
                       <RubroDisplay rubro={rubro} />
@@ -545,21 +574,16 @@ export function GastosFijosPage() {
                     </td>
                     <td className="hidden lg:table-cell py-3 px-2 text-center">
                       {(() => {
-                        const cuenta = gasto.cuentaBancariaId ? finanzas.cuentas.find((c) => c.id === gasto.cuentaBancariaId) : null;
-                        const pillClass = cuenta ? cuentaPillClass(cuenta.nombre) : 'bg-mist text-slate2';
-                        const n = cuenta ? cuenta.nombre.toLowerCase().replace(/\s+/g, '') : '';
-                        const banco = n.includes('santander') ? ' Santander' : n.includes('pampa') ? ' Pampa' : '';
-                        const esMPReserva = n.includes('mercadopago') && n.includes('reserva');
-                        const label =
-                          gasto.formaDePago === 'MERCADO_PAGO' ? (esMPReserva ? 'MP Reservas' : 'Mercado Pago') :
-                          gasto.formaDePago === 'DEBITO' ? `Débito${banco}` :
-                          gasto.formaDePago === 'TRANSFERENCIA BANCO' ? `Transfer.${banco}` :
-                          gasto.formaDePago === 'EFECTIVO' ? 'Efectivo' :
-                          gasto.formaDePago;
+                        const { mainLabel, subLabel, pillClass } = getFormaPagoDisplay(gasto);
                         return (
-                          <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md ${pillClass}`}>
-                            {label}
-                          </span>
+                          <div className="flex flex-col items-start gap-0.5">
+                            <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md ${pillClass}`}>
+                              {mainLabel}
+                            </span>
+                            {subLabel && (
+                              <span className="text-[9px] text-slate2 leading-tight max-w-[100px] truncate">{subLabel}</span>
+                            )}
+                          </div>
                         );
                       })()}
                     </td>
@@ -577,15 +601,24 @@ export function GastosFijosPage() {
                     </td>
                     <td className="py-3 px-2">
                       <div className="flex items-center justify-end gap-1">
-                        <Button
-                          size="sm"
-                          variant={isPagado ? 'primary' : 'danger'}
-                          onClick={() => abrirModalPago(gasto)}
-                          disabled={!gasto.activo || cargandoPago}
-                          className="text-[10px] px-2 h-7"
-                        >
-                          {isPagado ? 'Pagado' : 'Pagar'}
-                        </Button>
+                        {isPagado ? (
+                          <span
+                            onClick={() => abrirModalPago(gasto)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold border border-emerald-300 cursor-pointer hover:bg-emerald-200 transition-colors select-none"
+                          >
+                            ✓ Pagado
+                          </span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => abrirModalPago(gasto)}
+                            disabled={!gasto.activo || cargandoPago}
+                            className="text-[10px] px-2 h-7"
+                          >
+                            Pagar
+                          </Button>
+                        )}
                         <button
                           onClick={() => abrirFormulario(gasto)}
                           className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"

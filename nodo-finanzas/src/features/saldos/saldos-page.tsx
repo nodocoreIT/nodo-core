@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Plus, Edit, Trash2, Eye, EyeOff, PiggyBank, History, ArrowLeftRight, ArrowRight, X, TrendingUp, TrendingDown, ChevronLeft, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, PiggyBank, History, ArrowLeftRight, ArrowRight, X, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -88,10 +88,10 @@ type FormMovimiento = z.infer<typeof schemaMovimiento>;
 interface MovimientosModalProps {
   cuenta: Cuenta;
   onClose: () => void;
+  finanzas: ReturnType<typeof useFinanzas>;
 }
 
-function MovimientosModal({ cuenta, onClose }: MovimientosModalProps) {
-  const finanzas = useFinanzas();
+function MovimientosModal({ cuenta, onClose, finanzas }: MovimientosModalProps) {
   const [movimientos, setMovimientos] = useState<MovimientoCuenta[]>([]);
   const [loading, setLoading] = useState(true);
   const [vista, setVista] = useState<'lista' | 'form'>('lista');
@@ -99,6 +99,43 @@ function MovimientosModal({ cuenta, onClose }: MovimientosModalProps) {
   const [eliminandoId, setEliminandoId] = useState<string | null>(null);
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'entrada' | 'salida'>('todos');
   const [busqueda, setBusqueda] = useState('');
+  const [sortField, setSortField] = useState<'fecha' | 'descripcion' | 'monto' | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [mesFiltro, setMesFiltro] = useState<{ year: number; month: number } | null>(() => {
+    const hoy = new Date();
+    return { year: hoy.getFullYear(), month: hoy.getMonth() };
+  });
+
+  function toggleSort(field: 'fecha' | 'descripcion' | 'monto') {
+    if (sortField === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  }
+
+  function prevMes() {
+    setMesFiltro((prev) => {
+      if (!prev) return prev;
+      const d = new Date(prev.year, prev.month - 1);
+      return { year: d.getFullYear(), month: d.getMonth() };
+    });
+  }
+
+  function nextMes() {
+    setMesFiltro((prev) => {
+      if (!prev) return prev;
+      const d = new Date(prev.year, prev.month + 1);
+      return { year: d.getFullYear(), month: d.getMonth() };
+    });
+  }
+
+  const mesLabel = mesFiltro
+    ? new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric' })
+        .format(new Date(mesFiltro.year, mesFiltro.month))
+        .replace(/^\w/, (c) => c.toUpperCase())
+    : '';
 
   const {
     register,
@@ -207,10 +244,17 @@ function MovimientosModal({ cuenta, onClose }: MovimientosModalProps) {
     }
   }
 
-  const totalEntradas = movimientos.filter((m) => m.tipo === 'entrada').reduce((s, m) => s + m.monto, 0);
-  const totalSalidas = movimientos.filter((m) => m.tipo === 'salida').reduce((s, m) => s + m.monto, 0);
+  const movimientosMes = useMemo(() => {
+    if (!mesFiltro) return movimientos;
+    const prefix = `${mesFiltro.year}-${String(mesFiltro.month + 1).padStart(2, '0')}`;
+    return movimientos.filter((m) => m.fecha.startsWith(prefix));
+  }, [movimientos, mesFiltro]);
+
+  const totalEntradas = movimientosMes.filter((m) => m.tipo === 'entrada').reduce((s, m) => s + m.monto, 0);
+  const totalSalidas = movimientosMes.filter((m) => m.tipo === 'salida').reduce((s, m) => s + m.monto, 0);
+
   const movimientosFiltrados = useMemo(() => {
-    let list = filtroTipo === 'todos' ? movimientos : movimientos.filter((m) => m.tipo === filtroTipo);
+    let list = filtroTipo === 'todos' ? movimientosMes : movimientosMes.filter((m) => m.tipo === filtroTipo);
     if (busqueda.trim()) {
       const t = busqueda.toLowerCase().trim();
       list = list.filter((m) =>
@@ -218,12 +262,27 @@ function MovimientosModal({ cuenta, onClose }: MovimientosModalProps) {
         (m.detalle && m.detalle.toLowerCase().includes(t))
       );
     }
+    if (sortField) {
+      list = [...list].sort((a, b) => {
+        if (sortField === 'fecha') {
+          return sortDir === 'asc'
+            ? a.fecha.localeCompare(b.fecha)
+            : b.fecha.localeCompare(a.fecha);
+        }
+        if (sortField === 'descripcion') {
+          return sortDir === 'asc'
+            ? a.descripcion.localeCompare(b.descripcion)
+            : b.descripcion.localeCompare(a.descripcion);
+        }
+        return sortDir === 'asc' ? a.monto - b.monto : b.monto - a.monto;
+      });
+    }
     return list;
-  }, [movimientos, filtroTipo, busqueda]);
+  }, [movimientosMes, filtroTipo, busqueda, sortField, sortDir]);
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-mist flex-shrink-0">
@@ -383,17 +442,91 @@ function MovimientosModal({ cuenta, onClose }: MovimientosModalProps) {
             )}
 
             {movimientos.length > 0 && (
-              <div className="px-5 pb-3 flex-shrink-0">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate2" />
-                  <input
-                    type="text"
-                    value={busqueda}
-                    onChange={(e) => setBusqueda(e.target.value)}
-                    placeholder="Buscar movimiento…"
-                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-mist rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
-                  />
+              <div className="px-5 pt-3 pb-2 flex-shrink-0 space-y-2">
+                {/* Search + month nav */}
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate2" />
+                    <input
+                      type="text"
+                      value={busqueda}
+                      onChange={(e) => setBusqueda(e.target.value)}
+                      placeholder="Buscar movimiento…"
+                      className="w-full pl-8 pr-3 py-1.5 text-sm border border-mist rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
+                    />
+                  </div>
+                  <div className="flex items-center flex-shrink-0 border border-mist rounded-lg overflow-hidden">
+                    <button
+                      onClick={prevMes}
+                      disabled={!mesFiltro}
+                      className="p-1.5 text-slate2 hover:text-ink hover:bg-mist disabled:opacity-30 transition-colors"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="text-xs font-medium text-ink px-2 min-w-[80px] text-center">
+                      {mesFiltro ? mesLabel : 'Todos'}
+                    </span>
+                    <button
+                      onClick={nextMes}
+                      disabled={!mesFiltro}
+                      className="p-1.5 text-slate2 hover:text-ink hover:bg-mist disabled:opacity-30 transition-colors"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
+
+                {/* Ver todo toggle */}
+                <label className="flex items-center gap-2 text-xs text-slate2 cursor-pointer select-none w-fit">
+                  <input
+                    type="checkbox"
+                    checked={mesFiltro === null}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setMesFiltro(null);
+                      } else {
+                        const hoy = new Date();
+                        setMesFiltro({ year: hoy.getFullYear(), month: hoy.getMonth() });
+                      }
+                    }}
+                    className="w-3.5 h-3.5 rounded text-brand border-mist focus:ring-brand"
+                  />
+                  Ver todos los movimientos
+                </label>
+              </div>
+            )}
+
+            {movimientos.length > 0 && (
+              <div className="flex items-center gap-3 px-5 py-2 border-b border-mist flex-shrink-0">
+                <span className="w-7 flex-shrink-0" />
+                <button
+                  onClick={() => toggleSort('fecha')}
+                  className={`w-20 flex-shrink-0 flex items-center gap-1 text-xs font-medium transition-colors text-left ${sortField === 'fecha' ? 'text-brand' : 'text-slate2 hover:text-ink'}`}
+                >
+                  Fecha
+                  {sortField === 'fecha'
+                    ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)
+                    : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+                </button>
+                <button
+                  onClick={() => toggleSort('descripcion')}
+                  className={`flex-1 flex items-center gap-1 text-xs font-medium transition-colors text-left ${sortField === 'descripcion' ? 'text-brand' : 'text-slate2 hover:text-ink'}`}
+                >
+                  Descripción
+                  {sortField === 'descripcion'
+                    ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)
+                    : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+                </button>
+                <button
+                  onClick={() => toggleSort('monto')}
+                  className={`flex-shrink-0 flex items-center gap-1 text-xs font-medium transition-colors ${sortField === 'monto' ? 'text-brand' : 'text-slate2 hover:text-ink'}`}
+                >
+                  Importe
+                  {sortField === 'monto'
+                    ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)
+                    : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+                </button>
+                <span className="w-11 flex-shrink-0" />
               </div>
             )}
 
@@ -418,18 +551,18 @@ function MovimientosModal({ cuenta, onClose }: MovimientosModalProps) {
                   <button onClick={() => setBusqueda('')} className="mt-2 text-xs text-brand hover:underline">Limpiar búsqueda</button>
                 </div>
               ) : (
-                <div className="space-y-1">
+                <div className="divide-y divide-mist/50">
                   {movimientosFiltrados.map((m) => (
-                    <div key={m.id} className="flex items-center gap-3 py-2.5 border-b border-mist/50 last:border-0 group">
+                    <div key={m.id} className="flex items-center gap-3 py-2.5 group">
                       <div className={`flex-shrink-0 p-1.5 rounded-full ${m.tipo === 'entrada' ? 'bg-emerald-100' : 'bg-red-100'}`}>
                         {m.tipo === 'entrada'
                           ? <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
                           : <TrendingDown className="h-3.5 w-3.5 text-red-500" />
                         }
                       </div>
+                      <span className="w-20 flex-shrink-0 text-xs text-slate2">{formatearFecha(m.fecha)}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-ink truncate">{m.descripcion}</p>
-                        <p className="text-xs text-slate2">{formatearFecha(m.fecha)}</p>
                         {m.detalle && <p className="text-xs text-slate2/70 truncate">{m.detalle}</p>}
                       </div>
                       <span className={`text-sm font-bold flex-shrink-0 ${m.tipo === 'entrada' ? 'text-emerald-600' : 'text-red-500'}`}>
@@ -1084,6 +1217,7 @@ export function SaldosPage() {
         <MovimientosModal
           cuenta={cuentaMovimientos}
           onClose={() => setCuentaMovimientos(null)}
+          finanzas={finanzas}
         />
       )}
 

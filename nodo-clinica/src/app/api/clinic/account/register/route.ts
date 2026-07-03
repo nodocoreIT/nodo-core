@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
+const CLINIC_ORG_ID =
+  process.env.CLINIC_ORG_ID ?? "843524dc-0c3b-4340-bc8e-e3ae5aa00fd2";
+
+function splitName(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/);
+  const firstName = parts[0] ?? fullName;
+  const lastName = parts.slice(1).join(" ") || "-";
+  return { firstName, lastName };
+}
+
 async function registerDoctor(body: {
   fullName: string;
   email: string;
@@ -29,6 +39,7 @@ async function registerDoctor(body: {
   }
 
   const userId = data.user.id;
+  const { firstName, lastName } = splitName(body.fullName);
 
   const { error: orgMemberError } = await serviceClient
     .schema("shared" as never)
@@ -41,13 +52,19 @@ async function registerDoctor(body: {
   }
 
   const { error: profError } = await serviceClient
+    .schema("nodo_clinica" as never)
     .from("professionals")
     .insert({
       user_id: userId,
       org_id: body.orgId,
       full_name: body.fullName,
+      first_name: firstName,
+      last_name: lastName,
+      email: body.email.toLowerCase().trim(),
       specialty: body.specialty ?? "Medicina General",
-      license_number: body.licenseNumber ?? "Pendiente",
+      license_number: body.licenseNumber ?? null,
+      subscription_status: "trial",
+      subscription_plan: "trial",
     });
 
   if (profError) {
@@ -89,7 +106,10 @@ async function registerPatient(body: {
 
   const userId = data.user.id;
 
-  const { error: patientError } = await serviceClient.from("patients").insert({
+  const { error: patientError } = await serviceClient
+    .schema("nodo_clinica" as never)
+    .from("patients")
+    .insert({
     profile_id: userId,
     org_id: body.orgId,
     full_name: body.fullName,
@@ -119,7 +139,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!body.orgId) {
-      return NextResponse.json({ error: "org_id requerido" }, { status: 400 });
+      body.orgId = CLINIC_ORG_ID;
     }
 
     if (role === "doctor") {

@@ -8,6 +8,7 @@ const BASE_THEME: Omit<ThemeSettings, "primaryColor" | "brandText"> = {
   borderRadius: "md",
   fontFamily: "Inter",
   logoType: "default",
+  backgroundColor: "#f0fdf4",
 };
 
 /** Canonical default theme per dashboard unit code (source of truth for provisioning). */

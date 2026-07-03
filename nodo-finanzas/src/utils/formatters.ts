@@ -10,6 +10,9 @@ export const simboloMoneda = (moneda: Moneda = 'ARS'): string =>
  * Limpia texto mientras el usuario escribe (solo dígitos y una coma decimal).
  */
 export const sanitizarEntradaMonto = (valor: string): string => {
+  // Dots are always thousands separators (produced by the live formatter).
+  // Decimal input via "." is handled at the keydown level in MoneyInput,
+  // which converts "." → "," before it reaches this function.
   const sinSeparadores = valor.replace(/\./g, '');
   let limpio = sinSeparadores.replace(/[^\d,]/g, '');
 

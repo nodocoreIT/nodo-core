@@ -9,6 +9,7 @@ export interface AppNotification {
   description: string;
   href: string;
   priority: number;
+  duesToday?: boolean;
 }
 
 export interface NotificationKindStyle {

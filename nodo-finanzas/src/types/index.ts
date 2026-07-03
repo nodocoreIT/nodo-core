@@ -252,6 +252,7 @@ export interface Prestamo {
   notas?: string;
   comprobanteUrl?: string;
   ultimoPagoMes?: string; // Formato YYYY-MM
+  diaPago?: number;
 }
 
 export interface CuotaProgramada {
