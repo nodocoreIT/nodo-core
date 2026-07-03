@@ -93,7 +93,13 @@ export const useNotifications = () => {
 
     // 2. Préstamos
     prestamos.forEach((prestamo: Prestamo) => {
-      if (!prestamo.activo || !prestamo.fechaVencimiento || prestamo.cuotaAbonada || prestamo.pagado) return;
+      if (
+        !prestamo.activo ||
+        !prestamo.fechaVencimiento ||
+        prestamo.cuotaAbonada ||
+        prestamo.pagado ||
+        prestamo.ultimoPagoMes === mesActualStr
+      ) return;
 
       const id = `PRESTAMO-${prestamo.id}-${mesActualStr}`;
       if (estaPagado('prestamo', prestamo.id)) return;
