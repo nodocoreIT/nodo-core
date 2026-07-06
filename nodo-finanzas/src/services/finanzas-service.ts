@@ -8,6 +8,7 @@ import type {
   Tarjeta,
   ConsumoTarjeta,
   Prestamo,
+  PrestamoComprobante,
   CuotaProgramada,
   CuentaBancaria,
   ConfiguracionCategoria,
@@ -258,6 +259,18 @@ export class FinanzasService {
   }
 
   static async eliminarGastoFijo(id: string): Promise<boolean> {
+    // Nullify the FK reference in gastos_diarios before deleting to avoid constraint violation.
+    // The daily expense records are real transactions and must be preserved.
+    const { error: unlinkError } = await db
+      .from('gastos_diarios')
+      .update({ gasto_fijo_id: null })
+      .eq('gasto_fijo_id', id);
+
+    if (unlinkError) {
+      console.error('Error desvinculando gastos diarios:', unlinkError);
+      return false;
+    }
+
     const { error } = await db
       .from('gastos_fijos')
       .delete()
@@ -805,6 +818,122 @@ export class FinanzasService {
     return data.publicUrl;
   }
 
+  // === COMPROBANTES DE PRÉSTAMOS ===
+
+  static async subirComprobantePrestamo(
+    prestamoId: string,
+    file: File,
+  ): Promise<PrestamoComprobante | null> {
+    const userId = await requireUserId();
+    const ext = file.name.split('.').pop() ?? 'jpg';
+    const storagePath = `${userId}/${prestamoId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('loan-receipts')
+      .upload(storagePath, file, { upsert: false });
+
+    if (uploadError) {
+      console.error('Error subiendo comprobante:', uploadError);
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .schema('nodo_finanzas_personales')
+      .from('prestamo_comprobantes')
+      .insert([{
+        prestamo_id: prestamoId,
+        user_id: userId,
+        storage_path: storagePath,
+        nombre: file.name,
+        tipo: file.type,
+        tamanio: file.size,
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error guardando metadata de comprobante:', error);
+      // Clean up the uploaded file if DB insert fails
+      await supabase.storage.from('loan-receipts').remove([storagePath]);
+      return null;
+    }
+
+    const { data: signedData } = await supabase.storage
+      .from('loan-receipts')
+      .createSignedUrl(storagePath, 3600);
+
+    return {
+      id: data.id,
+      prestamoId: data.prestamo_id,
+      userId: data.user_id,
+      storagePath: data.storage_path,
+      nombre: data.nombre,
+      tipo: data.tipo ?? undefined,
+      tamanio: data.tamanio ?? undefined,
+      createdAt: data.created_at,
+      url: signedData?.signedUrl,
+    };
+  }
+
+  static async obtenerComprobantes(prestamoId: string): Promise<PrestamoComprobante[]> {
+    const { data, error } = await supabase
+      .schema('nodo_finanzas_personales')
+      .from('prestamo_comprobantes')
+      .select('*')
+      .eq('prestamo_id', prestamoId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error obteniendo comprobantes:', error);
+      return [];
+    }
+
+    // Get signed URLs for all files in one batch
+    const paths = data.map((r) => r.storage_path);
+    const { data: signed } = await supabase.storage
+      .from('loan-receipts')
+      .createSignedUrls(paths, 3600);
+
+    const urlMap = new Map(
+      (signed ?? []).map((s) => [s.path, s.signedUrl]),
+    );
+
+    return data.map((r) => ({
+      id: r.id,
+      prestamoId: r.prestamo_id,
+      userId: r.user_id,
+      storagePath: r.storage_path,
+      nombre: r.nombre,
+      tipo: r.tipo ?? undefined,
+      tamanio: r.tamanio ?? undefined,
+      createdAt: r.created_at,
+      url: urlMap.get(r.storage_path) ?? undefined,
+    }));
+  }
+
+  static async eliminarComprobante(comprobante: PrestamoComprobante): Promise<boolean> {
+    const { error: dbError } = await supabase
+      .schema('nodo_finanzas_personales')
+      .from('prestamo_comprobantes')
+      .delete()
+      .eq('id', comprobante.id);
+
+    if (dbError) {
+      console.error('Error eliminando comprobante de DB:', dbError);
+      return false;
+    }
+
+    const { error: storageError } = await supabase.storage
+      .from('loan-receipts')
+      .remove([comprobante.storagePath]);
+
+    if (storageError) {
+      console.error('Error eliminando archivo de storage:', storageError);
+    }
+
+    return true;
+  }
+
   // === CUENTAS BANCARIAS ===
   static async obtenerCuentasBancarias(): Promise<CuentaBancaria[]> {
     const { data, error } = await db
@@ -1084,6 +1213,7 @@ export class FinanzasService {
       tarjetaId: data.tarjeta_id,
       cuentaBancariaId: data.cuenta_bancaria_id,
       activo: data.activo,
+      excluirDelResumen: data.excluir_del_resumen ?? false,
       fechaCreacion: data.fecha_creacion || data.created_at,
       planId: data.plan_id,
       prestamoId: data.prestamo_id,
@@ -1105,6 +1235,7 @@ export class FinanzasService {
     if (gasto.tarjetaId !== undefined) datos.tarjeta_id = (gasto.tarjetaId && gasto.tarjetaId !== '') ? gasto.tarjetaId : null;
     if (gasto.cuentaBancariaId !== undefined) datos.cuenta_bancaria_id = (gasto.cuentaBancariaId && gasto.cuentaBancariaId !== '') ? gasto.cuentaBancariaId : null;
     if (gasto.activo !== undefined) datos.activo = gasto.activo;
+    if (gasto.excluirDelResumen !== undefined) datos.excluir_del_resumen = gasto.excluirDelResumen;
     if (gasto.fechaCreacion !== undefined) datos.fecha_creacion = gasto.fechaCreacion;
     if (gasto.planId !== undefined) datos.plan_id = (gasto.planId && gasto.planId !== '') ? gasto.planId : null;
     if (gasto.prestamoId !== undefined) datos.prestamo_id = (gasto.prestamoId && gasto.prestamoId !== '') ? gasto.prestamoId : null;
@@ -1201,6 +1332,7 @@ export class FinanzasService {
       monto: Number(data.monto),
       montoUSD: data.monto_usd ? Number(data.monto_usd) : undefined,
       fecha: data.fecha,
+      hora: data.hora ?? undefined,
       rubro: data.rubro || '',
       rubroId: data.rubro_id,
       rubroInfo: data.rubros ? FinanzasService.mapRubroFromDB(data.rubros) : undefined,
@@ -1228,6 +1360,7 @@ export class FinanzasService {
       monto: gasto.monto,
       monto_usd: gasto.montoUSD || null,
       fecha: gasto.fecha,
+      hora: gasto.hora ?? null,
       rubro: gasto.rubro || 'OTROS',
       rubro_id: gasto.rubroId || null,
       forma_de_pago: gasto.formaPago,
@@ -1304,7 +1437,9 @@ export class FinanzasService {
     if (prestamo.noCobrarCuota !== undefined) dbData.no_cobrar_cuota = prestamo.noCobrarCuota;
     if (prestamo.notas !== undefined) dbData.notas = prestamo.notas;
     if (prestamo.comprobanteUrl !== undefined) dbData.comprobante_url = prestamo.comprobanteUrl;
-    if (prestamo.ultimoPagoMes !== undefined) dbData.ultimo_pago_mes = prestamo.ultimoPagoMes;
+    // Use 'in' check so that explicitly passing undefined clears the column in DB (sends null)
+    // rather than being silently skipped (the bug: old value persisted after "unmark payment")
+    if ('ultimoPagoMes' in prestamo) dbData.ultimo_pago_mes = prestamo.ultimoPagoMes ?? null;
     if (prestamo.diaPago !== undefined) dbData.dia_pago = prestamo.diaPago;
 
     return dbData;

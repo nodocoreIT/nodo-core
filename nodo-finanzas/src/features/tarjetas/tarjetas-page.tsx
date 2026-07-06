@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CheckCircle2,
   AlertTriangle,
+  Calendar,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -244,6 +245,25 @@ export function TarjetasPage() {
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-slate2">Transacciones:</span>
                     <span className="font-medium text-ink">{resumen.cantidadTransacciones}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="flex items-center gap-1 text-slate2">
+                      <Calendar className="w-3.5 h-3.5" />
+                      Vencimiento:
+                    </span>
+                    <input
+                      type="date"
+                      value={resumen.tarjeta.fechaVencimiento ?? ''}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        finanzas.actualizarTarjeta(resumen.tarjeta.id, {
+                          fechaVencimiento: e.target.value || undefined,
+                        });
+                      }}
+                      className="text-sm font-semibold text-ink border-0 bg-transparent cursor-pointer focus:outline-none focus:ring-0 text-right"
+                    />
                   </div>
 
                   {/* Progress bar */}

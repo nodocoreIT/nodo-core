@@ -802,7 +802,7 @@ export function SaldosPage() {
             cuentas={finanzas.cuentas}
             onTransferExtracted={handleVoiceTransfer}
           />
-          <Button variant="secondary" onClick={() => setModalTransferencia(true)} className="shrink-0 whitespace-nowrap !bg-green-100 !text-green-800 hover:!bg-green-200 !border-transparent">
+          <Button variant="outline" onClick={() => setModalTransferencia(true)} className="shrink-0 whitespace-nowrap">
             <ArrowLeftRight className="h-4 w-4" />
             Transferir
           </Button>

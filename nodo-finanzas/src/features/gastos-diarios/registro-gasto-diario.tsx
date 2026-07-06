@@ -143,11 +143,15 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
         return;
       }
 
+      const now = new Date();
+      const horaActual = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
       const payload: Omit<GastoDiario, 'id'> = {
         descripcion: capitalizarDescripcion(data.descripcion),
         detalle: data.detalle || undefined,
         monto: data.monto,
         fecha: data.fecha,
+        hora: gastoEditando ? gastoEditando.hora : horaActual,
         rubroId: data.rubroId,
         rubro: data.rubro || data.rubroId,
         formaPago: data.formaPago,

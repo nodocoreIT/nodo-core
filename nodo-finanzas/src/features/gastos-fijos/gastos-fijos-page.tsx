@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Plus, Calculator, Search, X, Edit, Trash2, Mic, MicOff, Loader2 } from 'lucide-react';
+import { Plus, Calculator, Search, X, Edit, Trash2, Mic, MicOff, Loader2, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useOpenSettings } from '@/shared/hooks/use-open-settings';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/card';
@@ -21,6 +21,8 @@ import { normalizarCodigoRubro } from '@/utils/rubro-formatters';
 import type { GastoFijo } from '@/types';
 
 type VoiceState = 'idle' | 'listening' | 'extracting' | 'error';
+type SortField = 'rubro' | 'descripcion' | 'monto' | 'formaDePago';
+type SortDir = 'asc' | 'desc';
 
 export function GastosFijosPage() {
   const finanzas = useFinanzas();
@@ -38,6 +40,8 @@ export function GastosFijosPage() {
   const [busqueda, setBusqueda] = useState('');
   const [rubroFiltro, setRubroFiltro] = useState('');
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('rubro');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [gastoAEliminar, setGastoAEliminar] = useState<GastoFijo | null>(null);
 
   // Payment modal state
@@ -72,11 +76,36 @@ export function GastosFijosPage() {
     }
 
     return [...list].sort((a, b) => {
-      const ra = rubrosMap.get(a.rubroId)?.nombre ?? '';
-      const rb = rubrosMap.get(b.rubroId)?.nombre ?? '';
-      return ra.localeCompare(rb);
+      let cmp = 0;
+      switch (sortField) {
+        case 'rubro': {
+          const ra = rubrosMap.get(a.rubroId)?.nombre ?? '';
+          const rb = rubrosMap.get(b.rubroId)?.nombre ?? '';
+          cmp = ra.localeCompare(rb, 'es');
+          break;
+        }
+        case 'descripcion':
+          cmp = a.descripcion.localeCompare(b.descripcion, 'es');
+          break;
+        case 'monto':
+          cmp = a.monto - b.monto;
+          break;
+        case 'formaDePago':
+          cmp = a.formaDePago.localeCompare(b.formaDePago, 'es');
+          break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [finanzas.gastosFijos, busqueda, rubroFiltro, mostrarInactivos, rubrosMap]);
+  }, [finanzas.gastosFijos, busqueda, rubroFiltro, mostrarInactivos, rubrosMap, sortField, sortDir]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
 
   function getFormaPagoDisplay(gasto: GastoFijo): { mainLabel: string; subLabel?: string; pillClass: string } {
     if (gasto.formaDePago === 'TARJETA') {
@@ -84,20 +113,24 @@ export function GastosFijosPage() {
       return {
         mainLabel: 'Tarjeta',
         subLabel: tarjeta?.nombre,
-        pillClass: 'bg-brand/10 text-brand',
+        pillClass: tarjeta ? cuentaPillClass(tarjeta.banco || tarjeta.nombre) : 'bg-brand/10 text-brand',
       };
     }
+    if (gasto.formaDePago === 'MERCADO_PAGO') {
+      return { mainLabel: 'Mercado Pago', pillClass: 'bg-[#009ee3] text-white' };
+    }
+    if (gasto.formaDePago === 'EFECTIVO') {
+      return { mainLabel: 'Efectivo', pillClass: 'bg-emerald-100 text-emerald-800' };
+    }
     const cuenta = gasto.cuentaBancariaId
-      ? finanzas.cuentas.find((c) => c.id === gasto.cuentaBancariaId)
+      ? finanzas.configuracion.cuentasBancarias.find((c) => c.id === gasto.cuentaBancariaId)
       : null;
     const pillClass = cuenta ? cuentaPillClass(cuenta.nombre) : 'bg-mist text-slate2';
     const subLabel = cuenta?.nombre;
     switch (gasto.formaDePago) {
-      case 'DEBITO':             return { mainLabel: 'Débito',        subLabel, pillClass };
+      case 'DEBITO':              return { mainLabel: 'Débito',        subLabel, pillClass };
       case 'TRANSFERENCIA BANCO': return { mainLabel: 'Transferencia', subLabel, pillClass };
-      case 'MERCADO_PAGO':       return { mainLabel: 'Mercado Pago',  subLabel, pillClass };
-      case 'EFECTIVO':           return { mainLabel: 'Efectivo',      pillClass: 'bg-emerald-100 text-emerald-800' };
-      default:                   return { mainLabel: gasto.formaDePago, subLabel, pillClass };
+      default:                    return { mainLabel: gasto.formaDePago, subLabel, pillClass };
     }
   }
 
@@ -236,10 +269,10 @@ export function GastosFijosPage() {
   }
 
   const totalARS = finanzas.gastosFijos
-    .filter((g) => g.activo && g.moneda === 'ARS')
+    .filter((g) => g.activo && !g.excluirDelResumen && g.moneda === 'ARS')
     .reduce((s, g) => s + g.monto, 0);
   const totalUSD = finanzas.gastosFijos
-    .filter((g) => g.activo && g.moneda === 'USD')
+    .filter((g) => g.activo && !g.excluirDelResumen && g.moneda === 'USD')
     .reduce((s, g) => s + g.monto, 0);
   const totalGeneral = totalARS + (dolar.cotizacion ? dolar.convertirUSDaARS(totalUSD) : 0);
   const activosCount = finanzas.gastosFijos.filter((g) => g.activo).length;
@@ -444,18 +477,6 @@ export function GastosFijosPage() {
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <RubroDisplay rubro={rubro} />
-                      <button
-                        onClick={() => finanzas.actualizarGastoFijo(gasto.id, { activo: !gasto.activo })}
-                        className={`inline-flex px-2 py-0.5 text-[10px] font-bold uppercase rounded-md border tracking-wider transition-all shrink-0 ${
-                          isPagado
-                            ? 'bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200'
-                            : gasto.activo
-                            ? 'bg-mist text-brand border-brand/30 hover:bg-brand/10'
-                            : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
-                        }`}
-                      >
-                        {gasto.activo ? 'Activo' : 'Inactivo'}
-                      </button>
                     </div>
 
                     <p className={`font-semibold text-sm leading-snug ${isPagado ? 'text-brand' : 'text-ink'}`}>
@@ -477,12 +498,12 @@ export function GastosFijosPage() {
                       {(() => {
                         const { mainLabel, subLabel, pillClass } = getFormaPagoDisplay(gasto);
                         return (
-                          <div className="flex flex-col items-start gap-0.5">
+                          <div className="flex flex-col items-center gap-0.5">
                             <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md ${pillClass}`}>
                               {mainLabel}
                             </span>
                             {subLabel && (
-                              <span className="text-[9px] text-slate2 leading-tight max-w-[100px] truncate">{subLabel}</span>
+                              <span className="text-[9px] text-slate2 leading-tight">{subLabel}</span>
                             )}
                           </div>
                         );
@@ -534,11 +555,37 @@ export function GastosFijosPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-mist">
-                <th className="text-left py-3 px-2 font-medium text-slate2">Rubro</th>
-                <th className="text-left py-3 px-2 font-medium text-slate2">Descripción</th>
-                <th className="text-right py-3 px-2 font-medium text-slate2">Monto</th>
-                <th className="hidden lg:table-cell text-center py-3 px-2 font-medium text-slate2">Pago</th>
-                <th className="hidden sm:table-cell text-center py-3 px-2 font-medium text-slate2">Estado</th>
+                {([
+                  { field: 'rubro',      label: 'Rubro',       align: 'text-left'   },
+                  { field: 'descripcion',label: 'Descripción', align: 'text-left'   },
+                  { field: 'monto',      label: 'Monto',       align: 'text-right'  },
+                ] as { field: SortField; label: string; align: string }[]).map(({ field, label, align }) => (
+                  <th key={field} className={`py-3 px-2 font-medium text-slate2 ${align}`}>
+                    <button
+                      type="button"
+                      onClick={() => handleSort(field)}
+                      className="inline-flex items-center gap-1 hover:text-ink transition-colors"
+                    >
+                      {label}
+                      <span className="text-[10px]">
+                        {sortField === field ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                      </span>
+                    </button>
+                  </th>
+                ))}
+                <th className="hidden lg:table-cell text-center py-3 px-2 font-medium text-slate2">
+                  <button
+                    type="button"
+                    onClick={() => handleSort('formaDePago')}
+                    className="inline-flex items-center gap-1 hover:text-ink transition-colors"
+                  >
+                    Pago
+                    <span className="text-[10px]">
+                      {sortField === 'formaDePago' ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                    </span>
+                  </button>
+                </th>
+                <th className="hidden sm:table-cell text-center py-3 px-2 font-medium text-slate2 whitespace-nowrap">Incluir</th>
                 <th className="text-right py-3 px-2 font-medium text-slate2">Acciones</th>
               </tr>
             </thead>
@@ -576,12 +623,12 @@ export function GastosFijosPage() {
                       {(() => {
                         const { mainLabel, subLabel, pillClass } = getFormaPagoDisplay(gasto);
                         return (
-                          <div className="flex flex-col items-start gap-0.5">
+                          <div className="flex flex-col items-center gap-0.5">
                             <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded-md ${pillClass}`}>
                               {mainLabel}
                             </span>
                             {subLabel && (
-                              <span className="text-[9px] text-slate2 leading-tight max-w-[100px] truncate">{subLabel}</span>
+                              <span className="text-[9px] text-slate2 leading-tight">{subLabel}</span>
                             )}
                           </div>
                         );
@@ -589,14 +636,15 @@ export function GastosFijosPage() {
                     </td>
                     <td className="hidden sm:table-cell py-3 px-2 text-center">
                       <button
-                        onClick={() => finanzas.actualizarGastoFijo(gasto.id, { activo: !gasto.activo })}
-                        className={`inline-flex px-2 py-0.5 text-[10px] font-bold uppercase rounded-md border tracking-wider transition-all ${
-                          gasto.activo
-                            ? 'bg-mist text-brand border-brand/30 hover:bg-brand/10'
-                            : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
-                        }`}
+                        type="button"
+                        title={gasto.excluirDelResumen ? 'Excluido de la suma — click para incluir' : 'Incluido en la suma — click para excluir'}
+                        onClick={() => finanzas.actualizarGastoFijo(gasto.id, { excluirDelResumen: !gasto.excluirDelResumen })}
+                        className="inline-flex items-center justify-center transition-colors"
                       >
-                        {gasto.activo ? 'Activo' : 'Inactivo'}
+                        {gasto.excluirDelResumen
+                          ? <ToggleLeft className="h-6 w-6 text-red-400" />
+                          : <ToggleRight className="h-6 w-6 text-emerald-500" />
+                        }
                       </button>
                     </td>
                     <td className="py-3 px-2">

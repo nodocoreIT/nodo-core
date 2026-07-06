@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Receipt, CreditCard, Loader2 } from 'lucide-react';
+import { ArrowLeft, Receipt, CreditCard, Loader2, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/ui/money-input';
 import { FormSelect, SearchableSelect } from '@nodocore/shared-components';
@@ -7,36 +7,48 @@ import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { formatearMoneda, getFechaHoy } from '@/utils/formatters';
 import toast from 'react-hot-toast';
-import type { Tarjeta, RubroConsumo } from '@/types';
+import type { Tarjeta, RubroConsumo, ConsumoTarjeta } from '@/types';
 
 interface RegistroConsumoProps {
   onVolver: () => void;
   onGastoRegistrado?: (tarjetaId?: string) => void;
   tarjetaPreseleccionada?: Tarjeta | null;
+  consumoAClonar?: ConsumoTarjeta | null;
 }
 
 export function RegistroConsumo({
   onVolver,
   onGastoRegistrado,
   tarjetaPreseleccionada,
+  consumoAClonar,
 }: RegistroConsumoProps) {
   const finanzas = useFinanzas();
   const [procesando, setProcesando] = useState(false);
 
-  const [tarjetaId, setTarjetaId] = useState(tarjetaPreseleccionada?.id ?? '');
+  const origen = consumoAClonar;
+  const monedaOrigen: 'ARS' | 'USD' = origen?.importeUSD ? 'USD' : 'ARS';
+
+  const [tarjetaId, setTarjetaId] = useState(tarjetaPreseleccionada?.id ?? origen?.tarjetaId ?? '');
   const [fecha, setFecha] = useState(getFechaHoy());
   const [fechaCompra, setFechaCompra] = useState(getFechaHoy());
-  const [lugar, setLugar] = useState('');
-  const [rubroId, setRubroId] = useState('');
-  const [rubroCodigo, setRubroCodigo] = useState('');
-  const [detalle, setDetalle] = useState('');
-  const [monto, setMonto] = useState(0);
-  const [moneda, setMoneda] = useState<'ARS' | 'USD'>('ARS');
+  const [fechaVencimiento, setFechaVencimiento] = useState('');
+  const [lugar, setLugar] = useState(origen?.lugar ?? '');
+  const [rubroId, setRubroId] = useState(origen?.rubroId ?? '');
+  const [rubroCodigo, setRubroCodigo] = useState(origen?.rubro ?? '');
+  const [detalle, setDetalle] = useState(origen?.detalle ?? '');
+  const [monto, setMonto] = useState(monedaOrigen === 'USD' ? (origen?.importeUSD ?? 0) : (origen?.importeARS ?? 0));
+  const [moneda, setMoneda] = useState<'ARS' | 'USD'>(monedaOrigen);
   const [cuotas, setCuotas] = useState(1);
-  const [gastoFijo, setGastoFijo] = useState(false);
+  const [gastoFijo, setGastoFijo] = useState(origen?.gastoFijo ?? false);
   const [cuotasDetalle, setCuotasDetalle] = useState<{ fecha: string; monto: number }[]>([]);
 
   const tarjetasActivas = finanzas.tarjetas.filter((t) => t.activa);
+
+  // Pre-fill vencimiento when tarjeta changes
+  useEffect(() => {
+    const tarjeta = tarjetasActivas.find((t) => t.id === tarjetaId);
+    setFechaVencimiento(tarjeta?.fechaVencimiento ?? '');
+  }, [tarjetaId]);
 
   // Recalculate installment preview whenever cuotas, fecha, or monto change
   useEffect(() => {
@@ -112,6 +124,15 @@ export function RegistroConsumo({
         });
       }
 
+      // Update diaVencimiento on the card if user set/changed it
+      if (fechaVencimiento) {
+        const tarjeta = tarjetasActivas.find((t) => t.id === tarjetaId);
+        const nuevoDia = new Date(fechaVencimiento + 'T12:00:00').getDate();
+        if (tarjeta && nuevoDia !== tarjeta.diaVencimiento) {
+          await finanzas.actualizarTarjeta(tarjetaId, { diaVencimiento: nuevoDia });
+        }
+      }
+
       toast.success('Consumo registrado correctamente');
       onGastoRegistrado?.(tarjetaId);
     } catch (err) {
@@ -162,10 +183,20 @@ export function RegistroConsumo({
       </nav>
 
       <div className="flex items-center gap-3">
-        <Receipt className="w-8 h-8 text-brand" />
+        {consumoAClonar ? (
+          <Copy className="w-8 h-8 text-brand" />
+        ) : (
+          <Receipt className="w-8 h-8 text-brand" />
+        )}
         <div>
-          <h1 className="text-2xl font-bold text-ink">Registrar Nuevo Gasto</h1>
-          <p className="text-slate2">Agrega un consumo a tu tarjeta de crédito</p>
+          <h1 className="text-2xl font-bold text-ink">
+            {consumoAClonar ? 'Clonar Gasto' : 'Registrar Nuevo Gasto'}
+          </h1>
+          <p className="text-slate2">
+            {consumoAClonar
+              ? `Copia de "${consumoAClonar.lugar}" — revisá y ajustá los datos`
+              : 'Agrega un consumo a tu tarjeta de crédito'}
+          </p>
         </div>
       </div>
 
@@ -214,6 +245,22 @@ export function RegistroConsumo({
                 />
               </div>
             </div>
+
+            {/* Fecha de vencimiento */}
+            {tarjetaId && (
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-ink">
+                  Fecha de Vencimiento
+                  <span className="ml-1.5 text-xs font-normal text-slate2">(se actualiza en la tarjeta al guardar)</span>
+                </label>
+                <input
+                  type="date"
+                  value={fechaVencimiento}
+                  onChange={(e) => setFechaVencimiento(e.target.value)}
+                  className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
+                />
+              </div>
+            )}
 
             {/* Lugar */}
             <div className="flex flex-col gap-1">

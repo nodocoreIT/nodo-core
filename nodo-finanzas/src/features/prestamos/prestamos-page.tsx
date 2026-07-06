@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Search,
   X,
+  Paperclip,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/ui/money-input';
@@ -19,8 +20,10 @@ import { FormSelect } from '@nodocore/shared-components';
 import { Spinner } from '@/components/ui/spinner';
 import { useLocation } from 'react-router-dom';
 import { useFinanzas } from '@/hooks/use-finanzas';
+import { useRubros } from '@/hooks/use-rubros';
 import { formatearMoneda, formatearFecha, getFechaHoy } from '@/utils/formatters';
 import { GestionCuotasProgramadas } from './gestion-cuotas-programadas';
+import { ModalComprobantes } from './modal-comprobantes';
 import toast from 'react-hot-toast';
 import type { Prestamo, Moneda } from '@/types';
 
@@ -108,6 +111,7 @@ const defaultForm = (): FormState => ({
 
 export function PrestamosPage() {
   const finanzas = useFinanzas();
+  const { rubrosActivos } = useRubros();
   const location = useLocation();
   const mesActual = new Date().toISOString().slice(0, 7);
 
@@ -116,6 +120,7 @@ export function PrestamosPage() {
   const [mostrarFinalizados, setMostrarFinalizados] = useState(false);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [prestamoParaCuotas, setPrestamoParaCuotas] = useState<Prestamo | null>(null);
+  const [prestamoParaComprobantes, setPrestamoParaComprobantes] = useState<Prestamo | null>(null);
   const [prestamoParaPago, setPrestamoParaPago] = useState<Prestamo | null>(null);
   const [cuentaPagoId, setCuentaPagoId] = useState('');
   const [procesandoPago, setProcesandoPago] = useState(false);
@@ -174,22 +179,31 @@ export function PrestamosPage() {
   const prestamosActivos = prestamos.filter((p) => p.activo && !p.pagado);
   const prestamosFinalizados = prestamos.filter((p) => !p.activo || p.pagado);
   const prestamosBase = mostrarFinalizados ? prestamosFinalizados : prestamosActivos;
-  const prestamosMostrar = prestamosBase.filter(
-    (p) =>
-      p.concepto.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (p.prestamista || '').toLowerCase().includes(busqueda.toLowerCase())
+  const prestamosMostrar = prestamosBase
+    .filter(
+      (p) =>
+        p.concepto.toLowerCase().includes(busqueda.toLowerCase()) ||
+        (p.prestamista || '').toLowerCase().includes(busqueda.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aEsSalvataje = !a.cuotasTotales ? 1 : 0;
+      const bEsSalvataje = !b.cuotasTotales ? 1 : 0;
+      return aEsSalvataje - bEsSalvataje;
+    });
+
+  const activos = prestamos.filter((p) => p.activo && !p.pagado);
+
+  const totales = activos.reduce(
+    (acc, p) => {
+      if (p.moneda === 'USD') acc.USD += p.saldoPendiente;
+      else acc.ARS += p.saldoPendiente;
+      return acc;
+    },
+    { ARS: 0, USD: 0 }
   );
 
-  const totales = prestamos
-    .filter((p) => p.activo && !p.pagado)
-    .reduce(
-      (acc, p) => {
-        if (p.moneda === 'USD') acc.USD += p.saldoPendiente;
-        else acc.ARS += p.saldoPendiente;
-        return acc;
-      },
-      { ARS: 0, USD: 0 }
-    );
+  const totalCuotas = activos.reduce((s, p) => s + (p.importeCuota ?? 0), 0);
+  const totalCancelacion = activos.reduce((s, p) => s + (p.saldoCancelacion ?? 0), 0);
 
   const toggleExpansion = (id: string) => {
     setExpandidos((prev) => {
@@ -220,6 +234,13 @@ export function PrestamosPage() {
       cambios.saldoPendiente = prestamo.saldoPendiente + prestamo.importeCuota;
     }
     try {
+      // Revert the payment: find and delete the gasto diario created for this loan this month
+      const gastoAsociado = finanzas.gastosDiarios.find(
+        (g) => g.prestamoId === prestamo.id && g.fecha.startsWith(mesActual),
+      );
+      if (gastoAsociado) {
+        await finanzas.eliminarGastoDiario(gastoAsociado.id);
+      }
       await finanzas.actualizarPrestamo(prestamo.id, cambios);
       toast.success('Pago desmarcado');
     } catch {
@@ -240,6 +261,8 @@ export function PrestamosPage() {
     else if (cuenta.tipo === 'VIRTUAL') formaPago = 'MERCADO_PAGO';
 
     setProcesandoPago(true);
+    const rubroCreditos = rubrosActivos.find((r) => r.codigo === 'CREDITOS');
+
     try {
       await finanzas.agregarGastoDiario({
         descripcion: 'Préstamo',
@@ -249,6 +272,8 @@ export function PrestamosPage() {
         formaPago,
         cuentaId: cuentaPagoId,
         prestamoId: prestamoParaPago.id,
+        rubroId: rubroCreditos?.id,
+        rubro: rubroCreditos ? 'CREDITOS' : undefined,
       });
 
       const cambios: Partial<Prestamo> = {
@@ -278,6 +303,25 @@ export function PrestamosPage() {
     e.preventDefault();
     try {
       setGuardando(true);
+      const cuotasPagasNum = form.esSalvataje ? undefined : (form.cuotasPagas ? parseInt(form.cuotasPagas) : 0);
+      const cuotasTotalesNum = form.esSalvataje ? undefined : (form.cuotasTotales ? parseInt(form.cuotasTotales) : undefined);
+
+      // If cuotas paid < total, the loan is no longer complete — override pagado/activo
+      // regardless of what the checkboxes say. Prevents accidental "finalizado" state.
+      const cuotasComplete =
+        cuotasTotalesNum !== undefined &&
+        cuotasPagasNum !== undefined &&
+        cuotasPagasNum >= cuotasTotalesNum;
+      const pagado = cuotasTotalesNum !== undefined ? (form.pagado && cuotasComplete) : form.pagado;
+      const activo = pagado ? (prestamoEditando?.activo ?? true) : true;
+
+      // If the user reduced cuotasPagas, also clear monthly payment state so the
+      // loan stops showing "Mes Abonado" and correctly reflects pending status.
+      const cuotasReduced =
+        prestamoEditando !== null &&
+        cuotasPagasNum !== undefined &&
+        (prestamoEditando.cuotasPagas ?? 0) > cuotasPagasNum;
+
       const datos = {
         concepto: form.concepto,
         montoOriginal: parseFloat(form.montoOriginal) || 0,
@@ -286,14 +330,21 @@ export function PrestamosPage() {
         tasaInteres: form.tasaInteres ? parseFloat(form.tasaInteres) : undefined,
         fechaInicio: form.fechaInicio,
         fechaVencimiento: form.esSalvataje ? undefined : (form.fechaVencimiento || undefined),
-        cuotasTotales: form.esSalvataje ? undefined : (form.cuotasTotales ? parseInt(form.cuotasTotales) : undefined),
-        cuotasPagas: form.esSalvataje ? undefined : (form.cuotasPagas ? parseInt(form.cuotasPagas) : 0),
+        cuotasTotales: cuotasTotalesNum,
+        cuotasPagas: cuotasPagasNum,
         importeCuota: form.esSalvataje ? undefined : (form.importeCuota ? parseFloat(form.importeCuota) : undefined),
         saldoCancelacion: form.esSalvataje ? undefined : (form.saldoCancelacion ? parseFloat(form.saldoCancelacion) : undefined),
         prestamista: form.prestamista || undefined,
         notas: form.notas || undefined,
-        pagado: form.pagado,
-        cuotaAbonada: form.cuotaAbonada,
+        pagado,
+        activo,
+        cuotaAbonada: cuotasReduced ? false : form.cuotaAbonada,
+        // Sync ultimoPagoMes with the checkbox: checking = current month, unchecking = clear
+        ultimoPagoMes: cuotasReduced
+          ? undefined
+          : form.cuotaAbonada
+            ? (prestamoEditando?.ultimoPagoMes ?? mesActual)
+            : undefined,
         noCobrarCuota: form.noCobrarCuota,
         diaPago: form.diaPago ? parseInt(form.diaPago) : undefined,
       };
@@ -352,28 +403,39 @@ export function PrestamosPage() {
       </div>
 
       {/* Totales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl border border-mist p-5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <DollarSign className="w-5 h-5 text-orange-600" />
+            </div>
+            <div>
+              <p className="text-sm text-slate2">Total cuotas a pagar</p>
+              <p className="text-xl font-bold text-orange-600">{formatearMoneda(totalCuotas)}</p>
+              <p className="text-xs text-slate2 mt-0.5">suma mensual de cuotas</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-mist p-5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-100 rounded-lg">
+              <DollarSign className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <p className="text-sm text-slate2">Saldo cancelación</p>
+              <p className="text-xl font-bold text-indigo-600">{formatearMoneda(totalCancelacion)}</p>
+              <p className="text-xs text-slate2 mt-0.5">para cancelar todo hoy</p>
+            </div>
+          </div>
+        </div>
         <div className="bg-white rounded-xl border border-mist p-5">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-100 rounded-lg">
               <DollarSign className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <p className="text-sm text-slate2">Saldo pendiente ARS</p>
+              <p className="text-sm text-slate2">Saldo pendiente</p>
               <p className="text-xl font-bold text-red-600">{formatearMoneda(totales.ARS)}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-mist p-5">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <DollarSign className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-slate2">Saldo pendiente USD</p>
-              <p className="text-xl font-bold text-blue-600">
-                US$ {totales.USD.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-              </p>
             </div>
           </div>
         </div>
@@ -470,35 +532,37 @@ export function PrestamosPage() {
                           )}
                           {proximoVencimiento && !estaPagadoEsteMes && (
                             <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-                              <Calendar className="w-3 h-3" /> Vence pronto
+                              <Calendar className="w-3 h-3" /> Vence pronto · {formatearFecha(prestamo.fechaVencimiento!)}
                             </span>
                           )}
                         </div>
                       </div>
 
-                      {/* Center: compact stats */}
-                      <div className="flex items-start justify-around flex-1">
-                        <div>
-                          <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Cuota</p>
+                      {/* Center: compact stats — fixed-width columns so they align across cards */}
+                      <div className="hidden sm:flex items-start gap-6 shrink-0">
+                        <div className="w-32">
+                          <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Importe</p>
                           <p className="font-bold text-ink text-sm">
-                            {prestamo.cuotasTotales
-                              ? formatearMoneda(prestamo.importeCuota || 0, prestamo.moneda as Moneda)
+                            {prestamo.importeCuota
+                              ? formatearMoneda(prestamo.importeCuota, prestamo.moneda as Moneda)
                               : <span className="text-slate2 font-normal">—</span>}
                           </p>
                         </div>
-                        <div>
+                        <div className="w-32">
                           <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Saldo</p>
                           <p className="font-bold text-red-600 text-sm">
                             {formatearMoneda(prestamo.saldoPendiente, prestamo.moneda as Moneda)}
                           </p>
                         </div>
-                        {prestamo.cuotasTotales && (
-                          <div>
-                            <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Cuotas</p>
-                            <p className="font-medium text-ink text-sm">{cuotasPagadas}/{prestamo.cuotasTotales}</p>
-                          </div>
-                        )}
-                        <div>
+                        <div className="w-24">
+                          <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Cuotas pagas</p>
+                          <p className="font-medium text-ink text-sm">
+                            {prestamo.cuotasTotales
+                              ? `${cuotasPagadas}/${prestamo.cuotasTotales}`
+                              : <span className="text-slate2 font-normal">—</span>}
+                          </p>
+                        </div>
+                        <div className="w-20">
                           <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Vto.</p>
                           <p className="font-medium text-ink text-sm">
                             {prestamo.fechaVencimiento ? formatearFecha(prestamo.fechaVencimiento) : '—'}
@@ -506,33 +570,35 @@ export function PrestamosPage() {
                         </div>
                       </div>
 
-                      {/* Right: buttons */}
+                      {/* Right: buttons — fixed-width slot for the pay/unmark button so columns never shift */}
                       <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {prestamo.cuotasTotales && !prestamo.pagado && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className={`text-xs font-bold ${
-                              prestamo.cuotaAbonada
-                                ? 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
-                                : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                            }`}
-                            onClick={() => {
-                              if (prestamo.cuotaAbonada) {
-                                handleDesmarcarCuota(prestamo);
-                              } else {
-                                const cuentasCompatibles = finanzas.cuentas.filter(
-                                  (c) => c.activa && c.moneda === prestamo.moneda
-                                );
-                                setCuentaPagoId(cuentasCompatibles[0]?.id || '');
-                                setPrestamoParaPago(prestamo);
-                              }
-                            }}
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            {prestamo.cuotaAbonada ? 'Desmarcar pago' : 'Pagar cuota'}
-                          </Button>
-                        )}
+                        <div className="w-[138px] flex">
+                          {prestamo.cuotasTotales && !prestamo.pagado && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={`text-xs font-bold w-full ${
+                                prestamo.cuotaAbonada
+                                  ? 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
+                                  : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                              }`}
+                              onClick={() => {
+                                if (prestamo.cuotaAbonada) {
+                                  handleDesmarcarCuota(prestamo);
+                                } else {
+                                  const cuentasCompatibles = finanzas.cuentas.filter(
+                                    (c) => c.activa && c.moneda === prestamo.moneda
+                                  );
+                                  setCuentaPagoId(cuentasCompatibles[0]?.id || '');
+                                  setPrestamoParaPago(prestamo);
+                                }
+                              }}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              {prestamo.cuotaAbonada ? 'Desmarcar pago' : 'Pagar cuota'}
+                            </Button>
+                          )}
+                        </div>
                         <Button
                           variant="outline"
                           size="sm"
@@ -542,6 +608,13 @@ export function PrestamosPage() {
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           Ver Cuotas
                         </Button>
+                        <button
+                          onClick={() => setPrestamoParaComprobantes(prestamo)}
+                          className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"
+                          title="Comprobantes"
+                        >
+                          <Paperclip className="h-3.5 w-3.5" />
+                        </button>
                         <button
                           onClick={() => abrirFormulario(prestamo)}
                           className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"
@@ -879,6 +952,13 @@ export function PrestamosPage() {
         <GestionCuotasProgramadas
           prestamo={prestamoParaCuotas}
           onClose={() => setPrestamoParaCuotas(null)}
+        />
+      )}
+
+      {prestamoParaComprobantes && (
+        <ModalComprobantes
+          prestamo={prestamoParaComprobantes}
+          onClose={() => setPrestamoParaComprobantes(null)}
         />
       )}
     </div>

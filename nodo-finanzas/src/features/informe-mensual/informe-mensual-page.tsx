@@ -254,7 +254,7 @@ export function InformeMensualPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-5">
+          <div className="absolute top-0 right-0 p-4 opacity-20">
             <TrendingUp className="w-16 h-16 text-brand" />
           </div>
           <p className="text-xs font-bold text-slate2 uppercase tracking-widest mb-1">
@@ -268,7 +268,7 @@ export function InformeMensualPage() {
         </Card>
 
         <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-5">
+          <div className="absolute top-0 right-0 p-4 opacity-20">
             <BarChart2 className="w-16 h-16 text-slate2" />
           </div>
           <p className="text-xs font-bold text-slate2 uppercase tracking-widest mb-1">
@@ -279,7 +279,7 @@ export function InformeMensualPage() {
         </Card>
 
         <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-5">
+          <div className="absolute top-0 right-0 p-4 opacity-20">
             <PieChartIcon className="w-16 h-16 text-brand" />
           </div>
           <p className="text-xs font-bold text-slate2 uppercase tracking-widest mb-1">
