@@ -44,7 +44,7 @@ export function ResumenCategorias() {
   }, [rubroDetalle]);
 
   const resumenPorRubro = () => {
-    const gastosActivos = finanzas.gastosFijos.filter((g) => g.activo);
+    const gastosActivos = finanzas.gastosFijos.filter((g) => g.activo && !g.excluirDelResumen);
     const resumen: Record<string, RubroResumenData> = {};
 
     gastosActivos.forEach((gasto) => {

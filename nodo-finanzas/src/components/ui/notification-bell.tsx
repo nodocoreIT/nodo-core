@@ -45,7 +45,8 @@ function toAppNotification(notification: Notification) {
 export function NotificationBell() {
   const navigate = useNavigate();
   const { notifications } = useNotifications();
-  const items = notifications.map(toAppNotification);
+  // Bell only rings for items due within 2 days — the dashboard card shows the full month
+  const items = notifications.filter(n => n.urgencia === 'alta').map(toAppNotification);
 
   return (
     <NotificationsDropdown

@@ -5,6 +5,7 @@ import {
   Plus,
   Trash2,
   Edit,
+  Copy,
   Search,
   X,
   CreditCard,
@@ -37,6 +38,7 @@ export function DetalleTarjetaPage() {
   const [busqueda, setBusqueda] = useState('');
   const [rubroFiltro, setRubroFiltro] = useState<string | null>(null);
   const [consumoEditando, setConsumoEditando] = useState<ConsumoTarjeta | null>(null);
+  const [consumoClonar, setConsumoClonar] = useState<ConsumoTarjeta | null>(null);
   const [vistaRegistro, setVistaRegistro] = useState(false);
   const [sortField, setSortField] = useState<SortField>('fecha');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -148,10 +150,12 @@ export function DetalleTarjetaPage() {
     return (
       <RegistroConsumo
         tarjetaPreseleccionada={tarjeta}
-        onVolver={() => setVistaRegistro(false)}
+        consumoAClonar={consumoClonar}
+        onVolver={() => { setVistaRegistro(false); setConsumoClonar(null); }}
         onGastoRegistrado={async () => {
           await finanzas.recargarDatos(true);
           setVistaRegistro(false);
+          setConsumoClonar(null);
         }}
       />
     );
@@ -341,6 +345,13 @@ export function DetalleTarjetaPage() {
                           title="Editar"
                         >
                           <Edit className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => { setConsumoClonar(consumo); setVistaRegistro(true); }}
+                          className="p-1.5 text-slate2 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title="Clonar"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => handleEliminar(consumo)}
