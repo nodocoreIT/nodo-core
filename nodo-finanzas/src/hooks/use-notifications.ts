@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { useFinanzas } from '@/hooks/use-finanzas';
-import { calcularFechasTarjeta } from '@/utils/tarjeta-fechas';
 import type { Tarjeta, Prestamo, PlanAhorro } from '@/types';
 
 export interface Notification {
@@ -48,31 +47,21 @@ export const useNotifications = () => {
 
     // 1. Tarjetas
     tarjetas.forEach((tarjeta: Tarjeta) => {
-      if (!tarjeta.activa || !tarjeta.diaVencimiento || !tarjeta.diaCierre) return;
-
-      const fechas = calcularFechasTarjeta({
-        closingDay: tarjeta.diaCierre,
-        dueOffsetDays: (tarjeta.diaVencimiento - tarjeta.diaCierre + 30) % 30 || 14,
-      }, hoy);
-
-      const vtoStr = fechas.currentDueDate;
-      const id = `TARJETA-${tarjeta.id}-${vtoStr.substring(0, 7)}`;
-
+      if (!tarjeta.activa || !tarjeta.fechaVencimiento) return;
       if (estaPagado('tarjeta', tarjeta.id)) return;
+
+      const vtoStr = tarjeta.fechaVencimiento;
+      const id = `TARJETA-${tarjeta.id}-${vtoStr.substring(0, 7)}`;
 
       const fechaVencimiento = new Date(vtoStr + 'T00:00:00');
       const diff = fechaVencimiento.getTime() - hoy.getTime();
       const diffDays = Math.ceil(diff / (1000 * 60 * 60 * 24));
 
-      if (diffDays >= -5 && diffDays <= 10) {
+      if (diffDays <= 31) {
         const venceHoy = diffDays <= 0;
+        const mesVto = vtoStr.substring(0, 7);
         const montoPeriodo = consumosTarjetas
-          .filter(
-            (c) =>
-              c.tarjetaId === tarjeta.id &&
-              c.fecha > fechas.previousClosingDate &&
-              c.fecha <= fechas.currentClosingDate,
-          )
+          .filter((c) => c.tarjetaId === tarjeta.id && c.fecha.startsWith(mesVto))
           .reduce((sum, c) => sum + (c.importeARS ?? 0), 0);
         list.push({
           id,
@@ -83,7 +72,7 @@ export const useNotifications = () => {
             ? `El pago de tu tarjeta ${tarjeta.nombre} vence hoy.`
             : `El pago de tu tarjeta ${tarjeta.nombre} vence el ${isoAFecha(vtoStr)}.`,
           fecha: vtoStr,
-          urgencia: diffDays <= 2 ? 'alta' : 'media',
+          urgencia: diffDays <= 2 ? 'alta' : diffDays <= 5 ? 'media' : 'baja',
           venceHoy,
           monto: montoPeriodo > 0 ? montoPeriodo : undefined,
           moneda: 'ARS',
@@ -108,7 +97,7 @@ export const useNotifications = () => {
       const diff = fechaVencimiento.getTime() - hoy.getTime();
       const diffDays = Math.ceil(diff / (1000 * 60 * 60 * 24));
 
-      if (diffDays <= 10) {
+      if (diffDays <= 31) {
         const venceHoy = diffDays <= 0;
         list.push({
           id,
@@ -119,7 +108,7 @@ export const useNotifications = () => {
             ? `La cuota de "${prestamo.concepto}" vence hoy.`
             : `La cuota de "${prestamo.concepto}" vence el ${isoAFecha(prestamo.fechaVencimiento)}.`,
           fecha: prestamo.fechaVencimiento,
-          urgencia: diffDays <= 2 ? 'alta' : 'media',
+          urgencia: diffDays <= 2 ? 'alta' : diffDays <= 5 ? 'media' : 'baja',
           venceHoy,
           monto: prestamo.importeCuota,
           moneda: prestamo.moneda,
@@ -138,7 +127,7 @@ export const useNotifications = () => {
       const diff = fechaVencimiento.getTime() - hoy.getTime();
       const diffDays = Math.ceil(diff / (1000 * 60 * 60 * 24));
 
-      if (diffDays <= 10) {
+      if (diffDays <= 31) {
         const venceHoy = diffDays <= 0;
         list.push({
           id,
@@ -149,7 +138,7 @@ export const useNotifications = () => {
             ? `La cuota del plan "${plan.detalle}" vence hoy.`
             : `La cuota del plan "${plan.detalle}" vence el ${isoAFecha(plan.fechaVencimiento)}.`,
           fecha: plan.fechaVencimiento,
-          urgencia: diffDays <= 2 ? 'alta' : 'media',
+          urgencia: diffDays <= 2 ? 'alta' : diffDays <= 5 ? 'media' : 'baja',
           venceHoy,
           monto: plan.importeCuota,
           moneda: plan.moneda,
@@ -162,6 +151,8 @@ export const useNotifications = () => {
 
   return {
     notifications,
-    count: notifications.length
+    count: notifications.length,
+    // Only items ≤ 2 days away drive the bell badge
+    bellCount: notifications.filter(n => n.urgencia === 'alta').length,
   };
 };

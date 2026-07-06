@@ -24,9 +24,6 @@ const schema = z.object({
   formaDePago: z.enum(['EFECTIVO', 'DEBITO', 'TARJETA', 'TRANSFERENCIA BANCO', 'MERCADO_PAGO']),
   tarjetaId: z.string().optional(),
   cuentaBancariaId: z.string().optional(),
-  planId: z.string().optional(),
-  prestamoId: z.string().optional(),
-  pagoTarjetaId: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -73,9 +70,6 @@ export function RegistroGastoFijo({ onVolver, onGastoRegistrado, gastoEditando, 
     formaDePago: 'DEBITO',
     tarjetaId: '',
     cuentaBancariaId: '',
-    planId: '',
-    prestamoId: '',
-    pagoTarjetaId: '',
   };
 
   const {
@@ -99,9 +93,6 @@ export function RegistroGastoFijo({ onVolver, onGastoRegistrado, gastoEditando, 
         formaDePago: gastoEditando.formaDePago,
         tarjetaId: gastoEditando.tarjetaId ?? '',
         cuentaBancariaId: gastoEditando.cuentaBancariaId ?? '',
-        planId: gastoEditando.planId ?? '',
-        prestamoId: gastoEditando.prestamoId ?? '',
-        pagoTarjetaId: gastoEditando.pagoTarjetaId ?? '',
       });
     } else {
       reset({
@@ -133,8 +124,11 @@ export function RegistroGastoFijo({ onVolver, onGastoRegistrado, gastoEditando, 
         c.activa && c.nombre.toLowerCase().includes('santander')
       );
       if (santander) setValue('cuentaBancariaId', santander.id);
+    } else if (formaDePago === 'TARJETA') {
+      const activas = finanzas.tarjetas.filter((t) => t.activa);
+      if (activas.length === 1) setValue('tarjetaId', activas[0].id);
     }
-  }, [formaDePago, finanzas.configuracion.cuentasBancarias, setValue, gastoEditando]);
+  }, [formaDePago, finanzas.configuracion.cuentasBancarias, finanzas.tarjetas, setValue, gastoEditando]);
 
   const tarjetasActivas = finanzas.tarjetas.filter((t) => t.activa).map((t) => ({
     value: t.id,
@@ -151,9 +145,6 @@ export function RegistroGastoFijo({ onVolver, onGastoRegistrado, gastoEditando, 
       const payload = {
         ...data,
         descripcion: capitalizarDescripcion(data.descripcion),
-        planId: data.planId || undefined,
-        prestamoId: data.prestamoId || undefined,
-        pagoTarjetaId: data.pagoTarjetaId || undefined,
         tarjetaId: data.tarjetaId || undefined,
         cuentaBancariaId: data.cuentaBancariaId || undefined,
         etiqueta: data.etiqueta || undefined,
@@ -295,7 +286,7 @@ export function RegistroGastoFijo({ onVolver, onGastoRegistrado, gastoEditando, 
           )}
 
           {/* Cuenta bancaria */}
-          {(formaDePago === 'DEBITO' || formaDePago === 'MERCADO_PAGO' || formaDePago === 'TRANSFERENCIA BANCO') &&
+          {(formaDePago === 'DEBITO' || formaDePago === 'TRANSFERENCIA BANCO' || formaDePago === 'TARJETA') &&
             cuentasBancariasActivas.length > 0 && (
               <Select
                 label="Cuenta origen / Caja"
@@ -306,36 +297,6 @@ export function RegistroGastoFijo({ onVolver, onGastoRegistrado, gastoEditando, 
                 error={errors.cuentaBancariaId?.message}
               />
             )}
-
-          {/* Optional links */}
-          <div className="border-t border-dashed border-mist pt-5">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate2 mb-4">
-              Vincular con Préstamo, Plan o Tarjeta (Opcional)
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <Select
-                label="Plan de Ahorro"
-                {...register('planId')}
-                options={finanzas.planesAhorro.map((p) => ({ value: p.id, label: p.detalle }))}
-                allowEmpty
-                emptyLabel="Ninguno"
-              />
-              <Select
-                label="Préstamo"
-                {...register('prestamoId')}
-                options={finanzas.prestamos.map((p) => ({ value: p.id, label: p.concepto }))}
-                allowEmpty
-                emptyLabel="Ninguno"
-              />
-              <Select
-                label="Pago Tarjeta"
-                {...register('pagoTarjetaId')}
-                options={finanzas.tarjetas.map((t) => ({ value: t.id, label: t.nombre }))}
-                allowEmpty
-                emptyLabel="Ninguno"
-              />
-            </div>
-          </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-mist">
             <Button type="button" variant="outline" onClick={onVolver} disabled={isLoading}>

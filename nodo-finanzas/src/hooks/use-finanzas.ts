@@ -49,6 +49,17 @@ export const useFinanzas = () => {
   const [estado, setEstado] = useState<AppState>(_moduleCache);
   const [loading, setLoading] = useState(_moduleCache === EMPTY_STATE);
 
+  // Keeps the module-level cache in sync with every mutation so that new hook
+  // instances (e.g. when navigating to a different page) start with fresh data
+  // instead of the snapshot taken during the initial load.
+  const syncEstado = useCallback((updater: (prev: AppState) => AppState) => {
+    setEstado(prev => {
+      const next = updater(prev);
+      _moduleCache = next;
+      return next;
+    });
+  }, []);
+
   // Cargar datos cuando hay sesión (multi-tenant por user_id)
   useEffect(() => {
     if (!userId) {
@@ -233,7 +244,7 @@ export const useFinanzas = () => {
     try {
       const success = await FinanzasService.actualizarCuenta(id, cambios);
       if (success) {
-        setEstado(prev => ({
+        syncEstado(prev => ({
           ...prev,
           cuentas: prev.cuentas.map(cuenta =>
             cuenta.id === id ? { ...cuenta, ...cambios } : cuenta
@@ -243,7 +254,7 @@ export const useFinanzas = () => {
     } catch (error) {
       console.error('Error actualizando cuenta:', error);
     }
-  }, []);
+  }, [syncEstado]);
 
   const eliminarCuenta = useCallback(async (id: string) => {
     try {
@@ -400,17 +411,19 @@ export const useFinanzas = () => {
     try {
       const success = await FinanzasService.actualizarGastoFijo(id, cambios);
       if (success) {
-        setEstado(prev => ({
+        syncEstado(prev => ({
           ...prev,
           gastosFijos: prev.gastosFijos.map(gasto =>
             gasto.id === id ? { ...gasto, ...cambios } : gasto
           ),
         }));
+      } else {
+        console.error('actualizarGastoFijo: DB update returned false for id', id);
       }
     } catch (error) {
       console.error('Error actualizando gasto fijo:', error);
     }
-  }, []);
+  }, [syncEstado]);
 
   const eliminarGastoFijo = useCallback(async (id: string) => {
     try {
@@ -544,7 +557,7 @@ export const useFinanzas = () => {
       const nuevoGasto = await FinanzasService.crearGastoDiario(gasto);
 
       if (nuevoGasto) {
-        setEstado(prev => ({
+        syncEstado(prev => ({
           ...prev,
           gastosDiarios: [...prev.gastosDiarios, nuevoGasto],
         }));
@@ -564,7 +577,7 @@ export const useFinanzas = () => {
             console.log(`[useFinanzas] Vinculando automáticamente Gasto Diario ${nuevoGasto.id} con Gasto Fijo ${gastoFijoCoincidente.id}`);
             await FinanzasService.actualizarGastoDiario(nuevoGasto.id, { gastoFijoId: gastoFijoCoincidente.id });
             nuevoGasto.gastoFijoId = gastoFijoCoincidente.id;
-            setEstado(prev => ({
+            syncEstado(prev => ({
               ...prev,
               gastosDiarios: prev.gastosDiarios.map(gd => gd.id === nuevoGasto.id ? { ...gd, gastoFijoId: gastoFijoCoincidente.id } : gd)
             }));
@@ -830,14 +843,14 @@ export const useFinanzas = () => {
       throw error;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [estado.cuentas, estado.tarjetas, estado.configuracion, actualizarCuenta, agregarConsumo]);
+  }, [estado.cuentas, estado.tarjetas, estado.configuracion, actualizarCuenta, agregarConsumo, syncEstado]);
 
   const crearGastoDiarioSinConsumo = useCallback(async (gasto: Omit<GastoDiario, 'id'>) => {
     try {
       const nuevoGasto = await FinanzasService.crearGastoDiario(gasto);
 
       if (nuevoGasto) {
-        setEstado(prev => ({
+        syncEstado(prev => ({
           ...prev,
           gastosDiarios: [...prev.gastosDiarios, nuevoGasto],
         }));
@@ -862,7 +875,7 @@ export const useFinanzas = () => {
       const success = await FinanzasService.actualizarGastoDiario(id, cambios);
       if (!success) return false;
 
-      setEstado(prev => ({
+      syncEstado(prev => ({
         ...prev,
         gastosDiarios: prev.gastosDiarios.map(g => (g.id === id ? { ...g, ...cambios } : g)),
       }));
@@ -872,7 +885,7 @@ export const useFinanzas = () => {
       console.error('Error actualizando gasto diario:', error);
       throw error;
     }
-  }, [estado.gastosDiarios, estado.configuracion]);
+  }, [estado.gastosDiarios, estado.configuracion, syncEstado]);
 
   const eliminarGastoDiario = useCallback(async (id: string) => {
     try {
@@ -922,14 +935,14 @@ export const useFinanzas = () => {
             await FinanzasService.eliminarConsumoTarjeta(consumo.id);
           }
           if (consumosRelacionados.length > 0) {
-            setEstado(prev => ({
+            syncEstado(prev => ({
               ...prev,
               consumosTarjetas: prev.consumosTarjetas.filter(c => c.codigoOperacion !== gastoAEliminar.codigoOperacion)
             }));
           }
         }
 
-        setEstado(prev => ({
+        syncEstado(prev => ({
           ...prev,
           gastosDiarios: prev.gastosDiarios.filter(g => g.id !== id),
         }));
@@ -940,7 +953,7 @@ export const useFinanzas = () => {
       console.error('Error eliminando gasto diario:', error);
       throw error;
     }
-  }, [estado.gastosDiarios, estado.cuentas, estado.consumosTarjetas, actualizarCuenta, actualizarTarjeta, resolverCuentaDeSaldo]);
+  }, [estado.gastosDiarios, estado.cuentas, estado.consumosTarjetas, actualizarCuenta, actualizarTarjeta, resolverCuentaDeSaldo, syncEstado]);
 
   // === PRÉSTAMOS ===
   const agregarPrestamo = useCallback(async (prestamo: Omit<Prestamo, 'id'>) => {
@@ -961,7 +974,7 @@ export const useFinanzas = () => {
     try {
       const success = await FinanzasService.actualizarPrestamo(id, cambios);
       if (success) {
-        setEstado(prev => ({
+        syncEstado(prev => ({
           ...prev,
           prestamos: prev.prestamos.map(prestamo =>
             prestamo.id === id ? { ...prestamo, ...cambios } : prestamo
@@ -971,7 +984,7 @@ export const useFinanzas = () => {
     } catch (error) {
       console.error('Error actualizando préstamo:', error);
     }
-  }, []);
+  }, [syncEstado]);
 
   const eliminarPrestamo = useCallback(async (id: string) => {
     try {

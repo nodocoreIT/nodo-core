@@ -157,7 +157,10 @@ export function GastosDiariosPage() {
     return [...list].sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
-        case 'fecha':       cmp = a.fecha.localeCompare(b.fecha); break;
+        case 'fecha':
+          cmp = a.fecha.localeCompare(b.fecha);
+          if (cmp === 0 && a.hora && b.hora) cmp = a.hora.localeCompare(b.hora);
+          break;
         case 'descripcion': cmp = a.descripcion.localeCompare(b.descripcion, 'es'); break;
         case 'rubro': {
           const textOnly = (s: string) => s.replace(/^[^\p{L}]+/u, '');
@@ -488,7 +491,8 @@ export function GastosDiariosPage() {
                 gastosFiltrados.map((g) => (
                   <tr key={g.id} className="hover:bg-paper/60 transition-colors">
                     <td className="py-3 px-2 text-xs text-slate2 whitespace-nowrap">
-                      {formatearFecha(g.fecha)}
+                      <span>{formatearFecha(g.fecha)}</span>
+                      {g.hora && <span className="block text-[10px] text-slate2/70">{g.hora}</span>}
                     </td>
                     <td className="py-3 px-2">
                       <p className="font-semibold text-ink">{g.descripcion}</p>

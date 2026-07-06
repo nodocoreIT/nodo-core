@@ -259,6 +259,18 @@ export class FinanzasService {
   }
 
   static async eliminarGastoFijo(id: string): Promise<boolean> {
+    // Nullify the FK reference in gastos_diarios before deleting to avoid constraint violation.
+    // The daily expense records are real transactions and must be preserved.
+    const { error: unlinkError } = await db
+      .from('gastos_diarios')
+      .update({ gasto_fijo_id: null })
+      .eq('gasto_fijo_id', id);
+
+    if (unlinkError) {
+      console.error('Error desvinculando gastos diarios:', unlinkError);
+      return false;
+    }
+
     const { error } = await db
       .from('gastos_fijos')
       .delete()
@@ -1201,6 +1213,7 @@ export class FinanzasService {
       tarjetaId: data.tarjeta_id,
       cuentaBancariaId: data.cuenta_bancaria_id,
       activo: data.activo,
+      excluirDelResumen: data.excluir_del_resumen ?? false,
       fechaCreacion: data.fecha_creacion || data.created_at,
       planId: data.plan_id,
       prestamoId: data.prestamo_id,
@@ -1222,6 +1235,7 @@ export class FinanzasService {
     if (gasto.tarjetaId !== undefined) datos.tarjeta_id = (gasto.tarjetaId && gasto.tarjetaId !== '') ? gasto.tarjetaId : null;
     if (gasto.cuentaBancariaId !== undefined) datos.cuenta_bancaria_id = (gasto.cuentaBancariaId && gasto.cuentaBancariaId !== '') ? gasto.cuentaBancariaId : null;
     if (gasto.activo !== undefined) datos.activo = gasto.activo;
+    if (gasto.excluirDelResumen !== undefined) datos.excluir_del_resumen = gasto.excluirDelResumen;
     if (gasto.fechaCreacion !== undefined) datos.fecha_creacion = gasto.fechaCreacion;
     if (gasto.planId !== undefined) datos.plan_id = (gasto.planId && gasto.planId !== '') ? gasto.planId : null;
     if (gasto.prestamoId !== undefined) datos.prestamo_id = (gasto.prestamoId && gasto.prestamoId !== '') ? gasto.prestamoId : null;
@@ -1318,6 +1332,7 @@ export class FinanzasService {
       monto: Number(data.monto),
       montoUSD: data.monto_usd ? Number(data.monto_usd) : undefined,
       fecha: data.fecha,
+      hora: data.hora ?? undefined,
       rubro: data.rubro || '',
       rubroId: data.rubro_id,
       rubroInfo: data.rubros ? FinanzasService.mapRubroFromDB(data.rubros) : undefined,
@@ -1345,6 +1360,7 @@ export class FinanzasService {
       monto: gasto.monto,
       monto_usd: gasto.montoUSD || null,
       fecha: gasto.fecha,
+      hora: gasto.hora ?? null,
       rubro: gasto.rubro || 'OTROS',
       rubro_id: gasto.rubroId || null,
       forma_de_pago: gasto.formaPago,
@@ -1421,7 +1437,9 @@ export class FinanzasService {
     if (prestamo.noCobrarCuota !== undefined) dbData.no_cobrar_cuota = prestamo.noCobrarCuota;
     if (prestamo.notas !== undefined) dbData.notas = prestamo.notas;
     if (prestamo.comprobanteUrl !== undefined) dbData.comprobante_url = prestamo.comprobanteUrl;
-    if (prestamo.ultimoPagoMes !== undefined) dbData.ultimo_pago_mes = prestamo.ultimoPagoMes;
+    // Use 'in' check so that explicitly passing undefined clears the column in DB (sends null)
+    // rather than being silently skipped (the bug: old value persisted after "unmark payment")
+    if ('ultimoPagoMes' in prestamo) dbData.ultimo_pago_mes = prestamo.ultimoPagoMes ?? null;
     if (prestamo.diaPago !== undefined) dbData.dia_pago = prestamo.diaPago;
 
     return dbData;
