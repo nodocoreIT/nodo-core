@@ -39,8 +39,6 @@ export function TarjetasPage() {
 
   const tarjetasActivas = finanzas.tarjetas.filter((t) => t.activa);
 
-  const hoy = new Date();
-
   const resumenesDelMes = tarjetasActivas.map((tarjeta) => {
     const consumosDelMes = finanzas.consumosTarjetas.filter((c) => {
       const anioMes = new Date(c.fecha).toISOString().slice(0, 7);
