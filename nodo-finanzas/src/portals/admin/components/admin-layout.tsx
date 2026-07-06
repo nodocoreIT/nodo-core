@@ -32,7 +32,6 @@ import { SettingsDialog, type SettingsTabId } from "@nodocore/nodo-modules/setti
 import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { cn } from "@/shared/lib/utils";
 import { NotificationBell } from "@/components/ui/notification-bell";
-import { useFinanzas } from "@/hooks/use-finanzas";
 import { FinanzasSettingsModuleProvider } from "@/shared/lib/finanzas-settings-module";
 import { OpenSettingsContext } from "@/shared/hooks/use-open-settings";
 import { AiSettingsContext, useAiSettingsProvider } from "@/hooks/use-ai-settings";
@@ -88,13 +87,6 @@ export function AdminLayout() {
   }, []);
   const { user, role, plan, signOut } = useAuth();
   const aiSettingsValue = useAiSettingsProvider(user?.id);
-  const { gastosDiarios = [] } = useFinanzas();
-
-  const today = new Date().toISOString().split("T")[0];
-  const totalGastosHoy = gastosDiarios
-    .filter((g) => g.fecha === today)
-    .reduce((sum, g) => sum + g.monto, 0);
-
   const isSuperAdmin = role === "super_admin";
 
   useEffect(() => {
@@ -334,12 +326,6 @@ export function AdminLayout() {
             </div>
 
             <PortalHeaderActions
-              metrics={
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand whitespace-nowrap">
-                  <Wallet className="h-3 w-3" />
-                  Gastos del día · ${totalGastosHoy.toLocaleString("es-AR")}
-                </span>
-              }
               notifications={<NotificationBell />}
               trailing={<NodoSwitcher product="finanzas" />}
             />

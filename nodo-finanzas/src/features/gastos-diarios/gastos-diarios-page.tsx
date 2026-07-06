@@ -157,7 +157,10 @@ export function GastosDiariosPage() {
     return [...list].sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
-        case 'fecha':       cmp = a.fecha.localeCompare(b.fecha); break;
+        case 'fecha':
+          cmp = a.fecha.localeCompare(b.fecha);
+          if (cmp === 0 && a.hora && b.hora) cmp = a.hora.localeCompare(b.hora);
+          break;
         case 'descripcion': cmp = a.descripcion.localeCompare(b.descripcion, 'es'); break;
         case 'rubro': {
           const textOnly = (s: string) => s.replace(/^[^\p{L}]+/u, '');
@@ -190,6 +193,32 @@ export function GastosDiariosPage() {
   const totalMes = gastosFiltrados.reduce((s, g) => s + g.monto, 0);
   const totalUSD = gastosFiltrados.filter((g) => g.montoUSD && g.montoUSD > 0)
     .reduce((s, g) => s + (g.montoUSD ?? 0), 0);
+
+  const hoyISO = new Date().toISOString().slice(0, 10);
+  const esMesActual = filtroMes === hoyISO.slice(0, 7);
+
+  const totalHastaHoy = useMemo(() => {
+    if (!esMesActual) return totalMes;
+    return gastosFiltrados
+      .filter((g) => g.fecha <= hoyISO)
+      .reduce((s, g) => s + g.monto, 0);
+  }, [gastosFiltrados, esMesActual, hoyISO, totalMes]);
+
+  const resumenPorCuenta = useMemo(() => {
+    const map = new Map<string, { label: string; total: number; pillClass: string }>();
+    for (const g of gastosFiltrados) {
+      const label = obtenerEtiquetaFormaPago(g);
+      const pill = obtenerPillClass(g);
+      const existing = map.get(label);
+      if (existing) {
+        existing.total += g.monto;
+      } else {
+        map.set(label, { label, total: g.monto, pillClass: pill });
+      }
+    }
+    return [...map.values()].sort((a, b) => b.total - a.total);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gastosFiltrados, finanzas.cuentas, finanzas.tarjetas]);
 
   function abrirFormulario(gasto?: GastoDiario) {
     setGastoEditando(gasto ?? null);
@@ -276,25 +305,51 @@ export function GastosDiariosPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Receipt className="h-7 w-7 text-brand" />
-          <div>
-            <h1 className="text-2xl font-bold text-ink">Gastos Diarios</h1>
-            <p className="text-sm text-slate2">Gestioná tus gastos del día a día</p>
-          </div>
+      <div className="flex items-center gap-3">
+        <Receipt className="h-7 w-7 text-brand" />
+        <div>
+          <h1 className="text-2xl font-bold text-ink">Gastos Diarios</h1>
+          <p className="text-sm text-slate2">Gestioná tus gastos del día a día</p>
         </div>
-
-        {totalMes > 0 && (
-          <div className="bg-brand/5 px-4 py-2 rounded-xl border border-brand/20 text-right">
-            <p className="text-xs text-brand font-bold uppercase tracking-wider">Total Mes</p>
-            <p className="text-xl font-black text-brand">{formatearMoneda(totalMes)}</p>
-            {totalUSD > 0 && (
-              <p className="text-xs text-slate2 mt-0.5">{formatearMoneda(totalUSD, 'USD')}</p>
-            )}
-          </div>
-        )}
       </div>
+
+      {/* Summary cards */}
+      {gastosFiltrados.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {/* Total principal */}
+          <Card className="border-red-100 min-w-[160px] md:min-w-[200px] flex-shrink-0">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">
+              {esMesActual ? 'Total hasta hoy' : 'Total del mes'}
+            </p>
+            <p className="text-lg font-black text-ink mt-1 leading-tight">
+              {formatearMoneda(totalHastaHoy)}
+            </p>
+            {esMesActual && totalMes !== totalHastaHoy && (
+              <p className="text-[10px] text-slate2 mt-0.5">
+                Mes completo: {formatearMoneda(totalMes)}
+              </p>
+            )}
+            {totalUSD > 0 && (
+              <p className="text-[10px] text-slate2 mt-0.5">{formatearMoneda(totalUSD, 'USD')}</p>
+            )}
+          </Card>
+
+          {/* Breakdown por cuenta / forma de pago */}
+          {resumenPorCuenta.map(({ label, total, pillClass }) => (
+            <Card key={label} className="min-w-[140px] md:min-w-[190px] flex-shrink-0">
+              <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mb-2 ${pillClass}`}>
+                {label}
+              </span>
+              <p className="text-base font-black text-ink leading-tight">
+                {formatearMoneda(total)}
+              </p>
+              <p className="text-[10px] text-slate2 mt-0.5">
+                {((total / totalMes) * 100).toFixed(0)}% del mes
+              </p>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -436,7 +491,8 @@ export function GastosDiariosPage() {
                 gastosFiltrados.map((g) => (
                   <tr key={g.id} className="hover:bg-paper/60 transition-colors">
                     <td className="py-3 px-2 text-xs text-slate2 whitespace-nowrap">
-                      {formatearFecha(g.fecha)}
+                      <span>{formatearFecha(g.fecha)}</span>
+                      {g.hora && <span className="block text-[10px] text-slate2/70">{g.hora}</span>}
                     </td>
                     <td className="py-3 px-2">
                       <p className="font-semibold text-ink">{g.descripcion}</p>

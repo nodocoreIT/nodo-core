@@ -143,6 +143,7 @@ export interface GastoFijo {
   tarjetaId?: string; // Si forma de pago es tarjeta
   cuentaBancariaId?: string; // Si forma de pago es débito automático
   activo: boolean;
+  excluirDelResumen: boolean; // When true, excluded from dashboard totals (e.g. loans tracked separately)
   fechaCreacion: string;
   planId?: string;
   prestamoId?: string;
@@ -208,6 +209,7 @@ export interface GastoDiario {
   monto: number;
   montoUSD?: number;
   fecha: string;
+  hora?: string; // HH:MM — optional, only present for expenses recorded after migration
   rubro?: string; // Opcional por compatibilidad temporal
   rubroId?: string; // Nueva referencia a tabla rubros
   rubroInfo?: Rubro; // Información completa del rubro
@@ -253,6 +255,19 @@ export interface Prestamo {
   comprobanteUrl?: string;
   ultimoPagoMes?: string; // Formato YYYY-MM
   diaPago?: number;
+}
+
+export interface PrestamoComprobante {
+  id: string;
+  prestamoId: string;
+  userId: string;
+  storagePath: string;
+  nombre: string;
+  tipo?: string;
+  tamanio?: number;
+  createdAt: string;
+  /** Signed URL — populated on fetch, not persisted */
+  url?: string;
 }
 
 export interface CuotaProgramada {
