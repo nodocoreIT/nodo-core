@@ -88,6 +88,49 @@ describe("buildNotifications", () => {
     expect(items.some((n) => n.kind === "today_task" && n.href.includes("t-today"))).toBe(true);
   });
 
+  it("shows only tasks assigned to currentUserName when provided", () => {
+    const items = buildNotifications(
+      [
+        task({ id: "t-mine", due_date: "2026-06-13", assigned_to: "María" }),
+        task({ id: "t-other", due_date: "2026-06-13", assigned_to: "Carlos" }),
+        task({ id: "t-unassigned", due_date: "2026-06-13", assigned_to: null }),
+      ],
+      emptyMetrics(),
+      { today: TODAY, currentUserName: "María" },
+    );
+
+    expect(items.some((n) => n.href.includes("t-mine"))).toBe(true);
+    expect(items.some((n) => n.href.includes("t-other"))).toBe(false);
+    expect(items.some((n) => n.href.includes("t-unassigned"))).toBe(true);
+  });
+
+  it("shows tasks assigned to 'todos' for any user", () => {
+    const items = buildNotifications(
+      [
+        task({ id: "t-all", due_date: "2026-06-13", assigned_to: "todos" }),
+        task({ id: "t-other", due_date: "2026-06-13", assigned_to: "Carlos" }),
+      ],
+      emptyMetrics(),
+      { today: TODAY, currentUserName: "María" },
+    );
+
+    expect(items.some((n) => n.href.includes("t-all"))).toBe(true);
+    expect(items.some((n) => n.href.includes("t-other"))).toBe(false);
+  });
+
+  it("shows all tasks when currentUserName is null", () => {
+    const items = buildNotifications(
+      [
+        task({ id: "t-a", due_date: "2026-06-13", assigned_to: "María" }),
+        task({ id: "t-b", due_date: "2026-06-13", assigned_to: "Carlos" }),
+      ],
+      emptyMetrics(),
+      { today: TODAY, currentUserName: null },
+    );
+
+    expect(items).toHaveLength(2);
+  });
+
   it("skips completed tasks and settlements for non-admin", () => {
     const metrics = emptyMetrics();
     metrics.pendingSettlements.items = [
