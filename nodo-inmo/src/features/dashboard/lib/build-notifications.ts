@@ -45,12 +45,13 @@ function taskCategoryLabel(category: string): string {
 export function buildNotifications(
   tasks: TaskRow[],
   metrics: DashboardMetrics | null,
-  options: { isAdmin?: boolean; today?: Date } = {},
+  options: { isAdmin?: boolean; today?: Date; currentUserName?: string | null } = {},
 ): AppNotification[] {
   const today = options.today ?? new Date();
   const todayKey = todayStr(today);
   const horizon = addDays(todayKey, 7);
   const isAdmin = options.isAdmin ?? false;
+  const { currentUserName } = options;
   const list: AppNotification[] = [];
 
   if (metrics) {
@@ -92,7 +93,11 @@ export function buildNotifications(
     }
   }
 
-  const pendingTasks = tasks.filter((t) => t.status !== "completada");
+  const pendingTasks = tasks.filter((t) => {
+    if (t.status === "completada") return false;
+    if (currentUserName && t.assigned_to && t.assigned_to !== "todos" && t.assigned_to !== currentUserName) return false;
+    return true;
+  });
 
   for (const task of pendingTasks) {
     if (task.due_date < todayKey) {

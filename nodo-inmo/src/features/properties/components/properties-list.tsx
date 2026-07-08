@@ -10,6 +10,7 @@ import { useSearchStore } from "@nodocore/shared-components";
 import { matchesQuery } from "@/shared/search/matches-query";
 import { useUpdateProperty } from "@/features/properties/hooks/use-update-property";
 import { useDeleteProperty } from "@/features/properties/hooks/use-delete-property";
+import { useForceDeleteProperty } from "@/features/properties/hooks/use-force-delete-property";
 import { useContacts } from "@/features/contacts/hooks/use-contacts";
 import { CreatePropertyDialog } from "./create-property-dialog";
 import { PropertyFormDialog } from "./property-form-dialog";
@@ -111,6 +112,7 @@ export function PropertiesList() {
 
   const updateProperty = useUpdateProperty();
   const deleteProperty = useDeleteProperty();
+  const forceDeleteProperty = useForceDeleteProperty();
 
   function setFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((f) => ({
@@ -421,9 +423,8 @@ export function PropertiesList() {
                     <RowActions
                       property={property}
                       onEdit={() => setEditProperty(property)}
-                      onDeleteConfirm={() =>
-                        deleteProperty.mutateAsync(property.id)
-                      }
+                      onDeleteConfirm={() => deleteProperty.mutateAsync(property.id)}
+                      onForceDeleteConfirm={() => forceDeleteProperty.mutateAsync(property.id)}
                     />
                   </TableCell>
                 </TableRow>
@@ -520,10 +521,29 @@ function FilterSelect({
 interface RowActionsProps {
   property: PropertyRow;
   onEdit: () => void;
-  onDeleteConfirm: () => void;
+  onDeleteConfirm: () => Promise<void>;
+  onForceDeleteConfirm: () => Promise<void>;
 }
 
-function RowActions({ property, onEdit, onDeleteConfirm }: RowActionsProps) {
+function RowActions({ property, onEdit, onDeleteConfirm, onForceDeleteConfirm }: RowActionsProps) {
+  const [showContractWarning, setShowContractWarning] = useState(false);
+
+  const handleDeleteConfirm = async () => {
+    try {
+      await onDeleteConfirm();
+    } catch (error: unknown) {
+      const pgError = error as { code?: string };
+      if (pgError?.code === "23503") {
+        setShowContractWarning(true);
+      }
+    }
+  };
+
+  const handleForceDeleteConfirm = async () => {
+    await onForceDeleteConfirm();
+    setShowContractWarning(false);
+  };
+
   return (
     <div className="flex items-center justify-end gap-1">
       <SharePropertyButton property={property} />
@@ -555,8 +575,27 @@ function RowActions({ property, onEdit, onDeleteConfirm }: RowActionsProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={onDeleteConfirm}>
+            <AlertDialogAction onClick={handleDeleteConfirm}>
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showContractWarning} onOpenChange={setShowContractWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Esta propiedad tiene contratos asociados</AlertDialogTitle>
+            <AlertDialogDescription>
+              No se puede eliminar porque tiene uno o más contratos vinculados. Si eliminás
+              de todas formas, los contratos quedarán sin propiedad asociada.
+              ¿Querés continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleForceDeleteConfirm}>
+              Sí, eliminar igual
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
