@@ -42,10 +42,7 @@ function InmoAgendaInner() {
       value: contact.id,
       label: contact.name || contact.id,
     }));
-    const assigneeOptions = [
-      { value: "todos", label: "Todos" },
-      ...users.map((user) => ({ value: user.name, label: user.name })),
-    ];
+    const assigneeOptions = users.map((user) => ({ value: user.name, label: user.name }));
 
     return {
       categories: INMO_TASK_CATEGORIES,

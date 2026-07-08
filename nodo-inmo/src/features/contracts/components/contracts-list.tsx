@@ -408,7 +408,7 @@ export function ContractsList() {
             <DialogTitle>Contrato</DialogTitle>
             <DialogDescription>
               {viewContract?.tenant?.name ?? "—"} ·{" "}
-              {viewContract?.property?.address ?? "Sin definir"} ·{" "}
+              {viewContract?.property?.address ?? "—"} ·{" "}
               <ContractStatusBadge
                 status={viewContract?.status ?? ""}
                 archivedAt={viewContract?.archived_at}
