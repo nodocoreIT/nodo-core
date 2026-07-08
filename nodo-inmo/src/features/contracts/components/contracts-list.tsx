@@ -293,7 +293,7 @@ export function ContractsList() {
                 <TableRow key={contract.id}>
                   <TableCell>{contract.tenant?.name ?? "—"}</TableCell>
                   <TableCell className="font-medium">
-                    {contract.property?.address ?? "—"}
+                    {contract.property?.address ?? "Sin definir"}
                   </TableCell>
                   <TableCell>{formatDate(contract.start_date)}</TableCell>
                   <TableCell>{formatDate(contract.end_date)}</TableCell>
@@ -408,7 +408,7 @@ export function ContractsList() {
             <DialogTitle>Contrato</DialogTitle>
             <DialogDescription>
               {viewContract?.tenant?.name ?? "—"} ·{" "}
-              {viewContract?.property?.address ?? "—"} ·{" "}
+              {viewContract?.property?.address ?? "Sin definir"} ·{" "}
               <ContractStatusBadge
                 status={viewContract?.status ?? ""}
                 archivedAt={viewContract?.archived_at}
