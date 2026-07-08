@@ -263,10 +263,23 @@ export function ContactsListTable({
 interface RowActionsProps {
   contact: ContactRow;
   onEdit: () => void;
-  onDeleteConfirm: () => void;
+  onDeleteConfirm: () => Promise<void>;
 }
 
 function RowActions({ onEdit, onDeleteConfirm }: RowActionsProps) {
+  const [showFkError, setShowFkError] = useState(false);
+
+  const handleDeleteConfirm = async () => {
+    try {
+      await onDeleteConfirm();
+    } catch (error: unknown) {
+      const pgError = error as { code?: string };
+      if (pgError?.code === "23503") {
+        setShowFkError(true);
+      }
+    }
+  };
+
   return (
     <div className="flex items-center justify-end gap-1">
       <Button
@@ -295,8 +308,25 @@ function RowActions({ onEdit, onDeleteConfirm }: RowActionsProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={onDeleteConfirm}>
+            <AlertDialogAction onClick={handleDeleteConfirm}>
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showFkError} onOpenChange={setShowFkError}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>No se puede eliminar este contacto</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este contacto está asociado a una o más propiedades o contratos. Para eliminarlo,
+              primero desvinculalo de todos los registros relacionados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowFkError(false)}>
+              Entendido
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

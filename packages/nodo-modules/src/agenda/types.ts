@@ -13,6 +13,8 @@ export interface TaskRow {
   priority: TaskPriority;
   status: TaskStatus;
   due_date: string;
+  due_time: string | null;
+  all_day: boolean;
   assigned_to: string | null;
   property_id?: string | null;
   contact_id?: string | null;
@@ -64,6 +66,8 @@ export interface AgendaModuleConfig {
   /** Base path for deep links, e.g. /admin/agenda */
   agendaBasePath: string;
   entityLabel?: string;
+  /** Display name of the currently logged-in user, used for "assign to me" */
+  currentUserName?: string;
   /** Active AI provider */
   aiProvider?: AiProvider;
   /** Active provider's API key — enables voice-to-task dictation */

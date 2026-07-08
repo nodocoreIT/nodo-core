@@ -75,6 +75,7 @@ export function AgendaPage() {
     deleteTask,
     isSaving,
     entityLabel,
+    currentUserName,
     aiApiKey,
     aiProvider,
     onAiSettingsClick,
@@ -100,6 +101,8 @@ export function AgendaPage() {
   const [formCategory, setFormCategory] = useState(categories[0]?.value ?? "general");
   const [formPriority, setFormPriority] = useState<"alta" | "media" | "baja">("media");
   const [formDueDate, setFormDueDate] = useState(todayStr);
+  const [formAllDay, setFormAllDay] = useState(true);
+  const [formDueTime, setFormDueTime] = useState("");
   const [formAssignedTo, setFormAssignedTo] = useState("");
   const [formLinkValues, setFormLinkValues] = useState<LinkValuesState>({});
 
@@ -135,6 +138,8 @@ export function AgendaPage() {
     setFormCategory(categories[0]?.value ?? "general");
     setFormPriority("media");
     setFormDueDate(selectedDateStr);
+    setFormAllDay(true);
+    setFormDueTime("");
     setFormAssignedTo("");
     resetLinkValues();
     setDialogOpen(true);
@@ -148,6 +153,8 @@ export function AgendaPage() {
     setFormCategory(values.category ?? categories[0]?.value ?? "general");
     setFormPriority(values.priority ?? "media");
     setFormDueDate(values.due_date ?? selectedDateStr);
+    setFormAllDay(true);
+    setFormDueTime("");
     setFormAssignedTo(values.assigned_to ?? "");
     // Pre-fill link fields from voice extraction (e.g. property_id matched by address)
     const voiceLinkValues: LinkValuesState = {};
@@ -171,6 +178,8 @@ export function AgendaPage() {
     setFormCategory(task.category);
     setFormPriority(task.priority);
     setFormDueDate(task.due_date);
+    setFormAllDay(task.all_day ?? true);
+    setFormDueTime(task.due_time ?? "");
     setFormAssignedTo(task.assigned_to ?? "");
     setLinkValuesFromTask(task);
     setDialogOpen(true);
@@ -192,6 +201,8 @@ export function AgendaPage() {
     setFormCategory(task.category);
     setFormPriority(task.priority);
     setFormDueDate(task.due_date);
+    setFormAllDay(task.all_day ?? true);
+    setFormDueTime(task.due_time ?? "");
     setFormAssignedTo(task.assigned_to ?? "");
     const values: LinkValuesState = {};
     for (const linkField of linkFields) {
@@ -223,6 +234,8 @@ export function AgendaPage() {
       category: formCategory,
       priority: formPriority,
       due_date: formDueDate,
+      all_day: formAllDay,
+      due_time: formAllDay ? null : (formDueTime || null),
       assigned_to: formAssignedTo.trim() || null,
       ...dynamicLinks,
       status: editingTask ? editingTask.status : "pendiente",
@@ -716,31 +729,69 @@ export function AgendaPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label htmlFor="task-due-date">Fecha límite</Label>
-                <Input
-                  id="task-due-date"
-                  type="date"
-                  value={formDueDate}
-                  onChange={(event) => setFormDueDate(event.target.value)}
-                  required
-                />
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="task-due-date">Fecha límite</Label>
+                  <Input
+                    id="task-due-date"
+                    type="date"
+                    value={formDueDate}
+                    onChange={(event) => setFormDueDate(event.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="task-due-time">Hora</Label>
+                  <Input
+                    id="task-due-time"
+                    type="time"
+                    value={formDueTime}
+                    onChange={(event) => setFormDueTime(event.target.value)}
+                    disabled={formAllDay}
+                    className={formAllDay ? "opacity-40" : ""}
+                  />
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="task-assignee">Empleado Asignado</Label>
-                <SearchableSelect
-                  id="task-assignee"
-                  value={formAssignedTo}
-                  onChange={setFormAssignedTo}
-                  options={assigneeOptions}
-                  allowEmpty
-                  emptyLabel="Sin asignar / General"
-                  searchPlaceholder="Buscar..."
-                  triggerClassName="h-9 text-xs"
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-slate2">
+                <input
+                  type="checkbox"
+                  checked={formAllDay}
+                  onChange={(e) => {
+                    setFormAllDay(e.target.checked);
+                    if (e.target.checked) setFormDueTime("");
+                  }}
+                  className="h-3.5 w-3.5 rounded border-slate-300 accent-brand"
                 />
+                Todo el día
+              </label>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="task-assignee">Empleado Asignado</Label>
+                {currentUserName && (
+                  <button
+                    type="button"
+                    onClick={() => setFormAssignedTo(currentUserName)}
+                    className="text-[11px] font-medium text-brand hover:underline"
+                  >
+                    Asignarme a mí
+                  </button>
+                )}
               </div>
+              <SearchableSelect
+                id="task-assignee"
+                value={formAssignedTo}
+                onChange={setFormAssignedTo}
+                options={assigneeOptions}
+                allowEmpty
+                emptyLabel="Sin asignar / General"
+                searchPlaceholder="Buscar..."
+                triggerClassName="h-9 text-xs"
+              />
             </div>
 
             {linkFields.length > 0 && (
@@ -888,6 +939,11 @@ function TaskCard({
           <Clock className="h-3 w-3 shrink-0" />
           <span>
             F. Límite: {new Date(`${task.due_date}T00:00:00`).toLocaleDateString("es-AR")}
+            {!task.all_day && task.due_time && (
+              <span className="ml-1 font-normal text-slate2">
+                — {task.due_time.slice(0, 5)}
+              </span>
+            )}
           </span>
         </div>
       </div>
