@@ -883,12 +883,14 @@ export type Database = {
       }
       tasks: {
         Row: {
+          all_day: boolean
           assigned_to: string | null
           category: string
           contact_id: string | null
           created_at: string
           description: string | null
           due_date: string
+          due_time: string | null
           id: string
           org_id: string
           priority: string
@@ -898,12 +900,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          all_day?: boolean
           assigned_to?: string | null
           category?: string
           contact_id?: string | null
           created_at?: string
           description?: string | null
           due_date?: string
+          due_time?: string | null
           id?: string
           org_id: string
           priority?: string
@@ -913,12 +917,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          all_day?: boolean
           assigned_to?: string | null
           category?: string
           contact_id?: string | null
           created_at?: string
           description?: string | null
           due_date?: string
+          due_time?: string | null
           id?: string
           org_id?: string
           priority?: string

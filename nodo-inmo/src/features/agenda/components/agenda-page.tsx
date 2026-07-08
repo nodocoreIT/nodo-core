@@ -17,7 +17,8 @@ import { createInmoTasksHooks } from "@/shared/lib/inmo-module-hooks";
 import { INMO_TASK_CATEGORIES } from "../agenda-config";
 
 function InmoAgendaInner() {
-  const { orgId } = useAuth();
+  const { orgId, user } = useAuth();
+  const currentUserName = (user?.user_metadata?.full_name as string | undefined) ?? undefined;
   const { aiSettings } = useSettingsModule();
   const { data: properties = [] } = useProperties();
   const { data: contacts = [] } = useContacts();
@@ -47,6 +48,7 @@ function InmoAgendaInner() {
     return {
       categories: INMO_TASK_CATEGORIES,
       assigneeOptions,
+      currentUserName,
       linkFields: [
         {
           field: "property_id",
@@ -85,6 +87,7 @@ function InmoAgendaInner() {
     tasks,
     isLoading,
     orgId,
+    currentUserName,
     aiSettings,
     createMutation,
     updateMutation,
