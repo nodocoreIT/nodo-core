@@ -13,6 +13,8 @@ interface ComboboxProps {
   disabled?: boolean;
   id?: string;
   "aria-label"?: string;
+  allowCreate?: boolean;
+  createLabel?: (search: string) => string;
 }
 
 export function Combobox({
@@ -24,6 +26,8 @@ export function Combobox({
   disabled,
   id,
   "aria-label": ariaLabel,
+  allowCreate = false,
+  createLabel = (s) => `Agregar "${s}"`,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -101,33 +105,57 @@ export function Combobox({
           </div>
 
           <div className="max-h-56 overflow-y-auto py-1">
-            {filtered.length === 0 ? (
+            {filtered.length === 0 && !allowCreate ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
                 Sin resultados
               </p>
             ) : (
-              filtered.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  role="option"
-                  aria-selected={value === option}
-                  onClick={() => handleSelect(option)}
-                  className={cn(
-                    "flex w-full items-center gap-2 px-3 py-2 text-left text-sm",
-                    "hover:bg-accent hover:text-accent-foreground",
-                    value === option && "bg-accent/40",
-                  )}
-                >
-                  <Check
+              <>
+                {filtered.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="option"
+                    aria-selected={value === option}
+                    onClick={() => handleSelect(option)}
                     className={cn(
-                      "h-3.5 w-3.5 shrink-0",
-                      value === option ? "opacity-100" : "opacity-0",
+                      "flex w-full items-center gap-2 px-3 py-2 text-left text-sm",
+                      "hover:bg-accent hover:text-accent-foreground",
+                      value === option && "bg-accent/40",
                     )}
-                  />
-                  {option}
-                </button>
-              ))
+                  >
+                    <Check
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0",
+                        value === option ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    {option}
+                  </button>
+                ))}
+                {allowCreate &&
+                  search.trim() !== "" &&
+                  !options.some(
+                    (o) => o.toLowerCase() === search.trim().toLowerCase(),
+                  ) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onChange(search.trim());
+                        close();
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-brand hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <span className="text-xs">+</span>
+                      {createLabel(search.trim())}
+                    </button>
+                  )}
+                {filtered.length === 0 && allowCreate && search.trim() === "" && (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    Sin resultados
+                  </p>
+                )}
+              </>
             )}
           </div>
         </div>

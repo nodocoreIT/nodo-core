@@ -51,7 +51,24 @@ import { PhotoGallery } from "./photo-gallery";
 import { StagedPhotoUpload } from "./StagedPhotoUpload";
 import { cn } from "@/shared/lib/utils";
 import { Combobox } from "@nodocore/shared-components";
-import { PROVINCIAS, LOCALIDADES_BY_PROVINCIA, type Provincia } from "@/shared/data/argentina-geo";
+import { PROVINCIAS, type Provincia } from "@/shared/data/argentina-geo";
+import {
+  usePropertyTypes,
+  useLocalidadesByProvincia,
+} from "@/features/properties/hooks/use-property-options";
+
+const LEGACY_PROPERTY_TYPE_MAP: Record<string, string> = {
+  apartment: "Departamento",
+  house: "Casa",
+  commercial: "Local comercial",
+  land: "Terreno",
+  other: "Otro",
+};
+
+function normalizePropertyType(value: string | null | undefined): string {
+  if (!value) return "";
+  return LEGACY_PROPERTY_TYPE_MAP[value] ?? value;
+}
 import { ADMINISTRACION_INMOBILIARIA_PERCENT } from "@/features/caja/lib/settlement-labels";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -213,6 +230,7 @@ export function PropertyFormDialog({
   const { data: owners = [] } = useContacts("owner");
   const [stagedPhotos, setStagedPhotos] = useState<string[]>([]);
   const ownerChangedRef = useRef(false);
+  const { data: propertyTypes = [] } = usePropertyTypes();
 
   const form = useForm<PropertyFormValues>({
     resolver: zodResolver(schema) as any,
@@ -224,8 +242,8 @@ export function PropertyFormDialog({
       operation:
         (property?.operation as any) ?? voiceDefaults?.operation ?? "",
       property_type:
-        (property?.property_type as any) ??
-        voiceDefaults?.property_type ??
+        normalizePropertyType(property?.property_type) ||
+        voiceDefaults?.property_type ||
         "",
       status: (property?.status as any) ?? voiceDefaults?.status ?? "available",
       currency: (property?.currency as any) ?? voiceDefaults?.currency ?? "ARS",
@@ -272,6 +290,7 @@ export function PropertyFormDialog({
   const ownerId = form.watch("owner_id");
   const prevCurrencyRef = useRef(currency);
   const selectedProvincia = form.watch("provincia") as Provincia | undefined;
+  const { data: localidades = [] } = useLocalidadesByProvincia(selectedProvincia);
   useEffect(() => {
     if (prevCurrencyRef.current !== currency) {
       const currentPrice = form.getValues("sale_price");
@@ -381,11 +400,7 @@ export function PropertyFormDialog({
                       <Combobox
                         id="localidad-combobox"
                         aria-label="Localidad"
-                        options={
-                          selectedProvincia
-                            ? LOCALIDADES_BY_PROVINCIA[selectedProvincia] ?? []
-                            : []
-                        }
+                        options={localidades}
                         value={field.value ?? ""}
                         onChange={field.onChange}
                         placeholder={
@@ -393,6 +408,7 @@ export function PropertyFormDialog({
                         }
                         searchPlaceholder="Buscar localidad..."
                         disabled={!selectedProvincia}
+                        allowCreate
                       />
                     </FormControl>
                     <FormMessage />
@@ -433,26 +449,21 @@ export function PropertyFormDialog({
                 name="property_type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel htmlFor="type-trigger">
+                    <FormLabel htmlFor="property-type-combobox">
                       Tipo de propiedad
                     </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger
-                          id="type-trigger"
-                          aria-label="Tipo de propiedad"
-                        >
-                          <SelectValue placeholder="Seleccioná" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="apartment">Departamento</SelectItem>
-                        <SelectItem value="house">Casa</SelectItem>
-                        <SelectItem value="commercial">Local</SelectItem>
-                        <SelectItem value="land">Terreno</SelectItem>
-                        <SelectItem value="other">Otro</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <Combobox
+                        id="property-type-combobox"
+                        aria-label="Tipo de propiedad"
+                        options={propertyTypes}
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        placeholder="Seleccioná..."
+                        searchPlaceholder="Buscar tipo..."
+                        allowCreate
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
