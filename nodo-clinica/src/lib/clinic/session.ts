@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
 import { readDb } from "@/lib/clinic/local-db";
+import { createServiceClient } from "@/lib/supabase/server";
 
 export type SessionRole = "doctor" | "patient";
 
@@ -64,17 +65,27 @@ async function parseSignedSession(
 async function validateSessionUser(
   session: ClinicSession,
 ): Promise<ClinicSession | null> {
-  const db = await readDb();
   if (session.role === "doctor") {
-    const doctor = db.doctors.find((d) => d.id === session.userId);
-    if (!doctor) return null;
+    // Doctors are stored in nodo_clinica.professionals (Supabase).
+    // Use service client to bypass RLS — this runs server-side only.
+    const supabase = await createServiceClient();
+    const { data: professional } = await supabase
+      .from("professionals")
+      .select("id, email, full_name")
+      .eq("id", session.userId)
+      .maybeSingle();
+
+    if (!professional) return null;
     return {
-      userId: doctor.id,
+      userId: professional.id,
       role: "doctor",
-      email: doctor.email,
-      fullName: doctor.fullName,
+      email: professional.email,
+      fullName: professional.full_name,
     };
   }
+
+  // Patients are still in local-db until patient migration is complete.
+  const db = await readDb();
   const patient = db.patients.find((p) => p.id === session.userId);
   if (!patient) return null;
   return {

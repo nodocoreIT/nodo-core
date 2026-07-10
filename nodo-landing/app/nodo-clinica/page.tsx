@@ -62,7 +62,7 @@ export default function Page() {
 
             <div className="mt-10">
               <Link
-                href="https://clinica.nodocore.com.ar/nodo-clinica/login"
+                href="https://clinica.nodocore.com.ar/login"
                 className="inline-flex items-center justify-center px-8 py-4 text-[16px] font-bold rounded-md text-white active:scale-[.98] transition-all duration-150 shadow-lg"
                 style={{
                   background: `linear-gradient(135deg, ${CLINICA_ACCENT.brand}, ${CLINICA_ACCENT.brand600})`,

@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       user: {
         id: data.user.id,
         email: data.user.email,
+        fullName: data.user.user_metadata?.full_name ?? data.user.email?.split("@")[0] ?? "",
         role,
         org_id: appMeta.org_id ?? null,
       },
