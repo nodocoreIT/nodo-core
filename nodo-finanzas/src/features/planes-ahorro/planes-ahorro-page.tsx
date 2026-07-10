@@ -6,6 +6,7 @@ import {
   Calendar,
   AlertTriangle,
   CheckCircle2,
+  Check,
   Wallet,
   ExternalLink,
   Banknote,
@@ -777,8 +778,8 @@ export function PlanesAhorroPage() {
                   { codigo: 'MERCADO_PAGO', nombre: 'Mercado Pago' },
                   { codigo: 'TARJETA', nombre: 'Tarjeta de Crédito' },
                 ];
-                const formas = (finanzas.config?.formasDePago ?? []).filter((f) => f.activa).length > 0
-                  ? (finanzas.config!.formasDePago.filter((f) => f.activa).map((f) => ({ codigo: f.codigo as FormaDePago, nombre: f.nombre })))
+                const formas = (finanzas.configuracion?.formasDePago ?? []).filter((f: { activa: boolean }) => f.activa).length > 0
+                  ? (finanzas.configuracion!.formasDePago.filter((f: { activa: boolean }) => f.activa).map((f: { codigo: string; nombre: string }) => ({ codigo: f.codigo as FormaDePago, nombre: f.nombre })))
                   : FORMAS;
 
                 return (

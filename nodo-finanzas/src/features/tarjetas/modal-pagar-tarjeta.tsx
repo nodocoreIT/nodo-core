@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { CreditCard, CheckCircle2, AlertTriangle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/ui/money-input';
-import { getFechaHoy } from '@/utils/formatters';
 import type { Tarjeta } from '@/types';
 
 interface ModalPagarTarjetaProps {
