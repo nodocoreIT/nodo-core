@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
-import { readDb } from "@/lib/clinic/local-db";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export type SessionRole = "doctor" | "patient";
@@ -68,11 +67,12 @@ async function validateSessionUser(
   if (session.role === "doctor") {
     // Doctors are stored in nodo_clinica.professionals (Supabase).
     // Use service client to bypass RLS — this runs server-side only.
+    // session.userId may be professionals.id (platform-sync) or auth user_id (clinic login).
     const supabase = await createServiceClient();
     const { data: professional } = await supabase
       .from("professionals")
       .select("id, email, full_name")
-      .eq("id", session.userId)
+      .or(`id.eq.${session.userId},user_id.eq.${session.userId}`)
       .maybeSingle();
 
     if (!professional) return null;
@@ -84,15 +84,20 @@ async function validateSessionUser(
     };
   }
 
-  // Patients are still in local-db until patient migration is complete.
-  const db = await readDb();
-  const patient = db.patients.find((p) => p.id === session.userId);
+  // Patients: query nodo_clinica.patients via service client.
+  const patientClient = await createServiceClient();
+  const { data: patient } = await patientClient
+    .from("patients")
+    .select("profile_id, email, full_name")
+    .eq("profile_id", session.userId)
+    .maybeSingle();
+
   if (!patient) return null;
   return {
-    userId: patient.id,
+    userId: patient.profile_id,
     role: "patient",
     email: patient.email,
-    fullName: patient.fullName,
+    fullName: patient.full_name,
   };
 }
 
