@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Tag } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { RubroDisplay } from '@/components/rubros/rubro-display';
 import { useFinanzas } from '@/hooks/use-finanzas';
@@ -85,7 +85,13 @@ export function ResumenCategorias() {
 
   return (
     <>
-      <Card title="Gastos por Rubro" collapsible storageKey="gastos-fijos-rubros">
+      <Card
+        title="Gastos por Rubro"
+        titleClassName="text-xs"
+        titleIcon={<Tag className="h-3.5 w-3.5 text-slate2 shrink-0" />}
+        collapsible
+        storageKey="gastos-fijos-rubros"
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {resumen.map(([rubroId, data]) => {
             const rubro = rubros.find((r) => r.id === rubroId);

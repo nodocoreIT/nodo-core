@@ -5,6 +5,8 @@ interface CardProps {
   className?: string;
   children: React.ReactNode;
   title?: string;
+  titleClassName?: string;
+  titleIcon?: React.ReactNode;
   collapsible?: boolean;
   defaultOpen?: boolean;
   storageKey?: string;
@@ -14,6 +16,8 @@ export function Card({
   className = '',
   children,
   title,
+  titleClassName = 'text-base',
+  titleIcon,
   collapsible = false,
   defaultOpen = true,
   storageKey,
@@ -44,7 +48,10 @@ export function Card({
             className={`flex w-full items-center justify-between gap-3 text-left ${open ? 'mb-6' : ''}`}
             aria-expanded={open}
           >
-            <h3 className="text-base font-bold text-ink">{title}</h3>
+            <span className="flex items-center gap-2">
+              {titleIcon}
+              <h3 className={`${titleClassName} font-bold text-ink`}>{title}</h3>
+            </span>
             {open ? (
               <ChevronUp className="h-4 w-4 shrink-0 text-slate2" aria-hidden />
             ) : (

@@ -190,15 +190,15 @@ export function DetalleTarjetaPage() {
 
         <div className="flex items-center gap-3">
           {totalARS > 0 && (
-            <div className="bg-brand/5 px-4 py-2 rounded-xl border border-brand/20 text-right">
-              <p className="text-xs text-brand font-bold uppercase tracking-wider">Total Mes</p>
-              <p className="text-xl font-black text-brand">
+            <div className="bg-orange-50 px-4 py-2 rounded-xl border border-orange-200 text-center">
+              <p className="text-xs text-orange-500 font-bold uppercase tracking-wider">Total Mes</p>
+              <p className="text-xl font-black text-orange-600">
                 ${totalARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
               </p>
             </div>
           )}
           {totalUSD > 0 && (
-            <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-200 text-right">
+            <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-200 text-center">
               <p className="text-xs text-blue-600 font-bold uppercase tracking-wider">USD Mes</p>
               <p className="text-xl font-black text-blue-700">
                 U$S {totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -278,17 +278,17 @@ export function DetalleTarjetaPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-mist">
-                <th className="text-left py-3 px-2 font-medium text-slate2">
+                <th className="text-center py-3 px-2 font-medium text-slate2">
                   <button onClick={() => handleSort('fecha')} className="flex items-center hover:text-ink transition-colors">
                     Fecha<SortIcon field="fecha" />
                   </button>
                 </th>
-                <th className="text-left py-3 px-2 font-medium text-slate2">
+                <th className="text-center py-3 px-2 font-medium text-slate2">
                   <button onClick={() => handleSort('lugar')} className="flex items-center hover:text-ink transition-colors">
                     Lugar<SortIcon field="lugar" />
                   </button>
                 </th>
-                <th className="text-left py-3 px-2 font-medium text-slate2">
+                <th className="text-center py-3 px-2 font-medium text-slate2">
                   <button onClick={() => handleSort('rubro')} className="flex items-center hover:text-ink transition-colors">
                     Rubro<SortIcon field="rubro" />
                   </button>
@@ -320,7 +320,7 @@ export function DetalleTarjetaPage() {
                     </td>
                     <td className="py-3 px-2 text-center">
                       {consumo.cuotas && consumo.cuotas !== '1 de 1' ? (
-                        <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md font-medium">
+                        <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md font-medium whitespace-nowrap">
                           {consumo.cuotas}
                         </span>
                       ) : consumo.gastoFijo ? (

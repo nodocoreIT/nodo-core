@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, Bell, Plus, Wallet, ShoppingCart, CalendarRange, PiggyBank, Landmark, CreditCard, Settings2, X, ClipboardList } from 'lucide-react';
+import { CheckCircle, Bell, Plus, Wallet, ShoppingCart, CalendarRange, PiggyBank, Landmark, CreditCard, Settings2, X, ClipboardList, Coins, ChevronDown } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { useFinanzas } from '@/hooks/use-finanzas';
@@ -16,6 +16,7 @@ const CARD_LABELS = {
   gastosFijosPendientes: 'Gastos Fijos Pendientes',
   totalPrestamos: 'Total Préstamos',
   totalTarjetas: 'Total Tarjetas',
+  totalPlanesAhorro: 'Planes de Ahorro',
 } as const;
 
 type CardKey = keyof typeof CARD_LABELS;
@@ -28,6 +29,7 @@ const ALL_VISIBLE: Record<CardKey, boolean> = {
   gastosFijosPendientes: true,
   totalPrestamos: true,
   totalTarjetas: true,
+  totalPlanesAhorro: true,
 };
 
 const STORAGE_KEY = 'dashboard-cards-v3';
@@ -53,6 +55,7 @@ export function DashboardPage() {
   const { notifications } = useNotifications();
 
   const [mostrarPersonalizar, setMostrarPersonalizar] = useState(false);
+  const [resumenAbierto, setResumenAbierto] = useState(false);
   const [visibility, setVisibility] = useState<Record<CardKey, boolean>>(loadVisibility);
 
   const toggleCard = (key: CardKey) => {
@@ -89,11 +92,11 @@ export function DashboardPage() {
 
   const todayStr = hoy.toISOString().split('T')[0];
   const gastosDelDia = finanzas.gastosDiarios
-    .filter((g) => g.fecha === todayStr && !g.esSilencioso)
+    .filter((g) => g.fecha === todayStr && !g.esSilencioso && !g.pagoTarjetaId)
     .reduce((s, g) => s + g.monto, 0);
 
   const gastosMes = finanzas.gastosDiarios
-    .filter((g) => g.fecha.startsWith(mesActualStr) && !g.esSilencioso)
+    .filter((g) => g.fecha.startsWith(mesActualStr) && !g.esSilencioso && !g.pagoTarjetaId)
     .reduce((s, g) => s + g.monto, 0);
 
   // Fixed expenses not yet paid this month (have no gastosDiario with gastoFijoId in current month)
@@ -136,8 +139,33 @@ export function DashboardPage() {
             c.fecha <= fechas.currentClosingDate,
         )
         .reduce((s, c) => s + (c.importeARS ?? 0), 0);
-      return sum + periodoMonto;
+
+      // Deduct any payment registered this month for this card
+      const gastoPago = finanzas.gastosDiarios.find(
+        (g) => g.pagoTarjetaId === tarjeta.id && g.fecha.startsWith(mesActualStr),
+      );
+      if (!gastoPago) return sum + periodoMonto;
+      if (!gastoPago.pagoParcial) return sum; // fully paid — card contributes 0
+      return sum + Math.max(0, periodoMonto - gastoPago.monto); // partial — deduct paid amount
     }, 0);
+
+  // Account balances for quick-view cards
+  const cuentaMercadoPago = finanzas.cuentas
+    .filter((c) => c.nombre.toLowerCase().includes('mercado'))
+    .sort((a, b) => b.saldoActual - a.saldoActual)[0];
+  const cuentasSantander = finanzas.cuentas.filter(
+    (c) => c.nombre.toLowerCase().includes('santander'),
+  );
+
+  // Sum of savings plan installments pending this month (active plans with cuotas remaining, not yet paid this month)
+  const totalPlanesAhorro = finanzas.planesAhorro
+    .filter((p) => {
+      if (!p.activa || p.cuotasPagas >= p.cuotasTotales) return false;
+      return !finanzas.gastosDiarios.some(
+        (g) => g.planId === p.id && g.fecha.startsWith(mesActualStr),
+      );
+    })
+    .reduce((s, p) => s + (p.moneda === 'ARS' ? p.importeCuota : 0), 0);
 
   const ultimosGastos = [...finanzas.gastosDiarios]
     .filter((g) => !g.esSilencioso)
@@ -187,9 +215,33 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {/* Mobile compact strip: saldo only */}
+      <div className={`md:hidden ${resumenAbierto ? 'hidden' : ''}`}>
+        <div className="bg-emerald-500 rounded-xl px-4 py-2 flex items-center justify-between">
+          <div>
+            <p className="text-[9px] font-extrabold uppercase tracking-wider text-white/80">Saldo disponible</p>
+            <p className="text-base font-black text-white mt-1">
+              {formatearMoneda(totalARS - totalGastosFijosPendientes - totalPrestamos - totalTarjetas - totalPlanesAhorro)}
+            </p>
+          </div>
+          <PiggyBank className="h-6 w-6 text-white/60" />
+        </div>
+      </div>
+
       {/* Summary cards */}
       {visibleCount > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3">
+        <>
+          {/* Mobile accordion toggle */}
+          <button
+            type="button"
+            onClick={() => setResumenAbierto((v) => !v)}
+            className="md:hidden w-full flex items-center justify-between bg-white border border-mist rounded-xl px-4 py-3 text-sm font-semibold text-ink shadow-sm"
+          >
+            Resumen del mes
+            <ChevronDown className={`h-4 w-4 text-slate2 transition-transform ${resumenAbierto ? 'rotate-180' : ''}`} />
+          </button>
+
+          <div className={`grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3 ${resumenAbierto ? '' : 'hidden md:grid'}`}>
           {visibility.saldo && (
             <div className="rounded-xl shadow-sm border border-emerald-600 bg-emerald-500 p-3 flex flex-col justify-between gap-1.5">
               <div className="flex items-start gap-2">
@@ -201,7 +253,7 @@ export function DashboardPage() {
                   <p className="text-[9px] font-bold text-white/70 mt-0.5">disponible este mes</p>
                 </div>
               </div>
-              <p className="text-base font-black text-white leading-tight">{formatearMoneda(totalARS - gastosMes)}</p>
+              <p className="text-base font-black text-white leading-tight text-center md:text-left">{formatearMoneda(totalARS - totalGastosFijosPendientes - totalPrestamos - totalTarjetas - totalPlanesAhorro)}</p>
             </div>
           )}
 
@@ -216,7 +268,7 @@ export function DashboardPage() {
                   <p className="text-[9px] font-bold text-white/70 mt-0.5">en cuentas ARS</p>
                 </div>
               </div>
-              <p className="text-base font-black text-white leading-tight">{formatearMoneda(totalARS)}</p>
+              <p className="text-base font-black text-white leading-tight text-center md:text-left">{formatearMoneda(totalARS)}</p>
             </div>
           )}
 
@@ -231,7 +283,7 @@ export function DashboardPage() {
                   <p className="text-[9px] font-bold text-white/70 mt-0.5">hoy</p>
                 </div>
               </div>
-              <p className="text-base font-black text-white leading-tight">{formatearMoneda(gastosDelDia)}</p>
+              <p className="text-base font-black text-white leading-tight text-center md:text-left">{formatearMoneda(gastosDelDia)}</p>
             </div>
           )}
 
@@ -246,7 +298,7 @@ export function DashboardPage() {
                   <p className="text-[9px] font-bold text-white/70 mt-0.5">{mesLabel}</p>
                 </div>
               </div>
-              <p className="text-base font-black text-white leading-tight">{formatearMoneda(gastosMes)}</p>
+              <p className="text-base font-black text-white leading-tight text-center md:text-left">{formatearMoneda(gastosMes)}</p>
             </div>
           )}
 
@@ -261,7 +313,7 @@ export function DashboardPage() {
                   <p className="text-[9px] font-bold text-white/70 mt-0.5">pendientes este mes</p>
                 </div>
               </div>
-              <p className="text-base font-black text-white leading-tight">{formatearMoneda(totalGastosFijosPendientes)}</p>
+              <p className="text-base font-black text-white leading-tight text-center md:text-left">{formatearMoneda(totalGastosFijosPendientes)}</p>
             </div>
           )}
 
@@ -276,7 +328,7 @@ export function DashboardPage() {
                   <p className="text-[9px] font-bold text-white/70 mt-0.5">cuotas mensuales</p>
                 </div>
               </div>
-              <p className="text-base font-black text-white leading-tight">{formatearMoneda(totalPrestamos)}</p>
+              <p className="text-base font-black text-white leading-tight text-center md:text-left">{formatearMoneda(totalPrestamos)}</p>
             </div>
           )}
 
@@ -291,10 +343,44 @@ export function DashboardPage() {
                   <p className="text-[9px] font-bold text-white/70 mt-0.5">período actual</p>
                 </div>
               </div>
-              <p className="text-base font-black text-white leading-tight">{formatearMoneda(totalTarjetas)}</p>
+              <p className="text-base font-black text-white leading-tight text-center md:text-left">{formatearMoneda(totalTarjetas)}</p>
             </div>
           )}
-        </div>
+
+          {visibility.totalPlanesAhorro && (
+            <div className="rounded-xl shadow-sm border border-teal-600 bg-teal-500 p-3 flex flex-col justify-between gap-1.5">
+              <div className="flex items-start gap-2">
+                <div className="p-1.5 bg-white/20 rounded-lg shrink-0">
+                  <Coins className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-[9px] font-extrabold uppercase tracking-wider text-white leading-tight">Planes de Ahorro</p>
+                  <p className="text-[9px] font-bold text-white/70 mt-0.5">cuotas pendientes</p>
+                </div>
+              </div>
+              <p className="text-base font-black text-white leading-tight text-center md:text-left">{formatearMoneda(totalPlanesAhorro)}</p>
+            </div>
+          )}
+          </div>
+
+          {/* Mobile bank accounts row — below accordion */}
+          {(cuentaMercadoPago || cuentasSantander[0]) && (
+            <div className="md:hidden bg-white border border-mist rounded-xl shadow-sm flex divide-x divide-mist">
+              {cuentaMercadoPago && (
+                <div className="flex-1 flex flex-col items-center justify-center gap-1.5 px-3 py-3">
+                  <img src="/finanzas/mercadopago.jpg" alt="Mercado Pago" className="h-18 w-auto object-contain" />
+                  <p className="text-xs font-black text-ink text-center">{formatearMoneda(cuentaMercadoPago.saldoActual)}</p>
+                </div>
+              )}
+              {cuentasSantander[0] && (
+                <div className="flex-1 flex flex-col items-center justify-center gap-1.5 px-3 py-3">
+                  <img src="/finanzas/santander.jpg" alt="Santander" className="h-18 w-auto object-contain" />
+                  <p className="text-xs font-black text-ink text-center">{formatearMoneda(cuentasSantander[0].saldoActual)}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {/* Two-column layout */}
@@ -370,6 +456,24 @@ export function DashboardPage() {
           )}
         </Card>
       </div>
+
+      {/* Bank account balance cards — always aligned in the same row, desktop only */}
+      {(cuentaMercadoPago || cuentasSantander.length > 0) && (
+        <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {cuentaMercadoPago ? (
+            <div className="bg-white border-x border-mist rounded-xl shadow-sm py-3 flex items-center justify-between px-5">
+              <img src="/finanzas/mercadopago.jpg" alt="Mercado Pago" className="h-28 w-auto object-contain" />
+              <p className="text-base font-black text-ink">{formatearMoneda(cuentaMercadoPago.saldoActual)}</p>
+            </div>
+) : <div />}
+          {cuentasSantander[0] ? (
+            <div className="bg-white border-x border-mist rounded-xl shadow-sm py-3 flex items-center justify-between px-5">
+              <img src="/finanzas/santander.jpg" alt="Santander" className="h-28 w-auto object-contain" />
+              <p className="text-base font-black text-ink">{formatearMoneda(cuentasSantander[0].saldoActual)}</p>
+            </div>
+          ) : <div />}
+        </div>
+      )}
 
       {/* Personalizar panel */}
       {mostrarPersonalizar && (

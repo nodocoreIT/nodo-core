@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Plus, Calculator, Search, X, Edit, Trash2, Mic, MicOff, Loader2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Calculator, Search, X, Edit, Trash2, Mic, MicOff, Loader2, ToggleLeft, ToggleRight, ChevronDown } from 'lucide-react';
 import { useOpenSettings } from '@/shared/hooks/use-open-settings';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/card';
@@ -40,6 +40,7 @@ export function GastosFijosPage() {
   const [busqueda, setBusqueda] = useState('');
   const [rubroFiltro, setRubroFiltro] = useState('');
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
+  const [resumenAbierto, setResumenAbierto] = useState(false);
   const [sortField, setSortField] = useState<SortField>('rubro');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [gastoAEliminar, setGastoAEliminar] = useState<GastoFijo | null>(null);
@@ -317,28 +318,42 @@ export function GastosFijosPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-red-100">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Total ARS</p>
-          <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(totalARS)}</p>
-        </Card>
-        <Card className="border-brand/20">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Total USD</p>
-          <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(totalUSD, 'USD')}</p>
-          {dolar.cotizacion && totalUSD > 0 && (
-            <p className="text-[10px] text-slate2">≈ {formatearMoneda(dolar.convertirUSDaARS(totalUSD))}</p>
-          )}
-        </Card>
-        <Card>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Total General</p>
-          <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(totalGeneral)}</p>
-        </Card>
-        <Card>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Gastos</p>
-          <p className="text-xl font-black text-ink mt-1">{activosCount} activos</p>
-          <p className="text-[10px] text-slate2">{inactivosCount} inactivos</p>
-        </Card>
-      </div>
+      <>
+        <button
+          type="button"
+          onClick={() => setResumenAbierto((v) => !v)}
+          className="md:hidden w-full flex items-center justify-between bg-white border border-mist rounded-xl px-4 py-3 text-sm font-semibold text-ink shadow-sm"
+        >
+          <span className="flex items-center gap-2">
+            <Calculator className="h-4 w-4 text-slate2" />
+            Resumen — {formatearMoneda(totalGeneral)}
+          </span>
+          <ChevronDown className={`h-4 w-4 text-slate2 transition-transform ${resumenAbierto ? 'rotate-180' : ''}`} />
+        </button>
+
+        <div className={`grid grid-cols-2 lg:grid-cols-4 gap-4 ${resumenAbierto ? '' : 'hidden md:grid'}`}>
+          <Card className="border-red-100">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Total ARS</p>
+            <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(totalARS)}</p>
+          </Card>
+          <Card className="border-brand/20">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Total USD</p>
+            <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(totalUSD, 'USD')}</p>
+            {dolar.cotizacion && totalUSD > 0 && (
+              <p className="text-[10px] text-slate2">≈ {formatearMoneda(dolar.convertirUSDaARS(totalUSD))}</p>
+            )}
+          </Card>
+          <Card>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Total General</p>
+            <p className="text-sm sm:text-lg lg:text-xl font-black text-ink mt-1 leading-tight">{formatearMoneda(totalGeneral)}</p>
+          </Card>
+          <Card>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">Gastos</p>
+            <p className="text-xl font-black text-ink mt-1">{activosCount} activos</p>
+            <p className="text-[10px] text-slate2">{inactivosCount} inactivos</p>
+          </Card>
+        </div>
+      </>
 
       {/* Category summary */}
       <ResumenCategorias />
@@ -410,7 +425,7 @@ export function GastosFijosPage() {
                 ? 'Escuchando…'
                 : voiceState === 'extracting'
                 ? 'Procesando…'
-                : 'Cargá tu gasto por voz'}
+                : 'Cargar por voz'}
             </Button>
             {voiceState === 'listening' && (
               <span className="absolute -top-1 -right-1 h-3 w-3">

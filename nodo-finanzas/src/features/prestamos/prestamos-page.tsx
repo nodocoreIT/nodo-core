@@ -388,15 +388,15 @@ export function PrestamosPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <TrendingDown className="w-8 h-8 text-brand" />
-          <div>
-            <h1 className="text-2xl font-bold text-ink">Préstamos</h1>
-            <p className="text-slate2">Administrá tus préstamos y cuotas</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <TrendingDown className="w-6 h-6 md:w-8 md:h-8 text-brand shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-lg md:text-2xl font-bold text-ink leading-tight">Préstamos</h1>
+            <p className="text-slate2 text-xs md:text-sm truncate">Administrá tus préstamos y cuotas</p>
           </div>
         </div>
-        <Button onClick={() => abrirFormulario()}>
+        <Button onClick={() => abrirFormulario()} className="shrink-0">
           <Plus className="w-4 h-4" />
           Nuevo Préstamo
         </Button>
@@ -510,7 +510,7 @@ export function PrestamosPage() {
                     <div className="flex items-start justify-between gap-4">
                       {/* Left: title + badges */}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-lg text-ink leading-tight">{prestamo.concepto}</h3>
+                        <h3 className="font-bold text-lg text-ink leading-tight truncate">{prestamo.concepto}</h3>
                         {prestamo.prestamista && (
                           <p className="text-xs text-slate2 mt-0.5">{prestamo.prestamista}</p>
                         )}
@@ -570,8 +570,8 @@ export function PrestamosPage() {
                         </div>
                       </div>
 
-                      {/* Right: buttons — fixed-width slot for the pay/unmark button so columns never shift */}
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {/* Right: buttons (desktop only) */}
+                      <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
                         <div className="w-[138px] flex">
                           {prestamo.cuotasTotales && !prestamo.pagado && (
                             <Button
@@ -630,6 +630,62 @@ export function PrestamosPage() {
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
+                    </div>
+
+                    {/* Mobile action row */}
+                    <div className="sm:hidden flex items-center gap-2 mt-3 pt-3 border-t border-mist">
+                      {prestamo.cuotasTotales && !prestamo.pagado && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={`text-xs font-bold flex-1 ${
+                            prestamo.cuotaAbonada
+                              ? 'border-slate-200 bg-slate-50 text-slate-500'
+                              : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          }`}
+                          onClick={() => {
+                            if (prestamo.cuotaAbonada) {
+                              handleDesmarcarCuota(prestamo);
+                            } else {
+                              const cuentasCompatibles = finanzas.cuentas.filter(
+                                (c) => c.activa && c.moneda === prestamo.moneda
+                              );
+                              setCuentaPagoId(cuentasCompatibles[0]?.id || '');
+                              setPrestamoParaPago(prestamo);
+                            }
+                          }}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          {prestamo.cuotaAbonada ? 'Desmarcar' : 'Pagar cuota'}
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs border-green-200 bg-green-50 text-green-700 font-bold flex-1"
+                        onClick={() => setPrestamoParaCuotas(prestamo)}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Ver Cuotas
+                      </Button>
+                      <button
+                        onClick={() => setPrestamoParaComprobantes(prestamo)}
+                        className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"
+                      >
+                        <Paperclip className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => abrirFormulario(prestamo)}
+                        className="p-1.5 text-slate2 hover:text-brand hover:bg-mist rounded-lg transition-colors"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleEliminar(prestamo.id)}
+                        className="p-1.5 text-slate2 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
 
                     {/* Expandible details */}
