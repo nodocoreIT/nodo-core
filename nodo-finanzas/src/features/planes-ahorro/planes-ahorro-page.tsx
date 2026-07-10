@@ -6,9 +6,10 @@ import {
   Calendar,
   AlertTriangle,
   CheckCircle2,
+  Check,
   Wallet,
   ExternalLink,
-  Check,
+  Banknote,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,7 @@ import { useFinanzas } from '@/hooks/use-finanzas';
 import { formatearMoneda, formatearFecha, getFechaHoy } from '@/utils/formatters';
 import { GestionCuotasPlan } from './gestion-cuotas-plan';
 import toast from 'react-hot-toast';
-import type { PlanAhorro, Moneda } from '@/types';
+import type { PlanAhorro, Moneda, FormaDePago } from '@/types';
 
 interface FormState {
   detalle: string;
@@ -98,6 +99,11 @@ export function PlanesAhorroPage() {
   const [planEditando, setPlanEditando] = useState<PlanAhorro | null>(null);
   const [planParaCuotas, setPlanParaCuotas] = useState<PlanAhorro | null>(null);
   const [planParaMarcarPagado, setPlanParaMarcarPagado] = useState<PlanAhorro | null>(null);
+  const [planParaPagar, setPlanParaPagar] = useState<PlanAhorro | null>(null);
+  const [pagoFormaPago, setPagoFormaPago] = useState<FormaDePago>('TRANSFERENCIA BANCO');
+  const [pagoCuentaId, setPagoCuentaId] = useState<string>('');
+  const [pagoTarjetaId, setPagoTarjetaId] = useState<string>('');
+  const [pagoGuardando, setPagoGuardando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [form, setForm] = useState<FormState>(defaultForm());
 
@@ -233,6 +239,42 @@ export function PlanesAhorroPage() {
       setPlanParaMarcarPagado(null);
     } catch {
       toast.error('Error al marcar la cuota como pagada');
+    }
+  };
+
+  const handlePagarPlan = async () => {
+    if (!planParaPagar) return;
+    setPagoGuardando(true);
+    try {
+      const fechaActual = new Date(planParaPagar.fechaVencimiento + 'T12:00:00');
+      fechaActual.setMonth(fechaActual.getMonth() + 1);
+      const nuevaFechaVencimiento = fechaActual.toISOString().split('T')[0];
+
+      await finanzas.agregarGastoDiario({
+        descripcion: `Cuota plan de ahorro: ${planParaPagar.detalle}`,
+        monto: planParaPagar.importeCuota,
+        montoUSD: planParaPagar.moneda === 'USD' ? planParaPagar.importeCuota : undefined,
+        fecha: getFechaHoy(),
+        formaPago: pagoFormaPago,
+        cuentaId: pagoFormaPago !== 'TARJETA' ? (pagoCuentaId || undefined) : undefined,
+        tarjetaId: pagoFormaPago === 'TARJETA' ? (pagoTarjetaId || undefined) : undefined,
+        planId: planParaPagar.id,
+      });
+
+      await finanzas.actualizarPlanAhorro(planParaPagar.id, {
+        cuotasPagas: planParaPagar.cuotasPagas + 1,
+        fechaVencimiento: nuevaFechaVencimiento,
+      });
+
+      toast.success('Pago registrado correctamente');
+      setPlanParaPagar(null);
+      setPagoFormaPago('TRANSFERENCIA BANCO');
+      setPagoCuentaId('');
+      setPagoTarjetaId('');
+    } catch {
+      toast.error('Error al registrar el pago');
+    } finally {
+      setPagoGuardando(false);
     }
   };
 
@@ -423,33 +465,27 @@ export function PlanesAhorroPage() {
                   {plan.cuotasPagas === plan.cuotasTotales ? (
                     <CheckCircle2 className="w-7 h-7 text-green-500 shrink-0" strokeWidth={2.25} />
                   ) : (
-                    <a
-                      href={plan.linkPago || 'https://www.mercadopago.com.ar/servicios'}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPlanParaPagar(plan);
+                        setPagoFormaPago('TRANSFERENCIA BANCO');
+                        setPagoCuentaId('');
+                      }}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-black transition-all ${
                         proximo
                           ? 'bg-red-600 text-white hover:bg-red-700'
                           : 'bg-brand text-white hover:bg-brand/90'
                       }`}
-                      onClick={(e) => e.stopPropagation()}
                     >
                       PAGAR
-                      <ExternalLink className="w-4 h-4 shrink-0" strokeWidth={2.25} />
-                    </a>
+                      <Banknote className="w-4 h-4 shrink-0" strokeWidth={2.25} />
+                    </button>
                   )}
                 </div>
 
                 {/* Actions */}
                 <div className="flex justify-end gap-3 pt-3 border-t border-mist">
-                  <Button
-                    variant="outline"
-                    onClick={() => setPlanParaMarcarPagado(plan)}
-                    className="h-14 w-14 min-w-14 p-0 shrink-0 rounded-xl border-2 border-mist hover:border-green-200 hover:bg-green-50 [&_svg]:!size-8"
-                    title="Marcar cuota pagada"
-                  >
-                    <Check className="text-green-600" strokeWidth={2.5} />
-                  </Button>
                   <Button
                     variant="outline"
                     onClick={() => setPlanParaCuotas(plan)}
@@ -700,6 +736,120 @@ export function PlanesAhorroPage() {
               <Button onClick={handleGuardar} disabled={guardando}>
                 {guardando ? 'Guardando...' : planEditando ? 'Guardar Cambios' : 'Crear Plan'}
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pagar cuota modal */}
+      {planParaPagar && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden">
+            <div className="p-5 border-b border-mist flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-1.5 bg-green-600 rounded">
+                  <Banknote className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-ink">Registrar Pago</h2>
+                  <p className="text-xs text-slate2">{planParaPagar.detalle}</p>
+                </div>
+              </div>
+              <button onClick={() => setPlanParaPagar(null)} className="text-slate2 hover:text-ink">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Importe */}
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center justify-between">
+                <span className="text-sm font-bold text-green-800 uppercase tracking-wider">Cuota {planParaPagar.cuotasPagas + 1}</span>
+                <span className="text-xl font-black text-green-700">
+                  {formatearMoneda(planParaPagar.importeCuota, planParaPagar.moneda as Moneda)}
+                </span>
+              </div>
+
+              {/* Forma de pago como opciones con saldo */}
+              {(() => {
+                const FORMAS: { codigo: FormaDePago; nombre: string }[] = [
+                  { codigo: 'EFECTIVO', nombre: 'Efectivo' },
+                  { codigo: 'DEBITO', nombre: 'Débito' },
+                  { codigo: 'TRANSFERENCIA BANCO', nombre: 'Transferencia Banco' },
+                  { codigo: 'MERCADO_PAGO', nombre: 'Mercado Pago' },
+                  { codigo: 'TARJETA', nombre: 'Tarjeta de Crédito' },
+                ];
+                const formas = (finanzas.configuracion?.formasDePago ?? []).filter((f: { activa: boolean }) => f.activa).length > 0
+                  ? (finanzas.configuracion!.formasDePago.filter((f: { activa: boolean }) => f.activa).map((f: { codigo: string; nombre: string }) => ({ codigo: f.codigo as FormaDePago, nombre: f.nombre })))
+                  : FORMAS;
+
+                return (
+                  <div>
+                    <p className="text-xs font-bold text-slate2 uppercase tracking-wider mb-3">Forma de pago</p>
+                    <div className="space-y-2">
+                      {formas.map((f) => {
+                        const esTarjeta = f.codigo === 'TARJETA';
+                        const esMercadoPago = f.codigo === 'MERCADO_PAGO';
+                        let cuenta = null;
+                        let tarjeta = null;
+                        let saldoLabel = '';
+
+                        if (esTarjeta) {
+                          tarjeta = finanzas.tarjetas?.find((t) => {
+                            const n = (t.nombre ?? '').toLowerCase();
+                            return n.includes('santander') && (n.includes('río') || n.includes('rio'));
+                          });
+                          saldoLabel = tarjeta?.nombre ?? 'Santander Río';
+                        } else if (esMercadoPago) {
+                          cuenta = finanzas.cuentas
+                            .filter((c) => c.activa && c.moneda === 'ARS' && c.nombre.toLowerCase().includes('mercado'))
+                            .sort((a, b) => b.saldoActual - a.saldoActual)[0] ?? null;
+                          saldoLabel = cuenta ? formatearMoneda(cuenta.saldoActual) : '';
+                        } else {
+                          cuenta = finanzas.cuentas
+                            .filter((c) => c.activa && c.moneda === 'ARS' && !c.nombre.toLowerCase().includes('mercado'))
+                            .find((c) => f.codigo === 'EFECTIVO' ? c.tipo === 'EFECTIVO' : c.tipo !== 'EFECTIVO') ?? null;
+                          saldoLabel = cuenta ? formatearMoneda(cuenta.saldoActual) : '';
+                        }
+
+                        const isSelected = pagoFormaPago === f.codigo;
+                        return (
+                          <button
+                            key={f.codigo}
+                            type="button"
+                            onClick={() => {
+                              setPagoFormaPago(f.codigo);
+                              if (esTarjeta && tarjeta) setPagoTarjetaId(tarjeta.id);
+                              else if (!esTarjeta && cuenta) setPagoCuentaId(cuenta.id);
+                            }}
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                              isSelected ? 'border-green-500 bg-green-50' : 'border-mist bg-white hover:border-slate2/40'
+                            }`}
+                          >
+                            <span className={`text-sm font-bold ${isSelected ? 'text-green-700' : 'text-ink'}`}>{f.nombre}</span>
+                            {saldoLabel && (
+                              <span className={`text-xs font-semibold ${isSelected ? 'text-green-600' : 'text-slate2'}`}>{saldoLabel}</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" onClick={() => setPlanParaPagar(null)} className="flex-1">
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handlePagarPlan}
+                  disabled={pagoGuardando}
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                >
+                  {pagoGuardando ? 'Guardando...' : 'Confirmar Pago'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

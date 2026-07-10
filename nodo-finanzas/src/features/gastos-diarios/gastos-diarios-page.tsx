@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from 'react';
-import { Search, Plus, Edit, Trash2, Receipt, X, Mic, MicOff, Loader2, Copy, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Receipt, X, Mic, MicOff, Loader2, Copy, ChevronUp, ChevronDown, ChevronsUpDown, BarChart2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useOpenSettings } from '@/shared/hooks/use-open-settings';
 import { foldForSearch } from '@nodocore/shared-components';
@@ -132,6 +132,7 @@ export function GastosDiariosPage() {
     return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
   });
   const [busqueda, setBusqueda] = useState('');
+  const [resumenAbierto, setResumenAbierto] = useState(false);
   const [rubroFiltro, setRubroFiltro] = useState<string | null>(null);
   const [gastoAEliminar, setGastoAEliminar] = useState<GastoDiario | null>(null);
   const [eliminando, setEliminando] = useState(false);
@@ -315,40 +316,55 @@ export function GastosDiariosPage() {
 
       {/* Summary cards */}
       {gastosFiltrados.length > 0 && (
-        <div className="flex flex-wrap gap-3">
-          {/* Total principal */}
-          <Card className="border-red-100 min-w-[160px] md:min-w-[200px] flex-shrink-0">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">
-              {esMesActual ? 'Total hasta hoy' : 'Total del mes'}
-            </p>
-            <p className="text-lg font-black text-ink mt-1 leading-tight">
-              {formatearMoneda(totalHastaHoy)}
-            </p>
-            {esMesActual && totalMes !== totalHastaHoy && (
-              <p className="text-[10px] text-slate2 mt-0.5">
-                Mes completo: {formatearMoneda(totalMes)}
-              </p>
-            )}
-            {totalUSD > 0 && (
-              <p className="text-[10px] text-slate2 mt-0.5">{formatearMoneda(totalUSD, 'USD')}</p>
-            )}
-          </Card>
+        <>
+          {/* Mobile toggle */}
+          <button
+            type="button"
+            onClick={() => setResumenAbierto((v) => !v)}
+            className="md:hidden w-full flex items-center justify-between bg-white border border-mist rounded-xl px-4 py-3 text-sm font-semibold text-ink shadow-sm"
+          >
+            <span className="flex items-center gap-2">
+              <BarChart2 className="h-4 w-4 text-slate2" />
+              Resumen — {formatearMoneda(totalHastaHoy)}
+            </span>
+            <ChevronDown className={`h-4 w-4 text-slate2 transition-transform ${resumenAbierto ? 'rotate-180' : ''}`} />
+          </button>
 
-          {/* Breakdown por cuenta / forma de pago */}
-          {resumenPorCuenta.map(({ label, total, pillClass }) => (
-            <Card key={label} className="min-w-[140px] md:min-w-[190px] flex-shrink-0">
-              <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mb-2 ${pillClass}`}>
-                {label}
-              </span>
-              <p className="text-base font-black text-ink leading-tight">
-                {formatearMoneda(total)}
+          <div className={`flex flex-wrap gap-3 ${resumenAbierto ? '' : 'hidden md:flex'}`}>
+            {/* Total principal */}
+            <Card className="border-red-100 min-w-[160px] md:min-w-[200px] flex-shrink-0">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate2">
+                {esMesActual ? 'Total hasta hoy' : 'Total del mes'}
               </p>
-              <p className="text-[10px] text-slate2 mt-0.5">
-                {((total / totalMes) * 100).toFixed(0)}% del mes
+              <p className="text-lg font-black text-ink mt-1 leading-tight">
+                {formatearMoneda(totalHastaHoy)}
               </p>
+              {esMesActual && totalMes !== totalHastaHoy && (
+                <p className="text-[10px] text-slate2 mt-0.5">
+                  Mes completo: {formatearMoneda(totalMes)}
+                </p>
+              )}
+              {totalUSD > 0 && (
+                <p className="text-[10px] text-slate2 mt-0.5">{formatearMoneda(totalUSD, 'USD')}</p>
+              )}
             </Card>
-          ))}
-        </div>
+
+            {/* Breakdown por cuenta / forma de pago */}
+            {resumenPorCuenta.map(({ label, total, pillClass }) => (
+              <Card key={label} className="min-w-[140px] md:min-w-[190px] flex-shrink-0">
+                <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mb-2 ${pillClass}`}>
+                  {label}
+                </span>
+                <p className="text-base font-black text-ink leading-tight">
+                  {formatearMoneda(total)}
+                </p>
+                <p className="text-[10px] text-slate2 mt-0.5">
+                  {((total / totalMes) * 100).toFixed(0)}% del mes
+                </p>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Filters */}
@@ -397,7 +413,7 @@ export function GastosDiariosPage() {
               voiceState === 'listening' ? 'Escuchando… hacé clic para detener' :
               voiceState === 'extracting' ? 'Procesando con IA…' :
               !hasApiKey ? 'Configurá tu API key en Configuración → Integraciones IA' :
-              'Cargá tu gasto por voz'
+              'Cargar por voz'
             }
             className={`shrink-0 whitespace-nowrap ${voiceState === 'listening' ? 'animate-pulse !bg-red-500 !border-red-500 hover:!bg-red-600' : ''}`}
           >
@@ -410,7 +426,7 @@ export function GastosDiariosPage() {
             )}
             {voiceState === 'listening' ? 'Escuchando…' :
              voiceState === 'extracting' ? 'Procesando…' :
-             'Cargá tu gasto por voz'}
+             'Cargar por voz'}
           </Button>
 
           {voiceState === 'listening' && (

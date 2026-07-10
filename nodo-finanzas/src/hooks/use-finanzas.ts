@@ -810,6 +810,16 @@ export const useFinanzas = () => {
                 });
               }
 
+              // Link opId back to the payment gastoDiario so eliminarGastoDiario can clean up these consumos
+              await FinanzasService.actualizarGastoDiario(nuevoGasto.id, { codigoOperacion: opId });
+              nuevoGasto.codigoOperacion = opId;
+              syncEstado(prev => ({
+                ...prev,
+                gastosDiarios: prev.gastosDiarios.map(gd =>
+                  gd.id === nuevoGasto.id ? { ...gd, codigoOperacion: opId } : gd
+                )
+              }));
+
               console.log(`[useFinanzas] Cargos por financiación creados para ${proxMesStr}`);
               await recargarConsumosTarjetas();
             }

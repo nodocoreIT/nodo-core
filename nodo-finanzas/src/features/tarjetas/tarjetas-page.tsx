@@ -2,13 +2,14 @@ import { useState } from 'react';
 import {
   CreditCard,
   Plus,
-  Eye,
+  Banknote,
   Receipt,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
   AlertTriangle,
   Calendar,
+  Undo2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import { useFinanzas } from '@/hooks/use-finanzas';
 import { getFechaHoy } from '@/utils/formatters';
 import { ResumenTarjetas } from './resumen-tarjetas';
 import { RegistroConsumo } from './registro-consumo';
+import { ModalPagarTarjeta } from './modal-pagar-tarjeta';
 import type { Tarjeta, RubroConsumo } from '@/types';
 
 type Vista = 'resumen' | 'registro';
@@ -28,6 +30,11 @@ export function TarjetasPage() {
   const [vista, setVista] = useState<Vista>('resumen');
   const [tarjetaParaRegistro, setTarjetaParaRegistro] = useState<Tarjeta | null>(null);
   const [filtroMes, setFiltroMes] = useState(getFechaHoy().slice(0, 7));
+  const [tarjetaParaPago, setTarjetaParaPago] = useState<{
+    tarjeta: Tarjeta;
+    totalARS: number;
+    totalUSD: number;
+  } | null>(null);
 
   const cambiarMes = (incremento: number) => {
     const [anio, mes] = filtroMes.split('-').map(Number);
@@ -199,15 +206,47 @@ export function TarjetasPage() {
               >
                 {/* Status banner */}
                 {resumen.pagada && (
-                  <div className="bg-green-600 text-white px-5 py-2 -mx-5 -mt-5 mb-4 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span className="text-xs font-bold uppercase tracking-widest">Tarjeta Pagada</span>
+                  <div className="bg-green-600 text-white px-5 py-2 -mx-5 -mt-5 mb-4 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span className="text-xs font-bold uppercase tracking-widest">Tarjeta Pagada</span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const gastoPago = finanzas.gastosDiarios.find(
+                          g => g.pagoTarjetaId === resumen.tarjeta.id && g.fecha.startsWith(filtroMes)
+                        );
+                        if (gastoPago) finanzas.eliminarGastoDiario(gastoPago.id).then(() => finanzas.recargarDatos(true));
+                      }}
+                      className="flex items-center gap-1 text-xs text-white/80 hover:text-white transition-colors"
+                      title="Deshacer pago"
+                    >
+                      <Undo2 className="w-3.5 h-3.5" />
+                      Deshacer
+                    </button>
                   </div>
                 )}
                 {resumen.pagoParcial && (
-                  <div className="bg-orange-500 text-white px-5 py-2 -mx-5 -mt-5 mb-4 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4" />
-                    <span className="text-xs font-bold uppercase tracking-widest">Pago Parcial</span>
+                  <div className="bg-orange-500 text-white px-5 py-2 -mx-5 -mt-5 mb-4 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span className="text-xs font-bold uppercase tracking-widest">Pago Parcial</span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const gastoPago = finanzas.gastosDiarios.find(
+                          g => g.pagoTarjetaId === resumen.tarjeta.id && g.fecha.startsWith(filtroMes)
+                        );
+                        if (gastoPago) finanzas.eliminarGastoDiario(gastoPago.id).then(() => finanzas.recargarDatos(true));
+                      }}
+                      className="flex items-center gap-1 text-xs text-white/80 hover:text-white transition-colors"
+                      title="Deshacer pago"
+                    >
+                      <Undo2 className="w-3.5 h-3.5" />
+                      Deshacer
+                    </button>
                   </div>
                 )}
 
@@ -303,13 +342,18 @@ export function TarjetasPage() {
                     variant="outline"
                     size="sm"
                     className="flex-1"
+                    disabled={resumen.pagada}
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate(`/admin/tarjetas/${resumen.tarjeta.id}`);
+                      setTarjetaParaPago({
+                        tarjeta: resumen.tarjeta,
+                        totalARS: resumen.restanteARS,
+                        totalUSD: resumen.restanteUSD ?? resumen.totalUSD,
+                      });
                     }}
                   >
-                    <Eye className="w-4 h-4" />
-                    Historial
+                    <Banknote className="w-4 h-4" />
+                    {resumen.pagada ? 'Pagada' : 'Pagar'}
                   </Button>
                   <Button
                     size="sm"
@@ -329,6 +373,31 @@ export function TarjetasPage() {
           </div>
         )}
       </div>
+
+      {/* Modal pago tarjeta */}
+      {tarjetaParaPago && (
+        <ModalPagarTarjeta
+          open={true}
+          tarjeta={tarjetaParaPago.tarjeta}
+          totalARS={tarjetaParaPago.totalARS}
+          totalUSD={tarjetaParaPago.totalUSD}
+          filtroMes={filtroMes}
+          onClose={() => setTarjetaParaPago(null)}
+          onConfirm={async ({ montoARS, montoUSD, esParcial }) => {
+            await finanzas.agregarGastoDiario({
+              descripcion: `Pago tarjeta ${tarjetaParaPago.tarjeta.nombre}`,
+              detalle: `Pago ${esParcial ? 'parcial' : 'total'} — ${formatearMesLabel(filtroMes)}`,
+              monto: montoARS,
+              montoUSD: montoUSD > 0 ? montoUSD : undefined,
+              fecha: getFechaHoy(),
+              formaPago: 'TRANSFERENCIA BANCO',
+              pagoTarjetaId: tarjetaParaPago.tarjeta.id,
+              pagoParcial: esParcial,
+            });
+            await finanzas.recargarDatos(true);
+          }}
+        />
+      )}
     </div>
   );
 }
