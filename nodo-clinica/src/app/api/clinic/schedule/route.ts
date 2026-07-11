@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
-  const { user } = authResult;
+  const { user, supabase } = authResult;
 
   if (!DOCTOR_ROLES.has(user.role)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });

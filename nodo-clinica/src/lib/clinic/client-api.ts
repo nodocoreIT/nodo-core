@@ -1084,6 +1084,20 @@ export const clinicApi = {
     return data as { count: number; cobrosCount: number };
   },
 
+  async getMercadoPagoOAuthConfig() {
+    const res = await fetch(
+      `${BASE}/api/clinic/mercadopago/oauth/config`,
+      clinicFetchOpts(),
+    );
+    const data = await res.json();
+    return data as {
+      configured: boolean;
+      redirectUri?: string;
+      clientId?: string;
+      error?: string;
+    };
+  },
+
   async markCobrosNotificationsRead() {
     const res = await fetch(`${BASE}/api/clinic/notifications`, {
       method: "PATCH",
