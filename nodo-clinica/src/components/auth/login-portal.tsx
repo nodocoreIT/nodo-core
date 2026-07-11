@@ -241,7 +241,7 @@ export function LoginPortal() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setGeneralError("");
-    if (!form.fullName.trim() || !form.email.trim() || !form.password) {
+    if (!form.fullName.trim() || !form.email.trim()) {
       setGeneralError("Completá todos los campos obligatorios");
       return;
     }
