@@ -1,10 +1,10 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { jsonWithSession } from "@/lib/clinic/session";
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    const { email, password, role: requestedRole } = await request.json();
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email y contraseña requeridos" }, { status: 400 });
@@ -22,12 +22,11 @@ export async function POST(request: NextRequest) {
     const fullName: string =
       data.user.user_metadata?.full_name ?? data.user.email?.split("@")[0] ?? "";
 
-    // Map platform roles to the two clinic session roles
-    const sessionRole: "doctor" | "patient" = ["super_admin", "admin", "medico", "agent"].includes(
-      rawRole,
-    )
-      ? "doctor"
-      : "patient";
+    // If the client explicitly requests the patient portal, honour it.
+    // For doctor portal requests, only privileged accounts get the doctor role.
+    const isPrivileged = ["super_admin", "admin", "medico", "agent"].includes(rawRole);
+    const sessionRole: "doctor" | "patient" =
+      requestedRole === "patient" ? "patient" : isPrivileged ? "doctor" : "patient";
 
     // Use jsonWithSession so the ClinicSession cookie is set directly on the
     // response object (response.cookies.set), which is the only reliable way

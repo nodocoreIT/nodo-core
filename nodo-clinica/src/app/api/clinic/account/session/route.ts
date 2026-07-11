@@ -3,8 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getSession, clearSessionResponse } from "@/lib/clinic/session";
 
 export async function GET(): Promise<NextResponse> {
-  const supabase = await createClient();
+  // Resolve ClinicSession cookie once — used for role preference and as fallback.
+  const clinicSession = await getSession();
 
+  const supabase = await createClient();
   const {
     data: { user },
     error,
@@ -14,15 +16,16 @@ export async function GET(): Promise<NextResponse> {
     const appMeta = user.app_metadata ?? {};
     const userMeta = user.user_metadata ?? {};
     const rawRole: string = appMeta.role ?? "patient";
-    const sessionRole: "doctor" | "patient" = [
-      "super_admin",
-      "admin",
-      "medico",
-      "agent",
-    ].includes(rawRole)
-      ? "doctor"
-      : "patient";
+    const isPrivileged = ["super_admin", "admin", "medico", "agent"].includes(rawRole);
+    const appRole: "doctor" | "patient" = isPrivileged ? "doctor" : "patient";
     const fullName: string = userMeta.full_name ?? userMeta.name ?? user.email ?? "";
+
+    // Prefer the role recorded in the ClinicSession cookie (set at login time).
+    // This preserves the portal the user chose (e.g. patient portal for an admin).
+    // The cookie userId may be professionals.id (≠ auth uid) for doctors; in that
+    // case the comparison is false and we fall back to the app_metadata role.
+    const sessionRole: "doctor" | "patient" =
+      clinicSession?.userId === user.id ? clinicSession.role : appRole;
 
     return NextResponse.json({
       session: {
@@ -34,15 +37,14 @@ export async function GET(): Promise<NextResponse> {
       user: {
         id: user.id,
         email: user.email,
-        fullName,
+        fullName: clinicSession?.fullName ?? fullName,
         role: sessionRole,
         org_id: appMeta.org_id ?? null,
       },
     });
   }
 
-  // Fallback: check ClinicSession JWT cookie (set by login/platform-sync)
-  const clinicSession = await getSession();
+  // Fallback: ClinicSession JWT cookie (set by login / platform-sync routes).
   if (clinicSession) {
     return NextResponse.json({
       session: {

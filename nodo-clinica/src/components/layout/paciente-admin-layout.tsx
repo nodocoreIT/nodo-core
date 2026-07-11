@@ -80,7 +80,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
         const { session, user } = await clinicApi.getSession();
         if (!session || session.role !== "patient" || !user?.id) {
           router.replace("/login/paciente");
-          return;
+          return; // keep spinner while navigating — don't call setChecking(false)
         }
         setPatient({
           id: user.id,
@@ -88,11 +88,10 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
           email: user.email ?? session.email,
           profilePhotoData: user.profilePhotoData,
         });
+        setChecking(false);
       } catch {
         router.replace("/login/paciente");
-        return;
-      } finally {
-        setChecking(false);
+        // keep spinner while navigating — don't call setChecking(false)
       }
     }
     void check();
