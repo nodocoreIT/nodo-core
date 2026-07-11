@@ -1,7 +1,5 @@
 import "server-only";
-import fs from "fs";
 import nodemailer from "nodemailer";
-import path from "path";
 
 const HOST = process.env.ZOHO_SMTP_HOST ?? "smtp.zoho.com";
 const PORT = Number(process.env.ZOHO_SMTP_PORT ?? 465);
@@ -12,19 +10,23 @@ export function isMailConfigured(): boolean {
   return Boolean(USER && PASS);
 }
 
-function clinicLogoAttachment(): nodemailer.SendMailOptions["attachments"] {
-  const logoPath = path.join(
-    process.cwd(),
-    "public/logos/nodo ver clinica.png",
-  );
-  if (!fs.existsSync(logoPath)) return [];
-  return [
-    {
-      filename: "nodo_clinica.png",
-      path: logoPath,
-      cid: "nodoclinica_logo",
-    },
-  ];
+/**
+ * Resolve the public-facing origin for email links.
+ * If the request origin looks like localhost/0.0.0.0, fall back to
+ * NEXT_PUBLIC_BASE_URL so emails always contain the production URL.
+ */
+function resolveOrigin(requestOrigin: string): string {
+  const isLocal =
+    !requestOrigin ||
+    requestOrigin.includes("localhost") ||
+    requestOrigin.includes("0.0.0.0") ||
+    requestOrigin.includes("127.0.0.1");
+
+  if (isLocal && process.env.NEXT_PUBLIC_BASE_URL) {
+    return process.env.NEXT_PUBLIC_BASE_URL.replace(/\/$/, "");
+  }
+
+  return requestOrigin;
 }
 
 export async function sendClinicVerificationEmail(params: {
@@ -39,9 +41,11 @@ export async function sendClinicVerificationEmail(params: {
     );
   }
 
-  const { email, role, token, origin } = params;
+  const { email, role, token } = params;
+  const origin = resolveOrigin(params.origin);
   const verificationUrl = `${origin}/api/clinic/account/verify?token=${token}&role=${role}`;
   const roleLabel = role === "medico" ? "médico" : "paciente";
+  const logoUrl = `${origin}/logos/nodo%20ver%20clinica.png`;
 
   const transporter = nodemailer.createTransport({
     host: HOST,
@@ -54,7 +58,6 @@ export async function sendClinicVerificationEmail(params: {
     from: `"Nodo Clínica" <${USER}>`,
     to: email,
     subject: "Verificá tu cuenta en NODO | Clínica Virtual",
-    attachments: clinicLogoAttachment(),
     text: [
       `Hola,`,
       ``,
@@ -72,7 +75,7 @@ export async function sendClinicVerificationEmail(params: {
         <!-- Header -->
         <div style="background-color:#0D9488;padding:28px 32px;text-align:center;">
           <img
-            src="cid:nodoclinica_logo"
+            src="${logoUrl}"
             alt="NODO Clínica"
             style="height:32px;width:auto;display:inline-block;"
           />
