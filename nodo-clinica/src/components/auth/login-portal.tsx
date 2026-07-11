@@ -185,6 +185,7 @@ import {
   isPlatformMode,
 } from "@/lib/clinic/platform-config";
 import { PlatformMedicoLoginFields } from "@/components/auth/platform-medico-login";
+import { SpecialtyCombobox } from "@/components/ui/specialty-combobox";
 
 type Role = "doctor" | "patient";
 type AuthMode = "login" | "register";
@@ -597,11 +598,9 @@ export function LoginPortal() {
                   <>
                     <div className="mb-3">
                       <label className="block text-[13px] font-semibold text-navy mb-1.5">Especialidad</label>
-                      <input
-                        type="text"
+                      <SpecialtyCombobox
                         value={form.specialty}
-                        onChange={(e) => setForm({ ...form, specialty: e.target.value })}
-                        className={`${inputBase} ${inputNormal} ${inputFocus}`}
+                        onChange={(val) => setForm({ ...form, specialty: val })}
                       />
                     </div>
                     <div className="mb-4">
