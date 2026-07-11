@@ -178,14 +178,12 @@ function NodeTransitionOverlay({ isDoctor }: { isDoctor: boolean }) {
   );
 }
 import { clinicApi } from "@/lib/clinic/client-api";
-import { DEMO_CREDENTIALS } from "@/lib/clinic/config";
 import {
   CLINICA_REGISTRATION_URL,
   isOpenRegistrationAllowed,
   isPlatformMode,
 } from "@/lib/clinic/platform-config";
 import { PlatformMedicoLoginFields } from "@/components/auth/platform-medico-login";
-import { SpecialtyCombobox } from "@/components/ui/specialty-combobox";
 
 type Role = "doctor" | "patient";
 type AuthMode = "login" | "register";
@@ -199,23 +197,18 @@ export function LoginPortal() {
   const [showTransition, setShowTransition] = useState(false);
 
   const isDoctor = role === "doctor";
-  const demo = isDoctor ? DEMO_CREDENTIALS.doctor : DEMO_CREDENTIALS.patient;
   const platformDoctor = isDoctor && isPlatformMode();
   const showRegister = isOpenRegistrationAllowed() && !platformDoctor;
 
   const [form, setForm] = useState({
-    email: demo.email,
-    password: demo.password,
+    email: "",
+    password: "",
     fullName: "",
-    specialty: "Medicina General",
-    licenseNumber: "",
   });
 
   const handleRoleChange = (newRole: Role) => {
-    const newDemo = newRole === "doctor" ? DEMO_CREDENTIALS.doctor : DEMO_CREDENTIALS.patient;
     setRole(newRole);
     setGeneralError("");
-    setForm((f) => ({ ...f, email: newDemo.email, password: newDemo.password }));
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -535,11 +528,17 @@ export function LoginPortal() {
                     </div>
                   </div>
 
-                  <div className="flex items-center mb-5">
+                  <div className="flex items-center justify-between mb-5">
                     <label className="flex items-center gap-2 text-[13px] text-slate2 cursor-pointer">
                       <input type="checkbox" defaultChecked className="accent-brand" />
                       Mantener sesión iniciada
                     </label>
+                    <a
+                      href="/recuperar-contrasena"
+                      className="text-[13px] text-brand hover:underline"
+                    >
+                      ¿Olvidó su contraseña?
+                    </a>
                   </div>
 
                   {generalError && (
@@ -554,9 +553,6 @@ export function LoginPortal() {
                     {loading ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : "Ingresar al portal"}
                   </button>
 
-                  <p className="text-xs text-center text-slate2 mt-4">
-                    Demojjj: {demo.email} / {demo.password}
-                  </p>
                 </form>
               )
             )}
@@ -584,37 +580,6 @@ export function LoginPortal() {
                     className={`${inputBase} ${inputNormal} ${inputFocus}`}
                   />
                 </div>
-                <div className="mb-3">
-                  <label className="block text-[13px] font-semibold text-navy mb-1.5">Contraseña</label>
-                  <input
-                    type="password"
-                    placeholder="Mínimo 6 caracteres"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    className={`${inputBase} ${inputNormal} ${inputFocus}`}
-                  />
-                </div>
-                {isDoctor && (
-                  <>
-                    <div className="mb-3">
-                      <label className="block text-[13px] font-semibold text-navy mb-1.5">Especialidad</label>
-                      <SpecialtyCombobox
-                        value={form.specialty}
-                        onChange={(val) => setForm({ ...form, specialty: val })}
-                      />
-                    </div>
-                    <div className="mb-4">
-                      <label className="block text-[13px] font-semibold text-navy mb-1.5">Matrícula</label>
-                      <input
-                        type="text"
-                        placeholder="MN 12345"
-                        value={form.licenseNumber}
-                        onChange={(e) => setForm({ ...form, licenseNumber: e.target.value })}
-                        className={`${inputBase} ${inputNormal} ${inputFocus}`}
-                      />
-                    </div>
-                  </>
-                )}
                 {generalError && (
                   <p className="text-[13px] text-[#C0392B] mb-4 text-center">{generalError}</p>
                 )}
