@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
   ClipboardList,
+  DatabaseBackup,
   KeyRound,
   Layers,
   LayoutDashboard,
@@ -55,6 +56,7 @@ const PLATFORM_ITEMS: NavItem[] = [
   { label: "Equipo", href: "/panel/equipo", icon: UsersRound },
   { label: "Bóveda de contraseñas", href: "/panel/passwords", icon: KeyRound },
   { label: "Invitaciones", href: "/panel/invitaciones", icon: Mail },
+  { label: "Backups", href: "/panel/backups", icon: DatabaseBackup },
 ];
 
 const ECOSYSTEM_ITEMS: NavItem[] = [
