@@ -5,6 +5,20 @@ import type { MedicationSearchResponse } from "@/lib/clinic/medication-catalog";
 const BASE = "";
 const SESSION_KEY = "clinica_local_session";
 
+// ── Browser Supabase client (lazy-loaded, client-only) ────────────────────
+
+let _supabasePromise: Promise<ReturnType<typeof import("@/lib/supabase/client").createClient>> | null = null;
+
+function getBrowserSupabase() {
+  if (typeof window === "undefined") return null;
+  if (!_supabasePromise) {
+    _supabasePromise = import("@/lib/supabase/client").then((m) => m.createClient());
+  }
+  return _supabasePromise;
+}
+
+// ── Session helpers (sessionStorage — backwards-compat) ───────────────────
+
 export function saveClientSession(session: ClinicSession) {
   if (typeof window === "undefined") return;
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
@@ -26,6 +40,8 @@ export function clearClientSession() {
   sessionStorage.removeItem(SESSION_KEY);
 }
 
+// ── Fetch helpers ─────────────────────────────────────────────────────────
+
 function clinicFetchOpts(): RequestInit {
   return {
     credentials: "include",
@@ -42,34 +58,127 @@ function parseJsonResponse(res: Response) {
   return res.json();
 }
 
+// ── Role helpers ──────────────────────────────────────────────────────────
+
+const PRIVILEGED_ROLES = ["super_admin", "admin", "medico", "agent"];
+
+function mapSessionRole(appMetadataRole: string | null | undefined): "doctor" | "patient" {
+  return PRIVILEGED_ROLES.includes(appMetadataRole ?? "") ? "doctor" : "patient";
+}
+
+// ── Public API ────────────────────────────────────────────────────────────
+
 export const clinicApi = {
+  /**
+   * Returns the current session.
+   *
+   * Primary: browser Supabase client (reads from cookies/localStorage — same
+   *          pattern as nodo-inmo / nodo-autos / nodo-finanzas).
+   * Fallback: HTTP API (clinica_session JWT cookie for platform-sync logins).
+   */
   async getSession() {
+    // 1. Try browser Supabase client (fast, no round-trip)
+    const client = getBrowserSupabase();
+    if (client) {
+      try {
+        const supabase = await client;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const appMeta = session.user.app_metadata ?? {};
+          const userMeta = session.user.user_metadata ?? {};
+          const sessionRole = mapSessionRole(appMeta.role);
+          const fullName: string =
+            userMeta.full_name ?? userMeta.name ?? session.user.email ?? "";
+          return {
+            session: {
+              userId: session.user.id,
+              email: session.user.email,
+              role: sessionRole,
+              org_id: appMeta.org_id ?? null,
+            },
+            user: {
+              id: session.user.id,
+              email: session.user.email,
+              fullName,
+              role: sessionRole,
+              subscriptionPlan: appMeta.plan ?? appMeta.subscription_plan ?? undefined,
+              org_id: appMeta.org_id ?? null,
+            },
+          };
+        }
+      } catch {
+        /* fall through to HTTP */
+      }
+    }
+
+    // 2. Fallback: HTTP API
     const res = await fetch(`${BASE}/api/clinic/account/session`, {
       credentials: "include",
     });
     return parseJsonResponse(res);
   },
 
+  /**
+   * Sign in via the browser Supabase client (sets cookies in document.cookie
+   * so both browser reads and server API calls work).
+   *
+   * This matches how nodo-inmo / nodo-autos / nodo-finanzas handle login.
+   */
   async login(email: string, password: string, role: "doctor" | "patient") {
+    const client = getBrowserSupabase();
+    if (client) {
+      const supabase = await client;
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw new Error(error.message || "Credenciales incorrectas");
+      if (!data.user) throw new Error("Credenciales incorrectas");
+
+      const appMeta = data.user.app_metadata ?? {};
+      const userMeta = data.user.user_metadata ?? {};
+      const fullName: string =
+        userMeta.full_name ?? data.user.email?.split("@")[0] ?? "";
+      const sessionRole = mapSessionRole(appMeta.role);
+
+      // Backwards-compat: save to sessionStorage for components that still use it
+      saveClientSession({
+        userId: data.user.id,
+        role: role === "patient" ? "patient" : sessionRole,
+        email: data.user.email ?? "",
+        fullName,
+      });
+
+      return {
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+          fullName,
+          role: sessionRole,
+          org_id: appMeta.org_id ?? null,
+        },
+        role: sessionRole,
+      };
+    }
+
+    // Fallback: server-side login (shouldn't happen in browser)
     const res = await fetch(`${BASE}/api/clinic/account/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ email, password, role }),
     });
-    const data = await parseJsonResponse(res);
-    if (!res.ok) throw new Error(data.error || "Error de login");
-    if (data.session) {
-      saveClientSession(data.session);
-    } else if (data.user?.id && data.role) {
+    const respData = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(respData.error || "Error de login");
+    if (respData.user?.id) {
       saveClientSession({
-        userId: data.user.id,
-        role: data.role,
-        email: data.user.email,
-        fullName: data.user.fullName,
+        userId: respData.user.id,
+        role: respData.role ?? role,
+        email: respData.user.email,
+        fullName: respData.user.fullName,
       });
     }
-    return data;
+    return respData;
   },
 
   async register(payload: Record<string, unknown>) {
@@ -81,12 +190,39 @@ export const clinicApi = {
     });
     const data = await parseJsonResponse(res);
     if (!res.ok) throw new Error(data.error || "Error de registro");
+
+    // After server-side registration, sign in on the browser client so
+    // cookies are set for subsequent requests.
+    const client = getBrowserSupabase();
+    if (client && payload.email && payload.password) {
+      try {
+        const supabase = await client;
+        await supabase.auth.signInWithPassword({
+          email: payload.email as string,
+          password: payload.password as string,
+        });
+      } catch {
+        /* registration succeeded, login can be retried */
+      }
+    }
+
     if (data.session) saveClientSession(data.session);
     return data;
   },
 
   async logout() {
     clearClientSession();
+    // Sign out from browser Supabase client (clears cookies)
+    const client = getBrowserSupabase();
+    if (client) {
+      try {
+        const supabase = await client;
+        await supabase.auth.signOut();
+      } catch {
+        /* best-effort */
+      }
+    }
+    // Also clear server-side session
     await fetch(`${BASE}/api/clinic/account/session`, {
       method: "POST",
       credentials: "include",
