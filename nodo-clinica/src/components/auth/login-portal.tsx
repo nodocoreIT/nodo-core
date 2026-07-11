@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Stethoscope, User, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Stethoscope, User, Eye, EyeOff, Loader2, KeyRound, MailCheck } from "lucide-react";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
 
 function NodeTransitionOverlay({ isDoctor }: { isDoctor: boolean }) {
   return (
@@ -186,7 +187,7 @@ import {
 import { PlatformMedicoLoginFields } from "@/components/auth/platform-medico-login";
 
 type Role = "doctor" | "patient";
-type AuthMode = "login" | "register";
+type AuthMode = "login" | "register" | "forgot";
 
 export function LoginPortal() {
   const [role, setRole] = useState<Role>("doctor");
@@ -195,6 +196,8 @@ export function LoginPortal() {
   const [loading, setLoading] = useState(false);
   const [generalError, setGeneralError] = useState("");
   const [showTransition, setShowTransition] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [recoverySent, setRecoverySent] = useState(false);
 
   const isDoctor = role === "doctor";
   const platformDoctor = isDoctor && isPlatformMode();
@@ -267,11 +270,31 @@ export function LoginPortal() {
     }
   };
 
+  const handleRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGeneralError("");
+    if (!recoveryEmail.trim()) return;
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        recoveryEmail.trim(),
+        { redirectTo: `${window.location.origin}/actualizar-contrasena` }
+      );
+      if (resetError) throw resetError;
+      setRecoverySent(true);
+    } catch (err) {
+      setGeneralError(err instanceof Error ? err.message : "Error al enviar el correo");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const inputBase =
     "w-full text-[15px] py-[11px] px-[14px] rounded-md bg-white border transition-all duration-150 outline-none";
   const inputNormal = "border-mist text-ink";
   const inputFocus =
-    "focus:border-brand focus:shadow-[0_0_0_4px_rgba(218,90,14,.16)]";
+    "focus:border-brand focus:shadow-[0_0_0_4px_rgba(13,148,136,.16)]";
 
   return (
     <>
@@ -299,8 +322,8 @@ export function LoginPortal() {
           <div className="relative z-[1]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logos/logo compuesto estrella az letra blancazzz.png"
-              alt="NODO"
+              src="/logos/nodo ver clinica.png"
+              alt="NODO Clínica"
               style={{ height: "30px", width: "auto" }}
             />
           </div>
@@ -533,12 +556,13 @@ export function LoginPortal() {
                       <input type="checkbox" defaultChecked className="accent-brand" />
                       Mantener sesión iniciada
                     </label>
-                    <a
-                      href="/recuperar-contrasena"
-                      className="text-[13px] font-semibold text-brand hover:underline"
+                    <button
+                      type="button"
+                      onClick={() => { setAuthMode("forgot"); setGeneralError(""); setRecoverySent(false); }}
+                      className="text-[13px] font-semibold text-brand hover:underline bg-transparent border-none cursor-pointer p-0"
                     >
                       ¿Olvidó su contraseña?
-                    </a>
+                    </button>
                   </div>
 
                   {generalError && (
@@ -616,6 +640,77 @@ export function LoginPortal() {
                   Ir a registrarme
                 </a>
               </div>
+            )}
+
+            {/* Forgot password panel */}
+            {authMode === "forgot" && (
+              recoverySent ? (
+                <div className="flex flex-col items-center gap-4 py-8 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-100">
+                    <MailCheck className="h-7 w-7 text-brand" />
+                  </div>
+                  <h3 className="font-display font-bold text-ink text-[22px]">Revisá tu correo</h3>
+                  <p className="text-slate2 text-[14px] max-w-xs">
+                    Te enviamos un enlace de recuperación a{" "}
+                    <span className="font-semibold text-ink">{recoveryEmail}</span>.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => { setAuthMode("login"); setRecoverySent(false); setRecoveryEmail(""); }}
+                    className="text-[13px] font-semibold text-brand hover:underline bg-transparent border-none cursor-pointer p-0 mt-2"
+                  >
+                    Volver al inicio de sesión
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleRecovery} noValidate>
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <KeyRound className="h-3.5 w-3.5 text-brand" />
+                    <span className="text-[11px] font-bold tracking-widest uppercase text-brand">
+                      Recuperar contraseña
+                    </span>
+                  </div>
+                  <h2 className="font-display font-bold text-ink text-[24px] leading-tight mb-2">
+                    ¿Olvidaste tu contraseña?
+                  </h2>
+                  <p className="text-slate2 text-[14px] mb-5">
+                    Ingresá tu correo electrónico para recibir un enlace de recuperación.
+                  </p>
+                  <div className="mb-4">
+                    <label htmlFor="recovery-email" className="block text-[13px] font-semibold text-navy mb-1.5">
+                      Correo electrónico
+                    </label>
+                    <input
+                      id="recovery-email"
+                      type="email"
+                      placeholder="ejemplo@nodocore.com"
+                      value={recoveryEmail}
+                      onChange={(e) => setRecoveryEmail(e.target.value)}
+                      className={`${inputBase} ${inputNormal} ${inputFocus}`}
+                      required
+                    />
+                  </div>
+                  {generalError && (
+                    <p className="text-[13px] text-[#C0392B] mb-4 text-center">{generalError}</p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer mb-4"
+                  >
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : "Recuperar ingreso"}
+                  </button>
+                  <p className="text-center">
+                    <button
+                      type="button"
+                      onClick={() => { setAuthMode("login"); setGeneralError(""); }}
+                      className="text-[13px] font-semibold text-brand hover:underline bg-transparent border-none cursor-pointer p-0"
+                    >
+                      Volver al inicio de sesión
+                    </button>
+                  </p>
+                </form>
+              )
             )}
           </div>
         </main>
