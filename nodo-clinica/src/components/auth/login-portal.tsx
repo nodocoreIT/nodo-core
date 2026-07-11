@@ -535,7 +535,7 @@ export function LoginPortal() {
                     </label>
                     <a
                       href="/recuperar-contrasena"
-                      className="text-[13px] text-brand hover:underline"
+                      className="text-[13px] font-semibold text-brand hover:underline"
                     >
                       ¿Olvidó su contraseña?
                     </a>
