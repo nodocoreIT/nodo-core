@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle, Clock, FileImage, CreditCard } from "lucide-react";
+import { CheckCircle, Clock, FileImage, CreditCard, Stethoscope, Trash2, MailCheck, AlertCircle } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
 import { NODES } from "@/lib/nodes";
@@ -85,6 +85,17 @@ const DOC_LABELS: Record<string, string> = {
   other: "Otro documento",
 };
 
+type ClinicRegistration = {
+  id: string;
+  email: string;
+  role: "medico" | "paciente";
+  verified_at: string | null;
+  onboarding_token: string | null;
+  expires_at: string;
+  created_at: string;
+  stage: "pending_email" | "expired" | "pending_onboarding";
+};
+
 export default function SolicitudesPage() {
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,8 +103,13 @@ export default function SolicitudesPage() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
+  const [clinicRegs, setClinicRegs] = useState<ClinicRegistration[]>([]);
+  const [clinicLoading, setClinicLoading] = useState(true);
+  const [clinicActionId, setClinicActionId] = useState<string | null>(null);
+
   useEffect(() => {
     loadSolicitudes();
+    loadClinicRegistrations();
   }, []);
 
   async function loadSolicitudes() {
@@ -150,6 +166,33 @@ export default function SolicitudesPage() {
     }));
     setSolicitudes(rows);
     setLoading(false);
+  }
+
+  async function loadClinicRegistrations() {
+    setClinicLoading(true);
+    const res = await fetch("/api/admin/clinic-registrations");
+    if (res.ok) {
+      const json = await res.json();
+      setClinicRegs(json.registrations ?? []);
+    }
+    setClinicLoading(false);
+  }
+
+  async function handleClinicDelete(id: string) {
+    if (!confirm("¿Eliminar esta solicitud? El usuario podrá volver a registrarse.")) return;
+    setClinicActionId(id);
+    const res = await fetch("/api/admin/clinic-registrations", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    setClinicActionId(null);
+    if (res.ok) {
+      await loadClinicRegistrations();
+    } else {
+      const json = await res.json();
+      alert(json.error ?? "Error al eliminar.");
+    }
   }
 
   async function handleEnable(unitId: string) {
@@ -412,6 +455,135 @@ export default function SolicitudesPage() {
                 </div>
               </article>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Nodo Clínica registrations ─────────────────────────────── */}
+      <div style={{ marginTop: 48 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <Stethoscope size={18} style={{ color: "#0D9488" }} />
+          <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--color-navy)" }}>
+            Nodo Clínica — Solicitudes
+          </h2>
+        </div>
+        <p style={{ color: "var(--color-slate2)", fontSize: 13, maxWidth: 680, marginBottom: 20 }}>
+          Seguimiento de registros en proceso. <strong>Estadío 1</strong>: email enviado, sin
+          verificar. <strong>Estadío 2</strong>: email verificado, onboarding en curso.
+        </p>
+
+        {clinicLoading ? (
+          <p style={{ color: "var(--color-slate2)", fontSize: 13 }}>Cargando…</p>
+        ) : clinicRegs.length === 0 ? (
+          <div style={{ padding: 32, textAlign: "center", borderRadius: 14, background: "var(--color-mist)" }}>
+            <CheckCircle size={28} style={{ color: "var(--color-slate2)", margin: "0 auto 10px" }} />
+            <p style={{ color: "var(--color-slate2)", fontSize: 13 }}>No hay solicitudes de Nodo Clínica pendientes.</p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {clinicRegs.map((r) => {
+              const stageLabel =
+                r.stage === "pending_email"
+                  ? "Estadío 1 — Email enviado"
+                  : r.stage === "expired"
+                    ? "Estadío 1 — Link expirado"
+                    : "Estadío 2 — En onboarding";
+
+              const stageBg =
+                r.stage === "pending_email"
+                  ? "#DBEAFE"
+                  : r.stage === "expired"
+                    ? "#FEE2E2"
+                    : "#D1FAE5";
+
+              const stageColor =
+                r.stage === "pending_email"
+                  ? "#1D4ED8"
+                  : r.stage === "expired"
+                    ? "#991B1B"
+                    : "#065F46";
+
+              const StageIcon =
+                r.stage === "pending_email"
+                  ? Clock
+                  : r.stage === "expired"
+                    ? AlertCircle
+                    : MailCheck;
+
+              return (
+                <article
+                  key={r.id}
+                  style={{
+                    border: "1px solid var(--color-mist)",
+                    borderRadius: 12,
+                    padding: "14px 18px",
+                    background: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                    <div>
+                      <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{r.email}</p>
+                      <p style={{ fontSize: 12, color: "var(--color-slate2)", margin: "3px 0 0" }}>
+                        {r.role === "medico" ? "Médico" : "Paciente"} ·{" "}
+                        {new Date(r.created_at).toLocaleDateString("es-AR", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                        {r.stage !== "pending_onboarding" && (
+                          <> · vence {new Date(r.expires_at).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</>
+                        )}
+                      </p>
+                    </div>
+                    <span
+                      style={{
+                        background: stageBg,
+                        color: stageColor,
+                        padding: "3px 10px",
+                        borderRadius: 999,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                      }}
+                    >
+                      <StageIcon size={11} />
+                      {stageLabel}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={clinicActionId === r.id}
+                    onClick={() => handleClinicDelete(r.id)}
+                    title="Eliminar solicitud (permite re-registro)"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "6px 14px",
+                      borderRadius: 8,
+                      border: "1px solid #FCA5A5",
+                      background: "transparent",
+                      color: "#DC2626",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: clinicActionId === r.id ? "not-allowed" : "pointer",
+                      opacity: clinicActionId === r.id ? 0.6 : 1,
+                    }}
+                  >
+                    <Trash2 size={13} />
+                    {clinicActionId === r.id ? "Eliminando…" : "Eliminar"}
+                  </button>
+                </article>
+              );
+            })}
           </div>
         )}
       </div>
