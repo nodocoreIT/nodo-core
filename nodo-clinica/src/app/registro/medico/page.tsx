@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Stethoscope, Loader2, ArrowLeft, CreditCard, Check } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
+import { SpecialtyCombobox } from "@/components/ui/specialty-combobox";
 
 const PLANS = [
   {
@@ -132,13 +133,14 @@ export default function RegistroMedicoPage() {
                 </div>
                 <div>
                   <Label>Especialidad</Label>
-                  <Input
-                    value={form.specialty}
-                    onChange={(e) =>
-                      setForm({ ...form, specialty: e.target.value })
-                    }
-                    className="mt-1"
-                  />
+                  <div className="mt-1">
+                    <SpecialtyCombobox
+                      value={form.specialty}
+                      onChange={(val) =>
+                        setForm({ ...form, specialty: val })
+                      }
+                    />
+                  </div>
                 </div>
                 <div>
                   <Label>Matrícula</Label>
