@@ -14,11 +14,8 @@ async function getUntypedClient(): Promise<any> {
 const DOCTOR_ROLES = ["admin", "super_admin", "medico", "agent", "doctor"];
 
 // GET /api/clinic/specialties
-// Public (requires auth). Returns approved specialties, optionally filtered by ?q=
+// Public — no auth required (used on registration page before login).
 export async function GET(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (auth instanceof NextResponse) return auth;
-
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q")?.trim();
 
