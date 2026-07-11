@@ -45,3 +45,7 @@ supabase/.temp/
 .cursor/mcp.json
 .vercel
 .env*
+
+# Claude Code — local config, not for version control
+.claude/
+.mcp.json

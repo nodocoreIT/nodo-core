@@ -555,7 +555,7 @@ export function LoginPortal() {
                   </button>
 
                   <p className="text-xs text-center text-slate2 mt-4">
-                    Demo: {demo.email} / {demo.password}
+                    Demojjj: {demo.email} / {demo.password}
                   </p>
                 </form>
               )
