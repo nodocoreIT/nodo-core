@@ -248,19 +248,10 @@ export function LoginPortal() {
     setLoading(true);
     try {
       await clinicApi.register({
-        role,
-        fullName: form.fullName.trim(),
         email: form.email.trim(),
-        password: form.password,
-        specialty: form.specialty,
-        licenseNumber: form.licenseNumber,
-        plan: "trial",
+        role: isDoctor ? "medico" : "paciente",
       });
-      toast.success("¡Registro exitoso! Bienvenido/a.");
-      setShowTransition(true);
-      setTimeout(() => {
-        window.location.href = isDoctor ? "/medico/dashboard" : "/paciente";
-      }, 1500);
+      toast.success("¡Revisá tu correo para confirmar el registro!");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al registrarse";
       setGeneralError(msg);
