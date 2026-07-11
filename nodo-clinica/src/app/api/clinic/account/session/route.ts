@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getSession } from "@/lib/clinic/session";
+import { getSession, clearSessionResponse } from "@/lib/clinic/session";
 
 export async function GET(): Promise<NextResponse> {
   const supabase = await createClient();
@@ -67,5 +67,6 @@ export async function GET(): Promise<NextResponse> {
 export async function POST(): Promise<NextResponse> {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  return NextResponse.json({ ok: true });
+  // clearSessionResponse uses response.cookies.delete — reliable in Route Handlers
+  return clearSessionResponse();
 }
