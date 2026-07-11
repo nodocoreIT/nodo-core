@@ -181,7 +181,10 @@ export const clinicApi = {
     return respData;
   },
 
-  async register(payload: Record<string, unknown>) {
+  async register(payload: {
+    email: string;
+    role: "medico" | "paciente";
+  }): Promise<{ ok: boolean }> {
     const res = await fetch(`${BASE}/api/clinic/account/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -190,24 +193,38 @@ export const clinicApi = {
     });
     const data = await parseJsonResponse(res);
     if (!res.ok) throw new Error(data.error || "Error de registro");
+    return data as { ok: boolean };
+  },
 
-    // After server-side registration, sign in on the browser client so
-    // cookies are set for subsequent requests.
-    const client = getBrowserSupabase();
-    if (client && payload.email && payload.password) {
-      try {
-        const supabase = await client;
-        await supabase.auth.signInWithPassword({
-          email: payload.email as string,
-          password: payload.password as string,
-        });
-      } catch {
-        /* registration succeeded, login can be retried */
-      }
-    }
+  async completeOnboardingMedico(data: {
+    fullName: string;
+    specialty: string;
+    licenseNumber: string;
+    plan: string;
+  }): Promise<{ ok: boolean }> {
+    const res = await fetch(`${BASE}/api/clinic/account/onboarding/medico`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    const resData = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(resData.error || "Error en onboarding");
+    return resData as { ok: boolean };
+  },
 
-    if (data.session) saveClientSession(data.session);
-    return data;
+  async completeOnboardingPaciente(
+    formData: FormData,
+  ): Promise<{ ok: boolean }> {
+    // No Content-Type header — browser sets multipart boundary automatically
+    const res = await fetch(`${BASE}/api/clinic/account/onboarding/paciente`, {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+    const resData = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(resData.error || "Error en onboarding");
+    return resData as { ok: boolean };
   },
 
   async logout() {
