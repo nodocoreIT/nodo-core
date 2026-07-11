@@ -322,7 +322,7 @@ export function LoginPortal() {
           <div className="relative z-[1]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logos/nodo ver clinica.png"
+              src="/logos/logo compuesto estrella az letra blancazzz.png"
               alt="NODO Clínica"
               style={{ height: "30px", width: "auto" }}
             />
