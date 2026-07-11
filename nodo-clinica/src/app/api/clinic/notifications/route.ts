@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
 import {
   countUnreadDoctorNotifications,
   listDoctorNotifications,
@@ -12,19 +12,12 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
-  const { user, supabase } = auth;
 
-  if (user.role === "patient") {
+  if (auth.user.role === "patient") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  // Resolve professional_id from auth user
-  const { data: me } = await supabase
-    .from("professionals")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
+  const me = await resolveProfessional(auth);
   if (!me) {
     return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
   }
@@ -60,18 +53,12 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
-  const { user, supabase } = auth;
 
-  if (user.role === "patient") {
+  if (auth.user.role === "patient") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const { data: me } = await supabase
-    .from("professionals")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
+  const me = await resolveProfessional(auth);
   if (!me) {
     return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
   }
