@@ -1,5 +1,13 @@
 import { createServiceClient } from "@/lib/supabase/server";
 
+// The doctor_notifications table is not in the generated Supabase types yet.
+// We use an untyped client to avoid compilation errors that break the entire
+// notifications API route (GET + PATCH → 404 in production).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getUntypedClient(): Promise<any> {
+  return createServiceClient();
+}
+
 export type DoctorNotificationType =
   | "mercadopago_payment"
   | "transfer_pending"
@@ -64,7 +72,7 @@ export async function listDoctorNotifications(
   professionalId: string,
   opts?: { unreadOnly?: boolean; limit?: number },
 ): Promise<DoctorNotificationLegacy[]> {
-  const supabase = await createServiceClient();
+  const supabase = await getUntypedClient();
   let query = supabase
     .from("doctor_notifications")
     .select("*")
@@ -88,7 +96,7 @@ export async function countUnreadDoctorNotifications(
   professionalId: string,
   types?: DoctorNotificationType[],
 ): Promise<number> {
-  const supabase = await createServiceClient();
+  const supabase = await getUntypedClient();
   let query = supabase
     .from("doctor_notifications")
     .select("*", { count: "exact", head: true })
@@ -111,7 +119,7 @@ export async function markDoctorNotificationsRead(
   professionalId: string,
   ids?: string[],
 ): Promise<number> {
-  const supabase = await createServiceClient();
+  const supabase = await getUntypedClient();
   let query = supabase
     .from("doctor_notifications")
     .update({ read: true })
@@ -139,7 +147,7 @@ export async function notifyDoctorMercadoPagoPayment(params: {
   amount?: number;
   currency?: string;
 }): Promise<DoctorNotificationLegacy | null> {
-  const supabase = await createServiceClient();
+  const supabase = await getUntypedClient();
 
   // Deduplicate: skip if this payment was already notified
   const { data: existing } = await supabase
@@ -192,7 +200,7 @@ export async function notifyDoctorTransferPendingReview(params: {
   appointmentId: string;
   patientName: string;
 }): Promise<DoctorNotificationLegacy> {
-  const supabase = await createServiceClient();
+  const supabase = await getUntypedClient();
   const { data, error } = await supabase
     .from("doctor_notifications")
     .insert({
