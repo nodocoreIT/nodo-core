@@ -196,6 +196,7 @@ export function LoginPortal() {
   const [loading, setLoading] = useState(false);
   const [generalError, setGeneralError] = useState("");
   const [showTransition, setShowTransition] = useState(false);
+  const [registerSuccess, setRegisterSuccess] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [recoverySent, setRecoverySent] = useState(false);
 
@@ -251,7 +252,7 @@ export function LoginPortal() {
         email: form.email.trim(),
         role: isDoctor ? "medico" : "paciente",
       });
-      toast.success("¡Revisá tu correo para confirmar el registro!");
+      setRegisterSuccess(true);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al registrarse";
       setGeneralError(msg);
@@ -290,6 +291,40 @@ export function LoginPortal() {
   return (
     <>
       {showTransition && <NodeTransitionOverlay isDoctor={isDoctor} />}
+
+      {/* Loading overlay */}
+      {loading && authMode === "register" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl px-10 py-8 flex flex-col items-center gap-4 w-[280px]">
+            <Loader2 className="h-10 w-10 text-brand animate-spin" />
+            <p className="text-[15px] font-medium text-slate-700">Enviando solicitud...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Register success modal */}
+      {registerSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl px-10 py-8 flex flex-col items-center gap-4 w-[340px] text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-teal-50">
+              <MailCheck className="h-8 w-8 text-brand" />
+            </div>
+            <div>
+              <h3 className="font-display font-bold text-ink text-[20px] mb-1">¡Activá tu cuenta!</h3>
+              <p className="text-slate2 text-[14px]">
+                Te enviamos un correo de verificación. Revisá tu casilla para continuar con el registro.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setRegisterSuccess(false); setAuthMode("login"); }}
+              className="w-full py-3 rounded-xl bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
       <a
         href="https://www.nodocore.com.ar/nodo-clinica"
         className="fixed top-[22px] right-[22px] z-10 inline-flex items-center gap-2 px-4 py-2 text-[14px] font-semibold rounded-md bg-brand text-white shadow-sm hover:bg-brand-600 active:scale-[.98] transition-all duration-150"
