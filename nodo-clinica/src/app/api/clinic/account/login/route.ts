@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { setSession } from "@/lib/clinic/session";
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,16 +18,34 @@ export async function POST(request: NextRequest) {
     }
 
     const appMeta = data.user.app_metadata ?? {};
-    const role: string = appMeta.role ?? "patient";
+    const rawRole: string = appMeta.role ?? "patient";
+    const fullName: string =
+      data.user.user_metadata?.full_name ?? data.user.email?.split("@")[0] ?? "";
+
+    // Map platform roles to the two clinic session roles
+    const sessionRole: "doctor" | "patient" = ["super_admin", "admin", "medico", "agent"].includes(
+      rawRole,
+    )
+      ? "doctor"
+      : "patient";
+
+    // Set ClinicSession cookie — acts as fallback if Supabase auth cookie is missing
+    await setSession({
+      userId: data.user.id,
+      role: sessionRole,
+      email: data.user.email!,
+      fullName,
+    });
 
     return NextResponse.json({
       user: {
         id: data.user.id,
         email: data.user.email,
-        role,
+        fullName,
+        role: sessionRole,
         org_id: appMeta.org_id ?? null,
       },
-      role,
+      role: sessionRole,
     });
   } catch (err) {
     console.error("[login]", err);

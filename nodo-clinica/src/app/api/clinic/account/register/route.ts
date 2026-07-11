@@ -4,13 +4,6 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 const CLINIC_ORG_ID =
   process.env.CLINIC_ORG_ID ?? "843524dc-0c3b-4340-bc8e-e3ae5aa00fd2";
 
-function splitName(fullName: string): { firstName: string; lastName: string } {
-  const parts = fullName.trim().split(/\s+/);
-  const firstName = parts[0] ?? fullName;
-  const lastName = parts.slice(1).join(" ") || "-";
-  return { firstName, lastName };
-}
-
 async function registerDoctor(body: {
   fullName: string;
   email: string;
@@ -39,12 +32,11 @@ async function registerDoctor(body: {
   }
 
   const userId = data.user.id;
-  const { firstName, lastName } = splitName(body.fullName);
 
   const { error: orgMemberError } = await serviceClient
     .schema("shared" as never)
     .from("org_members")
-    .insert({ profile_id: userId, org_id: body.orgId, role: "admin" });
+    .insert({ user_id: userId, org_id: body.orgId, role: "admin" });
 
   if (orgMemberError) {
     console.error("[register/doctor] org_members insert error", orgMemberError);
@@ -58,8 +50,6 @@ async function registerDoctor(body: {
       user_id: userId,
       org_id: body.orgId,
       full_name: body.fullName,
-      first_name: firstName,
-      last_name: lastName,
       email: body.email.toLowerCase().trim(),
       specialty: body.specialty ?? "Medicina General",
       license_number: body.licenseNumber ?? null,

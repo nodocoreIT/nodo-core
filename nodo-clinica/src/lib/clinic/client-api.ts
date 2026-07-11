@@ -2,7 +2,7 @@ import type { ClinicSession } from "@/lib/clinic/types";
 import type { AppointmentStatus } from "@/lib/clinic/types";
 import type { MedicationSearchResponse } from "@/lib/clinic/medication-catalog";
 
-const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+const BASE = "";
 const SESSION_KEY = "clinica_local_session";
 
 export function saveClientSession(session: ClinicSession) {
