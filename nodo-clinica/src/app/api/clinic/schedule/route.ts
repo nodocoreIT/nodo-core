@@ -1,7 +1,9 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
+
+const DOCTOR_ROLES = new Set(["admin", "super_admin", "medico", "agent", "doctor"]);
 import { mergeThemeSettings } from "@/lib/clinic/theme-settings";
 import {
   DEFAULT_AVAILABILITY,
@@ -75,25 +77,26 @@ export async function GET(request: NextRequest) {
   if (own) {
     const authResult = await requireAuth(request);
     if (authResult instanceof NextResponse) return authResult;
-    const { user, supabase } = authResult;
+    const { user } = authResult;
 
-    if (user.role !== "admin" && user.role !== "super_admin") {
+    if (!DOCTOR_ROLES.has(user.role)) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { data: professional, error: profError } = await supabase
+    const me = await resolveProfessional(authResult);
+    if (!me) {
+      return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+    }
+
+    // Re-query with related office_settings using service client for full data
+    const serviceClient = await (await import("@/lib/supabase/server")).createServiceClient();
+    const { data: professional } = await serviceClient
       .from("professionals")
       .select("*, office_settings(*)")
-      .eq("user_id", user.id)
+      .eq("id", me.id)
       .maybeSingle();
 
     if (!professional) {
-      console.error("[schedule] professional not found", {
-        userId: user.id,
-        orgId: user.org_id,
-        role: user.role,
-        profError,
-      });
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
 
@@ -169,9 +172,9 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
-  const { user, supabase } = authResult;
+  const { user } = authResult;
 
-  if (user.role !== "admin" && user.role !== "super_admin") {
+  if (!DOCTOR_ROLES.has(user.role)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -205,10 +208,16 @@ export async function PUT(request: NextRequest) {
     customStudyLabels?: string[];
   };
 
-  const { data: professional } = await supabase
+  const me = await resolveProfessional(authResult);
+  if (!me) {
+    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+  }
+
+  const serviceClientPut = await (await import("@/lib/supabase/server")).createServiceClient();
+  const { data: professional } = await serviceClientPut
     .from("professionals")
     .select("id, office_settings(*)")
-    .eq("user_id", user.id)
+    .eq("id", me.id)
     .maybeSingle();
 
   if (!professional) {

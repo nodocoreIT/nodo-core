@@ -34,6 +34,7 @@ import {
 import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { DoctorSettingsDialog, type SectionId } from "@/components/medical/doctor-settings-dialog";
 import { ClinicNotificationsBell } from "@/components/layout/clinic-notifications-bell";
+import { PlanBadge } from "@/components/plan/plan-badge";
 
 interface NavItem {
   href: string;
