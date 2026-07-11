@@ -388,7 +388,7 @@ export function LoginPortal() {
         <main className="flex items-center justify-center p-8 bg-paper min-h-screen">
           <div className="w-[min(420px,100%)]">
             {/* Tabs */}
-            <div className="flex border-b border-mist mb-6">
+            {authMode !== "forgot" && <div className="flex border-b border-mist mb-6">
               <button
                 type="button"
                 onClick={() => { setAuthMode("login"); setGeneralError(""); }}
@@ -422,10 +422,10 @@ export function LoginPortal() {
                   Suscribirme
                 </a>
               ) : null}
-            </div>
+            </div>}
 
             {/* Branding inline (mobile / right panel header) */}
-            <div className="flex items-center gap-2.5 mb-5">
+            {authMode !== "forgot" && <div className="flex items-center gap-2.5 mb-5">
               <span
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
                 style={{
@@ -447,8 +447,9 @@ export function LoginPortal() {
                 <span className="font-light leading-none text-slate2/60 text-[22px]">|</span>
                 <span className="font-display font-extrabold text-ink" style={{ fontSize: "22px" }}>Clínica</span>
               </div>
-            </div>
+            </div>}
 
+            {authMode !== "forgot" && <>
             <h1 className="font-display font-bold text-ink text-[26px] mb-1">
               {authMode === "login" ? "Iniciar sesión" : "Crear cuenta"}
             </h1>
@@ -487,6 +488,7 @@ export function LoginPortal() {
                 Soy Paciente
               </button>
             </div>
+            </>}
 
             {/* Login form */}
             {authMode === "login" && (
