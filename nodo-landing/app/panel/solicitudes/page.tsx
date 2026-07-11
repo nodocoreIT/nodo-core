@@ -106,6 +106,7 @@ export default function SolicitudesPage() {
   const [clinicRegs, setClinicRegs] = useState<ClinicRegistration[]>([]);
   const [clinicLoading, setClinicLoading] = useState(true);
   const [clinicActionId, setClinicActionId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     loadSolicitudes();
@@ -179,7 +180,6 @@ export default function SolicitudesPage() {
   }
 
   async function handleClinicDelete(id: string) {
-    if (!confirm("¿Eliminar esta solicitud? El usuario podrá volver a registrarse.")) return;
     setClinicActionId(id);
     const res = await fetch("/api/admin/clinic-registrations", {
       method: "DELETE",
@@ -187,6 +187,7 @@ export default function SolicitudesPage() {
       body: JSON.stringify({ id }),
     });
     setClinicActionId(null);
+    setDeleteConfirmId(null);
     if (res.ok) {
       await loadClinicRegistrations();
     } else {
@@ -335,8 +336,7 @@ export default function SolicitudesPage() {
 
                     <button
                       type="button"
-                      disabled={clinicActionId === r.id}
-                      onClick={() => handleClinicDelete(r.id)}
+                      onClick={() => setDeleteConfirmId(r.id)}
                       title="Eliminar solicitud (permite re-registro)"
                       style={{
                         display: "flex",
@@ -349,12 +349,11 @@ export default function SolicitudesPage() {
                         color: "#DC2626",
                         fontSize: 12,
                         fontWeight: 600,
-                        cursor: clinicActionId === r.id ? "not-allowed" : "pointer",
-                        opacity: clinicActionId === r.id ? 0.6 : 1,
+                        cursor: "pointer",
                       }}
                     >
                       <Trash2 size={13} />
-                      {clinicActionId === r.id ? "Eliminando…" : "Eliminar"}
+                      Eliminar
                     </button>
                   </article>
                 );
@@ -634,6 +633,85 @@ export default function SolicitudesPage() {
             onClick={(e) => e.stopPropagation()}
             style={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: 10, objectFit: "contain" }}
           />
+        </div>
+      )}
+
+      {/* ── Delete confirmation dialog ───────────────────────────────── */}
+      {deleteConfirmId && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setDeleteConfirmId(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(18,30,47,.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 200,
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 14,
+              padding: "28px 32px",
+              maxWidth: 420,
+              width: "100%",
+              boxShadow: "0 8px 30px rgba(0,0,0,.15)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+              <div style={{ background: "#FEE2E2", borderRadius: 10, padding: 8, display: "flex" }}>
+                <Trash2 size={18} color="#DC2626" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "var(--color-navy)" }}>
+                Eliminar solicitud
+              </h3>
+            </div>
+            <p style={{ fontSize: 14, color: "var(--color-slate2)", lineHeight: 1.5, margin: "0 0 24px" }}>
+              ¿Estás seguro? El usuario podrá volver a registrarse con el mismo email.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmId(null)}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: 8,
+                  border: "1px solid var(--color-mist)",
+                  background: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  color: "var(--color-navy)",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={clinicActionId === deleteConfirmId}
+                onClick={() => handleClinicDelete(deleteConfirmId)}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#DC2626",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: clinicActionId === deleteConfirmId ? "not-allowed" : "pointer",
+                  opacity: clinicActionId === deleteConfirmId ? 0.7 : 1,
+                }}
+              >
+                {clinicActionId === deleteConfirmId ? "Eliminando…" : "Sí, eliminar"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>
