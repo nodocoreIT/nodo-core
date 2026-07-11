@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { setSession } from "@/lib/clinic/session";
+import { jsonWithSession } from "@/lib/clinic/session";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,24 +29,27 @@ export async function POST(request: NextRequest) {
       ? "doctor"
       : "patient";
 
-    // Set ClinicSession cookie — acts as fallback if Supabase auth cookie is missing
-    await setSession({
-      userId: data.user.id,
-      role: sessionRole,
-      email: data.user.email!,
-      fullName,
-    });
-
-    return NextResponse.json({
-      user: {
-        id: data.user.id,
-        email: data.user.email,
-        fullName,
+    // Use jsonWithSession so the ClinicSession cookie is set directly on the
+    // response object (response.cookies.set), which is the only reliable way
+    // to set cookies in a Next.js Route Handler.
+    return jsonWithSession(
+      {
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+          fullName,
+          role: sessionRole,
+          org_id: appMeta.org_id ?? null,
+        },
         role: sessionRole,
-        org_id: appMeta.org_id ?? null,
       },
-      role: sessionRole,
-    });
+      {
+        userId: data.user.id,
+        role: sessionRole,
+        email: data.user.email!,
+        fullName,
+      },
+    );
   } catch (err) {
     console.error("[login]", err);
     return NextResponse.json(
