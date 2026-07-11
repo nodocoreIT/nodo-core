@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,9 +36,10 @@ const PLANS = [
   },
 ];
 
-export default function OnboardingMedicoPage() {
-  const router = useRouter();
-  const [sessionChecked, setSessionChecked] = useState(false);
+function OnboardingMedicoContent() {
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token") ?? "";
+
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState("trial");
   const [form, setForm] = useState({
@@ -47,21 +48,29 @@ export default function OnboardingMedicoPage() {
     licenseNumber: "",
   });
 
-  // Auth guard: redirect to login if no active session
-  useEffect(() => {
-    clinicApi
-      .getSession()
-      .then((data) => {
-        if (!data?.session?.userId && !data?.user?.id) {
-          router.push("/login/medico");
-        } else {
-          setSessionChecked(true);
-        }
-      })
-      .catch(() => {
-        router.push("/login/medico");
-      });
-  }, [router]);
+  if (!token) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 flex items-center justify-center p-4">
+        <Card className="border-red-200 max-w-md w-full">
+          <CardContent className="pt-6 text-center">
+            <p className="text-red-600 font-medium">
+              Link de onboarding inválido.
+            </p>
+            <p className="text-slate-500 text-sm mt-2">
+              Revisá tu correo electrónico y hacé clic en el link de
+              verificación para continuar.
+            </p>
+            <Link
+              href="/registro/medico"
+              className="mt-4 inline-block text-teal-600 underline text-sm"
+            >
+              Volver al registro
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,28 +80,23 @@ export default function OnboardingMedicoPage() {
     }
     setLoading(true);
     try {
-      await clinicApi.completeOnboardingMedico({
+      const result = await clinicApi.completeOnboardingMedico({
         fullName: form.fullName,
         specialty: form.specialty,
         licenseNumber: form.licenseNumber,
         plan,
+        token,
       });
-      window.location.href = "/medico/dashboard";
+      // Navigate to the magic link — Supabase establishes the session, then
+      // redirects to /medico/dashboard
+      window.location.href = result.actionLink;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al completar el registro");
-    } finally {
+      toast.error(
+        err instanceof Error ? err.message : "Error al completar el registro",
+      );
       setLoading(false);
     }
   };
-
-  // Show loading skeleton while session check is in flight
-  if (!sessionChecked) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 py-8 px-4">
@@ -142,9 +146,7 @@ export default function OnboardingMedicoPage() {
                   <div className="mt-1">
                     <SpecialtyCombobox
                       value={form.specialty}
-                      onChange={(val) =>
-                        setForm({ ...form, specialty: val })
-                      }
+                      onChange={(val) => setForm({ ...form, specialty: val })}
                     />
                   </div>
                 </div>
@@ -184,7 +186,8 @@ export default function OnboardingMedicoPage() {
                       <p className="text-lg font-bold text-teal-600 mt-1">
                         {p.price}
                         <span className="text-xs font-normal text-slate-400">
-                          {" "}{p.period}
+                          {" "}
+                          {p.period}
                         </span>
                       </p>
                       <ul className="mt-2 space-y-1">
@@ -219,5 +222,19 @@ export default function OnboardingMedicoPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function OnboardingMedicoPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+        </div>
+      }
+    >
+      <OnboardingMedicoContent />
+    </Suspense>
   );
 }

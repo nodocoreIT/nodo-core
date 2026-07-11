@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -78,9 +78,10 @@ function DniSlot({ label, file, onChange }: DniSlotProps) {
   );
 }
 
-export default function OnboardingPacientePage() {
-  const router = useRouter();
-  const [sessionChecked, setSessionChecked] = useState(false);
+function OnboardingPacienteContent() {
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token") ?? "";
+
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState("gratuito");
   const [form, setForm] = useState({
@@ -91,21 +92,29 @@ export default function OnboardingPacientePage() {
   const [dniFront, setDniFront] = useState<File | null>(null);
   const [dniBack, setDniBack] = useState<File | null>(null);
 
-  // Auth guard: redirect to login if no active session
-  useEffect(() => {
-    clinicApi
-      .getSession()
-      .then((data) => {
-        if (!data?.session?.userId && !data?.user?.id) {
-          router.push("/login/paciente");
-        } else {
-          setSessionChecked(true);
-        }
-      })
-      .catch(() => {
-        router.push("/login/paciente");
-      });
-  }, [router]);
+  if (!token) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 flex items-center justify-center p-4">
+        <Card className="border-red-200 max-w-md w-full">
+          <CardContent className="pt-6 text-center">
+            <p className="text-red-600 font-medium">
+              Link de onboarding inválido.
+            </p>
+            <p className="text-slate-500 text-sm mt-2">
+              Revisá tu correo electrónico y hacé clic en el link de
+              verificación para continuar.
+            </p>
+            <Link
+              href="/registro/paciente"
+              className="mt-4 inline-block text-teal-600 underline text-sm"
+            >
+              Volver al registro
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,6 +125,7 @@ export default function OnboardingPacientePage() {
     setLoading(true);
     try {
       const formData = new FormData();
+      formData.append("token", token);
       formData.append("fullName", form.fullName);
       if (form.address) formData.append("address", form.address);
       if (form.obraSocial) formData.append("obraSocial", form.obraSocial);
@@ -123,25 +133,17 @@ export default function OnboardingPacientePage() {
       if (dniFront) formData.append("dniFront", dniFront);
       if (dniBack) formData.append("dniBack", dniBack);
 
-      await clinicApi.completeOnboardingPaciente(formData);
-      window.location.href = "/paciente";
+      const result = await clinicApi.completeOnboardingPaciente(formData);
+      // Navigate to the magic link — Supabase establishes the session, then
+      // redirects to /paciente
+      window.location.href = result.actionLink;
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Error al completar el registro",
       );
-    } finally {
       setLoading(false);
     }
   };
-
-  // Show loading skeleton while session check is in flight
-  if (!sessionChecked) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 py-8 px-4">
@@ -249,7 +251,8 @@ export default function OnboardingPacientePage() {
                       <p className="text-lg font-bold text-teal-600 mt-1">
                         {p.price}
                         <span className="text-xs font-normal text-slate-400">
-                          {" "}{p.period}
+                          {" "}
+                          {p.period}
                         </span>
                       </p>
                       <ul className="mt-2 space-y-1">
@@ -284,5 +287,19 @@ export default function OnboardingPacientePage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function OnboardingPacientePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+        </div>
+      }
+    >
+      <OnboardingPacienteContent />
+    </Suspense>
   );
 }

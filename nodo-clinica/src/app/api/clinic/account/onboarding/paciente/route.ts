@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
 
 const CLINIC_ORG_ID =
   process.env.CLINIC_ORG_ID ?? "843524dc-0c3b-4340-bc8e-e3ae5aa00fd2";
@@ -11,18 +10,23 @@ function getExtension(filename: string): string {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const auth = await requireAuth(request);
-  if (auth instanceof NextResponse) return auth;
-
   try {
     const formData = await request.formData();
 
+    const token = formData.get("token") as string | null;
     const fullName = formData.get("fullName") as string | null;
     const address = formData.get("address") as string | null;
     const obraSocial = formData.get("obraSocial") as string | null;
     const plan = formData.get("plan") as string | null;
     const dniFront = formData.get("dniFront") as File | null;
     const dniBack = formData.get("dniBack") as File | null;
+
+    if (!token) {
+      return NextResponse.json(
+        { error: "Token de onboarding requerido." },
+        { status: 400 },
+      );
+    }
 
     if (!fullName || !plan) {
       return NextResponse.json(
@@ -31,15 +35,53 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const serviceClient = await createServiceClient();
-    const userId = auth.user.id;
-    const email = auth.user.email ?? "";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const serviceClient = (await createServiceClient()) as any;
+
+    // Look up pending registration by onboarding_token
+    const { data: pending, error: tokenError } = await serviceClient
+      .from("pending_clinic_registrations")
+      .select("id, email, verified_at")
+      .eq("onboarding_token", token)
+      .eq("role", "paciente")
+      .maybeSingle();
+
+    if (tokenError || !pending) {
+      return NextResponse.json(
+        { error: "Token inválido o expirado." },
+        { status: 400 },
+      );
+    }
+
+    const email = pending.email as string;
+
+    // Find auth user by email (admin-only, one-time onboarding operation)
+    const { data: listData, error: listError } =
+      await serviceClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+
+    if (listError) {
+      console.error("[onboarding/paciente] listUsers error", listError);
+      return NextResponse.json(
+        { error: "Error al obtener usuario." },
+        { status: 500 },
+      );
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const authUser = listData.users.find((u: any) => u.email === email);
+    if (!authUser) {
+      return NextResponse.json(
+        { error: "Usuario no encontrado. Reintentá el registro." },
+        { status: 404 },
+      );
+    }
+
+    const userId = authUser.id;
 
     let dniFrontPath: string | null = null;
     let dniBackPath: string | null = null;
 
-    // Upload DNI files before inserting the patient row.
-    // If any upload fails, return 500 without creating a partial record.
+    // Upload DNI files before inserting the patient row
     if (dniFront && dniFront.size > 0) {
       const ext = getExtension(dniFront.name);
       const storagePath = `${userId}/dni_front.${ext}`;
@@ -86,11 +128,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       dniBackPath = storagePath;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const anyClient = serviceClient as any;
-
-    // Insert patient record
-    const { error: patientError } = await anyClient
+    // Insert patient record (ignore duplicate — idempotent)
+    const { error: patientError } = await serviceClient
       .from("patients")
       .insert({
         profile_id: userId,
@@ -104,13 +143,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         dni_back_path: dniBackPath,
       });
 
-    if (patientError) {
-      if (patientError.code === "23505") {
-        return NextResponse.json(
-          { error: "Onboarding already completed" },
-          { status: 409 },
-        );
-      }
+    if (patientError && patientError.code !== "23505") {
       console.error("[onboarding/paciente] patients insert error", patientError);
       return NextResponse.json(
         { error: "Error al crear perfil de paciente." },
@@ -118,7 +151,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    return NextResponse.json({ ok: true });
+    // Generate magic link to establish session — client navigates here immediately
+    const origin = new URL(request.url).origin;
+    const { data: linkData, error: linkError } =
+      await serviceClient.auth.admin.generateLink({
+        type: "magiclink",
+        email,
+        options: { redirectTo: `${origin}/paciente` },
+      });
+
+    if (linkError || !linkData?.properties?.action_link) {
+      console.error("[onboarding/paciente] generateLink error", linkError);
+      return NextResponse.json(
+        { error: "Error al generar sesión. Contactá a soporte." },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      actionLink: linkData.properties.action_link,
+    });
   } catch (err) {
     console.error("[onboarding/paciente]", err);
     return NextResponse.json(

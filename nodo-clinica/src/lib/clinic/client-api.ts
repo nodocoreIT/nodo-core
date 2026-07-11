@@ -201,7 +201,8 @@ export const clinicApi = {
     specialty: string;
     licenseNumber: string;
     plan: string;
-  }): Promise<{ ok: boolean }> {
+    token: string;
+  }): Promise<{ ok: boolean; actionLink: string }> {
     const res = await fetch(`${BASE}/api/clinic/account/onboarding/medico`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -210,12 +211,12 @@ export const clinicApi = {
     });
     const resData = await parseJsonResponse(res);
     if (!res.ok) throw new Error(resData.error || "Error en onboarding");
-    return resData as { ok: boolean };
+    return resData as { ok: boolean; actionLink: string };
   },
 
   async completeOnboardingPaciente(
     formData: FormData,
-  ): Promise<{ ok: boolean }> {
+  ): Promise<{ ok: boolean; actionLink: string }> {
     // No Content-Type header — browser sets multipart boundary automatically
     const res = await fetch(`${BASE}/api/clinic/account/onboarding/paciente`, {
       method: "POST",
@@ -224,7 +225,7 @@ export const clinicApi = {
     });
     const resData = await parseJsonResponse(res);
     if (!res.ok) throw new Error(resData.error || "Error en onboarding");
-    return resData as { ok: boolean };
+    return resData as { ok: boolean; actionLink: string };
   },
 
   async logout() {

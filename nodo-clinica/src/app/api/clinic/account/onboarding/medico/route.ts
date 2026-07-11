@@ -1,22 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
 
 const CLINIC_ORG_ID =
   process.env.CLINIC_ORG_ID ?? "843524dc-0c3b-4340-bc8e-e3ae5aa00fd2";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const auth = await requireAuth(request);
-  if (auth instanceof NextResponse) return auth;
-
   try {
     const body = await request.json();
-    const { fullName, specialty, licenseNumber, plan } = body as {
+    const { fullName, specialty, licenseNumber, plan, token } = body as {
       fullName?: string;
       specialty?: string;
       licenseNumber?: string;
       plan?: string;
+      token?: string;
     };
+
+    if (!token) {
+      return NextResponse.json(
+        { error: "Token de onboarding requerido." },
+        { status: 400 },
+      );
+    }
 
     if (!fullName || !specialty || !plan) {
       return NextResponse.json(
@@ -27,21 +31,53 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const serviceClient = (await createServiceClient()) as any;
-    const userId = auth.user.id;
-    const email = auth.user.email ?? "";
 
-    // Insert into org_members (shared schema)
+    // Look up pending registration by onboarding_token
+    const { data: pending, error: tokenError } = await serviceClient
+      .from("pending_clinic_registrations")
+      .select("id, email, verified_at")
+      .eq("onboarding_token", token)
+      .eq("role", "medico")
+      .maybeSingle();
+
+    if (tokenError || !pending) {
+      return NextResponse.json(
+        { error: "Token inválido o expirado." },
+        { status: 400 },
+      );
+    }
+
+    const email = pending.email as string;
+
+    // Find auth user by email (admin-only, one-time onboarding operation)
+    const { data: listData, error: listError } =
+      await serviceClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+
+    if (listError) {
+      console.error("[onboarding/medico] listUsers error", listError);
+      return NextResponse.json(
+        { error: "Error al obtener usuario." },
+        { status: 500 },
+      );
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const authUser = listData.users.find((u: any) => u.email === email);
+    if (!authUser) {
+      return NextResponse.json(
+        { error: "Usuario no encontrado. Reintentá el registro." },
+        { status: 404 },
+      );
+    }
+
+    const userId = authUser.id;
+
+    // Insert into org_members (ignore duplicate — idempotent)
     const { error: orgError } = await serviceClient
       .from("org_members")
       .insert({ user_id: userId, org_id: CLINIC_ORG_ID, role: "admin" });
 
-    if (orgError) {
-      if (orgError.code === "23505") {
-        return NextResponse.json(
-          { error: "Onboarding already completed" },
-          { status: 409 },
-        );
-      }
+    if (orgError && orgError.code !== "23505") {
       console.error("[onboarding/medico] org_members insert error", orgError);
       return NextResponse.json(
         { error: "Error al registrar organización." },
@@ -49,7 +85,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Insert into professionals
+    // Insert into professionals (ignore duplicate — idempotent)
     const { error: profError } = await serviceClient
       .from("professionals")
       .insert({
@@ -63,13 +99,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         subscription_plan: plan,
       });
 
-    if (profError) {
-      if (profError.code === "23505") {
-        return NextResponse.json(
-          { error: "Onboarding already completed" },
-          { status: 409 },
-        );
-      }
+    if (profError && profError.code !== "23505") {
       console.error("[onboarding/medico] professionals insert error", profError);
       return NextResponse.json(
         { error: "Error al crear perfil profesional." },
@@ -77,7 +107,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    return NextResponse.json({ ok: true });
+    // Generate magic link to establish session — client navigates here immediately
+    const origin = new URL(request.url).origin;
+    const { data: linkData, error: linkError } =
+      await serviceClient.auth.admin.generateLink({
+        type: "magiclink",
+        email,
+        options: { redirectTo: `${origin}/medico/dashboard` },
+      });
+
+    if (linkError || !linkData?.properties?.action_link) {
+      console.error("[onboarding/medico] generateLink error", linkError);
+      return NextResponse.json(
+        { error: "Error al generar sesión. Contactá a soporte." },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      actionLink: linkData.properties.action_link,
+    });
   } catch (err) {
     console.error("[onboarding/medico]", err);
     return NextResponse.json(
