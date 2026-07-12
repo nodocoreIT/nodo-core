@@ -116,7 +116,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Generate magic link to establish session — client navigates here immediately
-    const origin = new URL(request.url).origin;
+    const rawOrigin = new URL(request.url).origin;
+    const isLocal = /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(rawOrigin);
+    const origin = isLocal && process.env.NEXT_PUBLIC_BASE_URL
+      ? process.env.NEXT_PUBLIC_BASE_URL.replace(/\/$/, "")
+      : rawOrigin;
     const { data: linkData, error: linkError } =
       await serviceClient.auth.admin.generateLink({
         type: "magiclink",

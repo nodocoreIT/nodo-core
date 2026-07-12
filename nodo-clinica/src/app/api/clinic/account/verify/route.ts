@@ -17,7 +17,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
   const role = searchParams.get("role");
-  const origin = new URL(request.url).origin;
+  const rawOrigin = new URL(request.url).origin;
+  const isLocal = /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(rawOrigin);
+  const origin = isLocal && process.env.NEXT_PUBLIC_BASE_URL
+    ? process.env.NEXT_PUBLIC_BASE_URL.replace(/\/$/, "")
+    : rawOrigin;
 
   if (!token || !role) {
     return NextResponse.redirect(
