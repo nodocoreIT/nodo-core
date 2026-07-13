@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ObraSocialCombobox } from "@/components/ui/obra-social-combobox";
 import {
   User,
   Loader2,
@@ -151,22 +152,6 @@ function OnboardingPacienteContent() {
     }
   };
 
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 flex items-center justify-center p-4">
-        <div className="max-w-md w-full flex flex-col items-center gap-4 py-10 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-100">
-            <CheckCircle className="h-7 w-7 text-teal-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-800">¡Registro completado!</h2>
-          <p className="text-slate-500 text-sm leading-relaxed">
-            Pronto desde NODO activaremos tu cuenta. Una vez habilitada, vas a poder iniciar sesión con tu email y contraseña.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 py-8 px-4">
       <div className="max-w-lg mx-auto">
@@ -235,16 +220,14 @@ function OnboardingPacienteContent() {
               </div>
 
               <div>
-                <Label htmlFor="obraSocial">Obra social (opcional)</Label>
-                <Input
-                  id="obraSocial"
-                  value={form.obraSocial}
-                  onChange={(e) =>
-                    setForm({ ...form, obraSocial: e.target.value })
-                  }
-                  placeholder="OSDE, IOMA, particular..."
-                  className="mt-1"
-                />
+                <Label>Obra social (opcional)</Label>
+                <div className="mt-1">
+                  <ObraSocialCombobox
+                    value={form.obraSocial}
+                    onChange={(val) => setForm({ ...form, obraSocial: val })}
+                    placeholder="Buscar obra social..."
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -320,6 +303,21 @@ function OnboardingPacienteContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Success modal */}
+      {submitted && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 flex flex-col items-center gap-4 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-teal-100">
+              <CheckCircle className="h-8 w-8 text-teal-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800">¡Registro completado!</h2>
+            <p className="text-slate-500 text-sm leading-relaxed">
+              Pronto desde NODO activaremos tu cuenta. Una vez habilitada, vas a poder iniciar sesión con tu email y contraseña.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
