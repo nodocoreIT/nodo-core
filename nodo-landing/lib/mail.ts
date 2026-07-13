@@ -704,7 +704,8 @@ export async function sendAccountEnabledEmail({
   const transporter = createTransporter();
 
   // Per-node brand theme — same logic as sendPasswordResetEmail.
-  const slug = unitCode.trim().toLowerCase();
+  // Normalize: lowercase + strip diacritics so "Clínica" → "clinica".
+  const slug = unitCode.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const brandMap: Record<string, { brand: string; light: boolean }> = {
     finanzas:    { brand: "#43936C", light: false },
     clinica:     { brand: "#0D9488", light: false },

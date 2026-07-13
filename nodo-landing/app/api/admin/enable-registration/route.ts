@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
+import { nodoAuthProjectParam } from "@/lib/supabase/nodo-auth-config";
 import { getNodeRegistrationConfig } from "@/lib/registration/node-config";
 import {
   provisionNodoAccessPendingPassword,
@@ -129,7 +131,29 @@ export async function POST(request: Request) {
   const origin = new URL(request.url).origin;
   // Use nodo-{slug} prefix so multi-zone proxy paths (e.g. /ecommerce/*) are not hit.
   const loginPathSlug = cfg ? `nodo-${cfg.slug}` : "login";
-  const loginUrl = `${origin}/${loginPathSlug}/login?mode=first-access`;
+  let loginUrl = `${origin}/${loginPathSlug}/login?mode=first-access`;
+
+  // For provisionable nodes (own Supabase project), generate a Supabase recovery
+  // link with the correct redirectTo so the user can set their password directly.
+  if (cfg?.provisionable && provisionUserId) {
+    const nodoAdmin = createNodoAdminClient(unit.unit_code);
+    if (nodoAdmin) {
+      const project = nodoAuthProjectParam(unit.unit_code);
+      const next = `/${loginPathSlug}/login?mode=first-access`;
+      const confirmQuery = project
+        ? `project=${encodeURIComponent(project)}&next=${encodeURIComponent(next)}`
+        : `next=${encodeURIComponent(next)}`;
+      const redirectToUrl = `${origin}/auth/confirm?${confirmQuery}`;
+      const { data: linkData } = await nodoAdmin.auth.admin.generateLink({
+        type: "recovery",
+        email,
+        options: { redirectTo: redirectToUrl },
+      });
+      if (linkData?.properties?.action_link) {
+        loginUrl = linkData.properties.action_link;
+      }
+    }
+  }
 
   if (isMailConfigured()) {
     await sendAccountEnabledEmail({
