@@ -642,16 +642,17 @@ export default function ClientesPage() {
       }
     }
 
-    // Sync ban status: only when status changed or the nodo was just provisioned.
+    // Lift auth bans when reactivating — never ban (all nodos share one Supabase
+    // project, so auth bans are global). Per-nodo pause uses node_email_access.status.
     for (const u of unitsToSave) {
+      if (u.status !== "activo") continue;
       const nodeDef = NODES.find((n) => n.code === u.unit_code);
       if (!nodeDef?.provisionable) continue;
       const userId = provisionedUserIds.get(u.unit_code);
       if (!userId) continue;
 
       const prevForStatus = prevUnits.find((p) => p.unit_code === u.unit_code);
-      const statusUnchanged = prevForStatus && prevForStatus.status === u.status;
-      if (statusUnchanged && !freshlyProvisioned.has(u.unit_code)) continue;
+      if (prevForStatus?.status !== "pausado" && !freshlyProvisioned.has(u.unit_code)) continue;
 
       await fetch("/api/nodo-suspend", {
         method: "POST",
@@ -659,7 +660,7 @@ export default function ClientesPage() {
         body: JSON.stringify({
           nodo_code: u.unit_code,
           user_id: userId,
-          action: u.status === "pausado" ? "suspend" : "reactivate",
+          action: "reactivate",
         }),
       });
     }
@@ -749,6 +750,32 @@ export default function ClientesPage() {
     if (!confirmDelete) return;
     const ids = confirmDelete.ids;
     const supabase = createClient();
+
+    // Unban auth users before deleting so they get "credenciales incorrectas"
+    // instead of "tu acceso fue pausado" when trying to log in after deletion.
+    for (const clientId of ids) {
+      const { data: units } = await supabase
+        .from("client_units")
+        .select("unit_code, provision_user_id")
+        .eq("client_id", clientId);
+      if (units) {
+        for (const u of units) {
+          if (!u.provision_user_id) continue;
+          const nodeDef = NODES.find((n) => n.code === u.unit_code);
+          if (!nodeDef?.provisionable) continue;
+          await fetch("/api/nodo-suspend", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              nodo_code: u.unit_code,
+              user_id: u.provision_user_id,
+              action: "reactivate",
+            }),
+          });
+        }
+      }
+    }
+
     await supabase.from("clients").delete().in("id", ids);
     const idSet = new Set(ids);
     setClients((prev) => prev.filter((c) => !idSet.has(c.id)));
