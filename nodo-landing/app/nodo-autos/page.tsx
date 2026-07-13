@@ -157,7 +157,8 @@ export default function NodoAutosPage() {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/logos/estrella%20bco%20nar.png" alt="" aria-hidden style={{ height: "0.78em", width: "auto", display: "inline-block" }} />
-              <span style={{ color: "#fff" }}>nodo</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={autosLogoSrc} alt="Nodo" style={{ height: "0.78em", width: "auto", display: "inline-block" }} />
               <span style={{ color: "#fff", fontWeight: 400 }}>|</span>
               Autos
             </h1>
