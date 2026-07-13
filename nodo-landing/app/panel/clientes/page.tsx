@@ -931,11 +931,12 @@ export default function ClientesPage() {
                                 {cu.map((u) => {
                                   const st = statusStyle(u.status);
                                   const NODE_PILL_COLORS: Record<string, { bg: string; color: string }> = {
-                                    autos:     { bg: "#D12D3C", color: "#ffffff" },
-                                    finanzas:  { bg: "#43936C", color: "#ffffff" },
-                                    ecommerce: { bg: "#FFF600", color: "#000000" },
-                                    clinica:   { bg: "#0D9488", color: "#ffffff" },
-                                    salud:     { bg: "#0D9488", color: "#ffffff" },
+                                    autos:     { bg: "#B92737", color: "#ffffff" },
+                                    finanzas:  { bg: "#047D5B", color: "#ffffff" },
+                                    ecommerce: { bg: "#DDD400", color: "#000000" },
+                                    clinica:   { bg: "#0F7E74", color: "#ffffff" },
+                                    salud:     { bg: "#0F7E74", color: "#ffffff" },
+                                    inmo:      { bg: "#CA460D", color: "#ffffff" },
                                   };
                                   const pillTheme = NODE_PILL_COLORS[u.unit_code?.toLowerCase() ?? ""] ?? { bg: "var(--color-mist-200)", color: "var(--color-navy)" };
                                   return (
