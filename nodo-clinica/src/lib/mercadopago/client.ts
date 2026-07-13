@@ -81,6 +81,29 @@ export async function getPayment(
   return data as MpPaymentInfo;
 }
 
+export interface MpUser {
+  id: number;
+  nickname: string;
+  live_mode: boolean;
+  email?: string;
+}
+
+export async function getMercadoPagoUser(accessToken: string): Promise<MpUser> {
+  const res = await fetch(`${MP_API}/users/me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || "Token rechazado por Mercado Pago");
+  }
+  return data as MpUser;
+}
+
+/** Returns "test" for TEST- tokens, "production" otherwise. */
+export function mercadoPagoTokenKind(accessToken: string): "test" | "production" {
+  return accessToken.startsWith("TEST-") ? "test" : "production";
+}
+
 /** Prefer sandbox URL cuando el token es de prueba (TEST-). */
 export function checkoutUrl(
   pref: MpPreferenceResult,
