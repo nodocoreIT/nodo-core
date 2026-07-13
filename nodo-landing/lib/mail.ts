@@ -832,3 +832,9 @@ export async function sendActivationEmail({
     `,
   });
 }
+
+// Backward-compat aliases — routes from main used these names before the merge
+export const sendClientNodoInviteEmail = sendActivationEmail;
+export const sendFeedbackEmail = sendContactEmail;
+export const sendStaffAddedEmail = sendInmoStaffAddedEmail;
+export const sendStaffInviteEmail = sendInmoStaffInviteEmail;
