@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
   // Generate recovery link for password setup using nodo-clínica's own Supabase project
   const origin = new URL(request.url).origin;
   const project = nodoAuthProjectParam("clinica");
-  const next = "/nodo-clinica/login?mode=first-access";
+  const next = "/nodo-clinica/actualizar-contrasena";
   const confirmQuery = `project=${encodeURIComponent(project)}&next=${encodeURIComponent(next)}`;
   const redirectToUrl = `${origin}/auth/confirm?${confirmQuery}`;
 
