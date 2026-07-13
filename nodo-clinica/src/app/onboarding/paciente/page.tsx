@@ -52,14 +52,14 @@ function DniSlot({ label, file, onChange }: DniSlotProps) {
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="mt-1 h-28 w-full rounded-xl border-2 border-dashed border-slate-300 hover:border-teal-400 transition-colors flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-teal-500 overflow-hidden relative"
+        className="mt-1 w-full rounded-xl border-2 border-dashed border-slate-300 hover:border-teal-400 transition-colors flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-teal-500 overflow-hidden relative aspect-3/2"
       >
         {previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={previewUrl}
             alt={label}
-            className="absolute inset-0 h-full w-full object-cover rounded-xl"
+            className="absolute inset-0 h-full w-full object-contain rounded-xl bg-slate-50"
           />
         ) : (
           <>

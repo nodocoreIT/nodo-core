@@ -304,10 +304,12 @@ export async function PUT(request: NextRequest) {
 
   const { data: saved, error } = await supabase
     .from("office_settings")
-    .update(updateData)
-    .eq("professional_id", professional.id)
+    .upsert(
+      { ...updateData, professional_id: professional.id },
+      { onConflict: "professional_id" },
+    )
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json(
