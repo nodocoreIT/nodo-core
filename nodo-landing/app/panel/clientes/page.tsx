@@ -930,8 +930,16 @@ export default function ClientesPage() {
                               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                 {cu.map((u) => {
                                   const st = statusStyle(u.status);
+                                  const NODE_PILL_COLORS: Record<string, { bg: string; color: string }> = {
+                                    autos:     { bg: "#D12D3C", color: "#ffffff" },
+                                    finanzas:  { bg: "#43936C", color: "#ffffff" },
+                                    ecommerce: { bg: "#FFF600", color: "#000000" },
+                                    clinica:   { bg: "#0D9488", color: "#ffffff" },
+                                    salud:     { bg: "#0D9488", color: "#ffffff" },
+                                  };
+                                  const pillTheme = NODE_PILL_COLORS[u.unit_code?.toLowerCase() ?? ""] ?? { bg: "var(--color-mist-200)", color: "var(--color-navy)" };
                                   return (
-                                    <span key={u.id} style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 11.5, background: "var(--color-mist-200)", borderRadius: 6, padding: "3px 8px", color: "var(--color-navy)", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                    <span key={u.id} style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 11.5, background: pillTheme.bg, borderRadius: 6, padding: "3px 8px", color: pillTheme.color, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 }}>
                                       nodo | {u.unit_code}
                                       <span style={{ width: 7, height: 7, borderRadius: "50%", background: st.color }} />
                                     </span>
@@ -1288,7 +1296,8 @@ export default function ClientesPage() {
                     {formUnits.map((u, idx) => {
                       const active = activeFormUnit?.key === u.key;
                       const st = statusStyle(u.status);
-                      const nodeLabel = NODES.find((n) => n.code === u.unit_code)?.label ?? `Nodo ${idx + 1}`;
+                      const matchedNodeDef = NODES.find((n) => n.code.toLowerCase() === u.unit_code?.toLowerCase()) ?? NODES.find((n) => n.slug.toLowerCase() === u.unit_code?.toLowerCase());
+                      const nodeLabel = matchedNodeDef?.label ?? u.unit_code ?? `Nodo ${idx + 1}`;
                       return (
                         <button
                           key={u.key}
