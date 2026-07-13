@@ -942,7 +942,6 @@ export default function ClientesPage() {
                                   return (
                                     <span key={u.id} style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 11.5, background: pillTheme.bg, borderRadius: 6, padding: "3px 8px", color: pillTheme.color, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 }}>
                                       nodo | {u.unit_code}
-                                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: st.color }} />
                                     </span>
                                   );
                                 })}
