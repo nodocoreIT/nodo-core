@@ -38,6 +38,8 @@ export async function POST(request: NextRequest) {
     delete cleaned.mercadopagoRefreshToken;
     delete cleaned.mercadopagoTokenExpiresAt;
     delete cleaned.mercadopagoPublicKey;
+    delete cleaned.mercadopagoUserId;
+    delete cleaned.mercadopagoConnectedAt;
 
     await supabase
       .from("office_settings")

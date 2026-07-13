@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle, Clock, FileImage, CreditCard, Trash2, MailCheck, AlertCircle } from "lucide-react";
+import { CheckCircle, Clock, FileImage, CreditCard, Trash2, MailCheck, AlertCircle, ChevronDown } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
 import { NODES } from "@/lib/nodes";
@@ -109,6 +109,16 @@ export default function SolicitudesPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteUnitId, setDeleteUnitId] = useState<string | null>(null);
   const [deletingUnitId, setDeletingUnitId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   useEffect(() => {
     loadSolicitudes();
@@ -430,236 +440,278 @@ export default function SolicitudesPage() {
 
         {/* ── Other nodo registrations ────────────────────────────────── */}
         {!loading && solicitudes.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {solicitudes.map((s) => (
-              <article
-                key={s.id}
-                style={{ border: "1px solid var(--color-mist)", borderRadius: 14, padding: 20, background: "#fff" }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-                  <div>
-                    <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>{s.client?.name}</h3>
-                    <p style={{ fontSize: 13, color: "var(--color-slate2)", margin: "4px 0" }}>
-                      {s.client?.email}
-                      {s.profile?.phone || s.client?.phone ? ` · ${s.profile?.phone ?? s.client?.phone}` : ""}
-                    </p>
-                    <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                      <span style={{ background: "#FCE9D8", color: "#B5630C", padding: "2px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600 }}>
-                        {nodeLabel(s.unit_code)}
-                      </span>
-                      <span style={{ fontSize: 12, color: "var(--color-slate2)" }}>
-                        {planLabel(s.profile, s.plan)}
-                      </span>
-                      {s.identityCheck && (
-                        <span
-                          style={{
-                            padding: "2px 10px",
-                            borderRadius: 999,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            background:
-                              s.identityCheck.status === "approved"
-                                ? "#D1FAE5"
-                                : s.identityCheck.status === "review"
-                                  ? "#FEF3C7"
-                                  : "#FEE2E2",
-                            color:
-                              s.identityCheck.status === "approved"
-                                ? "#065F46"
-                                : s.identityCheck.status === "review"
-                                  ? "#92400E"
-                                  : "#991B1B",
-                          }}
-                        >
-                          Identidad:{" "}
-                          {s.identityCheck.status === "approved"
-                            ? "Verificado"
-                            : s.identityCheck.status === "review"
-                              ? "Revisión manual"
-                              : "No verificado"}
-                          {s.identityCheck.face_match_score != null
-                            ? ` (${Math.round(Number(s.identityCheck.face_match_score) * 100)}%)`
-                            : ""}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--color-slate2)", whiteSpace: "nowrap" }}>
-                    <Clock size={14} style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }} />
-                    {new Date(s.created_at).toLocaleDateString("es-AR", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </div>
-                </div>
-
-                {s.profile && (
-                  <div
-                    style={{
-                      marginTop: 16,
-                      padding: 14,
-                      borderRadius: 10,
-                      background: "var(--color-paper)",
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-                      gap: 10,
-                      fontSize: 13,
-                    }}
-                  >
-                    {(s.profile.address || s.profile.city) && (
-                      <div>
-                        <span style={{ color: "var(--color-slate2)", fontSize: 11, fontWeight: 600 }}>Domicilio</span>
-                        <p style={{ margin: "2px 0 0" }}>
-                          {s.profile.address}
-                          {s.profile.city ? `, ${s.profile.city}` : ""}
-                          {s.profile.province ? ` (${s.profile.province})` : ""}
-                        </p>
-                      </div>
-                    )}
-                    {s.profile.document_number && (
-                      <div>
-                        <span style={{ color: "var(--color-slate2)", fontSize: 11, fontWeight: 600 }}>DNI</span>
-                        <p style={{ margin: "2px 0 0", fontFamily: "monospace" }}>
-                          {s.profile.document_number}
-                          {s.profile.gender ? ` · ${s.profile.gender}` : ""}
-                        </p>
-                      </div>
-                    )}
-                    {s.profile.card_holder && (
-                      <div>
-                        <span style={{ color: "var(--color-slate2)", fontSize: 11, fontWeight: 600 }}>Tarjeta</span>
-                        <p style={{ margin: "2px 0 0" }}>
-                          {s.profile.card_holder}
-                          <br />
-                          <span style={{ fontFamily: "monospace" }}>···· {s.profile.card_last_four}</span>
-                          {s.profile.card_expiry ? ` · Vence ${s.profile.card_expiry}` : ""}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {s.docs.length > 0 && (
-                  <div style={{ marginTop: 16 }}>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: "var(--color-slate2)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                      Documentación enviada
-                    </p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-                      {s.docs.map((doc) => (
-                        <div
-                          key={doc.id}
-                          style={{
-                            border: "1px solid var(--color-mist)",
-                            borderRadius: 10,
-                            padding: 10,
-                            width: 160,
-                            background: "#fff",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                            {doc.doc_type === "credit_card" ? (
-                              <CreditCard size={14} color="var(--color-slate2)" />
-                            ) : (
-                              <FileImage size={14} color="var(--color-slate2)" />
-                            )}
-                            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-navy)" }}>
-                              {DOC_LABELS[doc.doc_type] ?? doc.doc_type}
-                            </span>
-                          </div>
-                          {doc.signed_url ? (
-                            <button
-                              type="button"
-                              onClick={() => setPreviewUrl(doc.signed_url!)}
-                              style={{
-                                display: "block",
-                                width: "100%",
-                                border: "none",
-                                background: "transparent",
-                                cursor: "pointer",
-                                padding: 0,
-                              }}
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={doc.signed_url}
-                                alt={DOC_LABELS[doc.doc_type] ?? "Documento"}
-                                style={{
-                                  width: "100%",
-                                  height: 100,
-                                  objectFit: "cover",
-                                  borderRadius: 6,
-                                  background: "var(--color-mist)",
-                                }}
-                              />
-                            </button>
-                          ) : (
-                            <p style={{ fontSize: 11, color: "var(--color-slate2)" }}>Sin vista previa</p>
-                          )}
-                          {doc.file_name && (
-                            <p style={{ fontSize: 10, color: "var(--color-slate2)", margin: "6px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {doc.file_name}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <textarea
-                  value={notes[s.id] ?? s.admin_notes ?? ""}
-                  onChange={(e) => setNotes((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                  rows={2}
-                  placeholder="Notas de verificación…"
-                  style={{ width: "100%", marginTop: 16, padding: 10, borderRadius: 8, border: "1px solid var(--color-mist)", fontSize: 13, boxSizing: "border-box" }}
-                />
-
-                <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {solicitudes.map((s) => {
+              const isExpanded = expandedIds.has(s.id);
+              return (
+                <article
+                  key={s.id}
+                  style={{ border: "1px solid var(--color-mist)", borderRadius: 14, background: "#fff", overflow: "hidden" }}
+                >
+                  {/* ── Accordion header ─────────────────────────────── */}
                   <button
                     type="button"
-                    disabled={actionId === s.id}
-                    onClick={() => handleEnable(s.id)}
+                    onClick={() => toggleExpanded(s.id)}
                     style={{
-                      padding: "8px 20px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: "#1F8A5B",
-                      color: "#fff",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: actionId === s.id ? "not-allowed" : "pointer",
-                      opacity: actionId === s.id ? 0.7 : 1,
-                    }}
-                  >
-                    {actionId === s.id ? "Habilitando…" : "Habilitar acceso"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={deletingUnitId === s.id}
-                    onClick={() => setDeleteUnitId(s.id)}
-                    style={{
-                      padding: "8px 14px",
-                      borderRadius: 8,
-                      border: "1px solid #FECACA",
-                      background: "#FFF5F5",
-                      color: "#DC2626",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: deletingUnitId === s.id ? "not-allowed" : "pointer",
+                      width: "100%",
                       display: "flex",
                       alignItems: "center",
-                      gap: 6,
-                      opacity: deletingUnitId === s.id ? 0.7 : 1,
+                      justifyContent: "space-between",
+                      gap: 16,
+                      padding: "14px 18px",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      textAlign: "left",
                     }}
                   >
-                    <Trash2 size={14} />
-                    Eliminar solicitud
+                    <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <p style={{ fontSize: 14, fontWeight: 600, margin: 0, color: "var(--color-navy)" }}>{s.client?.name}</p>
+                        <p style={{ fontSize: 12, color: "var(--color-slate2)", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {s.client?.email}
+                          {s.profile?.phone || s.client?.phone ? ` · ${s.profile?.phone ?? s.client?.phone}` : ""}
+                        </p>
+                      </div>
+                      <span style={{ background: "#FCE9D8", color: "#B5630C", padding: "2px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
+                        {nodeLabel(s.unit_code)}
+                      </span>
+                      <span style={{ fontSize: 12, color: "var(--color-slate2)", whiteSpace: "nowrap" }}>
+                        {s.unit_code}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+                      <span style={{ fontSize: 12, color: "var(--color-slate2)", whiteSpace: "nowrap" }}>
+                        <Clock size={13} style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }} />
+                        {new Date(s.created_at).toLocaleDateString("es-AR", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <ChevronDown
+                        size={16}
+                        color="var(--color-slate2)"
+                        style={{ transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}
+                      />
+                    </div>
                   </button>
-                  <span style={{ fontSize: 12, color: "var(--color-slate2)" }}>Pendiente de revisión</span>
-                </div>
-              </article>
-            ))}
+
+                  {/* ── Accordion body ───────────────────────────────── */}
+                  {isExpanded && (
+                    <div style={{ padding: "0 18px 18px", borderTop: "1px solid var(--color-mist)" }}>
+                      {/* Profile details */}
+                      {s.profile && (
+                        <div
+                          style={{
+                            marginTop: 14,
+                            padding: 14,
+                            borderRadius: 10,
+                            background: "var(--color-paper)",
+                            display: "grid",
+                            gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                            gap: 10,
+                            fontSize: 13,
+                          }}
+                        >
+                          <div>
+                            <span style={{ color: "var(--color-slate2)", fontSize: 11, fontWeight: 600 }}>Plan</span>
+                            <p style={{ margin: "2px 0 0" }}>{planLabel(s.profile, s.plan)}</p>
+                          </div>
+                          {(s.profile.address || s.profile.city) && (
+                            <div>
+                              <span style={{ color: "var(--color-slate2)", fontSize: 11, fontWeight: 600 }}>Domicilio</span>
+                              <p style={{ margin: "2px 0 0" }}>
+                                {s.profile.address}
+                                {s.profile.city ? `, ${s.profile.city}` : ""}
+                                {s.profile.province ? ` (${s.profile.province})` : ""}
+                              </p>
+                            </div>
+                          )}
+                          {s.profile.document_number && (
+                            <div>
+                              <span style={{ color: "var(--color-slate2)", fontSize: 11, fontWeight: 600 }}>DNI</span>
+                              <p style={{ margin: "2px 0 0", fontFamily: "monospace" }}>
+                                {s.profile.document_number}
+                                {s.profile.gender ? ` · ${s.profile.gender}` : ""}
+                              </p>
+                            </div>
+                          )}
+                          {s.profile.card_holder && (
+                            <div>
+                              <span style={{ color: "var(--color-slate2)", fontSize: 11, fontWeight: 600 }}>Tarjeta</span>
+                              <p style={{ margin: "2px 0 0" }}>
+                                {s.profile.card_holder}
+                                <br />
+                                <span style={{ fontFamily: "monospace" }}>···· {s.profile.card_last_four}</span>
+                                {s.profile.card_expiry ? ` · Vence ${s.profile.card_expiry}` : ""}
+                              </p>
+                            </div>
+                          )}
+                          {s.identityCheck && (
+                            <div>
+                              <span style={{ color: "var(--color-slate2)", fontSize: 11, fontWeight: 600 }}>Identidad</span>
+                              <p style={{ margin: "2px 0 0" }}>
+                                <span
+                                  style={{
+                                    padding: "2px 8px",
+                                    borderRadius: 999,
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    background:
+                                      s.identityCheck.status === "approved"
+                                        ? "#D1FAE5"
+                                        : s.identityCheck.status === "review"
+                                          ? "#FEF3C7"
+                                          : "#FEE2E2",
+                                    color:
+                                      s.identityCheck.status === "approved"
+                                        ? "#065F46"
+                                        : s.identityCheck.status === "review"
+                                          ? "#92400E"
+                                          : "#991B1B",
+                                  }}
+                                >
+                                  {s.identityCheck.status === "approved"
+                                    ? "Verificado"
+                                    : s.identityCheck.status === "review"
+                                      ? "Revisión manual"
+                                      : "No verificado"}
+                                  {s.identityCheck.face_match_score != null
+                                    ? ` (${Math.round(Number(s.identityCheck.face_match_score) * 100)}%)`
+                                    : ""}
+                                </span>
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Docs */}
+                      {s.docs.length > 0 && (
+                        <div style={{ marginTop: 16 }}>
+                          <p style={{ fontSize: 12, fontWeight: 700, color: "var(--color-slate2)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            Documentación enviada
+                          </p>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                            {s.docs.map((doc) => (
+                              <div
+                                key={doc.id}
+                                style={{
+                                  border: "1px solid var(--color-mist)",
+                                  borderRadius: 10,
+                                  padding: 10,
+                                  width: 160,
+                                  background: "#fff",
+                                }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                                  {doc.doc_type === "credit_card" ? (
+                                    <CreditCard size={14} color="var(--color-slate2)" />
+                                  ) : (
+                                    <FileImage size={14} color="var(--color-slate2)" />
+                                  )}
+                                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-navy)" }}>
+                                    {DOC_LABELS[doc.doc_type] ?? doc.doc_type}
+                                  </span>
+                                </div>
+                                {doc.signed_url ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPreviewUrl(doc.signed_url!)}
+                                    style={{
+                                      display: "block",
+                                      width: "100%",
+                                      border: "none",
+                                      background: "transparent",
+                                      cursor: "pointer",
+                                      padding: 0,
+                                    }}
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={doc.signed_url}
+                                      alt={DOC_LABELS[doc.doc_type] ?? "Documento"}
+                                      style={{
+                                        width: "100%",
+                                        height: 100,
+                                        objectFit: "cover",
+                                        borderRadius: 6,
+                                        background: "var(--color-mist)",
+                                      }}
+                                    />
+                                  </button>
+                                ) : (
+                                  <p style={{ fontSize: 11, color: "var(--color-slate2)" }}>Sin vista previa</p>
+                                )}
+                                {doc.file_name && (
+                                  <p style={{ fontSize: 10, color: "var(--color-slate2)", margin: "6px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {doc.file_name}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Notes + actions */}
+                      <textarea
+                        value={notes[s.id] ?? s.admin_notes ?? ""}
+                        onChange={(e) => setNotes((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                        rows={2}
+                        placeholder="Notas de verificación…"
+                        style={{ width: "100%", marginTop: 16, padding: 10, borderRadius: 8, border: "1px solid var(--color-mist)", fontSize: 13, boxSizing: "border-box" }}
+                      />
+
+                      <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 12 }}>
+                        <button
+                          type="button"
+                          disabled={actionId === s.id}
+                          onClick={() => handleEnable(s.id)}
+                          style={{
+                            padding: "8px 20px",
+                            borderRadius: 8,
+                            border: "none",
+                            background: "#1F8A5B",
+                            color: "#fff",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: actionId === s.id ? "not-allowed" : "pointer",
+                            opacity: actionId === s.id ? 0.7 : 1,
+                          }}
+                        >
+                          {actionId === s.id ? "Habilitando…" : "Habilitar acceso"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingUnitId === s.id}
+                          onClick={() => setDeleteUnitId(s.id)}
+                          style={{
+                            padding: "8px 14px",
+                            borderRadius: 8,
+                            border: "1px solid #FECACA",
+                            background: "#FFF5F5",
+                            color: "#DC2626",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: deletingUnitId === s.id ? "not-allowed" : "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            opacity: deletingUnitId === s.id ? 0.7 : 1,
+                          }}
+                        >
+                          <Trash2 size={14} />
+                          Eliminar solicitud
+                        </button>
+                        <span style={{ fontSize: 12, color: "var(--color-slate2)" }}>Pendiente de revisión</span>
+                      </div>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
           </div>
         )}
       </div>
