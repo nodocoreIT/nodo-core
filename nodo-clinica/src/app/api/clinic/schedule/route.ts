@@ -302,7 +302,8 @@ export async function PUT(request: NextRequest) {
     // Keep the labels in the response payload from existing data
   }
 
-  const { data: saved, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: saved, error } = await (serviceClientPut as any)
     .from("office_settings")
     .upsert(
       { ...updateData, professional_id: professional.id },
