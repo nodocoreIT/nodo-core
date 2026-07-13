@@ -57,23 +57,7 @@ export default function Navbar() {
     >
       <div className="w-[min(1200px,92vw)] mx-auto flex items-center justify-between h-[68px]">
         {/* Logo */}
-        {isNodoPage ? (
-          <Link href="/" className="flex-shrink-0 flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logos/estrella%20bco%20nar.png"
-              alt=""
-              aria-hidden
-              style={{ height: 28, width: "auto" }}
-            />
-            <span
-              className="font-display font-extrabold tracking-tight text-white"
-              style={{ fontSize: 22, letterSpacing: "-0.02em" }}
-            >
-              nodo
-            </span>
-          </Link>
-        ) : (
+        {!isNodoPage && (
           <Link
             href="/"
             className="flex-shrink-0"

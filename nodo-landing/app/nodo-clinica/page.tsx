@@ -40,11 +40,8 @@ export default function Page() {
               style={{ fontSize: "clamp(36px,5vw,64px)", lineHeight: 1.06 }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={clinicaLogoSrc}
-                alt="Nodo"
-                style={{ height: "0.78em", width: "auto", display: "inline-block" }}
-              />
+              <img src="/logos/estrella%20bco%20nar.png" alt="" aria-hidden style={{ height: "0.78em", width: "auto", display: "inline-block" }} />
+              <span style={{ color: "#fff" }}>nodo</span>
               <span style={{ color: "#fff", fontWeight: 400 }}>|</span>
               Clínica
             </h1>
