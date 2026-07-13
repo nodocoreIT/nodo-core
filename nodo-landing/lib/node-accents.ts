@@ -36,12 +36,12 @@ export const CONTABLE_ACCENT = {
   rgb: "124, 58, 237",
 } as const;
 
-/** Azul — no usado por otros nodos del ecosistema. */
+/** Amarillo ámbar — identidad visual de Nodo Ecommerce. */
 export const ECOMMERCE_ACCENT = {
-  brand: "#2563EB",
-  brand600: "#1E3A8A",
-  brand300: "#93C5FD",
-  rgb: "37, 99, 235",
+  brand: "#F59E0B",
+  brand600: "#D97706",
+  brand300: "#FCD34D",
+  rgb: "245, 158, 11",
 } as const;
 
 export const DEFAULT_ACCENT = {
@@ -73,7 +73,7 @@ export function getNodeAccentBySlug(slug: string): NodeAccent {
   if (key === "clinica" || key === "salud" || key === "clinica-virtual") return CLINICA_ACCENT;
   if (key === "obra") return OBRA_ACCENT;
   if (key === "contable") return CONTABLE_ACCENT;
-  if (key === "ecommerce") return ECOMMERCE_ACCENT;
+  if (key === "ecommerce" || key === "tienda") return ECOMMERCE_ACCENT;
   if (key === "inmo") return DEFAULT_ACCENT;
   return DEFAULT_ACCENT;
 }
