@@ -93,7 +93,7 @@ type ClinicRegistration = {
   onboarding_token: string | null;
   expires_at: string;
   created_at: string;
-  stage: "pending_email" | "expired" | "pending_onboarding";
+  stage: "pending_email" | "expired" | "pending_onboarding" | "pending_activation";
 };
 
 export default function SolicitudesPage() {
@@ -179,6 +179,22 @@ export default function SolicitudesPage() {
     setClinicLoading(false);
   }
 
+  async function handleClinicEnable(id: string) {
+    setClinicActionId(id);
+    const res = await fetch("/api/admin/clinic-registrations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    setClinicActionId(null);
+    if (res.ok) {
+      await loadClinicRegistrations();
+    } else {
+      const json = await res.json();
+      alert(json.error ?? "Error al habilitar.");
+    }
+  }
+
   async function handleClinicDelete(id: string) {
     setClinicActionId(id);
     const res = await fetch("/api/admin/clinic-registrations", {
@@ -236,10 +252,21 @@ export default function SolicitudesPage() {
       <Topbar title="Solicitudes pendientes" breadcrumb="Panel / Solicitudes" />
       <div className="panel-scroll" style={{ flex: 1, overflow: "auto", padding: "24px 32px" }}>
 
+        {/* ── Global loader ──────────────────────────────────────────── */}
+        {(clinicLoading || loading) && (
+          <div style={{ padding: 40, textAlign: "center" }}>
+            <p style={{ color: "var(--color-slate2)", fontSize: 14 }}>Cargando solicitudes…</p>
+          </div>
+        )}
+
+        {!clinicLoading && !loading && clinicRegs.length === 0 && solicitudes.length === 0 && (
+          <div style={{ padding: 24, textAlign: "center", borderRadius: 14, background: "var(--color-mist)" }}>
+            <p style={{ color: "var(--color-slate2)", fontSize: 13, margin: 0 }}>Sin solicitudes pendientes.</p>
+          </div>
+        )}
+
         {/* ── Nodo Clínica registrations ─────────────────────────────── */}
-        {clinicLoading ? (
-          <p style={{ color: "var(--color-slate2)", fontSize: 13 }}>Cargando…</p>
-        ) : clinicRegs.length > 0 && (
+        {!clinicLoading && clinicRegs.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
             {clinicRegs.map((r) => {
               const stageLabel =
@@ -247,28 +274,36 @@ export default function SolicitudesPage() {
                   ? "Estadío 1 — Email enviado"
                   : r.stage === "expired"
                     ? "Estadío 1 — Link expirado"
-                    : "Estadío 2 — En onboarding";
+                    : r.stage === "pending_activation"
+                      ? "Estadío 3 — Onboarding completo"
+                      : "Estadío 2 — En onboarding";
 
               const stageBg =
                 r.stage === "pending_email"
                   ? "#DBEAFE"
                   : r.stage === "expired"
                     ? "#FEE2E2"
-                    : "#D1FAE5";
+                    : r.stage === "pending_activation"
+                      ? "#FEF3C7"
+                      : "#D1FAE5";
 
               const stageColor =
                 r.stage === "pending_email"
                   ? "#1D4ED8"
                   : r.stage === "expired"
                     ? "#991B1B"
-                    : "#065F46";
+                    : r.stage === "pending_activation"
+                      ? "#92400E"
+                      : "#065F46";
 
               const StageIcon =
                 r.stage === "pending_email"
                   ? Clock
                   : r.stage === "expired"
                     ? AlertCircle
-                    : MailCheck;
+                    : r.stage === "pending_activation"
+                      ? CheckCircle
+                      : MailCheck;
 
               return (
                 <article
@@ -321,27 +356,53 @@ export default function SolicitudesPage() {
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setDeleteConfirmId(r.id)}
-                    title="Eliminar solicitud (permite re-registro)"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "6px 14px",
-                      borderRadius: 8,
-                      border: "1px solid #FCA5A5",
-                      background: "transparent",
-                      color: "#DC2626",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Trash2 size={13} />
-                    Eliminar
-                  </button>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    {r.stage === "pending_activation" && (
+                      <button
+                        type="button"
+                        disabled={clinicActionId === r.id}
+                        onClick={() => handleClinicEnable(r.id)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "6px 14px",
+                          borderRadius: 8,
+                          border: "none",
+                          background: "#1F8A5B",
+                          color: "#fff",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: clinicActionId === r.id ? "not-allowed" : "pointer",
+                          opacity: clinicActionId === r.id ? 0.7 : 1,
+                        }}
+                      >
+                        <CheckCircle size={13} />
+                        {clinicActionId === r.id ? "Habilitando…" : "Habilitar"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirmId(r.id)}
+                      title="Eliminar solicitud (permite re-registro)"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "6px 14px",
+                        borderRadius: 8,
+                        border: "1px solid #FCA5A5",
+                        background: "transparent",
+                        color: "#DC2626",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Trash2 size={13} />
+                      Eliminar
+                    </button>
+                  </div>
                 </article>
               );
             })}
@@ -349,13 +410,7 @@ export default function SolicitudesPage() {
         )}
 
         {/* ── Other nodo registrations ────────────────────────────────── */}
-        {loading ? (
-          <p style={{ color: "var(--color-slate2)" }}>Cargando…</p>
-        ) : solicitudes.length === 0 && clinicRegs.length === 0 ? (
-          <div style={{ padding: 24, textAlign: "center", borderRadius: 14, background: "var(--color-mist)" }}>
-            <p style={{ color: "var(--color-slate2)", fontSize: 13, margin: 0 }}>Sin solicitudes pendientes.</p>
-          </div>
-        ) : solicitudes.length > 0 && (
+        {!loading && solicitudes.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {solicitudes.map((s) => (
               <article
