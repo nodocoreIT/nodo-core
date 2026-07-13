@@ -115,31 +115,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Generate magic link to establish session — client navigates here immediately
-    const rawOrigin = new URL(request.url).origin;
-    const isLocal = /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(rawOrigin);
-    const origin = isLocal && process.env.NEXT_PUBLIC_BASE_URL
-      ? process.env.NEXT_PUBLIC_BASE_URL.replace(/\/$/, "")
-      : rawOrigin;
-    const { data: linkData, error: linkError } =
-      await serviceClient.auth.admin.generateLink({
-        type: "magiclink",
-        email,
-        options: { redirectTo: `${origin}/medico/dashboard` },
-      });
-
-    if (linkError || !linkData?.properties?.action_link) {
-      console.error("[onboarding/medico] generateLink error", linkError);
-      return NextResponse.json(
-        { error: "Error al generar sesión. Contactá a soporte." },
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      actionLink: linkData.properties.action_link,
-    });
+    return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[onboarding/medico]", err);
     return NextResponse.json(
