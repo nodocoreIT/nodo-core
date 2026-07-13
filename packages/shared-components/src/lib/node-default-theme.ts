@@ -40,12 +40,6 @@ export const NODE_DEFAULT_THEMES: Record<string, ThemeSettings> = {
     primaryColor: "#da5a0e",
     brandText: "nodo salud",
   },
-  Tienda: {
-    ...BASE_THEME,
-    primaryColor: "#6366f1",
-    sidebarTextColor: "#a5b4fc",
-    brandText: "nodo tienda",
-  },
 };
 
 export function getNodeDefaultTheme(unitCode: string): ThemeSettings {

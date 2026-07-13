@@ -230,6 +230,36 @@ export const NODES: NodeDef[] = [
     provisionable: true,
   },
   {
+    code: "Ecommerce",
+    slug: "ecommerce",
+    label: "Nodo Ecommerce",
+    parentSlug: "it",
+    inDevelopment: false,
+    description:
+      "Plataforma de e-commerce multi-tenant: creá y administrá tu tienda online con productos, pedidos, proveedores y pasarelas de pago.",
+    Icon: ShoppingBag,
+    intro:
+      "Nodo Ecommerce es tu plataforma completa para vender online. Gestioná productos, categorías, marcas y proveedores. Procesá pedidos, configurá pasarelas de pago y personalizá tu tienda con tu dominio propio.",
+    highlights: [
+      {
+        title: "Catálogo y stock",
+        description:
+          "Cargá productos con fotos, variantes, precio de costo y venta, y control de inventario en tiempo real.",
+      },
+      {
+        title: "Pedidos y pagos",
+        description:
+          "Gestioná pedidos con estados, integrá MercadoPago y mostrá datos bancarios para transferencias.",
+      },
+      {
+        title: "Tu dominio propio",
+        description:
+          "Cada tienda vive en un subdominio propio. Con el plan Pro conectá tu dominio personalizado.",
+      },
+    ],
+    provisionable: true,
+  },
+  {
     code: "Autos",
     slug: "autos",
     label: "Nodo Automotores",
@@ -257,30 +287,6 @@ export const NODES: NodeDef[] = [
       },
     ],
     provisionable: true,
-  },
-  {
-    code: "Tienda",
-    slug: "tienda",
-    label: "Nodo Tienda",
-    provisionable: true,
-    inDevelopment: false,
-    description: "Plataforma de e-commerce SaaS: creá y administrá tu tienda online con tu dominio propio.",
-    Icon: ShoppingBag,
-    intro: "NODO Tienda es tu plataforma de e-commerce completa. Creá tu tienda online, personalizá tu identidad visual, gestioná productos, inventario, pedidos y clientes desde un solo panel. Con el plan Pro, conectá tu dominio propio y activá el portal de clientes.",
-    highlights: [
-      {
-        title: "Tienda personalizada",
-        description: "Configurá colores, tipografías, logo y banners. Tu tienda, tu marca.",
-      },
-      {
-        title: "Gestión completa",
-        description: "Productos con variantes, control de inventario, pedidos con estados y trazabilidad.",
-      },
-      {
-        title: "Dominio propio (Pro)",
-        description: "Conectá www.tutienda.com a tu nodo. Certificado SSL automático incluido.",
-      },
-    ],
   },
 ];
 

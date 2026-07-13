@@ -111,7 +111,6 @@ export async function submitDoctorRegistration(
 export async function submitPatientRegistration(
   fullName: string,
   email: string,
-  password: string,
   origin: string,
 ): Promise<DoctorRegState> {
   const result = await submitNodeRegistration({
@@ -120,7 +119,6 @@ export async function submitPatientRegistration(
     email,
     plan: "paciente",
     origin,
-    password,
   });
   return { status: result.status === "idle" ? "error" : result.status, message: result.message };
 }
@@ -223,6 +221,7 @@ export async function requestPasswordReset(
         email: email.trim(),
         recoveryUrl: data.properties.action_link,
         nodeLabel,
+        nodeSlug,
       });
     } else {
       console.warn(

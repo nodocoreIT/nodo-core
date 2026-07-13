@@ -167,14 +167,14 @@ export default function NodoEcommercePage() {
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
               <Link
-                href="#precios"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 text-[16px] font-bold rounded-md text-white active:scale-[.98] transition-all duration-150 shadow-lg"
+                href="/nodo-ecommerce/login?mode=register"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 text-[16px] font-bold rounded-md text-black active:scale-[.98] transition-all duration-150 shadow-lg"
                 style={{
                   background: `linear-gradient(135deg, ${A.brand}, ${A.brand600})`,
                   boxShadow: `0 8px 24px -8px rgba(${A.rgb},.45)`,
                 }}
               >
-                Ver planes <ArrowRight className="h-4 w-4" />
+                Empezar ahora <ArrowRight className="h-4 w-4" />
               </Link>
               <a
                 href="#funcionalidades"
@@ -346,8 +346,8 @@ export default function NodoEcommercePage() {
                 </ul>
 
                 <Link
-                  href="/#contacto"
-                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 text-[15px] font-bold rounded-xl text-white transition-all duration-150 active:scale-[.98]"
+                  href="/nodo-ecommerce/login?mode=register"
+                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 text-[15px] font-bold rounded-xl text-black transition-all duration-150 active:scale-[.98]"
                   style={{
                     background: `linear-gradient(135deg, ${A.brand}, ${A.brand600})`,
                     boxShadow: `0 6px 20px -6px rgba(${A.rgb},.45)`,
@@ -368,7 +368,7 @@ export default function NodoEcommercePage() {
               >
                 <div className="absolute top-5 right-5">
                   <span
-                    className="px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide text-white"
+                    className="px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide text-black"
                     style={{ background: `linear-gradient(135deg, ${A.brand}, ${A.brand600})` }}
                   >
                     Recomendado
@@ -439,8 +439,8 @@ export default function NodoEcommercePage() {
                 </ul>
 
                 <Link
-                  href="/#contacto"
-                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 text-[15px] font-bold rounded-xl text-white transition-all duration-150 active:scale-[.98]"
+                  href="/nodo-ecommerce/login?mode=register"
+                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 text-[15px] font-bold rounded-xl text-black transition-all duration-150 active:scale-[.98]"
                   style={{
                     background: `linear-gradient(135deg, ${A.brand}, ${A.brand600})`,
                     boxShadow: `0 6px 20px -6px rgba(${A.rgb},.55)`,

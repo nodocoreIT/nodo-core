@@ -127,7 +127,9 @@ export async function POST(request: Request) {
     .eq("client_unit_id", clientUnitId);
 
   const origin = new URL(request.url).origin;
-  const loginUrl = `${origin}/${cfg?.slug ?? "login"}/login?mode=first-access`;
+  // Use nodo-{slug} prefix so multi-zone proxy paths (e.g. /ecommerce/*) are not hit.
+  const loginPathSlug = cfg ? `nodo-${cfg.slug}` : "login";
+  const loginUrl = `${origin}/${loginPathSlug}/login?mode=first-access`;
 
   if (isMailConfigured()) {
     await sendAccountEnabledEmail({
@@ -135,6 +137,7 @@ export async function POST(request: Request) {
       email,
       nodeLabel: cfg?.label ?? unit.unit_code,
       loginUrl,
+      unitCode: unit.unit_code,
     });
   }
 

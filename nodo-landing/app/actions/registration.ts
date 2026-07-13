@@ -13,6 +13,7 @@ import {
   sendPatientVerificationEmail,
   sendInmoVerificationEmail,
   sendFinanzasVerificationEmail,
+  sendEcommerceVerificationEmail,
   sendAdminNewRegistrationEmail,
 } from "@/lib/mail";
 import { resolveRegistrationOrigin } from "@/lib/registration/origin";
@@ -39,6 +40,10 @@ async function sendVerificationEmail(
   }
   if (planLower === "finanzas" || unitCode === "Finanzas") {
     await sendFinanzasVerificationEmail(payload);
+    return;
+  }
+  if (planLower === "ecommerce" || unitCode === "Ecommerce") {
+    await sendEcommerceVerificationEmail(payload);
     return;
   }
   await sendRegistrationVerificationEmail({

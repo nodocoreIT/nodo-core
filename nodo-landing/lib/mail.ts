@@ -246,16 +246,42 @@ export async function sendPasswordResetEmail({
   email,
   recoveryUrl,
   nodeLabel,
+  nodeSlug = "",
 }: {
   email: string;
   recoveryUrl: string;
   nodeLabel: string;
+  nodeSlug?: string;
 }): Promise<void> {
   if (!isMailConfigured()) {
     throw new Error(
       "SMTP no configurado: faltan ZOHO_SMTP_USER y/o ZOHO_SMTP_PASSWORD."
     );
   }
+
+  // Per-node brand colors — matches getNodeAccentBySlug logic without importing it.
+  const slug = nodeSlug.trim().toLowerCase().replace(/^nodo-/, "");
+  const brandMap: Record<string, { brand: string; light: boolean }> = {
+    finanzas:  { brand: "#43936C", light: false },
+    clinica:   { brand: "#0D9488", light: false },
+    salud:     { brand: "#0D9488", light: false },
+    autos:     { brand: "#D12D3C", light: false },
+    automotores: { brand: "#D12D3C", light: false },
+    obra:      { brand: "#CA8A04", light: false },
+    contable:  { brand: "#7C3AED", light: false },
+    ecommerce: { brand: "#FFF600", light: true  },
+  };
+  const theme = brandMap[slug] ?? { brand: "#DA5A0E", light: false };
+  const brandColor   = theme.brand;
+  const buttonText   = theme.light ? "#000000" : "#ffffff";
+  const badgeBg      = theme.light ? "#000000" : "rgba(0,0,0,0.20)";
+  const badgeText    = theme.light ? brandColor : "#ffffff";
+  const linkColor    = theme.light ? "#857f00" : brandColor;
+
+  const attachments = registrationLogoAttachments();
+  const logoHtml = attachments?.length
+    ? `<img src="cid:nodologo" alt="NODO Core" style="height:28px;display:inline-block;margin-bottom:16px;"/><br/>`
+    : "";
 
   const transporter = nodemailer.createTransport({
     host: HOST,
@@ -267,34 +293,58 @@ export async function sendPasswordResetEmail({
   await transporter.sendMail({
     from: `"${nodeLabel}" <${USER}>`,
     to: email,
-    subject: `Recuperá tu cuenta en ${nodeLabel}`,
-    text: `Hola,\n\nRecibimos una solicitud para restablecer la contraseña de tu cuenta en ${nodeLabel}. Hacé clic en el siguiente enlace para crear una nueva contraseña:\n\n${recoveryUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de ${nodeLabel}`,
-    attachments: [
-      {
-        filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
-        cid: "nodologo",
-      },
-    ],
+    subject: `Recuperá tu contraseña en ${nodeLabel}`,
+    text: `Hola,\n\nRecibimos una solicitud para restablecer la contraseña de tu cuenta en ${nodeLabel}. Hacé clic en el siguiente enlace para crear una nueva contraseña:\n\n${recoveryUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO Core`,
+    attachments,
     html: `
-      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;background-color:#F5F8FC;">
-        <div style="text-align:center;margin-bottom:20px;">
-          <img src="cid:nodologo" alt="NODO Core" style="height:32px;display:inline-block;"/>
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+
+        <!-- Header: logo + brand strip -->
+        <div style="background-color:${brandColor};padding:28px 32px 24px;text-align:center;">
+          ${logoHtml}
+          <span style="display:inline-block;background:${badgeBg};color:${badgeText};font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 12px;border-radius:100px;">
+            ◎ ${nodeLabel}
+          </span>
         </div>
-        <h2 style="color:#DA5A0E;margin-top:0;font-size:20px;text-align:center;">Recuperá tu cuenta</h2>
-        <p style="color:#647890;font-size:15px;line-height:1.5;">
-          Hola,<br/><br/>
-          Recibimos una solicitud para restablecer la contraseña de tu cuenta en <strong>${nodeLabel}</strong>. Hacé clic en el botón de abajo para restablecerla:
-        </p>
-        <div style="margin:24px 0;text-align:center;">
-          <a href="${recoveryUrl}" style="background-color:#DA5A0E;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;font-size:15px;">
-            Restablecer Contraseña
-          </a>
+
+        <!-- Body -->
+        <div style="background:#ffffff;padding:32px;">
+          <h2 style="color:#0a0a0a;margin:0 0 8px;font-size:22px;font-weight:800;text-align:center;">
+            Recuperá tu contraseña
+          </h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;text-align:center;margin:0 0 8px;">
+            en <strong>${nodeLabel}</strong>
+          </p>
+          <hr style="border:none;border-top:1px solid #f3f4f6;margin:20px 0;"/>
+          <p style="color:#4b5563;font-size:15px;line-height:1.6;margin:0 0 24px;">
+            Recibimos una solicitud para restablecer la contraseña de tu cuenta.<br/>
+            Hacé clic en el botón de abajo para crear una nueva contraseña:
+          </p>
+
+          <!-- CTA -->
+          <div style="text-align:center;margin:0 0 28px;">
+            <a href="${recoveryUrl}"
+               style="background-color:${brandColor};color:${buttonText};padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:800;display:inline-block;font-size:15px;letter-spacing:.01em;">
+              Restablecer contraseña
+            </a>
+          </div>
+
+          <p style="color:#9ca3af;font-size:12px;line-height:1.5;margin:0;">
+            Si el botón no funciona, copiá este enlace en tu navegador:<br/>
+            <a href="${recoveryUrl}" style="color:${linkColor};word-break:break-all;">${recoveryUrl}</a>
+          </p>
         </div>
-        <p style="color:#9DACBE;font-size:12px;line-height:1.4;">
-          Si el botón no funciona, podés copiar y pegar este enlace en tu navegador:<br/>
-          <a href="${recoveryUrl}" style="color:#DA5A0E;">${recoveryUrl}</a>
-        </p>
+
+        <!-- Footer -->
+        <div style="background:#f9fafb;border-top:1px solid #f3f4f6;padding:16px 32px;text-align:center;">
+          <p style="color:#9ca3af;font-size:11px;margin:0;">
+            Si no realizaste esta solicitud, podés ignorar este correo.
+          </p>
+          <p style="color:#d1d5db;font-size:11px;margin:6px 0 0;">
+            © 2026 NODO Core · nodocore.com.ar
+          </p>
+        </div>
+
       </div>
     `,
   });
@@ -482,6 +532,112 @@ export async function sendInmoVerificationEmail({
   });
 }
 
+export async function sendEcommerceVerificationEmail({
+  nombre,
+  email,
+  token,
+  origin,
+}: {
+  nombre: string;
+  email: string;
+  token: string;
+  origin: string;
+}): Promise<void> {
+  if (!isMailConfigured()) {
+    throw new Error("SMTP no configurado: faltan ZOHO_SMTP_USER y/o ZOHO_SMTP_PASSWORD.");
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: HOST,
+    port: PORT,
+    secure: PORT === 465,
+    auth: { user: USER, pass: PASS },
+  });
+
+  const verificationUrl = `${origin}/api/verify-registration?token=${token}`;
+  const attachments = registrationLogoAttachments();
+
+  await transporter.sendMail({
+    from: `"NODO Ecommerce" <${USER}>`,
+    to: email,
+    subject: `Activá tu cuenta en NODO | Ecommerce`,
+    text: `Hola ${nombre},\n\nGracias por registrarte en NODO | Ecommerce. Para activar tu cuenta y empezar a gestionar tu tienda, hacé clic en el siguiente enlace:\n\n${verificationUrl}\n\nEl enlace vence en 24 horas.\n\nSaludos,\nEl equipo de NODO Core`,
+    attachments,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+
+        <!-- Header amarillo -->
+        <div style="background-color:#FFF600;padding:28px 32px 24px;text-align:center;">
+          ${attachments?.length
+            ? `<img src="cid:nodologo" alt="NODO Core" style="height:28px;display:inline-block;margin-bottom:16px;"/><br/>`
+            : ""}
+          <span style="display:inline-block;background:#000;color:#FFF600;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 12px;border-radius:100px;">
+            ◎ Nodo Ecommerce
+          </span>
+        </div>
+
+        <!-- Body -->
+        <div style="background:#ffffff;padding:32px;">
+          <h2 style="color:#0a0a0a;margin:0 0 8px;font-size:22px;font-weight:800;text-align:center;">
+            ¡Gracias por registrarte!
+          </h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;text-align:center;margin:0 0 8px;">
+            en <strong>NODO | Ecommerce</strong>
+          </p>
+          <hr style="border:none;border-top:1px solid #f3f4f6;margin:20px 0;"/>
+          <p style="color:#4b5563;font-size:15px;line-height:1.6;margin:0 0 24px;">
+            Hola <strong>${nombre}</strong>,<br/><br/>
+            Confirmá tu correo para activar tu cuenta y empezar a cargar productos, configurar tu tienda y recibir pedidos.
+          </p>
+
+          <!-- CTA -->
+          <div style="text-align:center;margin:0 0 28px;">
+            <a href="${verificationUrl}"
+               style="background-color:#FFF600;color:#000000;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:800;display:inline-block;font-size:15px;letter-spacing:.01em;">
+              Activar mi cuenta
+            </a>
+          </div>
+
+          <!-- Features row -->
+          <div style="display:flex;gap:12px;margin-bottom:28px;">
+            <div style="flex:1;background:#fafafa;border:1px solid #f3f4f6;border-radius:10px;padding:14px;text-align:center;">
+              <div style="font-size:20px;margin-bottom:6px;">🛍️</div>
+              <div style="font-size:12px;font-weight:700;color:#111;">Catálogo</div>
+              <div style="font-size:11px;color:#6b7280;margin-top:2px;">Productos y stock</div>
+            </div>
+            <div style="flex:1;background:#fafafa;border:1px solid #f3f4f6;border-radius:10px;padding:14px;text-align:center;">
+              <div style="font-size:20px;margin-bottom:6px;">📦</div>
+              <div style="font-size:12px;font-weight:700;color:#111;">Pedidos</div>
+              <div style="font-size:11px;color:#6b7280;margin-top:2px;">Gestión completa</div>
+            </div>
+            <div style="flex:1;background:#fafafa;border:1px solid #f3f4f6;border-radius:10px;padding:14px;text-align:center;">
+              <div style="font-size:20px;margin-bottom:6px;">💳</div>
+              <div style="font-size:12px;font-weight:700;color:#111;">Pagos</div>
+              <div style="font-size:11px;color:#6b7280;margin-top:2px;">MercadoPago y más</div>
+            </div>
+          </div>
+
+          <p style="color:#9ca3af;font-size:12px;line-height:1.5;margin:0;">
+            Si el botón no funciona, copiá este enlace en tu navegador:<br/>
+            <a href="${verificationUrl}" style="color:#b8a000;word-break:break-all;">${verificationUrl}</a>
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="background:#f9fafb;border-top:1px solid #f3f4f6;padding:16px 32px;text-align:center;">
+          <p style="color:#9ca3af;font-size:11px;margin:0;">
+            Este enlace vence en 24 horas · Si no te registraste, ignorá este correo.
+          </p>
+          <p style="color:#d1d5db;font-size:11px;margin:6px 0 0;">
+            © 2026 NODO Core · nodocore.com.ar
+          </p>
+        </div>
+
+      </div>
+    `,
+  });
+}
+
 function createTransporter() {
   if (!isMailConfigured()) {
     throw new Error("SMTP no configurado.");
@@ -537,34 +693,95 @@ export async function sendAccountEnabledEmail({
   email,
   nodeLabel,
   loginUrl,
+  unitCode = "",
 }: {
   nombre: string;
   email: string;
   nodeLabel: string;
   loginUrl: string;
+  unitCode?: string;
 }): Promise<void> {
   const transporter = createTransporter();
+
+  // Per-node brand theme — same logic as sendPasswordResetEmail.
+  const slug = unitCode.trim().toLowerCase();
+  const brandMap: Record<string, { brand: string; light: boolean }> = {
+    finanzas:    { brand: "#43936C", light: false },
+    clinica:     { brand: "#0D9488", light: false },
+    salud:       { brand: "#0D9488", light: false },
+    autos:       { brand: "#D12D3C", light: false },
+    automotores: { brand: "#D12D3C", light: false },
+    obra:        { brand: "#CA8A04", light: false },
+    contable:    { brand: "#7C3AED", light: false },
+    ecommerce:   { brand: "#FFF600", light: true  },
+  };
+  const theme      = brandMap[slug] ?? { brand: "#DA5A0E", light: false };
+  const brandColor = theme.brand;
+  const buttonText = theme.light ? "#000000" : "#ffffff";
+  const badgeBg    = theme.light ? "#000000" : "rgba(0,0,0,0.20)";
+  const badgeText  = theme.light ? brandColor : "#ffffff";
+  const linkColor  = theme.light ? "#857f00" : brandColor;
+
+  const attachments = registrationLogoAttachments();
+  const logoHtml = attachments?.length
+    ? `<img src="cid:nodologo" alt="NODO Core" style="height:28px;display:inline-block;margin-bottom:16px;"/><br/>`
+    : "";
 
   await transporter.sendMail({
     from: `"NODO Core · Activación" <${USER}>`,
     to: email,
     subject: `Tu acceso a ${nodeLabel} fue habilitado`,
-    text: `Hola ${nombre},\n\nTu cuenta en ${nodeLabel} fue habilitada. Configurá tu contraseña en el primer acceso:\n\n${loginUrl}\n\nSaludos,\nNODO Core`,
-    attachments: [
-      {
-        filename: "logo_compuesto.png",
-        path: path.join(process.cwd(), "public/logos/logo compuestoa.png"),
-        cid: "nodologo",
-      },
-    ],
+    text: `Hola ${nombre},\n\nTu acceso a ${nodeLabel} está listo. Configurá tu contraseña en el primer ingreso:\n\n${loginUrl}\n\nSaludos,\nNODO Core`,
+    attachments,
     html: `
-      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;">
-        <h2 style="color:#DA5A0E;">¡Tu cuenta fue habilitada!</h2>
-        <p style="color:#647890;">Hola <strong>${nombre}</strong>, tu acceso a <strong>${nodeLabel}</strong> está listo.</p>
-        <p style="color:#647890;">Configurá tu contraseña en el primer acceso:</p>
-        <a href="${loginUrl}" style="display:inline-block;margin-top:12px;background:#DA5A0E;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">
-          Configurar contraseña e ingresar
-        </a>
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+
+        <!-- Header brandado -->
+        <div style="background-color:${brandColor};padding:28px 32px 24px;text-align:center;">
+          ${logoHtml}
+          <span style="display:inline-block;background:${badgeBg};color:${badgeText};font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 12px;border-radius:100px;">
+            ◎ ${nodeLabel}
+          </span>
+        </div>
+
+        <!-- Body -->
+        <div style="background:#ffffff;padding:32px;">
+          <h2 style="color:#0a0a0a;margin:0 0 8px;font-size:22px;font-weight:800;text-align:center;">
+            ¡Tu cuenta fue habilitada!
+          </h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;text-align:center;margin:0 0 8px;">
+            en <strong>${nodeLabel}</strong>
+          </p>
+          <hr style="border:none;border-top:1px solid #f3f4f6;margin:20px 0;"/>
+          <p style="color:#4b5563;font-size:15px;line-height:1.6;margin:0 0 24px;">
+            Hola <strong>${nombre}</strong>,<br/><br/>
+            Tu acceso a <strong>${nodeLabel}</strong> está listo. Hacé clic en el botón para configurar tu contraseña e ingresar:
+          </p>
+
+          <!-- CTA -->
+          <div style="text-align:center;margin:0 0 28px;">
+            <a href="${loginUrl}"
+               style="background-color:${brandColor};color:${buttonText};padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:800;display:inline-block;font-size:15px;letter-spacing:.01em;">
+              Configurar contraseña e ingresar
+            </a>
+          </div>
+
+          <p style="color:#9ca3af;font-size:12px;line-height:1.5;margin:0;">
+            Si el botón no funciona, copiá este enlace en tu navegador:<br/>
+            <a href="${loginUrl}" style="color:${linkColor};word-break:break-all;">${loginUrl}</a>
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="background:#f9fafb;border-top:1px solid #f3f4f6;padding:16px 32px;text-align:center;">
+          <p style="color:#9ca3af;font-size:11px;margin:0;">
+            Si no esperabas este correo, podés ignorarlo.
+          </p>
+          <p style="color:#d1d5db;font-size:11px;margin:6px 0 0;">
+            © 2026 NODO Core · nodocore.com.ar
+          </p>
+        </div>
+
       </div>
     `,
   });

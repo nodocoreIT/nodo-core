@@ -4,5 +4,3 @@ packages:
   - 'nodo-inmo'
   - 'nodo-autos'
   - 'nodo-finanzas'
-  - 'nodo-tienda'
-  - 'nodo-tienda-store'

@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import EcosystemDiagram from "@/components/EcosystemDiagram";
-import { Layers } from "lucide-react";
+import { Layers, ShoppingBag } from "lucide-react";
 import {
   PasswordResetPanel,
   usePasswordRecoveryBootstrap,
@@ -247,8 +247,8 @@ function LoginForm() {
   const isAutosNode = nodeParam === "nodo-autos" || nodeParam === "autos";
   const isFinanzasNode =
     nodeParam === "nodo-finanzas" || nodeParam === "finanzas";
-  const isTiendaNode = nodeParam === "nodo-tienda" || nodeParam === "tienda";
-  const isSimpleRegisterNode = isInmoNode || isAutosNode || isFinanzasNode;
+  const isEcommerceNode = nodeParam === "nodo-ecommerce" || nodeParam === "ecommerce";
+  const isSimpleRegisterNode = isInmoNode || isAutosNode || isFinanzasNode || isEcommerceNode;
   const loginAccent = getLoginAccent(nodeParam);
   const loginNodoLogoSrc = isFinanzasNode
     ? "/logos/nodo ver.png"
@@ -256,7 +256,9 @@ function LoginForm() {
       ? "/logos/nodo roj.png"
       : isClinicaNode
         ? getNodoLogoSrc("clinica")
-        : "/logos/nodo nar.png";
+        : isEcommerceNode
+          ? "/logos/nodo%20bco.png"
+          : "/logos/nodo nar.png";
 
   useEffect(() => applyLoginAccent(loginAccent), [loginAccent]);
 
@@ -418,6 +420,11 @@ function LoginForm() {
     panelTitle = "NODO | Automotores";
     panelDesc =
       "Panel de gestión de stock para concesionarias y agencias: inventario, clientes, publicaciones y contratos de venta digitales.";
+  } else if (isEcommerceNode) {
+    activeNodeSlug = "ecommerce";
+    panelTitle = "NODO | Ecommerce";
+    panelDesc =
+      "Plataforma de e-commerce para gestionar productos, proveedores, ventas y pasarelas de pago desde un solo panel.";
   } else if (matchedNode) {
     activeNodeSlug = matchedNode.slug;
     panelTitle = `NODO | ${matchedNode.code}`;
@@ -431,9 +438,9 @@ function LoginForm() {
     let tCode = "Core";
     let TIcon: React.ElementType = Layers;
 
-    if (isTiendaNode) {
-      tLabel = matchedNode?.label ?? "Nodo Tienda";
-      tCode = matchedNode?.code ?? "Tienda";
+    if (isEcommerceNode) {
+      tLabel = matchedNode?.label ?? "Nodo Ecommerce";
+      tCode = matchedNode?.code ?? "Ecommerce";
       TIcon = matchedNode?.Icon ?? Layers;
     } else if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
       tLabel = matchedNode?.label ?? "Nodo Inmo";
@@ -461,15 +468,15 @@ function LoginForm() {
       label: tLabel,
       code: tCode,
       Icon: TIcon,
-      ...(isFinanzasNode || isAutosNode || isClinicaNode
+      ...(isFinanzasNode || isAutosNode || isClinicaNode || isEcommerceNode
         ? { logoSrc: loginNodoLogoSrc }
         : {}),
     });
 
     const { access_token, refresh_token } = session;
     setTimeout(() => {
-      if (isTiendaNode) {
-        window.location.href = `/tienda/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+      if (isEcommerceNode) {
+        window.location.href = `/ecommerce/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
       } else if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
         window.location.href = `/inmo/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
       } else if (
@@ -556,7 +563,6 @@ function LoginForm() {
     }
     const needsPassword =
       authMode === "login" ||
-      (authMode === "register" && isClinicaNode && registerRole === "paciente") ||
       (authMode === "register" && isFinanzasNode);
 
     if (needsPassword) {
@@ -590,8 +596,7 @@ function LoginForm() {
         return;
       }
 
-      // Tienda provisions on first access at the SPA auth callback — skip gate here
-      if (matchedNode?.code && !isTiendaNode) {
+      if (matchedNode?.code) {
         const access = await enforceNodeAccess(supabase, matchedNode.code);
         if (!access.ok) {
           setGeneralError(access.message);
@@ -633,9 +638,9 @@ function LoginForm() {
           });
           setLoading(false);
         }
-      } else if (isAutosNode || isFinanzasNode) {
-        const unitCode = isAutosNode ? "Autos" : "Finanzas";
-        const plan = isAutosNode ? "autos" : "finanzas";
+      } else if (isAutosNode || isFinanzasNode || isEcommerceNode) {
+        const unitCode = isAutosNode ? "Autos" : isFinanzasNode ? "Finanzas" : "Ecommerce";
+        const plan = isAutosNode ? "autos" : isFinanzasNode ? "finanzas" : "ecommerce";
         const result = await submitNodeRegistration({
           unitCode,
           fullName,
@@ -681,7 +686,6 @@ function LoginForm() {
         const result = await submitPatientRegistration(
           fullName,
           email,
-          password,
           originUrl,
         );
 
@@ -835,6 +839,8 @@ function LoginForm() {
       window.location.href = `/autos/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
     } else if (isFinanzasNode) {
       redirectToFinanzasAuth(access_token, refresh_token);
+    } else if (isEcommerceNode) {
+      window.location.href = `/ecommerce/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
     } else {
       router.push("/panel");
     }
@@ -845,7 +851,16 @@ function LoginForm() {
       password: newPassword,
     });
 
-    if (error) return error.message;
+    if (error) {
+      const SUPABASE_AUTH_ERRORS: Record<string, string> = {
+        "New password should be different from the old password.":
+          "La nueva contraseña debe ser diferente a la anterior.",
+        "Password should be at least 6 characters.":
+          "La contraseña debe tener al menos 6 caracteres.",
+        "Auth session missing!": "Sesión expirada. Solicitá un nuevo enlace de recuperación.",
+      };
+      return SUPABASE_AUTH_ERRORS[error.message] ?? error.message;
+    }
 
     await authSupabase.auth.signOut({ scope: "local" });
     setSuccessModal({
@@ -892,6 +907,15 @@ function LoginForm() {
             submitLabel: "Crear cuenta",
             idPrefix: "reg-finanzas",
           }
+        : isEcommerceNode
+        ? {
+            title: "Crear cuenta en Nodo Ecommerce",
+            subtitle:
+              "Gestioná productos, proveedores, ventas y pasarelas de pago desde un solo lugar.",
+            emailPlaceholder: "tienda@ejemplo.com",
+            submitLabel: "Crear cuenta",
+            idPrefix: "reg-ecommerce",
+          }
         : null;
 
   const googleIcon = (
@@ -936,7 +960,7 @@ function LoginForm() {
               ? `/nodo-${matchedNode.slug}`
               : "/"
         }
-        className="fixed top-[22px] right-[22px] z-10 inline-flex items-center gap-2 px-4 py-2 text-[14px] font-semibold rounded-md bg-brand text-white shadow-sm hover:bg-brand-600 active:scale-[.98] transition-all duration-150"
+        className={`fixed top-[22px] right-[22px] z-10 inline-flex items-center gap-2 px-4 py-2 text-[14px] font-semibold rounded-md shadow-sm active:scale-[.98] transition-all duration-150 ${isEcommerceNode ? "bg-brand text-black border border-black/30 hover:bg-brand-600" : "bg-brand text-white hover:bg-brand-600"}`}
       >
         ← Volver a la web
       </Link>
@@ -963,13 +987,32 @@ function LoginForm() {
           </div>
 
           <div className="relative z-[1] login-brand-diagram">
-            <EcosystemDiagram
-              dark
-              interactive
-              isLoginPage
-              activeNodeSlug={activeNodeSlug}
-              className="w-[min(480px,96%)] aspect-square mx-auto"
-            />
+            {isEcommerceNode ? (
+              <div className="flex items-center justify-center w-full h-full">
+                <div
+                  className="flex items-center justify-center rounded-full"
+                  style={{
+                    width: 120,
+                    height: 120,
+                    background: `rgba(${loginAccent.rgb}, 0.15)`,
+                    border: `2px solid rgba(${loginAccent.rgb}, 0.35)`,
+                  }}
+                >
+                  <ShoppingBag
+                    style={{ color: loginAccent.brand, width: 52, height: 52 }}
+                    strokeWidth={1.5}
+                  />
+                </div>
+              </div>
+            ) : (
+              <EcosystemDiagram
+                dark
+                interactive
+                isLoginPage
+                activeNodeSlug={activeNodeSlug}
+                className="w-[min(480px,96%)] aspect-square mx-auto"
+              />
+            )}
           </div>
 
           <div className="relative z-[1] shrink-0 login-brand-copy">
@@ -1029,7 +1072,7 @@ function LoginForm() {
                     }}
                     className={`flex-1 pb-3 text-[15px] font-bold transition-colors border-b-2 ${
                       authMode === "login"
-                        ? "border-brand text-brand"
+                        ? isEcommerceNode ? "border-black text-black" : "border-brand text-brand"
                         : "border-transparent text-slate2 hover:text-navy"
                     }`}
                   >
@@ -1042,7 +1085,7 @@ function LoginForm() {
                     }}
                     className={`flex-1 pb-3 text-[15px] font-bold transition-colors border-b-2 ${
                       authMode === "register"
-                        ? "border-brand text-brand"
+                        ? isEcommerceNode ? "border-black text-black" : "border-brand text-brand"
                         : "border-transparent text-slate2 hover:text-navy"
                     }`}
                   >
@@ -1168,7 +1211,7 @@ function LoginForm() {
             ) : authMode === "login" ? (
               <div>
                 {/* Kicker */}
-                <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
+                <span className={`inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] ${isEcommerceNode ? "text-black" : "text-brand"}`}>
                   {isClinicaNode
                     ? "◎ Portal Clínica Virtual"
                     : isInmoNode
@@ -1177,7 +1220,9 @@ function LoginForm() {
                         ? "◎ Portal Automotores"
                         : isFinanzasNode
                           ? "◎ Portal Finanzas Personales"
-                          : "◎ Acceso administradores"}
+                          : isEcommerceNode
+                            ? "◎ Portal Ecommerce"
+                            : "◎ Acceso administradores"}
                 </span>
 
                 <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
@@ -1192,7 +1237,9 @@ function LoginForm() {
                         ? "Ingrese sus credenciales para acceder al panel de automotores."
                         : isFinanzasNode
                           ? "Ingrese sus credenciales para acceder a finanzas personales."
-                          : "Ingrese sus credenciales para acceder al panel de Nodo Core."}
+                          : isEcommerceNode
+                            ? "Ingrese sus credenciales para acceder al panel de e-commerce."
+                            : "Ingrese sus credenciales para acceder al panel de Nodo Core."}
                 </p>
 
                 {(isClinicaNode || isSimpleRegisterNode) && (
@@ -1357,7 +1404,7 @@ function LoginForm() {
                         setAuthMode("forgot");
                         setGeneralError("");
                       }}
-                      className="text-[13px] text-brand font-semibold cursor-pointer bg-transparent border-none outline-none hover:underline"
+                      className={`text-[13px] font-semibold cursor-pointer bg-transparent border-none outline-none hover:underline ${isEcommerceNode ? "text-black" : "text-brand"}`}
                     >
                       ¿Olvidó su contraseña?
                     </button>
@@ -1374,7 +1421,7 @@ function LoginForm() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                    className={`w-full py-3.5 rounded-md bg-brand font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer ${isEcommerceNode ? "text-black" : "text-white"}`}
                   >
                     {loading ? "Ingresando…" : "Ingresar al portal"}
                   </button>
@@ -1382,7 +1429,7 @@ function LoginForm() {
               </div>
             ) : authMode === "forgot" ? (
               <form onSubmit={handleForgotPasswordSubmit} noValidate>
-                <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
+                <span className={`inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] ${isEcommerceNode ? "text-black" : "text-brand"}`}>
                   ◎ Recuperar contraseña
                 </span>
                 <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
@@ -1427,7 +1474,7 @@ function LoginForm() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                  className={`w-full py-3.5 rounded-md bg-brand font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer ${isEcommerceNode ? "text-black" : "text-white"}`}
                 >
                   {loading ? "Enviando…" : "Recuperar ingreso"}
                 </button>
@@ -1439,7 +1486,7 @@ function LoginForm() {
                       setAuthMode("login");
                       setGeneralError("");
                     }}
-                    className="text-[13.5px] font-semibold text-brand hover:underline bg-transparent border-none cursor-pointer"
+                    className={`text-[13.5px] font-semibold hover:underline bg-transparent border-none cursor-pointer ${isEcommerceNode ? "text-black" : "text-brand"}`}
                   >
                     Volver al inicio de sesión
                   </button>
@@ -1528,7 +1575,7 @@ function LoginForm() {
                       setAuthMode("login");
                       setGeneralError("");
                     }}
-                    className="text-[13.5px] font-semibold text-brand hover:underline bg-transparent border-none cursor-pointer"
+                    className={`text-[13.5px] font-semibold hover:underline bg-transparent border-none cursor-pointer ${isEcommerceNode ? "text-black" : "text-brand"}`}
                   >
                     Volver al inicio de sesión
                   </button>
@@ -1684,7 +1731,7 @@ function LoginForm() {
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                        className={`w-full py-3.5 rounded-md bg-brand font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer ${isEcommerceNode ? "text-black" : "text-white"}`}
                       >
                         {loading
                           ? "Registrando…"
@@ -1828,32 +1875,6 @@ function LoginForm() {
                             {emailError && (
                               <p className="text-[12.5px] text-[#C0392B] mt-1.5">
                                 {emailError}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Password */}
-                          <div className="mb-4">
-                            <label
-                              htmlFor="reg-patient-pass"
-                              className="block text-[13px] font-semibold text-navy mb-1.5"
-                            >
-                              Contraseña
-                            </label>
-                            <input
-                              id="reg-patient-pass"
-                              type="password"
-                              placeholder="Ingresé contraseña…"
-                              value={password}
-                              onChange={(e) => {
-                                setPassword(e.target.value);
-                                setPasswordError("");
-                              }}
-                              className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
-                            />
-                            {passwordError && (
-                              <p className="text-[12.5px] text-[#C0392B] mt-1.5">
-                                {passwordError}
                               </p>
                             )}
                           </div>
@@ -2059,7 +2080,7 @@ function LoginForm() {
                     });
                     router.push("/nodo-salud/clinica-virtual");
                   }}
-                  className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
+                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
                 >
                   Entendido
                 </button>
@@ -2082,7 +2103,7 @@ function LoginForm() {
                     />
                   </svg>
                 </div>
-                <h3 className="font-display font-extrabold text-brand text-[21px] mb-2.5">
+                <h3 className="font-display font-extrabold text-[var(--color-brand-kicker,var(--color-brand,#DA5A0E))] text-[21px] mb-2.5">
                   Contraseña actualizada
                 </h3>
                 <p className="text-slate2 text-[14px] leading-relaxed mb-6">
@@ -2097,7 +2118,7 @@ function LoginForm() {
                     });
                     setAuthMode("login");
                   }}
-                  className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
+                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
                 >
                   Ir al inicio de sesión
                 </button>
@@ -2137,7 +2158,7 @@ function LoginForm() {
                     });
                     setAuthMode("login");
                   }}
-                  className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
+                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
                 >
                   Entendido
                 </button>
@@ -2182,10 +2203,12 @@ function LoginForm() {
                           ? "/nodo-autos"
                           : isFinanzasNode
                             ? "/nodo-finanzas"
-                            : "/nodo-salud/clinica-virtual",
+                            : isEcommerceNode
+                              ? "/nodo-ecommerce"
+                              : "/nodo-salud/clinica-virtual",
                     );
                   }}
-                  className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
+                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
                 >
                   Entendido
                 </button>
@@ -2224,7 +2247,7 @@ function LoginForm() {
                     });
                     router.push("/panel");
                   }}
-                  className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
+                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
                 >
                   Ingresar al Panel
                 </button>
