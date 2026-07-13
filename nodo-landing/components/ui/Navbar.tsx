@@ -14,10 +14,13 @@ const navLinks = [
   { label: "Contacto", id: "contacto" },
 ];
 
+const NODO_SLUGS = ["/nodo-autos", "/nodo-finanzas", "/nodo-inmo", "/nodo-clinica", "/nodo-ecommerce"];
+
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const isHome = pathname === "/";
+  const isNodoPage = NODO_SLUGS.some((slug) => pathname === slug || pathname.startsWith(slug + "/"));
   const { open: openCommandPalette } = useCommandPalette();
 
   useEffect(() => {
@@ -54,25 +57,43 @@ export default function Navbar() {
     >
       <div className="w-[min(1200px,92vw)] mx-auto flex items-center justify-between h-[68px]">
         {/* Logo */}
-        <Link
-          href="/"
-          className="flex-shrink-0"
-          onClick={(e) => {
-            if (isHome) {
-              e.preventDefault();
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }
-          }}
-        >
-          <Image
-            src="/logos/logo%20compuesto.png"
-            alt="Nodo Core"
-            height={32}
-            width={137}
-            className="h-[32px] w-auto"
-            priority
-          />
-        </Link>
+        {isNodoPage ? (
+          <Link href="/" className="flex-shrink-0 flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logos/estrella%20bco%20nar.png"
+              alt=""
+              aria-hidden
+              style={{ height: 28, width: "auto" }}
+            />
+            <span
+              className="font-display font-extrabold tracking-tight text-white"
+              style={{ fontSize: 22, letterSpacing: "-0.02em" }}
+            >
+              nodo
+            </span>
+          </Link>
+        ) : (
+          <Link
+            href="/"
+            className="flex-shrink-0"
+            onClick={(e) => {
+              if (isHome) {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
+            }}
+          >
+            <Image
+              src="/logos/logo%20compuesto.png"
+              alt="Nodo Core"
+              height={32}
+              width={137}
+              className="h-[32px] w-auto"
+              priority
+            />
+          </Link>
+        )}
 
         {/* Center links */}
         <ul className="nav-links flex items-center gap-8 list-none m-0 p-0">
