@@ -835,6 +835,36 @@ export async function sendActivationEmail({
 
 // Backward-compat aliases — routes from main used these names before the merge
 export const sendClientNodoInviteEmail = sendActivationEmail;
-export const sendFeedbackEmail = sendContactEmail;
 export const sendStaffAddedEmail = sendInmoStaffAddedEmail;
 export const sendStaffInviteEmail = sendInmoStaffInviteEmail;
+
+type FeedbackEmailPayload = {
+  category: "bug" | "idea" | "bloat";
+  content: string;
+  sourceNode: string;
+  userEmail?: string;
+};
+
+export async function sendFeedbackEmail({
+  category,
+  content,
+  sourceNode,
+  userEmail,
+}: FeedbackEmailPayload): Promise<void> {
+  const transporter = createTransporter();
+  const categoryLabel = category === "bug" ? "🐛 Bug" : category === "idea" ? "💡 Idea" : "🧹 Bloat";
+
+  await transporter.sendMail({
+    from: `"NODO Core · Feedback" <${USER}>`,
+    to: CONTACT_TO,
+    subject: `[Feedback] ${categoryLabel} — ${sourceNode}`,
+    text: `Nodo: ${sourceNode}\nCategoría: ${category}\nUsuario: ${userEmail ?? "anónimo"}\n\n${content}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;background:#F5F8FC;">
+        <h2 style="color:#DA5A0E;margin-top:0;font-size:18px;">${categoryLabel} — ${sourceNode}</h2>
+        <p style="color:#647890;font-size:13px;margin:0 0 8px;">Usuario: <strong>${userEmail ?? "anónimo"}</strong></p>
+        <p style="color:#1A2B3C;font-size:15px;line-height:1.6;white-space:pre-wrap;">${content}</p>
+      </div>
+    `,
+  });
+}
