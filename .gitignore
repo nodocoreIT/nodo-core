@@ -49,3 +49,4 @@ supabase/.temp/
 # Claude Code — local config, not for version control
 .claude/
 .mcp.json
+.mcp.json
