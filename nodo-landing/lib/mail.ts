@@ -835,8 +835,42 @@ export async function sendActivationEmail({
 
 // Backward-compat aliases — routes from main used these names before the merge
 export const sendClientNodoInviteEmail = sendActivationEmail;
-export const sendStaffAddedEmail = sendInmoStaffAddedEmail;
-export const sendStaffInviteEmail = sendInmoStaffInviteEmail;
+
+export async function sendStaffInviteEmail({
+  name,
+  email,
+  inviteUrl,
+  orgName,
+  inviterName,
+  nodeLabel,
+}: {
+  name: string;
+  email: string;
+  inviteUrl: string;
+  orgName: string;
+  inviterName?: string;
+  nodeLabel?: string;
+}): Promise<void> {
+  return sendInmoStaffInviteEmail({ name, email, inviteUrl, orgName });
+}
+
+export async function sendStaffAddedEmail({
+  name,
+  email,
+  orgName,
+  loginUrl,
+  inviterName,
+  nodeLabel,
+}: {
+  name: string;
+  email: string;
+  orgName: string;
+  loginUrl: string;
+  inviterName?: string;
+  nodeLabel?: string;
+}): Promise<void> {
+  return sendInmoStaffAddedEmail({ name, email, orgName, loginUrl });
+}
 
 type FeedbackEmailPayload = {
   category: "bug" | "idea" | "bloat";
