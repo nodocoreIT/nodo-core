@@ -81,6 +81,16 @@ export default function Navbar() {
 
         {/* Center links */}
         <ul className="nav-links flex items-center gap-8 list-none m-0 p-0">
+          {isNodoPage && (
+            <li>
+              <Link
+                href="/"
+                className="text-[14.5px] font-medium text-white/70 hover:text-white transition-colors duration-150"
+              >
+                Inicio
+              </Link>
+            </li>
+          )}
           {navLinks.map((link) => (
             <li key={link.id}>
               <Link
