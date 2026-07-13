@@ -13,6 +13,9 @@ import {
   ArrowRight,
   Bot,
 } from "lucide-react";
+import { getNodoLogoSrc } from "@/lib/node-accents";
+
+const inmoLogoSrc = getNodoLogoSrc("inmo");
 
 const FEATURES = [
   {
@@ -120,15 +123,19 @@ export default function NodoInmoPage() {
             </span>
 
             <p className="text-[13px] font-bold uppercase tracking-[.16em] text-orange-400 mb-4">
-              Módulo de Nodo Core
+              Unidad del ecosistema
             </p>
 
             <h1
-              className="font-display font-extrabold text-white"
+              className="font-display font-extrabold text-white flex flex-wrap items-center justify-center gap-x-4 gap-y-1"
               style={{ fontSize: "clamp(36px,5vw,64px)", lineHeight: 1.06 }}
             >
-              Tu inmobiliaria,{" "}
-              <span style={{ color: "#f97316" }}>en un solo lugar</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logos/estrella%20bco%20nar.png" alt="" aria-hidden style={{ height: "0.78em", width: "auto", display: "inline-block" }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={inmoLogoSrc} alt="Nodo" style={{ height: "0.78em", width: "auto", display: "inline-block" }} />
+              <span style={{ color: "#fff", fontWeight: 400 }}>|</span>
+              Inmobiliaria
             </h1>
 
             <p

@@ -149,10 +149,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Generate recovery link for password setup using nodo-clínica's own Supabase project
+  // Generate recovery link for password setup using nodo-clínica's own Supabase project.
+  // `next` must be a full URL pointing to the nodo-clinica app domain so the browser
+  // lands on the correct page after the auth/confirm token exchange.
   const origin = new URL(request.url).origin;
   const project = nodoAuthProjectParam("clinica");
-  const next = "/nodo-clinica/actualizar-contrasena";
+  const clinicaAppUrl = (process.env.NODO_CLINICA_APP_URL ?? "https://clinica.nodocore.com.ar").replace(/\/$/, "");
+  const next = `${clinicaAppUrl}/actualizar-contrasena`;
   const confirmQuery = `project=${encodeURIComponent(project)}&next=${encodeURIComponent(next)}`;
   const redirectToUrl = `${origin}/auth/confirm?${confirmQuery}`;
 
