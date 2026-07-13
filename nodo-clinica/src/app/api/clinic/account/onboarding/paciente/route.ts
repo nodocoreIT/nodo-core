@@ -15,6 +15,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const token = formData.get("token") as string | null;
     const fullName = formData.get("fullName") as string | null;
+    const dni = formData.get("dni") as string | null;
     const address = formData.get("address") as string | null;
     const obraSocial = formData.get("obraSocial") as string | null;
     const plan = formData.get("plan") as string | null;
@@ -28,9 +29,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    if (!fullName || !plan) {
+    if (!fullName || !plan || !dni) {
       return NextResponse.json(
-        { error: "Se requieren fullName y plan." },
+        { error: "Se requieren fullName, dni y plan." },
         { status: 400 },
       );
     }
@@ -142,6 +143,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         first_name: firstName,
         last_name: lastName,
         full_name: fullName,
+        dni: dni.trim(),
         email: email.toLowerCase().trim(),
         address: address ?? null,
         obra_social: obraSocial ?? null,
@@ -153,7 +155,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (patientError && patientError.code !== "23505") {
       console.error("[onboarding/paciente] patients insert error", patientError);
       return NextResponse.json(
-        { error: `DB: ${patientError.code} — ${patientError.message}` },
+        { error: "Error al crear perfil de paciente." },
         { status: 500 },
       );
     }

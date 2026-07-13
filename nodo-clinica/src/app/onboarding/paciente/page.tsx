@@ -88,6 +88,7 @@ function OnboardingPacienteContent() {
   const [plan, setPlan] = useState("gratuito");
   const [form, setForm] = useState({
     fullName: "",
+    dni: "",
     address: "",
     obraSocial: "",
   });
@@ -124,11 +125,16 @@ function OnboardingPacienteContent() {
       toast.error("El nombre completo es requerido.");
       return;
     }
+    if (!form.dni.trim()) {
+      toast.error("El número de DNI es requerido.");
+      return;
+    }
     setLoading(true);
     try {
       const formData = new FormData();
       formData.append("token", token);
       formData.append("fullName", form.fullName);
+      formData.append("dni", form.dni.trim());
       if (form.address) formData.append("address", form.address);
       if (form.obraSocial) formData.append("obraSocial", form.obraSocial);
       formData.append("plan", plan);
@@ -199,6 +205,18 @@ function OnboardingPacienteContent() {
                     setForm({ ...form, fullName: e.target.value })
                   }
                   placeholder="Juan García"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="dni">Número de DNI</Label>
+                <Input
+                  id="dni"
+                  required
+                  value={form.dni}
+                  onChange={(e) => setForm({ ...form, dni: e.target.value })}
+                  placeholder="28660386"
                   className="mt-1"
                 />
               </div>
