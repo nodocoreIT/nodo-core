@@ -32,8 +32,7 @@ function getNodoConfig(nodoCode: string): NodoConfig | null {
     case "finanzas":
       return envPair("NODO_FINANZAS");
     case "ecommerce":
-    case "tienda":
-      return envPair("NODO_TIENDA");
+      return envPair("NODO_ECOMMERCE");
     default:
       return null;
   }
