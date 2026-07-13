@@ -153,7 +153,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (patientError && patientError.code !== "23505") {
       console.error("[onboarding/paciente] patients insert error", patientError);
       return NextResponse.json(
-        { error: "Error al crear perfil de paciente." },
+        { error: `DB: ${patientError.code} — ${patientError.message}` },
         { status: 500 },
       );
     }
