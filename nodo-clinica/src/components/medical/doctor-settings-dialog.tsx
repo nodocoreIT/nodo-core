@@ -492,7 +492,7 @@ export function DoctorSettingsDialog({
                       <Input
                         type="file"
                         accept="image/*"
-                        className="mt-1 h-9 text-xs"
+                        className="mt-1 h-9 text-xs cursor-pointer file:cursor-pointer file:bg-brand file:text-white file:border-0 file:rounded file:px-3 file:text-xs file:font-medium hover:border-brand/50 transition-colors"
                         onChange={async (e) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
@@ -565,7 +565,7 @@ export function DoctorSettingsDialog({
                     <Input
                       type="file"
                       accept="image/*"
-                      className="mt-1 h-9 text-xs"
+                      className="mt-1 h-9 text-xs cursor-pointer file:cursor-pointer file:bg-brand file:text-white file:border-0 file:rounded file:px-3 file:text-xs file:font-medium hover:border-brand/50 transition-colors"
                       onChange={async (e) => {
                         const f = e.target.files?.[0];
                         if (!f) return;
@@ -886,7 +886,7 @@ export function DoctorSettingsDialog({
                     <Input
                       type="file"
                       accept="image/*"
-                      className="mt-1 h-9 text-xs"
+                      className="mt-1 h-9 text-xs cursor-pointer file:cursor-pointer file:bg-brand file:text-white file:border-0 file:rounded file:px-3 file:text-xs file:font-medium hover:border-brand/50 transition-colors"
                       onChange={async (e) => {
                         const f = e.target.files?.[0];
                         if (!f) return;

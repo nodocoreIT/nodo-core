@@ -216,7 +216,7 @@ export const clinicApi = {
 
   async completeOnboardingPaciente(
     formData: FormData,
-  ): Promise<{ ok: boolean; actionLink: string }> {
+  ): Promise<{ ok: boolean }> {
     // No Content-Type header — browser sets multipart boundary automatically
     const res = await fetch(`${BASE}/api/clinic/account/onboarding/paciente`, {
       method: "POST",
@@ -225,7 +225,7 @@ export const clinicApi = {
     });
     const resData = await parseJsonResponse(res);
     if (!res.ok) throw new Error(resData.error || "Error en onboarding");
-    return resData as { ok: boolean; actionLink: string };
+    return resData as { ok: boolean };
   },
 
   async logout() {

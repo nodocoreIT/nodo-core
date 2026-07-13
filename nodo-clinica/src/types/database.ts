@@ -53,21 +53,45 @@ export interface Database {
         {
           id: string;
           profile_id: string;
+          full_name: string | null;
+          email: string | null;
+          org_id: string | null;
           date_of_birth: string | null;
           medical_record_number: string | null;
+          address: string | null;
+          obra_social: string | null;
+          subscription_plan: string | null;
+          dni_front_path: string | null;
+          dni_back_path: string | null;
           created_at: string;
         },
         {
           id?: string;
           profile_id: string;
+          full_name?: string | null;
+          email?: string | null;
+          org_id?: string | null;
           date_of_birth?: string | null;
           medical_record_number?: string | null;
+          address?: string | null;
+          obra_social?: string | null;
+          subscription_plan?: string | null;
+          dni_front_path?: string | null;
+          dni_back_path?: string | null;
           created_at?: string;
         },
         {
           profile_id?: string;
+          full_name?: string | null;
+          email?: string | null;
+          org_id?: string | null;
           date_of_birth?: string | null;
           medical_record_number?: string | null;
+          address?: string | null;
+          obra_social?: string | null;
+          subscription_plan?: string | null;
+          dni_front_path?: string | null;
+          dni_back_path?: string | null;
         }
       >;
       appointments: TableDef<

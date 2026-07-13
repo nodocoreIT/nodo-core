@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   CreditCard,
   Check,
+  CheckCircle,
   ImagePlus,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,14 +25,14 @@ const PLANS = [
     name: "Gratuito",
     price: "$0",
     period: "siempre",
-    features: ["Hasta 3 turnos/mes", "Historial básico", "Videoconsulta"],
+    features: ["Historial básico", "Videoconsulta"],
   },
   {
     id: "pago",
     name: "Pago",
     price: "$4.900",
     period: "/mes",
-    features: ["Turnos ilimitados", "Historial completo", "Prioridad de atención"],
+    features: ["Historial completo", "Prioridad de atención", "Carga de Estudios"],
   },
 ];
 
@@ -83,6 +84,7 @@ function OnboardingPacienteContent() {
   const token = searchParams.get("token") ?? "";
 
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [plan, setPlan] = useState("gratuito");
   const [form, setForm] = useState({
     fullName: "",
@@ -133,10 +135,8 @@ function OnboardingPacienteContent() {
       if (dniFront) formData.append("dniFront", dniFront);
       if (dniBack) formData.append("dniBack", dniBack);
 
-      const result = await clinicApi.completeOnboardingPaciente(formData);
-      // Navigate to the magic link — Supabase establishes the session, then
-      // redirects to /paciente
-      window.location.href = result.actionLink;
+      await clinicApi.completeOnboardingPaciente(formData);
+      setSubmitted(true);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Error al completar el registro",
@@ -144,6 +144,22 @@ function OnboardingPacienteContent() {
       setLoading(false);
     }
   };
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 flex items-center justify-center p-4">
+        <div className="max-w-md w-full flex flex-col items-center gap-4 py-10 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-100">
+            <CheckCircle className="h-7 w-7 text-teal-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800">¡Registro completado!</h2>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            Pronto desde NODO activaremos tu cuenta. Una vez habilitada, vas a poder iniciar sesión con tu email y contraseña.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 py-8 px-4">
@@ -279,7 +295,7 @@ function OnboardingPacienteContent() {
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  "Completar registro"
+                  "Confirmar y solicitar habilitación"
                 )}
               </Button>
             </form>
