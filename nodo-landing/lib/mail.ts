@@ -601,17 +601,14 @@ export async function sendEcommerceVerificationEmail({
           <!-- Features row -->
           <div style="display:flex;gap:12px;margin-bottom:28px;">
             <div style="flex:1;background:#fafafa;border:1px solid #f3f4f6;border-radius:10px;padding:14px;text-align:center;">
-              <div style="font-size:20px;margin-bottom:6px;">🛍️</div>
               <div style="font-size:12px;font-weight:700;color:#111;">Catálogo</div>
               <div style="font-size:11px;color:#6b7280;margin-top:2px;">Productos y stock</div>
             </div>
             <div style="flex:1;background:#fafafa;border:1px solid #f3f4f6;border-radius:10px;padding:14px;text-align:center;">
-              <div style="font-size:20px;margin-bottom:6px;">📦</div>
               <div style="font-size:12px;font-weight:700;color:#111;">Pedidos</div>
               <div style="font-size:11px;color:#6b7280;margin-top:2px;">Gestión completa</div>
             </div>
             <div style="flex:1;background:#fafafa;border:1px solid #f3f4f6;border-radius:10px;padding:14px;text-align:center;">
-              <div style="font-size:20px;margin-bottom:6px;">💳</div>
               <div style="font-size:12px;font-weight:700;color:#111;">Pagos</div>
               <div style="font-size:11px;color:#6b7280;margin-top:2px;">MercadoPago y más</div>
             </div>
