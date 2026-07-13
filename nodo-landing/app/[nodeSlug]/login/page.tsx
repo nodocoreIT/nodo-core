@@ -2,30 +2,20 @@
 
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
-import LoginBrandPanel from "@/components/LoginBrandPanel";
-import { LoginFormNodeHeader } from "@/components/LoginFormNodeHeader";
-import { LoginNodeLockup } from "@/components/LoginNodeLockup";
-import { getLoginPanelDetails } from "@/lib/login-panel";
-import { Layers, Loader2, Stethoscope, User } from "lucide-react";
+import EcosystemDiagram from "@/components/EcosystemDiagram";
+import { Layers, ShoppingBag } from "lucide-react";
 import {
   PasswordResetPanel,
   usePasswordRecoveryBootstrap,
   enforceNodeAccess,
-  mapAuthLoginError,
   INVALID_LOGIN_MESSAGE,
   AUTH_ERROR_CREDENTIALS,
   mustSetPassword,
   fetchMustSetPassword,
-  mapAuthPasswordError,
-  isSamePasswordAuthError,
 } from "@nodocore/shared-components";
 import { createNodeBrowserClient } from "@/lib/supabase/nodo-browser";
-import {
-  getNodoAuthCode,
-  getNodoPublicAuthConfigError,
-} from "@/lib/supabase/nodo-auth-config";
-import { ClinicaLocalLoginEntry } from "@/components/ClinicaLocalLoginEntry";
 import { getNodeBySlug, getNodeMailLabel, getChildNodes, needsModulePicker } from "@/lib/nodes";
 import {
   submitDoctorRegistration,
@@ -34,10 +24,10 @@ import {
   submitInmoRegistration,
 } from "@/app/actions";
 import { submitNodeRegistration } from "@/app/actions/registration";
-import { resolvePublicOrigin } from "@/lib/auth/public-origin";
 import {
   DEFAULT_ACCENT,
   getLoginAccent,
+  getNodoLogoSrc,
   applyLoginAccent,
   type NodeAccent,
 } from "@/lib/node-accents";
@@ -55,14 +45,14 @@ function NodeTransitionOverlay({
   label,
   code,
   Icon,
+  logoSrc = "/logos/nodo%20nar.png",
   accent = DEFAULT_ACCENT,
-  wordmarkSlug,
 }: {
   label: string;
   code: string;
   Icon: React.ElementType;
+  logoSrc?: string;
   accent?: NodeAccent;
-  wordmarkSlug?: string;
 }) {
   const [mounted, setMounted] = useState(false);
   const [barWidth, setBarWidth] = useState(0);
@@ -146,9 +136,23 @@ function NodeTransitionOverlay({
         >
           Entrando a
         </p>
-        <div className="mt-2 flex justify-center">
-          <LoginNodeLockup nodeCode={code} wordmarkSlug={wordmarkSlug} size="panel" />
-        </div>
+        <h2
+          className="mt-2 font-display font-extrabold text-white text-center flex items-center justify-center gap-x-3.5 gap-y-1"
+          style={{ fontSize: "clamp(28px,5vw,52px)", lineHeight: 1.06 }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={logoSrc}
+            alt=""
+            style={{
+              height: "0.78em",
+              width: "auto",
+              display: "inline-block",
+            }}
+          />
+          <span style={{ color: "#fff", fontWeight: 400 }}>|</span>
+          <span>{code}</span>
+        </h2>
 
         {/* Dots */}
         <div className="mt-8 flex items-center gap-1.5">
@@ -196,22 +200,6 @@ function NodeTransitionOverlay({
   );
 }
 
-function SubmissionOverlay({ message }: { message: string }) {
-  return (
-    <div
-      className="fixed inset-0 z-[9998] flex items-center justify-center bg-navy-900/45 backdrop-blur-[2px]"
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-    >
-      <div className="flex flex-col items-center gap-4 rounded-2xl border border-mist bg-white px-10 py-8 shadow-2xl">
-        <Loader2 className="h-10 w-10 animate-spin text-brand" aria-hidden />
-        <p className="text-[15px] font-semibold text-navy">{message}</p>
-      </div>
-    </div>
-  );
-}
-
 export default function LoginPage() {
   return (
     <Suspense
@@ -226,37 +214,11 @@ export default function LoginPage() {
   );
 }
 
-export function LoginForm({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
-  const params = useParams();
-  const nodeParam = forcedNodeSlug ?? (params?.nodeSlug as string) ?? "";
-
-  const isClinicaNode =
-    nodeParam === "nodo-clinica" ||
-    nodeParam === "clinica-virtual" ||
-    nodeParam === "clinica";
-
-  const clinicaAuthError = useMemo(() => {
-    if (!isClinicaNode) return null;
-    const code = getNodoAuthCode(nodeParam);
-    if (!code) return "Auth no configurado para Clínica.";
-    return getNodoPublicAuthConfigError(code);
-  }, [isClinicaNode, nodeParam]);
-
-  if (isClinicaNode && clinicaAuthError) {
-    if (typeof window !== "undefined") {
-      window.location.replace("/clinica/login");
-    }
-    return null;
-  }
-
-  return <LoginFormInner forcedNodeSlug={forcedNodeSlug} />;
-}
-
-function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const params = useParams();
-  const nodeSlug = forcedNodeSlug ?? (params?.nodeSlug as string);
+  const nodeSlug = params?.nodeSlug as string;
   const nodeParam = nodeSlug || "";
   const modeParam = searchParams.get("mode") || "login";
   const roleParam = searchParams.get("role") || "paciente";
@@ -285,8 +247,18 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
   const isAutosNode = nodeParam === "nodo-autos" || nodeParam === "autos";
   const isFinanzasNode =
     nodeParam === "nodo-finanzas" || nodeParam === "finanzas";
-  const isSimpleRegisterNode = isInmoNode || isAutosNode || isFinanzasNode;
+  const isEcommerceNode = nodeParam === "nodo-ecommerce" || nodeParam === "ecommerce";
+  const isSimpleRegisterNode = isInmoNode || isAutosNode || isFinanzasNode || isEcommerceNode;
   const loginAccent = getLoginAccent(nodeParam);
+  const loginNodoLogoSrc = isFinanzasNode
+    ? "/logos/nodo ver.png"
+    : isAutosNode
+      ? "/logos/nodo roj.png"
+      : isClinicaNode
+        ? getNodoLogoSrc("clinica")
+        : isEcommerceNode
+          ? "/logos/nodo%20bco.png"
+          : "/logos/nodo nar.png";
 
   useEffect(() => applyLoginAccent(loginAccent), [loginAccent]);
 
@@ -312,9 +284,6 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
   const [generalError, setGeneralError] = useState("");
   const [loading, setLoading] = useState(false);
   const [needsNewPassword, setNeedsNewPassword] = useState(false);
-  const [inviterName, setInviterName] = useState<string | undefined>();
-  const [inviteRole, setInviteRole] = useState<string | undefined>();
-  const [invitedUserEmail, setInvitedUserEmail] = useState<string | undefined>();
 
   const {
     authMode,
@@ -331,11 +300,6 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
   useEffect(() => {
     if (recoveryBootstrapping) return;
     if (modeParam === "register") setAuthMode("register");
-    else if (modeParam === "first-access") {
-      setAuthMode("first-access");
-      const urlEmail = searchParams.get("email");
-      if (urlEmail) setEmail(urlEmail);
-    }
     else if (modeParam === "login") setAuthMode("login");
     else if (modeParam === "forgot") setAuthMode("forgot");
   }, [modeParam, recoveryBootstrapping, setAuthMode]);
@@ -345,54 +309,11 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
     else if (roleParam === "paciente") setRegisterRole("paciente");
   }, [roleParam]);
 
-  // Activate-invite mode: bootstrap session from magic link hash tokens
-  useEffect(() => {
-    if (modeParam !== "activate-invite") return;
-    setInviterName(searchParams.get("inviter") ?? undefined);
-    setInviteRole(searchParams.get("role") ?? undefined);
-
-    const hash = window.location.hash.substring(1);
-    const hashParams = new URLSearchParams(hash);
-
-    if (hashParams.get("access_token")) {
-      // Hash tokens present: bootstrap session via onAuthStateChange
-      let mounted = true;
-      const { data: { subscription } } = authSupabase.auth.onAuthStateChange((event, session) => {
-        if (!mounted) return;
-        if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session) {
-          window.history.replaceState(null, "", window.location.pathname + window.location.search);
-          if (session.user?.email) setInvitedUserEmail(session.user.email);
-          setNeedsNewPassword(true);
-        }
-      });
-      return () => {
-        mounted = false;
-        subscription.unsubscribe();
-      };
-    }
-
-    // No hash tokens: check existing session for must_set_password.
-    // Covers the SPA-callback redirect where the session lives in localStorage.
-    let cancelled = false;
-    void (async () => {
-      const { data: { session } } = await authSupabase.auth.getSession();
-      if (cancelled || !session) return;
-      const must = await fetchMustSetPassword(authSupabase);
-      if (cancelled) return;
-      if (must) {
-        if (session.user?.email) setInvitedUserEmail(session.user.email);
-        setNeedsNewPassword(true);
-      }
-    })();
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const [transitionTarget, setTransitionTarget] = useState<{
     label: string;
     code: string;
     Icon: React.ElementType;
-    wordmarkSlug?: string;
+    logoSrc?: string;
   } | null>(null);
   const [successModal, setSuccessModal] = useState<{
     open: boolean;
@@ -418,16 +339,10 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
     authMode === "login" &&
     !recoveryBootstrapping;
 
-  const showPortalPicker =
-    isClinicaNode &&
-    !searchParams.get("role") &&
-    authMode === "login" &&
-    !recoveryBootstrapping;
-
   const registrationOrigin =
     typeof window !== "undefined"
-      ? resolvePublicOrigin(window.location.origin)
-      : resolvePublicOrigin();
+      ? (process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? window.location.origin)
+      : "http://localhost:3000";
 
   const urlError = searchParams.get("error");
   const authErrorCode = searchParams.get("auth_error");
@@ -489,8 +404,32 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
     }
   }
 
-  const loginPanel = getLoginPanelDetails(nodeParam);
-  const detailNode = getNodeBySlug(loginPanel.activeNodeSlug ?? cleanSlug);
+  // Set up details for the left panel based on nodeParam
+  let activeNodeSlug: string | undefined = undefined;
+  let panelTitle = "El núcleo de gestión de su ecosistema.";
+  let panelDesc =
+    "Panel de administración para gestionar clientes, unidades de negocio y el roadmap del Core.";
+
+  if (nodeParam === "nodo-clinica" || nodeParam === "clinica-virtual") {
+    activeNodeSlug = "clinica"; // Connect to Clinica sub-node in diagram
+    panelTitle = "NODO | Clínica Virtual";
+    panelDesc =
+      "Plataforma HealthTech para telemedicina profesional: consultorios virtuales, recetas digitales e informes automatizados con Inteligencia Artificial.";
+  } else if (nodeParam === "nodo-autos" || nodeParam === "autos") {
+    activeNodeSlug = "autos";
+    panelTitle = "NODO | Automotores";
+    panelDesc =
+      "Panel de gestión de stock para concesionarias y agencias: inventario, clientes, publicaciones y contratos de venta digitales.";
+  } else if (isEcommerceNode) {
+    activeNodeSlug = "ecommerce";
+    panelTitle = "NODO | Ecommerce";
+    panelDesc =
+      "Plataforma de e-commerce para gestionar productos, proveedores, ventas y pasarelas de pago desde un solo panel.";
+  } else if (matchedNode) {
+    activeNodeSlug = matchedNode.slug;
+    panelTitle = `NODO | ${matchedNode.code}`;
+    panelDesc = matchedNode.description;
+  }
 
   const validEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
@@ -498,9 +437,12 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
     let tLabel = "Core";
     let tCode = "Core";
     let TIcon: React.ElementType = Layers;
-    let tWordmarkSlug: string | undefined;
 
-    if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
+    if (isEcommerceNode) {
+      tLabel = matchedNode?.label ?? "Nodo Ecommerce";
+      tCode = matchedNode?.code ?? "Ecommerce";
+      TIcon = matchedNode?.Icon ?? Layers;
+    } else if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
       tLabel = matchedNode?.label ?? "Nodo Inmo";
       tCode = matchedNode?.code ?? "Inmo";
       TIcon = matchedNode?.Icon ?? Layers;
@@ -509,10 +451,9 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
       nodeParam === "clinica-virtual" ||
       nodeParam === "clinica"
     ) {
-      tLabel = "Clínica Virtual";
+      tLabel = "Clínica Virtualaaaaa";
       tCode = "Clínica";
       TIcon = matchedNode?.Icon ?? Layers;
-      tWordmarkSlug = "clinica";
     } else if (isAutosNode) {
       tLabel = matchedNode?.label ?? "Nodo Automotores";
       tCode = matchedNode?.code ?? "Autos";
@@ -527,12 +468,16 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
       label: tLabel,
       code: tCode,
       Icon: TIcon,
-      wordmarkSlug: tWordmarkSlug,
+      ...(isFinanzasNode || isAutosNode || isClinicaNode || isEcommerceNode
+        ? { logoSrc: loginNodoLogoSrc }
+        : {}),
     });
 
     const { access_token, refresh_token } = session;
     setTimeout(() => {
-      if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
+      if (isEcommerceNode) {
+        window.location.href = `/ecommerce/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+      } else if (nodeParam === "nodo-inmo" || nodeParam === "inmo") {
         window.location.href = `/inmo/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
       } else if (
         nodeParam === "nodo-clinica" ||
@@ -565,16 +510,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
     }
 
     setLoading(true);
-
-    // Refresh the session before the API call to ensure a fresh access token.
-    // The invite access_token expires in 1h but the refresh_token lasts 7 days.
-    const { data: preRefreshed } = await authSupabase!.auth.refreshSession();
-    const { data: sessionData } = preRefreshed?.session
-      ? { data: { session: preRefreshed.session } }
-      : await authSupabase!.auth.getSession();
-
-    const userEmail = invitedUserEmail ?? sessionData.session?.user?.email;
-
+    const { data: sessionData } = await authSupabase!.auth.getSession();
     const res = await fetch("/api/auth/complete-forced-password", {
       method: "POST",
       headers: {
@@ -590,30 +526,14 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
     });
     const json = await res.json();
     if (!res.ok) {
-      setGeneralError(mapAuthPasswordError(json.error ?? "No se pudo actualizar la contraseña."));
+      setGeneralError(json.error ?? "No se pudo actualizar la contraseña.");
       setLoading(false);
       return;
     }
 
-    // Sign in directly with the new password — more reliable than refreshSession
-    // after the invite token exchange.
-    if (userEmail) {
-      const { data: signInData, error: signInErr } = await authSupabase!.auth.signInWithPassword({
-        email: userEmail,
-        password: password.trim(),
-      });
-      if (!signInErr && signInData.session) {
-        setNeedsNewPassword(false);
-        redirectAfterSession(signInData.session);
-        setLoading(false);
-        return;
-      }
-    }
-
-    // Fallback: try refreshSession in case signInWithPassword is unavailable.
-    const { data: refreshed, error: refreshErr } = await authSupabase!.auth.refreshSession();
+    const { data: refreshed, error: refreshErr } = await authSupabase.auth.refreshSession();
     if (refreshErr || !refreshed.session) {
-      setGeneralError("Contraseña activada. Podés iniciar sesión ahora.");
+      setGeneralError("Contraseña actualizada. Volvé a iniciar sesión.");
       setNeedsNewPassword(false);
       setAuthMode("login");
       setLoading(false);
@@ -643,7 +563,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
     }
     const needsPassword =
       authMode === "login" ||
-      (authMode === "register" && isClinicaNode && registerRole === "paciente");
+      (authMode === "register" && isFinanzasNode);
 
     if (needsPassword) {
       if (authMode === "login" && password.trim().length < 4) {
@@ -671,26 +591,9 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
       });
 
       if (error) {
-        setGeneralError(mapAuthLoginError(error.message));
+        setGeneralError(INVALID_LOGIN_MESSAGE);
         setLoading(false);
         return;
-      }
-
-      // For invite activation: accept pending invitations before checking access
-      // so the user gets added to org_members first.
-      if (modeParam === "activate-invite") {
-        try {
-          const { data: invitations } = await supabase.rpc("get_my_pending_invitations");
-          if (invitations?.length) {
-            for (const inv of invitations as { token: string }[]) {
-              await supabase.functions.invoke("accept-invitation", {
-                body: { token: inv.token, action: "accept" },
-              });
-            }
-          }
-        } catch (e) {
-          console.warn("accept-invitation:", e);
-        }
       }
 
       if (matchedNode?.code) {
@@ -735,15 +638,16 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
           });
           setLoading(false);
         }
-      } else if (isAutosNode || isFinanzasNode) {
-        const unitCode = isAutosNode ? "Autos" : "Finanzas";
-        const plan = isAutosNode ? "autos" : "finanzas";
+      } else if (isAutosNode || isFinanzasNode || isEcommerceNode) {
+        const unitCode = isAutosNode ? "Autos" : isFinanzasNode ? "Finanzas" : "Ecommerce";
+        const plan = isAutosNode ? "autos" : isFinanzasNode ? "finanzas" : "ecommerce";
         const result = await submitNodeRegistration({
           unitCode,
           fullName,
           email,
           plan,
           origin: originUrl,
+          password: isFinanzasNode ? password.trim() : undefined,
         });
 
         if (result.status === "error") {
@@ -782,7 +686,6 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
         const result = await submitPatientRegistration(
           fullName,
           email,
-          password,
           originUrl,
         );
 
@@ -909,39 +812,38 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
     }
 
     const supabase = authSupabase;
-
-    if (json.session?.access_token && json.session?.refresh_token) {
-      const { data: sessData, error: sessErr } = await supabase.auth.setSession({
-        access_token: json.session.access_token,
-        refresh_token: json.session.refresh_token,
-      });
-      if (!sessErr && sessData.session) {
-        setLoading(false);
-        redirectAfterSession(sessData.session);
-        return;
-      }
-    }
-
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password: password.trim(),
     });
 
     if (error || !data.session) {
-      setGeneralError(
-        mapAuthLoginError(error?.message) ||
-          json.login_error ||
-          "Tu contraseña quedó guardada. Iniciá sesión con tu email y la contraseña que elegiste.",
-      );
+      setSuccessModal({
+        open: true,
+        type: "paciente",
+        message: "Contraseña configurada. Ya podés iniciar sesión.",
+      });
       setAuthMode("login");
-      setPassword("");
-      setConfirmPassword("");
       setLoading(false);
       return;
     }
 
+    // Reuse login redirect logic
+    const { access_token, refresh_token } = data.session;
     setLoading(false);
-    redirectAfterSession(data.session);
+    if (isInmoNode) {
+      window.location.href = `/inmo/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+    } else if (isClinicaNode) {
+      window.location.href = `/clinica/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+    } else if (isAutosNode) {
+      window.location.href = `/autos/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+    } else if (isFinanzasNode) {
+      redirectToFinanzasAuth(access_token, refresh_token);
+    } else if (isEcommerceNode) {
+      window.location.href = `/ecommerce/auth/callback#access_token=${access_token}&refresh_token=${refresh_token}`;
+    } else {
+      router.push("/panel");
+    }
   }
 
   async function handleResetPassword(newPassword: string): Promise<string | null> {
@@ -950,19 +852,14 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
     });
 
     if (error) {
-      if (isSamePasswordAuthError(error.message)) {
-        // Recovery session is valid; password already matches — no change needed.
-        await authSupabase.auth.signOut({ scope: "local" });
-        setSuccessModal({
-          open: true,
-          type: "reset_success",
-          message:
-            "Tu contraseña ya era esa. Podés iniciar sesión con la misma clave.",
-        });
-        setAuthMode("login");
-        return null;
-      }
-      return mapAuthPasswordError(error.message);
+      const SUPABASE_AUTH_ERRORS: Record<string, string> = {
+        "New password should be different from the old password.":
+          "La nueva contraseña debe ser diferente a la anterior.",
+        "Password should be at least 6 characters.":
+          "La contraseña debe tener al menos 6 caracteres.",
+        "Auth session missing!": "Sesión expirada. Solicitá un nuevo enlace de recuperación.",
+      };
+      return SUPABASE_AUTH_ERRORS[error.message] ?? error.message;
     }
 
     await authSupabase.auth.signOut({ scope: "local" });
@@ -1010,6 +907,15 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
             submitLabel: "Crear cuenta",
             idPrefix: "reg-finanzas",
           }
+        : isEcommerceNode
+        ? {
+            title: "Crear cuenta en Nodo Ecommerce",
+            subtitle:
+              "Gestioná productos, proveedores, ventas y pasarelas de pago desde un solo lugar.",
+            emailPlaceholder: "tienda@ejemplo.com",
+            submitLabel: "Crear cuenta",
+            idPrefix: "reg-ecommerce",
+          }
         : null;
 
   const googleIcon = (
@@ -1040,35 +946,116 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
           label={transitionTarget.label}
           code={transitionTarget.code}
           Icon={transitionTarget.Icon}
+          logoSrc={transitionTarget.logoSrc}
           accent={loginAccent}
-          wordmarkSlug={transitionTarget.wordmarkSlug}
         />
-      )}
-
-      {loading && authMode === "register" && (
-        <SubmissionOverlay message="Enviando solicitud…" />
-      )}
-
-      {resendLoading && (
-        <SubmissionOverlay message="Reenviando correo de verificación…" />
       )}
 
       {/* Back button */}
       <Link
         href={
           nodeParam === "nodo-clinica" || nodeParam === "clinica-virtual"
-            ? "/nodo-clinica"
+            ? "/nodo-salud/clinica-virtual"
             : matchedNode
               ? `/nodo-${matchedNode.slug}`
               : "/"
         }
-        className="fixed top-[22px] right-[22px] z-10 inline-flex items-center gap-2 px-4 py-2 text-[14px] font-semibold rounded-md bg-brand text-white shadow-sm hover:bg-brand-600 active:scale-[.98] transition-all duration-150"
+        className={`fixed top-[22px] right-[22px] z-10 inline-flex items-center gap-2 px-4 py-2 text-[14px] font-semibold rounded-md shadow-sm active:scale-[.98] transition-all duration-150 ${isEcommerceNode ? "bg-brand text-black border border-black/30 hover:bg-brand-600" : "bg-brand text-white hover:bg-brand-600"}`}
       >
         ← Volver a la web
       </Link>
 
       <div className="min-h-screen grid grid-cols-1 login-split">
-        <LoginBrandPanel accent={loginAccent} {...loginPanel} />
+        {/* Brand panel (left) */}
+        <aside className="login-brand-panel relative overflow-hidden bg-navy-900 text-white px-12 py-10 flex-col min-h-screen hidden">
+          <div
+            aria-hidden
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: `radial-gradient(70% 50% at 30% 30%, rgba(${loginAccent.rgb},.20), transparent 70%)`,
+            }}
+          />
+
+          <div className="relative z-[1] shrink-0">
+            <Image
+              src="/logos/logo compuesto estrella az letra blancazzz.png"
+              alt="Nodo Core"
+              width={140}
+              height={30}
+              style={{ height: "30px", width: "auto" }}
+            />
+          </div>
+
+          <div className="relative z-[1] login-brand-diagram">
+            {isEcommerceNode ? (
+              <div className="flex items-center justify-center w-full h-full">
+                <div
+                  className="flex items-center justify-center rounded-full"
+                  style={{
+                    width: 120,
+                    height: 120,
+                    background: `rgba(${loginAccent.rgb}, 0.15)`,
+                    border: `2px solid rgba(${loginAccent.rgb}, 0.35)`,
+                  }}
+                >
+                  <ShoppingBag
+                    style={{ color: loginAccent.brand, width: 52, height: 52 }}
+                    strokeWidth={1.5}
+                  />
+                </div>
+              </div>
+            ) : (
+              <EcosystemDiagram
+                dark
+                interactive
+                isLoginPage
+                activeNodeSlug={activeNodeSlug}
+                className="w-[min(480px,96%)] aspect-square mx-auto"
+              />
+            )}
+          </div>
+
+          <div className="relative z-[1] shrink-0 login-brand-copy">
+            <h2
+              className="font-display font-extrabold text-white max-w-[14em]"
+              style={{ fontSize: "clamp(26px,2.6vw,34px)", lineHeight: 1.15 }}
+            >
+              {panelTitle.includes("|") ? (
+                <span className="flex items-center gap-[0.3em]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={loginNodoLogoSrc}
+                    alt="NODO"
+                    style={{
+                      height: "0.82em",
+                      width: "auto",
+                      display: "inline-block",
+                      verticalAlign: "middle",
+                    }}
+                  />
+                  <span className="text-white/40 font-normal mx-1">|</span>
+                  <span>{panelTitle.split("|")[1].trim()}</span>
+                </span>
+              ) : (
+                panelTitle
+              )}
+            </h2>
+
+            <p
+              className="text-[14.5px] leading-relaxed mt-4 max-w-[32em]"
+              style={{ color: "rgba(234,240,247,.7)" }}
+            >
+              {panelDesc}
+            </p>
+
+            <p
+              className="mt-8 text-[13px]"
+              style={{ color: "rgba(234,240,247,.5)" }}
+            >
+              © 2026 Nodo Core · Transparencia tecnológica
+            </p>
+          </div>
+        </aside>
 
         {/* Form panel (right) */}
         <main className="flex items-center justify-center p-8 bg-paper min-h-screen">
@@ -1076,7 +1063,6 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
             {/* If node is Clinica Virtual or Inmo, show Iniciar / Registrar toggle */}
             {(isClinicaNode || isSimpleRegisterNode) &&
               !showModulePicker &&
-              !showPortalPicker &&
               (authMode === "login" || authMode === "register") && (
                 <div className="flex border-b border-mist mb-6">
                   <button
@@ -1086,7 +1072,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                     }}
                     className={`flex-1 pb-3 text-[15px] font-bold transition-colors border-b-2 ${
                       authMode === "login"
-                        ? "border-brand text-brand"
+                        ? isEcommerceNode ? "border-black text-black" : "border-brand text-brand"
                         : "border-transparent text-slate2 hover:text-navy"
                     }`}
                   >
@@ -1099,7 +1085,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                     }}
                     className={`flex-1 pb-3 text-[15px] font-bold transition-colors border-b-2 ${
                       authMode === "register"
-                        ? "border-brand text-brand"
+                        ? isEcommerceNode ? "border-black text-black" : "border-brand text-brand"
                         : "border-transparent text-slate2 hover:text-navy"
                     }`}
                   >
@@ -1108,94 +1094,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                 </div>
               )}
 
-            {showPortalPicker ? (
-              <div>
-                <span
-                  className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em]"
-                  style={{ color: loginAccent.brand }}
-                >
-                  ◎ NODO SALUD · CLÍNICA VIRTUAL
-                </span>
-
-                <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
-                  Ingresar al portal
-                </h1>
-                <p className="text-slate2 text-[14.5px] mb-8">
-                  Elegí si sos profesional de la salud o paciente para continuar.
-                </p>
-
-                <div className="flex flex-col gap-4">
-                  <button
-                    type="button"
-                    onClick={() => router.push("/nodo-clinica/login?role=medico")}
-                    className="flex items-start gap-4 rounded-xl border border-mist bg-white p-5 text-left transition-all duration-150 cursor-pointer hover:shadow-md"
-                    style={{
-                      // Using inline style for hover border since Tailwind dynamic color needs CSS var
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = loginAccent.brand;
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = "";
-                    }}
-                  >
-                    <span
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-navy-900"
-                    >
-                      <Stethoscope
-                        aria-hidden
-                        className="h-5 w-5"
-                        strokeWidth={1.75}
-                        style={{ color: loginAccent.brand }}
-                      />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-bold text-ink text-[17px]">
-                        Soy Médico
-                      </span>
-                      <span className="mt-1 block text-slate2 text-[13.5px] leading-snug">
-                        Consultorio digital, cola de pacientes, interconsultas entre colegas e informes clínicos.
-                      </span>
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => router.push("/nodo-clinica/login?role=paciente")}
-                    className="flex items-start gap-4 rounded-xl border border-mist bg-white p-5 text-left transition-all duration-150 cursor-pointer hover:shadow-md"
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = loginAccent.brand;
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = "";
-                    }}
-                  >
-                    <span
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-navy-900"
-                    >
-                      <User
-                        aria-hidden
-                        className="h-5 w-5"
-                        strokeWidth={1.75}
-                        style={{ color: loginAccent.brand }}
-                      />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-bold text-ink text-[17px]">
-                        Soy Paciente
-                      </span>
-                      <span className="mt-1 block text-slate2 text-[13.5px] leading-snug">
-                        Reservá turno online, subí estudios y conectate por videollamada con tu médico.
-                      </span>
-                    </span>
-                  </button>
-                </div>
-
-                <p className="text-slate2 text-[13px] text-center mt-6">
-                  Seleccioná un portal para iniciar sesión o registrarte.
-                </p>
-              </div>
-            ) : recoveryBootstrapping ? (
+            {recoveryBootstrapping ? (
               <div className="text-center py-16">
                 <p className="text-slate2 text-[14.5px] font-medium">
                   Validando enlace de recuperación…
@@ -1254,17 +1153,13 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
             ) : needsNewPassword ? (
               <form onSubmit={handleForcedPasswordSubmit} noValidate>
                 <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
-                  {modeParam === "activate-invite" ? "◎ Activar tu cuenta" : "◎ Nueva contraseña"}
+                  ◎ Nueva contraseña
                 </span>
                 <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
-                  {modeParam === "activate-invite" ? "Activá tu acceso" : "Definí tu nueva contraseña"}
+                  Definí tu nueva contraseña
                 </h1>
                 <p className="text-slate2 text-[14.5px] mb-6">
-                  {modeParam === "activate-invite"
-                    ? (inviterName
-                        ? `${inviteRole ? `Ingresá tu contraseña para acceder como ${inviteRole}` : "Ingresá tu contraseña para continuar"} — te invitó ${inviterName}.`
-                        : "Te invitaron a participar. Elegí tu contraseña para continuar.")
-                    : "Tu acceso fue blanqueado o requiere una clave nueva. Elegí una contraseña y repetila para continuar."}
+                  Tu acceso fue blanqueado o requiere una clave nueva. Elegí una contraseña y repetila para continuar.
                 </p>
 
                 <div className="mb-4">
@@ -1310,42 +1205,42 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                   disabled={loading}
                   className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  {loading ? "Guardando…" : modeParam === "activate-invite" ? "Activar mi cuenta" : "Continuar"}
+                  {loading ? "Guardando…" : "Continuar"}
                 </button>
               </form>
             ) : authMode === "login" ? (
               <div>
-                {loginPanel.nodeCode && detailNode ? (
-                  <LoginFormNodeHeader
-                    nodeCode={loginPanel.nodeCode}
-                    wordmarkSlug={loginPanel.activeNodeSlug}
-                    Icon={detailNode.Icon}
-                    accent={loginAccent}
-                    subtitle={
-                      isClinicaNode
-                        ? "Ingrese sus credenciales de médico o paciente para acceder."
-                        : isInmoNode
-                          ? "Ingrese sus credenciales de dueño de inmobiliaria para acceder."
-                          : isAutosNode
-                            ? "Ingrese sus credenciales para acceder al panel de automotores."
-                            : isFinanzasNode
-                              ? "Ingrese sus credenciales para acceder a finanzas personales."
-                              : "Ingrese sus credenciales para acceder."
-                    }
-                  />
-                ) : (
-                  <>
-                    <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
-                      ◎ Acceso administradores
-                    </span>
-                    <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
-                      Iniciar sesión
-                    </h1>
-                    <p className="text-slate2 text-[14.5px] mb-6">
-                      Ingrese sus credenciales para acceder al panel de Nodo Core.
-                    </p>
-                  </>
-                )}
+                {/* Kicker */}
+                <span className={`inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] ${isEcommerceNode ? "text-black" : "text-brand"}`}>
+                  {isClinicaNode
+                    ? "◎ Portal Clínica Virtual"
+                    : isInmoNode
+                      ? "◎ Portal Inmobiliarias"
+                      : isAutosNode
+                        ? "◎ Portal Automotores"
+                        : isFinanzasNode
+                          ? "◎ Portal Finanzas Personales"
+                          : isEcommerceNode
+                            ? "◎ Portal Ecommerce"
+                            : "◎ Acceso administradores"}
+                </span>
+
+                <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
+                  Iniciar sesión
+                </h1>
+                <p className="text-slate2 text-[14.5px] mb-6">
+                  {isClinicaNode
+                    ? "Ingrese sus credenciales de médico o paciente para acceder."
+                    : isInmoNode
+                      ? "Ingrese sus credenciales de dueño de inmobiliaria para acceder."
+                      : isAutosNode
+                        ? "Ingrese sus credenciales para acceder al panel de automotores."
+                        : isFinanzasNode
+                          ? "Ingrese sus credenciales para acceder a finanzas personales."
+                          : isEcommerceNode
+                            ? "Ingrese sus credenciales para acceder al panel de e-commerce."
+                            : "Ingrese sus credenciales para acceder al panel de Nodo Core."}
+                </p>
 
                 {(isClinicaNode || isSimpleRegisterNode) && (
                   <>
@@ -1509,7 +1404,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                         setAuthMode("forgot");
                         setGeneralError("");
                       }}
-                      className="text-[13px] text-brand font-semibold cursor-pointer bg-transparent border-none outline-none hover:underline"
+                      className={`text-[13px] font-semibold cursor-pointer bg-transparent border-none outline-none hover:underline ${isEcommerceNode ? "text-black" : "text-brand"}`}
                     >
                       ¿Olvidó su contraseña?
                     </button>
@@ -1526,7 +1421,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                    className={`w-full py-3.5 rounded-md bg-brand font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer ${isEcommerceNode ? "text-black" : "text-white"}`}
                   >
                     {loading ? "Ingresando…" : "Ingresar al portal"}
                   </button>
@@ -1534,7 +1429,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
               </div>
             ) : authMode === "forgot" ? (
               <form onSubmit={handleForgotPasswordSubmit} noValidate>
-                <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-brand">
+                <span className={`inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] ${isEcommerceNode ? "text-black" : "text-brand"}`}>
                   ◎ Recuperar contraseña
                 </span>
                 <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
@@ -1579,7 +1474,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                  className={`w-full py-3.5 rounded-md bg-brand font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer ${isEcommerceNode ? "text-black" : "text-white"}`}
                 >
                   {loading ? "Enviando…" : "Recuperar ingreso"}
                 </button>
@@ -1591,7 +1486,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                       setAuthMode("login");
                       setGeneralError("");
                     }}
-                    className="text-[13.5px] font-semibold text-brand hover:underline bg-transparent border-none cursor-pointer"
+                    className={`text-[13.5px] font-semibold hover:underline bg-transparent border-none cursor-pointer ${isEcommerceNode ? "text-black" : "text-brand"}`}
                   >
                     Volver al inicio de sesión
                   </button>
@@ -1608,6 +1503,23 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                 <p className="text-slate2 text-[14.5px] mb-6">
                   Tu cuenta fue habilitada. Creá tu contraseña para ingresar a la aplicación.
                 </p>
+
+                <div className="mb-4">
+                  <label htmlFor="first-email" className="block text-[13px] font-semibold text-navy mb-1.5">
+                    Email
+                  </label>
+                  <input
+                    id="first-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setEmailError("");
+                    }}
+                    className={`${inputBase} ${emailError ? inputError : inputNormal} ${inputFocus}`}
+                  />
+                  {emailError && <p className="text-[12.5px] text-[#C0392B] mt-1.5">{emailError}</p>}
+                </div>
 
                 <div className="mb-4">
                   <label htmlFor="first-pass" className="block text-[13px] font-semibold text-navy mb-1.5">
@@ -1663,7 +1575,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                       setAuthMode("login");
                       setGeneralError("");
                     }}
-                    className="text-[13.5px] font-semibold text-brand hover:underline bg-transparent border-none cursor-pointer"
+                    className={`text-[13.5px] font-semibold hover:underline bg-transparent border-none cursor-pointer ${isEcommerceNode ? "text-black" : "text-brand"}`}
                   >
                     Volver al inicio de sesión
                   </button>
@@ -1763,8 +1675,40 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                         )}
                       </div>
 
+                      {isFinanzasNode && (
+                        <>
+                          <div className="mb-3">
+                            <label
+                              htmlFor={`${simpleRegisterContent.idPrefix}-password`}
+                              className="block text-[13px] font-semibold text-navy mb-1.5"
+                            >
+                              Contraseña
+                            </label>
+                            <input
+                              id={`${simpleRegisterContent.idPrefix}-password`}
+                              type="password"
+                              placeholder="Ingresé contraseña…"
+                              value={password}
+                              onChange={(e) => {
+                                setPassword(e.target.value);
+                                setPasswordError("");
+                              }}
+                              className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
+                              autoComplete="new-password"
+                            />
+                            {passwordError && (
+                              <p className="text-[12.5px] text-[#C0392B] mt-1.5">
+                                {passwordError}
+                              </p>
+                            )}
+                          </div>
+                        </>
+                      )}
+
                       <p className="text-slate2 text-[12px] mb-4 text-center">
-                        Te enviaremos un correo para verificar tu email. La contraseña la configurás después de la habilitación.
+                        {isFinanzasNode
+                          ? "Te enviaremos un correo para verificar tu email y activar tu cuenta."
+                          : "Te enviaremos un correo para verificar tu email. La contraseña la configurás después de la habilitación."}
                       </p>
 
                       {generalError && (
@@ -1787,7 +1731,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3.5 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                        className={`w-full py-3.5 rounded-md bg-brand font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer ${isEcommerceNode ? "text-black" : "text-white"}`}
                       >
                         {loading
                           ? "Registrando…"
@@ -1931,32 +1875,6 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                             {emailError && (
                               <p className="text-[12.5px] text-[#C0392B] mt-1.5">
                                 {emailError}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Password */}
-                          <div className="mb-4">
-                            <label
-                              htmlFor="reg-patient-pass"
-                              className="block text-[13px] font-semibold text-navy mb-1.5"
-                            >
-                              Contraseña
-                            </label>
-                            <input
-                              id="reg-patient-pass"
-                              type="password"
-                              placeholder="Ingresé contraseña…"
-                              value={password}
-                              onChange={(e) => {
-                                setPassword(e.target.value);
-                                setPasswordError("");
-                              }}
-                              className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
-                            />
-                            {passwordError && (
-                              <p className="text-[12.5px] text-[#C0392B] mt-1.5">
-                                {passwordError}
                               </p>
                             )}
                           </div>
@@ -2160,9 +2078,9 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                       type: "medico",
                       message: "",
                     });
-                    router.push("/nodo-clinica");
+                    router.push("/nodo-salud/clinica-virtual");
                   }}
-                  className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
+                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
                 >
                   Entendido
                 </button>
@@ -2185,7 +2103,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                     />
                   </svg>
                 </div>
-                <h3 className="font-display font-extrabold text-brand text-[21px] mb-2.5">
+                <h3 className="font-display font-extrabold text-[var(--color-brand-kicker,var(--color-brand,#DA5A0E))] text-[21px] mb-2.5">
                   Contraseña actualizada
                 </h3>
                 <p className="text-slate2 text-[14px] leading-relaxed mb-6">
@@ -2200,7 +2118,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                     });
                     setAuthMode("login");
                   }}
-                  className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
+                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
                 >
                   Ir al inicio de sesión
                 </button>
@@ -2240,7 +2158,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                     });
                     setAuthMode("login");
                   }}
-                  className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
+                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
                 >
                   Entendido
                 </button>
@@ -2285,10 +2203,12 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                           ? "/nodo-autos"
                           : isFinanzasNode
                             ? "/nodo-finanzas"
-                            : "/nodo-clinica",
+                            : isEcommerceNode
+                              ? "/nodo-ecommerce"
+                              : "/nodo-salud/clinica-virtual",
                     );
                   }}
-                  className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
+                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
                 >
                   Entendido
                 </button>
@@ -2327,7 +2247,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                     });
                     router.push("/panel");
                   }}
-                  className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
+                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
                 >
                   Ingresar al Panel
                 </button>

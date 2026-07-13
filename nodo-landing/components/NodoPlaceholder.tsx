@@ -339,10 +339,10 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
                     </p>
                   </div>
                   <Link
-                    href="/nodo-autos/login"
+                    href="/nodo-autos"
                     className="inline-flex items-center gap-2 text-rose-500 font-semibold text-[15px] hover:text-rose-400 transition-colors"
                   >
-                    Acceder al módulo <ArrowRight className="h-4 w-4" />
+                    Ver Módulo <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
 
@@ -371,10 +371,10 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
                     </p>
                   </div>
                   <Link
-                    href="/nodo-finanzas/login"
+                    href="/nodo-finanzas"
                     className="inline-flex items-center gap-2 text-emerald-400 font-semibold text-[15px] hover:text-emerald-300 transition-colors"
                   >
-                    Acceder al módulo <ArrowRight className="h-4 w-4" />
+                    Ver Módulo <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
 
@@ -384,29 +384,29 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
                   style={{
                     background:
                       "linear-gradient(135deg, var(--color-navy-700), var(--color-navy))",
-                    border: "1px solid rgba(59, 130, 246, 0.25)",
-                    boxShadow: "0 10px 30px -15px rgba(59, 130, 246, 0.15)",
+                    border: "1px solid rgba(245, 158, 11, 0.25)",
+                    boxShadow: "0 10px 30px -15px rgba(245, 158, 11, 0.15)",
                   }}
                 >
                   <div>
-                    <div className="h-12 w-12 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center mb-6">
+                    <div className="h-12 w-12 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center mb-6">
                       <ShoppingBag className="h-6 w-6" />
                     </div>
                     <h3 className="font-display font-bold text-white text-[20px] mb-3">
                       Nodo Ecommerce
                     </h3>
-                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20 mb-4">
-                      Desarrollo a pedido
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4">
+                      Disponible
                     </span>
                     <p className="text-[14.5px] leading-relaxed text-slate2-300 mb-6">
                       Todo para gestionar tu e-commerce de manera profesional: catálogo de productos, pasarelas de pago, envíos integrados y control de ventas.
                     </p>
                   </div>
                   <Link
-                    href="/#contacto"
-                    className="inline-flex items-center gap-2 text-blue-400 font-semibold text-[15px] hover:text-blue-300 transition-colors"
+                    href="/nodo-ecommerce"
+                    className="inline-flex items-center gap-2 text-amber-400 font-semibold text-[15px] hover:text-amber-300 transition-colors"
                   >
-                    Desarrollo a pedido <ArrowRight className="h-4 w-4" />
+                    Ver Módulo <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
               </div>

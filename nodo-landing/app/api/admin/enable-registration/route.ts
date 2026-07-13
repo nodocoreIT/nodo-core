@@ -1,13 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getNodeRegistrationConfig } from "@/lib/registration/node-config";
-import { getLoginHrefForNode, getNodeMailLabelByCode } from "@/lib/nodes";
 import {
   provisionNodoAccessPendingPassword,
   createLandingAuthPendingPassword,
 } from "@/lib/registration/provision";
 import { sendAccountEnabledEmail, isMailConfigured } from "@/lib/mail";
-import { setNodoAuthSuspendedForUnit } from "@/lib/registration/nodo-access-suspend";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -128,27 +126,18 @@ export async function POST(request: Request) {
     .update({ status: "activo" })
     .eq("client_unit_id", clientUnitId);
 
-  if (cfg?.provisionable && provisionUserId) {
-    const reactivate = await setNodoAuthSuspendedForUnit(
-      unit.unit_code,
-      { provision_user_id: provisionUserId, access_user: email },
-      "reactivate",
-    );
-    if (!reactivate.ok) {
-      console.error("[enable-registration] reactivate auth:", reactivate.error);
-    }
-  }
-
   const origin = new URL(request.url).origin;
-  const loginPath = getLoginHrefForNode(cfg?.slug ?? "inmo");
-  const loginUrl = `${origin}${loginPath}?mode=first-access&email=${encodeURIComponent(email)}`;
+  // Use nodo-{slug} prefix so multi-zone proxy paths (e.g. /ecommerce/*) are not hit.
+  const loginPathSlug = cfg ? `nodo-${cfg.slug}` : "login";
+  const loginUrl = `${origin}/${loginPathSlug}/login?mode=first-access`;
 
   if (isMailConfigured()) {
     await sendAccountEnabledEmail({
       nombre: fullName,
       email,
-      nodeLabel: getNodeMailLabelByCode(unit.unit_code),
+      nodeLabel: cfg?.label ?? unit.unit_code,
       loginUrl,
+      unitCode: unit.unit_code,
     });
   }
 

@@ -199,8 +199,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const unitStatus = selfService ? "activo" : "pending_onboarding";
-    const unitProgress = selfService ? 100 : 0;
+    const isPaciente = row.plan === "paciente";
+    const unitStatus = selfService ? "activo" : isPaciente ? "pending_review" : "pending_onboarding";
+    const unitProgress = selfService ? 100 : isPaciente ? 50 : 0;
 
     let clientUnitId = existingUnit?.id;
 
@@ -229,7 +230,7 @@ export async function GET(request: NextRequest) {
     } else if (!selfService) {
       await admin
         .from("client_units")
-        .update({ status: "pending_onboarding", progress: 0 })
+        .update({ status: unitStatus, progress: unitProgress })
         .eq("id", clientUnitId);
     }
 
@@ -309,6 +310,13 @@ export async function GET(request: NextRequest) {
           `/registro/verificado?node=${redirectSlug}${row.plan === "paciente" ? "&role=paciente" : ""}`,
           request.url,
         ),
+      );
+    }
+
+    // Patients skip onboarding — go straight to pending_review confirmation
+    if (row.plan === "paciente") {
+      return NextResponse.redirect(
+        new URL(`/registro/verificado?node=${redirectSlug}&status=pending_review&role=paciente`, request.url),
       );
     }
 

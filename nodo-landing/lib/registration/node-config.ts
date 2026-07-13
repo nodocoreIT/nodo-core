@@ -15,7 +15,7 @@ export interface NodeRegistrationConfig {
   accessUrl?: string;
 }
 
-const SELF_SERVICE = new Set(["paciente"]);
+const SELF_SERVICE = new Set<string>([]);
 
 export const NODE_REGISTRATION_CONFIG: Record<string, NodeRegistrationConfig> =
   Object.fromEntries(

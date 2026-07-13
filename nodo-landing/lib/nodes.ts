@@ -8,6 +8,7 @@ import {
   Wheat,
   Calculator,
   Car,
+  ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
 
@@ -224,6 +225,36 @@ export const NODES: NodeDef[] = [
         title: "Informe mensual",
         description:
           "Visualización gráfica de tu situación financiera: gastos por categoría, evolución diaria y balance del mes.",
+      },
+    ],
+    provisionable: true,
+  },
+  {
+    code: "Ecommerce",
+    slug: "ecommerce",
+    label: "Nodo Ecommerce",
+    parentSlug: "it",
+    inDevelopment: false,
+    description:
+      "Plataforma de e-commerce multi-tenant: creá y administrá tu tienda online con productos, pedidos, proveedores y pasarelas de pago.",
+    Icon: ShoppingBag,
+    intro:
+      "Nodo Ecommerce es tu plataforma completa para vender online. Gestioná productos, categorías, marcas y proveedores. Procesá pedidos, configurá pasarelas de pago y personalizá tu tienda con tu dominio propio.",
+    highlights: [
+      {
+        title: "Catálogo y stock",
+        description:
+          "Cargá productos con fotos, variantes, precio de costo y venta, y control de inventario en tiempo real.",
+      },
+      {
+        title: "Pedidos y pagos",
+        description:
+          "Gestioná pedidos con estados, integrá MercadoPago y mostrá datos bancarios para transferencias.",
+      },
+      {
+        title: "Tu dominio propio",
+        description:
+          "Cada tienda vive en un subdominio propio. Con el plan Pro conectá tu dominio personalizado.",
       },
     ],
     provisionable: true,
