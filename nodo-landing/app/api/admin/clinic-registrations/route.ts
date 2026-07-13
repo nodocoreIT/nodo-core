@@ -177,6 +177,7 @@ export async function POST(request: NextRequest) {
       email: reg.email,
       nodeLabel: "Nodo Clínica",
       loginUrl: linkData.properties.action_link,
+      unitCode: "clinica",
     });
   } catch (mailErr) {
     console.error("[admin/clinic-registrations] email error", mailErr);
