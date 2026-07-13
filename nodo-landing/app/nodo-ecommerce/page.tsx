@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
-import { ECOMMERCE_ACCENT } from "@/lib/node-accents";
+import { ECOMMERCE_ACCENT, getNodoLogoSrc } from "@/lib/node-accents";
 import {
   ShoppingBag,
   Package,
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 const A = ECOMMERCE_ACCENT;
+const ecommerceLogoSrc = getNodoLogoSrc("ecommerce");
 
 const FEATURES = [
   {
@@ -142,15 +143,19 @@ export default function NodoEcommercePage() {
               className="text-[13px] font-bold uppercase tracking-[.16em] mb-4"
               style={{ color: A.brand }}
             >
-              Módulo de Nodo Core
+              Unidad del ecosistema
             </p>
 
             <h1
-              className="font-display font-extrabold text-white"
+              className="font-display font-extrabold text-white flex flex-wrap items-center justify-center gap-x-4 gap-y-1"
               style={{ fontSize: "clamp(36px,5vw,64px)", lineHeight: 1.06 }}
             >
-              Tu negocio digital,{" "}
-              <span style={{ color: A.brand }}>todo en un lugar</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logos/estrella%20bco%20nar.png" alt="" aria-hidden style={{ height: "0.78em", width: "auto", display: "inline-block" }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={ecommerceLogoSrc} alt="Nodo" style={{ height: "0.78em", width: "auto", display: "inline-block" }} />
+              <span style={{ color: "#fff", fontWeight: 400 }}>|</span>
+              Ecommerce
             </h1>
 
             <p

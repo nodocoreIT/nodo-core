@@ -723,7 +723,11 @@ export async function sendAccountEnabledEmail({
   const badgeText  = theme.light ? brandColor : "#ffffff";
   const linkColor  = theme.light ? "#857f00" : brandColor;
 
-  const attachments = registrationLogoAttachments();
+  // Use the white composite logo on the colored header (better contrast than the orange logo).
+  const whiteLogoPath = path.join(process.cwd(), "public/logos/logo compuesto estrella az letra blanca_50.png");
+  const attachments: nodemailer.SendMailOptions["attachments"] = fs.existsSync(whiteLogoPath)
+    ? [{ filename: "logo_blanco.png", path: whiteLogoPath, cid: "nodologo" }]
+    : (registrationLogoAttachments() ?? []);
   const logoHtml = attachments?.length
     ? `<img src="cid:nodologo" alt="NODO Core" style="height:28px;display:inline-block;margin-bottom:16px;"/><br/>`
     : "";

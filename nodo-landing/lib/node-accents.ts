@@ -109,6 +109,7 @@ export function getNodoLogoSrc(nodeParamOrSlug: string): string {
   if (slug === "clinica" || slug === "clinica-virtual" || slug === "salud") {
     return "/logos/nodo%20ver%20clinica.png";
   }
+  if (slug === "ecommerce") return "/logos/nodo%20amar.png";
   return "/logos/nodo%20nar.png";
 }
 
