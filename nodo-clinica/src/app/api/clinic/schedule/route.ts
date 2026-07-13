@@ -223,7 +223,7 @@ export async function PUT(request: NextRequest) {
   const serviceClientPut = await (await import("@/lib/supabase/server")).createServiceClient();
   const { data: professional } = await serviceClientPut
     .from("professionals")
-    .select("id, office_settings(*)")
+    .select("id, org_id, office_settings(*)")
     .eq("id", me.id)
     .maybeSingle();
 
@@ -316,7 +316,7 @@ export async function PUT(request: NextRequest) {
   const { data: saved, error } = await (serviceClientPut as any)
     .from("office_settings")
     .upsert(
-      { ...updateData, professional_id: professional.id },
+      { ...updateData, professional_id: (professional as any).id, org_id: (professional as any).org_id },
       { onConflict: "professional_id" },
     )
     .select()
