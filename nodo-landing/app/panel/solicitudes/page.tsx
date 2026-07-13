@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle, Clock, FileImage, CreditCard, Stethoscope, Trash2, MailCheck, AlertCircle } from "lucide-react";
+import { CheckCircle, Clock, FileImage, CreditCard, Trash2, MailCheck, AlertCircle } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
 import { NODES } from "@/lib/nodes";
@@ -237,149 +237,125 @@ export default function SolicitudesPage() {
       <div className="panel-scroll" style={{ flex: 1, overflow: "auto", padding: "24px 32px" }}>
 
         {/* ── Nodo Clínica registrations ─────────────────────────────── */}
-        <div style={{ marginBottom: 40 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-            <Stethoscope size={18} style={{ color: "#0D9488" }} />
-            <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--color-navy)" }}>
-              Nodo Clínica
-            </h2>
-          </div>
-          <p style={{ color: "var(--color-slate2)", fontSize: 13, maxWidth: 680, marginBottom: 16 }}>
-            Seguimiento de registros en proceso. <strong>Estadío 1</strong>: email enviado, sin
-            verificar. <strong>Estadío 2</strong>: email verificado, onboarding en curso.
-          </p>
+        {clinicLoading ? (
+          <p style={{ color: "var(--color-slate2)", fontSize: 13 }}>Cargando…</p>
+        ) : clinicRegs.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+            {clinicRegs.map((r) => {
+              const stageLabel =
+                r.stage === "pending_email"
+                  ? "Estadío 1 — Email enviado"
+                  : r.stage === "expired"
+                    ? "Estadío 1 — Link expirado"
+                    : "Estadío 2 — En onboarding";
 
-          {clinicLoading ? (
-            <p style={{ color: "var(--color-slate2)", fontSize: 13 }}>Cargando…</p>
-          ) : clinicRegs.length === 0 ? (
-            <div style={{ padding: 24, textAlign: "center", borderRadius: 14, background: "var(--color-mist)" }}>
-              <p style={{ color: "var(--color-slate2)", fontSize: 13, margin: 0 }}>Sin solicitudes de Nodo Clínica.</p>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {clinicRegs.map((r) => {
-                const stageLabel =
-                  r.stage === "pending_email"
-                    ? "Estadío 1 — Email enviado"
-                    : r.stage === "expired"
-                      ? "Estadío 1 — Link expirado"
-                      : "Estadío 2 — En onboarding";
+              const stageBg =
+                r.stage === "pending_email"
+                  ? "#DBEAFE"
+                  : r.stage === "expired"
+                    ? "#FEE2E2"
+                    : "#D1FAE5";
 
-                const stageBg =
-                  r.stage === "pending_email"
-                    ? "#DBEAFE"
-                    : r.stage === "expired"
-                      ? "#FEE2E2"
-                      : "#D1FAE5";
+              const stageColor =
+                r.stage === "pending_email"
+                  ? "#1D4ED8"
+                  : r.stage === "expired"
+                    ? "#991B1B"
+                    : "#065F46";
 
-                const stageColor =
-                  r.stage === "pending_email"
-                    ? "#1D4ED8"
-                    : r.stage === "expired"
-                      ? "#991B1B"
-                      : "#065F46";
+              const StageIcon =
+                r.stage === "pending_email"
+                  ? Clock
+                  : r.stage === "expired"
+                    ? AlertCircle
+                    : MailCheck;
 
-                const StageIcon =
-                  r.stage === "pending_email"
-                    ? Clock
-                    : r.stage === "expired"
-                      ? AlertCircle
-                      : MailCheck;
-
-                return (
-                  <article
-                    key={r.id}
-                    style={{
-                      border: "1px solid var(--color-mist)",
-                      borderRadius: 12,
-                      padding: "14px 18px",
-                      background: "#fff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 16,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-                      <div>
-                        <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{r.email}</p>
-                        <p style={{ fontSize: 12, color: "var(--color-slate2)", margin: "3px 0 0" }}>
-                          {r.role === "medico" ? "Médico" : "Paciente"} ·{" "}
-                          {new Date(r.created_at).toLocaleDateString("es-AR", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                          {r.stage !== "pending_onboarding" && (
-                            <> · vence {new Date(r.expires_at).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</>
-                          )}
-                        </p>
-                      </div>
-                      <span
-                        style={{
-                          background: stageBg,
-                          color: stageColor,
-                          padding: "3px 10px",
-                          borderRadius: 999,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 5,
-                        }}
-                      >
-                        <StageIcon size={11} />
-                        {stageLabel}
-                      </span>
+              return (
+                <article
+                  key={r.id}
+                  style={{
+                    border: "1px solid var(--color-mist)",
+                    borderRadius: 12,
+                    padding: "14px 18px",
+                    background: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                    <div>
+                      <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{r.email}</p>
+                      <p style={{ fontSize: 12, color: "var(--color-slate2)", margin: "3px 0 0" }}>
+                        {r.role === "medico" ? "Médico" : "Paciente"} ·{" "}
+                        {new Date(r.created_at).toLocaleDateString("es-AR", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                        {r.stage !== "pending_onboarding" && (
+                          <> · vence {new Date(r.expires_at).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</>
+                        )}
+                      </p>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setDeleteConfirmId(r.id)}
-                      title="Eliminar solicitud (permite re-registro)"
+                    <span style={{ background: "#E0F2F1", color: "#0D9488", padding: "2px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600 }}>
+                      Nodo Clínica
+                    </span>
+                    <span
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "6px 14px",
-                        borderRadius: 8,
-                        border: "1px solid #FCA5A5",
-                        background: "transparent",
-                        color: "#DC2626",
-                        fontSize: 12,
+                        background: stageBg,
+                        color: stageColor,
+                        padding: "3px 10px",
+                        borderRadius: 999,
+                        fontSize: 11,
                         fontWeight: 600,
-                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
                       }}
                     >
-                      <Trash2 size={13} />
-                      Eliminar
-                    </button>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                      <StageIcon size={11} />
+                      {stageLabel}
+                    </span>
+                  </div>
 
-        {/* ── Nodo Inmo / otros nodos ────────────────────────────────── */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--color-navy)" }}>
-            Otros nodos
-          </h2>
-        </div>
-        <p style={{ color: "var(--color-slate2)", fontSize: 13, maxWidth: 720, marginBottom: 16 }}>
-          Revisá documentación, datos de contacto y tarjeta. Al habilitar, el usuario recibe el
-          correo para configurar su contraseña en el primer acceso.
-        </p>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirmId(r.id)}
+                    title="Eliminar solicitud (permite re-registro)"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "6px 14px",
+                      borderRadius: 8,
+                      border: "1px solid #FCA5A5",
+                      background: "transparent",
+                      color: "#DC2626",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Trash2 size={13} />
+                    Eliminar
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+        )}
 
+        {/* ── Other nodo registrations ────────────────────────────────── */}
         {loading ? (
           <p style={{ color: "var(--color-slate2)" }}>Cargando…</p>
-        ) : solicitudes.length === 0 ? (
+        ) : solicitudes.length === 0 && clinicRegs.length === 0 ? (
           <div style={{ padding: 24, textAlign: "center", borderRadius: 14, background: "var(--color-mist)" }}>
-            <p style={{ color: "var(--color-slate2)", fontSize: 13, margin: 0 }}>Sin solicitudes de otros nodos.</p>
+            <p style={{ color: "var(--color-slate2)", fontSize: 13, margin: 0 }}>Sin solicitudes pendientes.</p>
           </div>
-        ) : (
+        ) : solicitudes.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {solicitudes.map((s) => (
               <article
