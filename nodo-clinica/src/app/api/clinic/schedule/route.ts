@@ -52,6 +52,13 @@ function doctorOfficePayload(professional: any, officeSettings: any) {
   const availability = getAvailability(officeSettings);
   return {
     availability,
+    fullName: professional?.full_name ?? "",
+    licenseNumber: professional?.license_number ?? "",
+    specialties: Array.isArray(professional?.specialties)
+      ? professional.specialties
+      : professional?.specialty
+        ? [professional.specialty]
+        : [],
     signatureText: professional?.signature_text ?? "",
     signatureImageData: professional?.signature_image_url ?? "",
     profilePhotoData: professional?.profile_photo_url ?? "",
@@ -245,6 +252,9 @@ export async function PUT(request: NextRequest) {
 
   // Update profile fields on the professionals row
   const professionalUpdate: Record<string, unknown> = {};
+  if ((body as any).fullName !== undefined) professionalUpdate.full_name = String((body as any).fullName).trim();
+  if ((body as any).licenseNumber !== undefined) professionalUpdate.license_number = String((body as any).licenseNumber).trim();
+  if (Array.isArray((body as any).specialties)) professionalUpdate.specialties = (body as any).specialties;
   if (signatureText !== undefined) professionalUpdate.signature_text = signatureText;
   if (signatureImageData !== undefined) professionalUpdate.signature_image_url = signatureImageData;
   if (profilePhotoData !== undefined) professionalUpdate.profile_photo_url = profilePhotoData;

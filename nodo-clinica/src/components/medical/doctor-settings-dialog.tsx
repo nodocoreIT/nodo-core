@@ -95,6 +95,10 @@ export function DoctorSettingsDialog({
 
   const [availability, setAvailability] = useState<DoctorAvailability>(DEFAULT_AVAILABILITY);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const [fullName, setFullName] = useState("");
+  const [licenseNumber, setLicenseNumber] = useState("");
+  const [specialties, setSpecialties] = useState<string[]>([]);
+  const [specialtyInput, setSpecialtyInput] = useState("");
   const [signatureText, setSignatureText] = useState("");
   const [signatureImageData, setSignatureImageData] = useState("");
   const [profilePhotoData, setProfilePhotoData] = useState("");
@@ -157,6 +161,9 @@ export function DoctorSettingsDialog({
         const avail = data.availability as DoctorAvailability;
         setBlockedDates(avail.blockedDates ?? (data.blockedDates as string[]) ?? []);
       }
+      if (data.fullName != null) setFullName(String(data.fullName));
+      if (data.licenseNumber != null) setLicenseNumber(String(data.licenseNumber));
+      if (Array.isArray(data.specialties)) setSpecialties(data.specialties as string[]);
       if (data.signatureText != null) setSignatureText(String(data.signatureText));
       if (data.signatureImageData != null) setSignatureImageData(String(data.signatureImageData));
       if (data.profilePhotoData != null) setProfilePhotoData(String(data.profilePhotoData));
@@ -260,6 +267,9 @@ export function DoctorSettingsDialog({
     setSaving(true);
     try {
       const result = await clinicApi.saveDoctorOffice({
+        fullName,
+        licenseNumber,
+        specialties,
         availability: { ...availability, blockedDates },
         blockedDates,
         signatureText,
@@ -478,6 +488,69 @@ export function DoctorSettingsDialog({
               {/* ── Perfil ── */}
               {activeSection === "perfil" && (
                 <>
+                  {/* Name & license */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Nombre y apellido</Label>
+                      <Input
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Dr. Juan García"
+                        className="mt-1 h-9 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Matrícula</Label>
+                      <Input
+                        value={licenseNumber}
+                        onChange={(e) => setLicenseNumber(e.target.value)}
+                        placeholder="MP 12345"
+                        className="mt-1 h-9 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Specialties */}
+                  <div>
+                    <Label className="text-xs">Especialidades</Label>
+                    <div className="mt-1 flex flex-wrap gap-1.5 min-h-[36px] rounded-md border border-slate-200 px-2 py-1.5 bg-white">
+                      {specialties.map((s, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1 bg-brand/10 text-brand text-xs font-medium px-2 py-0.5 rounded-full"
+                        >
+                          {s}
+                          <button
+                            type="button"
+                            onClick={() => setSpecialties((prev) => prev.filter((_, idx) => idx !== i))}
+                            className="hover:text-red-500 transition-colors"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <input
+                        type="text"
+                        value={specialtyInput}
+                        onChange={(e) => setSpecialtyInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if ((e.key === "Enter" || e.key === ",") && specialtyInput.trim()) {
+                            e.preventDefault();
+                            const val = specialtyInput.trim();
+                            if (!specialties.includes(val)) setSpecialties((prev) => [...prev, val]);
+                            setSpecialtyInput("");
+                          }
+                          if (e.key === "Backspace" && !specialtyInput && specialties.length > 0) {
+                            setSpecialties((prev) => prev.slice(0, -1));
+                          }
+                        }}
+                        placeholder={specialties.length === 0 ? "Ej: Cardiología, Clínica…  (Enter para agregar)" : "Agregar…"}
+                        className="flex-1 min-w-[120px] text-xs outline-none bg-transparent text-slate-800 placeholder:text-slate-400"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">Presioná Enter o coma para agregar cada especialidad.</p>
+                  </div>
+
                   <div className="flex items-center gap-4">
                     <div className="h-16 w-16 rounded-full bg-slate-100 overflow-hidden flex items-center justify-center shrink-0">
                       {profilePhotoData ? (

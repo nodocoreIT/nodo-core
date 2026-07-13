@@ -629,6 +629,9 @@ export const clinicApi = {
   },
 
   async saveDoctorOffice(payload: {
+    fullName?: string;
+    licenseNumber?: string;
+    specialties?: string[];
     availability?: import("@/lib/clinic/schedule").DoctorAvailability;
     blockedDates?: string[];
     signatureText?: string;
