@@ -107,6 +107,8 @@ export default function SolicitudesPage() {
   const [clinicLoading, setClinicLoading] = useState(true);
   const [clinicActionId, setClinicActionId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteUnitId, setDeleteUnitId] = useState<string | null>(null);
+  const [deletingUnitId, setDeletingUnitId] = useState<string | null>(null);
 
   useEffect(() => {
     loadSolicitudes();
@@ -209,6 +211,23 @@ export default function SolicitudesPage() {
     } else {
       const json = await res.json();
       alert(json.error ?? "Error al eliminar.");
+    }
+  }
+
+  async function handleDeleteUnit(unitId: string) {
+    setDeletingUnitId(unitId);
+    const res = await fetch("/api/admin/pending-solicitud", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ client_unit_id: unitId }),
+    });
+    setDeletingUnitId(null);
+    setDeleteUnitId(null);
+    if (res.ok) {
+      await loadSolicitudes();
+    } else {
+      const json = await res.json();
+      alert(json.error ?? "Error al eliminar la solicitud.");
     }
   }
 
@@ -615,6 +634,28 @@ export default function SolicitudesPage() {
                   >
                     {actionId === s.id ? "Habilitando…" : "Habilitar acceso"}
                   </button>
+                  <button
+                    type="button"
+                    disabled={deletingUnitId === s.id}
+                    onClick={() => setDeleteUnitId(s.id)}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: 8,
+                      border: "1px solid #FECACA",
+                      background: "#FFF5F5",
+                      color: "#DC2626",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: deletingUnitId === s.id ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      opacity: deletingUnitId === s.id ? 0.7 : 1,
+                    }}
+                  >
+                    <Trash2 size={14} />
+                    Eliminar solicitud
+                  </button>
                   <span style={{ fontSize: 12, color: "var(--color-slate2)" }}>Pendiente de revisión</span>
                 </div>
               </article>
@@ -664,6 +705,85 @@ export default function SolicitudesPage() {
             onClick={(e) => e.stopPropagation()}
             style={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: 10, objectFit: "contain" }}
           />
+        </div>
+      )}
+
+      {/* ── Delete solicitud (client_unit) confirmation ─────────────── */}
+      {deleteUnitId && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setDeleteUnitId(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(18,30,47,.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 200,
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 14,
+              padding: "28px 32px",
+              maxWidth: 420,
+              width: "100%",
+              boxShadow: "0 8px 30px rgba(0,0,0,.15)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+              <div style={{ background: "#FEE2E2", borderRadius: 10, padding: 8, display: "flex" }}>
+                <Trash2 size={18} color="#DC2626" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "var(--color-navy)" }}>
+                Eliminar solicitud pendiente
+              </h3>
+            </div>
+            <p style={{ fontSize: 14, color: "var(--color-slate2)", lineHeight: 1.5, margin: "0 0 24px" }}>
+              Se eliminará la solicitud y los documentos asociados. El usuario podrá volver a registrarse con el mismo email.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setDeleteUnitId(null)}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: 8,
+                  border: "1px solid var(--color-mist)",
+                  background: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  color: "var(--color-navy)",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={deletingUnitId === deleteUnitId}
+                onClick={() => handleDeleteUnit(deleteUnitId)}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#DC2626",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: deletingUnitId === deleteUnitId ? "not-allowed" : "pointer",
+                  opacity: deletingUnitId === deleteUnitId ? 0.7 : 1,
+                }}
+              >
+                {deletingUnitId === deleteUnitId ? "Eliminando…" : "Sí, eliminar"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
