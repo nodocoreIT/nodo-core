@@ -26,30 +26,59 @@ export interface AuthContext {
  *   - Supabase auth: user.id is the auth user_id → look up by user_id
  *   - ClinicSession: _professionalId is professionals.id → look up by id
  *
+ * Always uses the service client to bypass RLS — this is safe because
+ * requireAuth already verified the user's identity.
+ *
  * Returns null if no professional row is found.
  */
 export async function resolveProfessional(
   auth: AuthContext,
 ): Promise<{ id: string; email: string } | null> {
+  // Always use service client to bypass RLS for this critical lookup.
+  // requireAuth already authenticated the user — we trust auth.user.id.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const svc = (await createServiceClient()) as any;
+
   if (auth._professionalId) {
     // Fast path: came from ClinicSession — we already have the professional id
-    // Use service client to bypass RLS
-    const serviceClient = await createServiceClient();
-    const { data } = await serviceClient
+    const { data } = await svc
       .from("professionals")
       .select("id, email")
       .eq("id", auth._professionalId)
       .maybeSingle();
-    return data ?? null;
+    return (data as { id: string; email: string } | null) ?? null;
   }
 
-  // Supabase auth path: look up by user_id (or fall back to id for flexibility)
-  const { data } = await auth.supabase
+  // Supabase auth path: look up by user_id first
+  const { data: byUserId } = await svc
     .from("professionals")
     .select("id, email")
-    .or(`user_id.eq.${auth.user.id},id.eq.${auth.user.id}`)
+    .eq("user_id", auth.user.id)
     .maybeSingle();
-  return data ?? null;
+
+  if (byUserId) return byUserId as { id: string; email: string };
+
+  // Email fallback: handles cases where user_id was not set at onboarding time.
+  // Auto-heals by writing user_id so future lookups use the fast path.
+  if (auth.user.email) {
+    const { data: byEmail } = await svc
+      .from("professionals")
+      .select("id, email")
+      .eq("email", auth.user.email)
+      .maybeSingle();
+
+    if (byEmail) {
+      const prof = byEmail as { id: string; email: string };
+      // Silently link user_id for future requests
+      await svc
+        .from("professionals")
+        .update({ user_id: auth.user.id })
+        .eq("id", prof.id);
+      return prof;
+    }
+  }
+
+  return null;
 }
 
 /**
