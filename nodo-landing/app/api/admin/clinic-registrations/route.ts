@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
+import { nodoAuthProjectParam } from "@/lib/supabase/nodo-auth-config";
 import { sendAccountEnabledEmail } from "@/lib/mail";
 
 async function requireAdmin() {
@@ -147,19 +149,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Generate recovery link for password setup
-  const clinicUrl = (
-    process.env.NODO_CLINICA_URL ?? "http://localhost:3002"
-  ).replace(/\/$/, "");
+  // Generate recovery link for password setup using nodo-clínica's own Supabase project
+  const origin = new URL(request.url).origin;
+  const project = nodoAuthProjectParam("clinica");
+  const next = "/nodo-clinica/login?mode=first-access";
+  const confirmQuery = `project=${encodeURIComponent(project)}&next=${encodeURIComponent(next)}`;
+  const redirectToUrl = `${origin}/auth/confirm?${confirmQuery}`;
 
-  const admin = createAdminClient();
+  const nodoAdmin = createNodoAdminClient("clinica");
+  if (!nodoAdmin) {
+    return Response.json({ error: "Nodo Clínica no está configurado (NODO_CLINICA_SUPABASE_URL / SERVICE_ROLE_KEY)." }, { status: 500 });
+  }
   const { data: linkData, error: linkError } =
-    await admin.auth.admin.generateLink({
+    await nodoAdmin.auth.admin.generateLink({
       type: "recovery",
       email: reg.email,
-      options: {
-        redirectTo: `${clinicUrl}/actualizar-contrasena`,
-      },
+      options: { redirectTo: redirectToUrl },
     });
 
   if (linkError || !linkData?.properties?.action_link) {
