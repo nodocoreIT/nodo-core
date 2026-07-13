@@ -128,12 +128,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       dniBackPath = storagePath;
     }
 
+    // Split fullName into first/last for the DB columns
+    const nameParts = (fullName ?? "").trim().split(/\s+/);
+    const firstName = nameParts[0] ?? "";
+    const lastName = nameParts.slice(1).join(" ") || firstName;
+
     // Insert patient record (ignore duplicate — idempotent)
     const { error: patientError } = await serviceClient
       .from("patients")
       .insert({
         profile_id: userId,
         org_id: CLINIC_ORG_ID,
+        first_name: firstName,
+        last_name: lastName,
         full_name: fullName,
         email: email.toLowerCase().trim(),
         address: address ?? null,
@@ -146,7 +153,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (patientError && patientError.code !== "23505") {
       console.error("[onboarding/paciente] patients insert error", patientError);
       return NextResponse.json(
-        { error: `DB: ${patientError.code} — ${patientError.message}` },
+        { error: "Error al crear perfil de paciente." },
         { status: 500 },
       );
     }
