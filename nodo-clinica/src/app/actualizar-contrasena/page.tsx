@@ -66,6 +66,10 @@ export default function ActualizarContrasenaPage() {
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) throw updateError;
 
+      // Ensure app_metadata.role is set before re-authenticating.
+      // Users created via the registration flow may not have a role in app_metadata.
+      await fetch("/api/clinic/account/ensure-role", { method: "POST", credentials: "include" });
+
       // The recovery session is consumed after updateUser — re-authenticate
       // using the same path as the login portal so all session state is set correctly.
       if (userEmail) {
