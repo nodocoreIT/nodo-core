@@ -75,5 +75,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Failed to update role" }, { status: 500 });
   }
 
+  // Clean up the pending registration now that the user has been activated.
+  // This removes the entry from the admin panel's "Solicitudes pendientes".
+  await service
+    .from("pending_clinic_registrations")
+    .delete()
+    .eq("email", email);
+
   return NextResponse.json({ ok: true, role });
 }
