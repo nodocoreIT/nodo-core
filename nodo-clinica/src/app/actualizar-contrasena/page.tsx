@@ -72,7 +72,7 @@ export default function ActualizarContrasenaPage() {
       }
 
       setSuccess(true);
-      setTimeout(() => router.push("/medico/dashboard"), 2000);
+      setTimeout(() => window.location.replace("/medico/dashboard"), 2000);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Error al actualizar contraseña",
