@@ -71,13 +71,13 @@ export async function sendClinicVerificationEmail(params: {
       `Si no realizaste esta solicitud, ignorá este correo.`,
     ].join("\n"),
     html: `
-      <div style="font-family:sans-serif;max-width:540px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #CCEBE9;">
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #CCEBE9;">
         <!-- Header -->
-        <div style="background-color:#0D9488;padding:28px 32px;text-align:center;">
+        <div style="background-color:#0D9488;padding:36px 48px;text-align:center;">
           <img
             src="${logoUrl}"
             alt="NODO Clínica"
-            style="height:32px;width:auto;display:inline-block;"
+            style="height:44px;width:auto;display:inline-block;"
           />
         </div>
 
