@@ -173,6 +173,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Set app_metadata.role so getSession() returns the correct role after login.
+  // Users created via the verify flow have no role in app_metadata — without this
+  // they land in the patient portal and get kicked out of /medico/dashboard.
+  const authUserId = linkData.user?.id;
+  if (authUserId) {
+    await nodoAdmin.auth.admin.updateUserById(authUserId, {
+      app_metadata: { role: reg.role }, // "medico" or "paciente"
+    });
+  }
+
   // Send activation email
   try {
     await sendAccountEnabledEmail({
