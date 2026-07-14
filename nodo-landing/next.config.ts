@@ -28,13 +28,15 @@ const nextConfig: NextConfig = {
   // can serve them via readFileSync. On Vercel, public/ is on the CDN
   // and not accessible from serverless functions unless explicitly traced.
   // Note: moved out of `experimental` in Next.js 15+.
+  // Pin turbopack root to nodo-landing so it doesn't climb to the pnpm
+  // workspace root and lose the next/package.json resolution.
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   outputFileTracingIncludes: {
     "/inmo/[[...slug]]": ["./public/inmo/index.html"],
     "/autos/[[...slug]]": ["./public/autos/index.html"],
     "/finanzas/[[...slug]]": ["./public/finanzas/index.html"],
-  },
-  turbopack: {
-    root: path.resolve(__dirname, ".."),
   },
   async rewrites() {
     if (isDev) {

@@ -1,5 +1,6 @@
 {
-  "installCommand": "cd .. && pnpm install --no-frozen-lockfile",
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm build",
   "crons": [
     {
       "path": "/api/cron/backup-orgs",
