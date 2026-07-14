@@ -3,33 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "development": "./src/index.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
-    },
-    "./lib/node-default-theme": {
-      "types": "./dist/lib/node-default-theme.d.ts",
-      "development": "./src/lib/node-default-theme.ts",
-      "import": "./dist/lib/node-default-theme.js",
-      "default": "./dist/lib/node-default-theme.js"
-    },
-    "./lib/create-nodo-auth-client": {
-      "types": "./dist/lib/create-nodo-auth-client.d.ts",
-      "development": "./src/lib/create-nodo-auth-client.ts",
-      "import": "./dist/lib/create-nodo-auth-client.js",
-      "default": "./dist/lib/create-nodo-auth-client.js"
-    },
-    "./lib/auth-password-errors": {
-      "types": "./dist/lib/auth-password-errors.d.ts",
-      "development": "./src/lib/auth-password-errors.ts",
-      "import": "./dist/lib/auth-password-errors.js",
-      "default": "./dist/lib/auth-password-errors.js"
-    },
+    ".": "./src/index.ts",
+    "./lib/node-default-theme": "./src/lib/node-default-theme.ts",
+    "./lib/create-nodo-auth-client": "./src/lib/create-nodo-auth-client.ts",
+    "./lib/auth-password-errors": "./src/lib/auth-password-errors.ts",
     "./styles/base.css": "./src/styles/base.css",
     "./styles/interactive.css": "./src/styles/interactive.css"
   },
