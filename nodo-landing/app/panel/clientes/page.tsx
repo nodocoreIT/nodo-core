@@ -939,7 +939,8 @@ export default function ClientesPage() {
                                     inmo:      { bg: "#CA460D", color: "#ffffff" },
                                     legales:   { bg: "#530403", color: "#ffffff" }
                                   };
-                                  const pillTheme = NODE_PILL_COLORS[u.unit_code?.toLowerCase() ?? ""] ?? { bg: "var(--color-mist-200)", color: "var(--color-navy)" };
+                                  const normalizedCode = (u.unit_code ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                                  const pillTheme = NODE_PILL_COLORS[normalizedCode] ?? { bg: "var(--color-mist-200)", color: "var(--color-navy)" };
                                   return (
                                     <span key={u.id} style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 11.5, background: pillTheme.bg, borderRadius: 6, padding: "3px 8px", color: pillTheme.color, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 }}>
                                       nodo | {u.unit_code}

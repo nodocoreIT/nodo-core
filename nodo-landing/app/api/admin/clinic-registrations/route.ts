@@ -200,6 +200,49 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Ensure the user has a client record + "Clínica" unit in the landing DB
+  // so the badge "nodo | Clínica" appears in the admin panel.
+  const landingSb = auth.supabase!;
+  const { data: existingClient } = await landingSb
+    .from("clients")
+    .select("id")
+    .eq("email", reg.email)
+    .maybeSingle();
+
+  let clientId = existingClient?.id ?? null;
+
+  if (!clientId) {
+    const { data: newClient } = await landingSb
+      .from("clients")
+      .insert({ name: profile.full_name ?? reg.email, email: reg.email })
+      .select("id")
+      .single();
+    clientId = newClient?.id ?? null;
+  }
+
+  if (clientId) {
+    // Check if a Clínica unit already exists to avoid duplicates
+    const { data: existingUnit } = await landingSb
+      .from("client_units")
+      .select("id")
+      .eq("client_id", clientId)
+      .eq("unit_code", "Clínica")
+      .maybeSingle();
+
+    if (!existingUnit) {
+      const clinicaUrl = (process.env.NODO_CLINICA_APP_URL ?? "https://clinica.nodocore.com.ar").replace(/\/$/, "");
+      await landingSb.from("client_units").insert({
+        client_id: clientId,
+        unit_code: "Clínica",
+        plan: reg.role === "medico" ? "profesional" : "paciente",
+        status: "activo",
+        progress: 100,
+        access_url: clinicaUrl,
+        access_user: reg.email,
+      });
+    }
+  }
+
   // Delete the pending registration (cleanup)
   await auth.supabase!.rpc("admin_delete_clinic_registration", { p_id: id });
 
