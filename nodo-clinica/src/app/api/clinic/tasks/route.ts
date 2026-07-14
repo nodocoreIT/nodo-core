@@ -1,15 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
+import { isLocalMode } from "@/lib/clinic/config";
+import { readDb, writeDb } from "@/lib/clinic/local-db";
 import { randomUUID } from "crypto";
 
 export async function GET(request: NextRequest) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
-  const { user, supabase } = auth;
 
-  if (user.role === "patient") {
+  if (auth.user.role === "patient") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+
+  if (isLocalMode()) {
+    const me = await resolveProfessional(auth);
+    if (!me) {
+      return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+    }
+
+    const due = new URL(request.url).searchParams.get("due");
+    const db = await readDb();
+    let tasks = (db.doctorTasks ?? []).filter((t) => t.doctorId === me.id);
+    if (due) tasks = tasks.filter((t) => t.dueDate === due);
+    tasks.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+
+    return NextResponse.json({ tasks });
+  }
+
+  const { user, supabase } = auth;
 
   const { data: me } = await supabase
     .from("professionals")
@@ -53,11 +74,41 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
-  const { user, supabase } = auth;
 
-  if (user.role === "patient") {
+  if (auth.user.role === "patient") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+
+  const body = await request.json();
+  const title = String(body.title ?? "").trim();
+  if (!title) {
+    return NextResponse.json({ error: "Título requerido" }, { status: 400 });
+  }
+
+  if (isLocalMode()) {
+    const me = await resolveProfessional(auth);
+    if (!me) {
+      return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+    }
+
+    const task = {
+      id: randomUUID(),
+      doctorId: me.id,
+      title,
+      dueDate: body.dueDate ? String(body.dueDate) : undefined,
+      done: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    await writeDb((db) => {
+      if (!db.doctorTasks) db.doctorTasks = [];
+      db.doctorTasks.push(task);
+    });
+
+    return NextResponse.json({ task });
+  }
+
+  const { user, supabase } = auth;
 
   const { data: me } = await supabase
     .from("professionals")
@@ -67,12 +118,6 @@ export async function POST(request: NextRequest) {
 
   if (!me) {
     return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
-  }
-
-  const body = await request.json();
-  const title = String(body.title ?? "").trim();
-  if (!title) {
-    return NextResponse.json({ error: "Título requerido" }, { status: 400 });
   }
 
   const { data: task, error } = await supabase
@@ -107,11 +152,45 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
-  const { user, supabase } = auth;
 
-  if (user.role === "patient") {
+  if (auth.user.role === "patient") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+
+  const body = await request.json();
+  const taskId = String(body.id ?? "");
+  if (!taskId) {
+    return NextResponse.json({ error: "id requerido" }, { status: 400 });
+  }
+
+  if (isLocalMode()) {
+    const me = await resolveProfessional(auth);
+    if (!me) {
+      return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+    }
+
+    let found = false;
+    await writeDb((db) => {
+      const task = (db.doctorTasks ?? []).find(
+        (t) => t.id === taskId && t.doctorId === me.id,
+      );
+      if (!task) return;
+      found = true;
+      if (body.title !== undefined) task.title = String(body.title).trim();
+      if (body.dueDate !== undefined) {
+        task.dueDate = body.dueDate ? String(body.dueDate) : undefined;
+      }
+      if (body.done !== undefined) task.done = !!body.done;
+    });
+
+    if (!found) {
+      return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true });
+  }
+
+  const { user, supabase } = auth;
 
   const { data: me } = await supabase
     .from("professionals")
@@ -121,12 +200,6 @@ export async function PATCH(request: NextRequest) {
 
   if (!me) {
     return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
-  }
-
-  const body = await request.json();
-  const taskId = String(body.id ?? "");
-  if (!taskId) {
-    return NextResponse.json({ error: "id requerido" }, { status: 400 });
   }
 
   const updates: Record<string, unknown> = {};
@@ -152,11 +225,32 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
-  const { user, supabase } = auth;
 
-  if (user.role === "patient") {
+  if (auth.user.role === "patient") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+
+  const taskId = new URL(request.url).searchParams.get("id");
+  if (!taskId) {
+    return NextResponse.json({ error: "id requerido" }, { status: 400 });
+  }
+
+  if (isLocalMode()) {
+    const me = await resolveProfessional(auth);
+    if (!me) {
+      return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+    }
+
+    await writeDb((db) => {
+      db.doctorTasks = (db.doctorTasks ?? []).filter(
+        (t) => !(t.id === taskId && t.doctorId === me.id),
+      );
+    });
+
+    return NextResponse.json({ ok: true });
+  }
+
+  const { user, supabase } = auth;
 
   const { data: me } = await supabase
     .from("professionals")
@@ -166,11 +260,6 @@ export async function DELETE(request: NextRequest) {
 
   if (!me) {
     return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
-  }
-
-  const taskId = new URL(request.url).searchParams.get("id");
-  if (!taskId) {
-    return NextResponse.json({ error: "id requerido" }, { status: 400 });
   }
 
   await supabase

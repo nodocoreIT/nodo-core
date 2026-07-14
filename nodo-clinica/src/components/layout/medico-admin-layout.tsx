@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard,
   Stethoscope,
@@ -35,6 +35,19 @@ import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { DoctorSettingsDialog, type SectionId } from "@/components/medical/doctor-settings-dialog";
 import { ClinicNotificationsBell } from "@/components/layout/clinic-notifications-bell";
 import { PlanBadge } from "@/components/plan/plan-badge";
+import { toast } from "sonner";
+
+function mpErrorLabel(code: string) {
+  const labels: Record<string, string> = {
+    oauth_not_configured: "OAuth no configurado en el servidor (CLIENT_ID / CLIENT_SECRET)",
+    invalid_state: "Sesión OAuth expirada — intentá conectar de nuevo",
+    expired_state: "El enlace de autorización venció — reconectá",
+    session_mismatch: "Iniciá sesión como el mismo médico que conectó",
+    missing_code: "Mercado Pago no devolvió el código de autorización",
+    token_exchange: "Error al intercambiar el código por tokens",
+  };
+  return labels[code] ?? code;
+}
 
 interface NavItem {
   href: string;
@@ -75,6 +88,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   useConsultorioTheme();
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [doctor, setDoctor] = useState<{
     id: string;
@@ -86,6 +100,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SectionId | undefined>(undefined);
   const [cobrosUnread, setCobrosUnread] = useState(0);
+  const mpCallbackHandled = useRef(false);
 
   const isPro = isProPlan(doctor?.subscriptionPlan);
   const chatEmbedded = pathname === "/medico/interconsultas";
@@ -155,8 +170,36 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const displayName = doctor?.fullName ?? "Médico";
 
   useEffect(() => {
-    document.title = "Nodo | Clínica";
-  }, []);
+    if (!doctor) return;
+
+    const settingsTab = searchParams.get("settings");
+    const mp = searchParams.get("mp");
+
+    if (settingsTab === "cobros" || mp === "connected" || mp === "error") {
+      setSettingsSection("cobros");
+      setSettingsOpen(true);
+    }
+
+    if (!mp || mpCallbackHandled.current) return;
+    mpCallbackHandled.current = true;
+
+    if (mp === "connected") {
+      toast.success(
+        "Tu cuenta de Mercado Pago quedó vinculada. Los pacientes pueden pagarte por MP.",
+      );
+      void clinicApi.getDoctorSchedule(doctor.id).catch(() => {});
+    } else if (mp === "error") {
+      const msg = searchParams.get("mp_msg") ?? "desconocido";
+      toast.error(`No se pudo vincular Mercado Pago: ${mpErrorLabel(msg)}`);
+    }
+
+    const clearParams = () => router.replace(pathname, { scroll: false });
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(clearParams);
+    } else {
+      setTimeout(clearParams, 0);
+    }
+  }, [searchParams, router, pathname, doctor]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -364,6 +407,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
 
         {doctor && (
           <DoctorSettingsDialog
+            key={doctor.id}
             open={settingsOpen}
             onOpenChange={(o) => { setSettingsOpen(o); if (!o) setSettingsSection(undefined); }}
             doctorId={doctor.id}

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -95,6 +94,10 @@ export function DoctorSettingsDialog({
 
   const [availability, setAvailability] = useState<DoctorAvailability>(DEFAULT_AVAILABILITY);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const [fullName, setFullName] = useState("");
+  const [licenseNumber, setLicenseNumber] = useState("");
+  const [specialties, setSpecialties] = useState<string[]>([]);
+  const [specialtyInput, setSpecialtyInput] = useState("");
   const [signatureText, setSignatureText] = useState("");
   const [signatureImageData, setSignatureImageData] = useState("");
   const [profilePhotoData, setProfilePhotoData] = useState("");
@@ -114,39 +117,26 @@ export function DoctorSettingsDialog({
   const [saving, setSaving] = useState(false);
   const [testingReminder, setTestingReminder] = useState(false);
   const [mpOAuthConfigured, setMpOAuthConfigured] = useState<boolean | null>(null);
-  const [mpOAuthRedirectUri, setMpOAuthRedirectUri] = useState("");
+  const [mpOAuthHelp, setMpOAuthHelp] = useState<{
+    redirectUri?: string;
+    checklist?: string[];
+    diagnoseUrl?: string;
+  } | null>(null);
   const [testingMpConnection, setTestingMpConnection] = useState(false);
   const loadGen = useRef(0);
-  const searchParams = useSearchParams();
-
-  const mpErrorLabel = (code: string) => {
-    const labels: Record<string, string> = {
-      oauth_not_configured: "OAuth no configurado en el servidor (CLIENT_ID / CLIENT_SECRET)",
-      invalid_state: "Sesión OAuth expirada — intentá conectar de nuevo",
-      expired_state: "El enlace de autorización venció — reconectá",
-      session_mismatch: "Iniciá sesión como el mismo médico que conectó",
-      missing_code: "Mercado Pago no devolvió el código de autorización",
-      token_exchange: "Error al intercambiar el código por tokens",
-    };
-    return labels[code] ?? code;
-  };
 
   useEffect(() => {
     void clinicApi.getMercadoPagoOAuthConfig().then((cfg) => {
       setMpOAuthConfigured(!!cfg.configured);
-      if (cfg.redirectUri) setMpOAuthRedirectUri(cfg.redirectUri);
+      if (cfg.configured) {
+        setMpOAuthHelp({
+          redirectUri: cfg.redirectUri,
+          checklist: cfg.checklist,
+          diagnoseUrl: cfg.diagnoseUrl,
+        });
+      }
     });
   }, []);
-
-  useEffect(() => {
-    const mp = searchParams.get("mp");
-    if (mp === "connected") {
-      toast.success("Tu cuenta de Mercado Pago quedó vinculada. Los cobros van directo a vos.");
-    } else if (mp === "error") {
-      const msg = searchParams.get("mp_msg") ?? "desconocido";
-      toast.error(`No se pudo conectar Mercado Pago: ${mpErrorLabel(msg)}`);
-    }
-  }, [searchParams]);
 
   type OfficeData = Record<string, unknown>;
 
@@ -157,6 +147,9 @@ export function DoctorSettingsDialog({
         const avail = data.availability as DoctorAvailability;
         setBlockedDates(avail.blockedDates ?? (data.blockedDates as string[]) ?? []);
       }
+      if (data.fullName != null) setFullName(String(data.fullName));
+      if (data.licenseNumber != null) setLicenseNumber(String(data.licenseNumber));
+      if (Array.isArray(data.specialties)) setSpecialties(data.specialties as string[]);
       if (data.signatureText != null) setSignatureText(String(data.signatureText));
       if (data.signatureImageData != null) setSignatureImageData(String(data.signatureImageData));
       if (data.profilePhotoData != null) setProfilePhotoData(String(data.profilePhotoData));
@@ -260,6 +253,9 @@ export function DoctorSettingsDialog({
     setSaving(true);
     try {
       const result = await clinicApi.saveDoctorOffice({
+        fullName,
+        licenseNumber,
+        specialties,
         availability: { ...availability, blockedDates },
         blockedDates,
         signatureText,
@@ -478,6 +474,77 @@ export function DoctorSettingsDialog({
               {/* ── Perfil ── */}
               {activeSection === "perfil" && (
                 <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Nombre y apellido</Label>
+                      <Input
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Dr. Juan García"
+                        className="mt-1 h-9 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Matrícula</Label>
+                      <Input
+                        value={licenseNumber}
+                        onChange={(e) => setLicenseNumber(e.target.value)}
+                        placeholder="MP 12345"
+                        className="mt-1 h-9 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs">Especialidades</Label>
+                    <div className="mt-1 flex flex-wrap gap-1.5 min-h-[36px] rounded-md border border-slate-200 px-2 py-1.5 bg-white">
+                      {specialties.map((s, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1 bg-brand/10 text-brand text-xs font-medium px-2 py-0.5 rounded-full"
+                        >
+                          {s}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSpecialties((prev) => prev.filter((_, idx) => idx !== i))
+                            }
+                            className="hover:text-red-500 transition-colors"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <input
+                        type="text"
+                        value={specialtyInput}
+                        onChange={(e) => setSpecialtyInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if ((e.key === "Enter" || e.key === ",") && specialtyInput.trim()) {
+                            e.preventDefault();
+                            const val = specialtyInput.trim();
+                            if (!specialties.includes(val)) {
+                              setSpecialties((prev) => [...prev, val]);
+                            }
+                            setSpecialtyInput("");
+                          }
+                          if (e.key === "Backspace" && !specialtyInput && specialties.length > 0) {
+                            setSpecialties((prev) => prev.slice(0, -1));
+                          }
+                        }}
+                        placeholder={
+                          specialties.length === 0
+                            ? "Ej: Cardiología, Clínica…  (Enter para agregar)"
+                            : "Agregar…"
+                        }
+                        className="flex-1 min-w-[120px] text-xs outline-none bg-transparent text-slate-800 placeholder:text-slate-400"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Presioná Enter o coma para agregar cada especialidad.
+                    </p>
+                  </div>
+
                   <div className="flex items-center gap-4">
                     <div className="h-16 w-16 rounded-full bg-slate-100 overflow-hidden flex items-center justify-center shrink-0">
                       {profilePhotoData ? (
@@ -492,7 +559,7 @@ export function DoctorSettingsDialog({
                       <Input
                         type="file"
                         accept="image/*"
-                        className="mt-1 h-9 text-xs"
+                        className="mt-1 h-9 text-xs cursor-pointer file:cursor-pointer file:bg-brand file:text-white file:border-0 file:rounded file:px-3 file:text-xs file:font-medium hover:border-brand/50 transition-colors"
                         onChange={async (e) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
@@ -565,7 +632,7 @@ export function DoctorSettingsDialog({
                     <Input
                       type="file"
                       accept="image/*"
-                      className="mt-1 h-9 text-xs"
+                      className="mt-1 h-9 text-xs cursor-pointer file:cursor-pointer file:bg-brand file:text-white file:border-0 file:rounded file:px-3 file:text-xs file:font-medium hover:border-brand/50 transition-colors"
                       onChange={async (e) => {
                         const f = e.target.files?.[0];
                         if (!f) return;
@@ -640,8 +707,8 @@ export function DoctorSettingsDialog({
                               )}
                             </p>
                             <p className="text-[11px] text-emerald-800">
-                              Los cobros usan el Access Token de tu cuenta (OAuth). No hace falta
-                              pegar credenciales.
+                              Los pacientes pueden pagarte con Mercado Pago. Los cobros van a tu
+                              cuenta vinculada.
                             </p>
                             <Button
                               type="button"
@@ -690,40 +757,88 @@ export function DoctorSettingsDialog({
                             </Button>
                           </div>
                         ) : (
-                          <div className="space-y-3">
-                            {mpOAuthConfigured === false && (
-                              <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                                OAuth de la plataforma sin configurar. El administrador debe
-                                definir{" "}
-                                <code className="text-[10px]">MERCADOPAGO_CLIENT_ID</code> y{" "}
-                                <code className="text-[10px]">MERCADOPAGO_CLIENT_SECRET</code> en
-                                el servidor. Mientras tanto podés pegar un Access Token de prueba
-                                abajo.
+                          <div className="space-y-4">
+                            <div className="rounded-md border border-slate-200 bg-white p-3 space-y-2">
+                              <p className="text-xs font-medium text-slate-800">
+                                Opción 1 — Vincular con Mercado Pago (recomendado)
                               </p>
-                            )}
-                            <div className="flex justify-center">
-                              <Button
-                                type="button"
-                                size="sm"
-                                className="h-8 px-4 text-xs bg-[#009ee3] hover:bg-[#008ecf] text-white"
-                                disabled={mpOAuthConfigured !== true}
-                                onClick={() => {
-                                  window.location.href = "/api/clinic/mercadopago/oauth/connect";
-                                }}
-                              >
-                                <CreditCard className="h-4 w-4 mr-2" />
-                                Vincular mi cuenta de Mercado Pago
-                              </Button>
+                              {mpOAuthConfigured === false ? (
+                                <p className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-2 leading-relaxed">
+                                  El botón OAuth requiere que la <strong>plataforma</strong> tenga
+                                  configurada la app en{" "}
+                                  <code className="text-[10px]">nodo-clinica/.env.local</code>{" "}
+                                  (<code className="text-[10px]">MERCADOPAGO_CLIENT_ID</code> y{" "}
+                                  <code className="text-[10px]">MERCADOPAGO_CLIENT_SECRET</code>).
+                                  Mientras tanto usá la opción 2 abajo.
+                                </p>
+                              ) : (
+                                <p className="text-[11px] text-slate-600">
+                                  Te llevamos a Mercado Pago para iniciar sesión con tu cuenta
+                                  vendedor y autorizar los cobros. No pegás contraseñas acá.
+                                </p>
+                              )}
+                              {mpOAuthConfigured && mpOAuthHelp?.checklist && (
+                                <details className="text-[11px] text-slate-600 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
+                                  <summary className="cursor-pointer font-medium text-slate-700">
+                                    ¿Error «Tenemos un problema» en Mercado Pago?
+                                  </summary>
+                                  <ol className="mt-2 list-decimal pl-4 space-y-1.5 leading-relaxed">
+                                    {mpOAuthHelp.checklist.map((item) => (
+                                      <li key={item}>{item}</li>
+                                    ))}
+                                  </ol>
+                                  {mpOAuthHelp.diagnoseUrl && (
+                                    <p className="mt-2">
+                                      Diagnóstico:{" "}
+                                      <a
+                                        href={mpOAuthHelp.diagnoseUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-[#009ee3] underline"
+                                      >
+                                        {mpOAuthHelp.diagnoseUrl}
+                                      </a>
+                                    </p>
+                                  )}
+                                </details>
+                              )}
+                              <div className="flex justify-center">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="h-9 px-5 text-sm bg-[#009ee3] hover:bg-[#008ecf] text-white"
+                                  disabled={mpOAuthConfigured !== true}
+                                  onClick={() => {
+                                    window.location.href =
+                                      "/api/clinic/mercadopago/oauth/connect";
+                                  }}
+                                >
+                                  <CreditCard className="h-4 w-4 mr-2" />
+                                  Vincular mi cuenta de Mercado Pago
+                                </Button>
+                              </div>
                             </div>
-                            <details className="rounded-md border border-amber-200 bg-amber-50/80 p-3 text-[11px] text-amber-950">
-                              <summary className="cursor-pointer font-semibold">
-                                ¿OAuth falla? Modo prueba — pegar Access Token
-                              </summary>
-                              <p className="mt-2 text-amber-900/90 leading-relaxed">
-                                En Mercado Pago → Credenciales de prueba, copiá el{" "}
-                                <strong>Access Token</strong> (APP_USR-…) del vendedor de prueba y
-                                pegalo acá. No uses el Public Key ni el N.º de aplicación como
-                                secret en Vercel.
+
+                            <div className="rounded-md border border-[#009ee3]/25 bg-white p-3 space-y-2">
+                              <p className="text-xs font-medium text-slate-800">
+                                Opción 2 — Pegar Access Token de tu cuenta
+                              </p>
+                              <p className="text-[11px] text-slate-600 leading-relaxed">
+                                En{" "}
+                                <a
+                                  href="https://www.mercadopago.com.ar/developers/panel/app"
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[#009ee3] underline"
+                                >
+                                  Mercado Pago Developers
+                                </a>
+                                {" "}→ tu aplicación → <strong>Credenciales</strong>, copiá el{" "}
+                                <strong>Access Token</strong> de tu cuenta vendedor (prueba:
+                                <code className="text-[10px]"> TEST-…</code> / producción:{" "}
+                                <code className="text-[10px]">APP_USR-…</code>) y pegalo acá.
+                                Después tocá <strong>Guardar cambios</strong> y{" "}
+                                <strong>Probar conexión</strong>.
                               </p>
                               <Input
                                 value={payment.mercadopagoAccessToken ?? ""}
@@ -733,75 +848,12 @@ export function DoctorSettingsDialog({
                                     mercadopagoAccessToken: e.target.value,
                                   }))
                                 }
-                                placeholder="APP_USR-..."
-                                className="mt-2 h-9 font-mono text-[10px]"
+                                placeholder="TEST-… o APP_USR-…"
+                                className="h-9 font-mono text-[11px]"
+                                autoComplete="off"
                               />
-                              <p className="mt-2 text-amber-800/80">
-                                Después tocá <strong>Guardar cambios</strong> al pie. En local usá
-                                el Access Token del <strong>vendedor de prueba</strong> (empieza
-                                con <code className="text-[10px]">TEST-</code>), no el Public Key
-                                ni credenciales de producción. Diagnóstico:{" "}
-                                <a
-                                  href="/api/clinic/mercadopago/oauth/diagnose"
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="underline"
-                                >
-                                  /api/clinic/mercadopago/oauth/diagnose
-                                </a>
-                              </p>
-                              <div className="flex justify-center">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className="mt-2 h-8 text-xs"
-                                  disabled={testingMpConnection}
-                                  onClick={async () => {
-                                    setTestingMpConnection(true);
-                                    try {
-                                      await clinicApi.saveDoctorPayment(payment);
-                                      const result = await clinicApi.testMercadoPagoConnection();
-                                      toast.success(result.message ?? "Token de Mercado Pago válido");
-                                      const data = await clinicApi.getDoctorSchedule(doctorId);
-                                      applyOfficeData(data);
-                                    } catch (e) {
-                                      toast.error(
-                                        e instanceof Error ? e.message : "Token inválido",
-                                        { duration: 12_000 },
-                                      );
-                                    } finally {
-                                      setTestingMpConnection(false);
-                                    }
-                                  }}
-                                >
-                                  {testingMpConnection ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    "Guardar y probar token"
-                                  )}
-                                </Button>
-                              </div>
-                            </details>
-                            <p className="text-[11px] text-slate-500">
-                              OAuth redirige a MP con PKCE. En sandbox, iniciá sesión con el
-                              usuario TESTUSER… de tu panel MP.
-                            </p>
+                            </div>
                           </div>
-                        )}
-
-                        <p className="text-[11px] text-slate-500">
-                          Webhook de pagos (configurarlo en el panel MP de la app):{" "}
-                          <code className="text-[10px] bg-white px-1 rounded break-all">
-                            {typeof window !== "undefined"
-                              ? `${window.location.origin}/api/webhooks/mercadopago`
-                              : "/api/webhooks/mercadopago"}
-                          </code>
-                        </p>
-                        {mpOAuthRedirectUri && (
-                          <p className="text-[10px] text-slate-400 break-all">
-                            Redirect OAuth activo: {mpOAuthRedirectUri}
-                          </p>
                         )}
                       </div>
                     )}
@@ -886,7 +938,7 @@ export function DoctorSettingsDialog({
                     <Input
                       type="file"
                       accept="image/*"
-                      className="mt-1 h-9 text-xs"
+                      className="mt-1 h-9 text-xs cursor-pointer file:cursor-pointer file:bg-brand file:text-white file:border-0 file:rounded file:px-3 file:text-xs file:font-medium hover:border-brand/50 transition-colors"
                       onChange={async (e) => {
                         const f = e.target.files?.[0];
                         if (!f) return;

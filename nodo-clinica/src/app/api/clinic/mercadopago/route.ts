@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { isLocalMode } from "@/lib/clinic/config";
+import { readDb } from "@/lib/clinic/local-db";
+import { isPaymentConfirmed } from "@/lib/clinic/payment";
+import { getSessionFromRequest } from "@/lib/clinic/session";
 import { buildCheckoutForAppointment } from "@/lib/mercadopago/checkout";
+import { requireAuth } from "@/lib/supabase/auth-guard";
 import { createClient } from "@/lib/supabase/server";
-import { getAppointmentByToken, getAppointmentById } from "@/lib/clinic/db/appointments";
+import {
+  getAppointmentById,
+  getAppointmentByToken,
+} from "@/lib/clinic/db/appointments";
 
 /** Obtiene o regenera URL de checkout MP para un turno pendiente. */
 export async function GET(request: NextRequest) {
@@ -10,11 +17,45 @@ export async function GET(request: NextRequest) {
   const accessTokenParam = searchParams.get("accessToken");
   const appointmentId = searchParams.get("appointmentId");
 
-  // Allow unauthenticated access when a patient uses accessToken (waiting room)
+  if (isLocalMode()) {
+    const session = await getSessionFromRequest(request);
+    const db = await readDb();
+
+    const apt = accessTokenParam
+      ? db.appointments.find((a) => a.accessToken === accessTokenParam)
+      : appointmentId
+        ? db.appointments.find((a) => a.id === appointmentId)
+        : undefined;
+
+    if (!apt) {
+      return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
+    }
+
+    if (session?.role === "patient" && session.userId !== apt.patientId) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+
+    if (isPaymentConfirmed(apt)) {
+      return NextResponse.json({
+        paid: true,
+        waitingRoomUrl: `/paciente/sala/${apt.accessToken}`,
+      });
+    }
+
+    const result = await buildCheckoutForAppointment(apt.id);
+    if (!result) {
+      return NextResponse.json(
+        { error: "Mercado Pago no configurado para este médico" },
+        { status: 400 },
+      );
+    }
+
+    return NextResponse.json(result);
+  }
+
   const auth = await requireAuth(request);
-  const supabase = auth instanceof NextResponse
-    ? await createClient()
-    : auth.supabase;
+  const supabase =
+    auth instanceof NextResponse ? await createClient() : auth.supabase;
 
   const { data: apt } = accessTokenParam
     ? await getAppointmentByToken(supabase, accessTokenParam)
@@ -28,7 +69,6 @@ export async function GET(request: NextRequest) {
 
   const row = apt as Record<string, unknown>;
 
-  // If patient is authenticated, verify ownership
   if (!(auth instanceof NextResponse) && auth.user.role === "patient") {
     const { data: patient } = await supabase
       .from("patients")

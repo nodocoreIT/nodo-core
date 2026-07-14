@@ -1,11 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isLocalMode } from "@/lib/clinic/config";
+import { writeDb } from "@/lib/clinic/local-db";
+import { getSessionFromRequest } from "@/lib/clinic/session";
 import { requireAuth } from "@/lib/supabase/auth-guard";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-/** Desconecta la cuenta de Mercado Pago del org (borra tokens de payment_credentials). */
+/** Desconecta la cuenta de Mercado Pago del médico/org. */
 export async function POST(request: NextRequest) {
+  if (isLocalMode()) {
+    const session = await getSessionFromRequest(request);
+    if (!session || session.role !== "doctor") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    await writeDb((db) => {
+      const doctor = db.doctors.find((d) => d.id === session.userId);
+      if (!doctor?.payment) return;
+      doctor.payment.mercadopagoEnabled = false;
+      delete doctor.payment.mercadopagoOAuthPending;
+      delete doctor.payment.mercadopagoAccessToken;
+      delete doctor.payment.mercadopagoRefreshToken;
+      delete doctor.payment.mercadopagoTokenExpiresAt;
+      delete doctor.payment.mercadopagoUserId;
+      delete doctor.payment.mercadopagoPublicKey;
+      delete doctor.payment.mercadopagoConnectedAt;
+    });
+
+    return NextResponse.json({ ok: true });
+  }
+
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
   const { user } = auth;
@@ -16,13 +41,8 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createServiceClient();
 
-  // Remove the payment_credentials row for this org
-  await supabase
-    .from("payment_credentials")
-    .delete()
-    .eq("org_id", user.org_id);
+  await supabase.from("payment_credentials").delete().eq("org_id", user.org_id);
 
-  // Disable MP in office_settings.payment JSONB
   const { data: existing } = await supabase
     .from("office_settings")
     .select("payment")
@@ -30,7 +50,7 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (existing) {
-    const payment = ((existing.payment as Record<string, unknown>) ?? {});
+    const payment = (existing.payment as Record<string, unknown>) ?? {};
     const cleaned: Record<string, unknown> = { ...payment };
     cleaned.mercadopagoEnabled = false;
     delete cleaned.mercadopagoOAuthPending;

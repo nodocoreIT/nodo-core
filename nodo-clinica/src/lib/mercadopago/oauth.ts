@@ -56,10 +56,14 @@ export function newOAuthState(): string {
   return randomUUID();
 }
 
+export function isPkceEnabled(): boolean {
+  return process.env.MERCADOPAGO_OAUTH_PKCE !== "false";
+}
+
 export function buildAuthorizationUrl(params: {
   config: MpOAuthConfig;
   state: string;
-  codeChallenge: string;
+  codeChallenge?: string;
   codeChallengeMethod?: string;
 }): string {
   const q = new URLSearchParams({
@@ -67,10 +71,12 @@ export function buildAuthorizationUrl(params: {
     client_id: params.config.clientId,
     redirect_uri: params.config.redirectUri,
     state: params.state,
-    code_challenge: params.codeChallenge,
-    code_challenge_method: params.codeChallengeMethod ?? "S256",
     platform_id: "mp",
   });
+  if (params.codeChallenge) {
+    q.set("code_challenge", params.codeChallenge);
+    q.set("code_challenge_method", params.codeChallengeMethod ?? "S256");
+  }
   return `${MP_AUTH_URL}?${q.toString()}`;
 }
 
@@ -98,7 +104,7 @@ async function postToken(
 export async function exchangeAuthorizationCode(params: {
   config: MpOAuthConfig;
   code: string;
-  codeVerifier: string;
+  codeVerifier?: string;
   testToken?: boolean;
 }): Promise<MpOAuthTokenResponse> {
   return postToken({
@@ -107,7 +113,7 @@ export async function exchangeAuthorizationCode(params: {
     grant_type: "authorization_code",
     code: params.code,
     redirect_uri: params.config.redirectUri,
-    code_verifier: params.codeVerifier,
+    ...(params.codeVerifier ? { code_verifier: params.codeVerifier } : {}),
     ...(params.testToken ? { test_token: "true" } : {}),
   });
 }

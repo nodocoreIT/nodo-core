@@ -83,6 +83,8 @@ export interface LocalDoctor {
   email: string;
   password: string;
   specialty: string;
+  /** Varias especialidades (si vacío, se usa `specialty`). */
+  specialties?: string[];
   licenseNumber: string;
   subscriptionStatus: SubscriptionStatus;
   subscriptionPlan: string;

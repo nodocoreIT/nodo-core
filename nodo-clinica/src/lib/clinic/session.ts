@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isLocalMode } from "@/lib/clinic/config";
 
 export type SessionRole = "doctor" | "patient";
 
@@ -64,6 +65,9 @@ async function parseSignedSession(
 async function validateSessionUser(
   session: ClinicSession,
 ): Promise<ClinicSession | null> {
+  // ponytail: local JSON mode trusts the signed JWT; no Supabase round-trip
+  if (isLocalMode()) return session;
+
   if (session.role === "doctor") {
     // Doctors are stored in nodo_clinica.professionals (Supabase).
     // Use service client to bypass RLS — this runs server-side only.

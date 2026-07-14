@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isLocalMode } from "@/lib/clinic/config";
+import { handlePatientHistoryGetLocal } from "@/lib/clinic/patient-history-local-get";
 import { requireAuth } from "@/lib/supabase/auth-guard";
 import { buildPatientTimeline } from "@/lib/clinic/patient-timeline";
 
 export async function GET(request: NextRequest) {
+  if (isLocalMode()) {
+    return handlePatientHistoryGetLocal(request);
+  }
+
   const { searchParams } = new URL(request.url);
   const patientId = searchParams.get("patientId");
 

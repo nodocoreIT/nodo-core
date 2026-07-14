@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getSession } from "@/lib/clinic/session";
+import { isLocalMode } from "@/lib/clinic/config";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
@@ -31,6 +32,13 @@ export interface AuthContext {
 export async function resolveProfessional(
   auth: AuthContext,
 ): Promise<{ id: string; email: string } | null> {
+  if (isLocalMode() && auth._professionalId) {
+    return {
+      id: auth._professionalId,
+      email: auth.user.email ?? "",
+    };
+  }
+
   if (auth._professionalId) {
     // Fast path: came from ClinicSession — we already have the professional id
     // Use service client to bypass RLS
@@ -64,6 +72,26 @@ export async function resolveProfessional(
 export async function requireAuth(
   _request?: NextRequest,
 ): Promise<AuthContext | NextResponse> {
+  if (isLocalMode()) {
+    const clinicSession = await getSession();
+    if (!clinicSession) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const sessionRole =
+      clinicSession.role === "doctor" ? "doctor" : "patient";
+    return {
+      user: {
+        id: clinicSession.userId,
+        email: clinicSession.email,
+        role: sessionRole,
+        org_id: null,
+      },
+      _professionalId:
+        clinicSession.role === "doctor" ? clinicSession.userId : null,
+      supabase: null as unknown as SupabaseClient<Database>,
+    };
+  }
+
   const supabase = await createClient();
 
   const {
