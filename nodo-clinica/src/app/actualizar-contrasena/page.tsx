@@ -69,21 +69,28 @@ export default function ActualizarContrasenaPage() {
       // 1. Set app_metadata.role BEFORE re-login so the JWT includes the role claim.
       //    This endpoint uses the service role key — no session required (recovery is
       //    already consumed by updateUser above).
+      let redirectPath = "/medico/dashboard";
+      let loginRole: "doctor" | "patient" = "doctor";
       if (userEmail) {
-        await fetch("/api/clinic/account/ensure-role", {
+        const roleRes = await fetch("/api/clinic/account/ensure-role", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: userEmail }),
         });
+        const roleData = await roleRes.json().catch(() => ({}));
+        if (roleData.role === "paciente") {
+          redirectPath = "/paciente";
+          loginRole = "patient";
+        }
       }
 
       // 2. Re-authenticate — the new JWT will have app_metadata.role set from step 1.
       if (userEmail) {
-        await clinicApi.login(userEmail, password, "doctor");
+        await clinicApi.login(userEmail, password, loginRole);
       }
 
       setSuccess(true);
-      setTimeout(() => window.location.replace("/medico/dashboard"), 2000);
+      setTimeout(() => window.location.replace(redirectPath), 2000);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Error al actualizar contraseña",

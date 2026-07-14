@@ -142,6 +142,12 @@ function OnboardingMedicoContent() {
                   Pronto desde NODO activaremos tu cuenta. Una vez habilitada,
                   vas a poder iniciar sesión con tu email y contraseña.
                 </p>
+                <a
+                  href="/login/medico"
+                  className="mt-4 inline-flex items-center justify-center rounded-md bg-teal-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors"
+                >
+                  Ir al inicio de sesión
+                </a>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">

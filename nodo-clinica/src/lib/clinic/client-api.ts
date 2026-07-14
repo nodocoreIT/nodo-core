@@ -132,7 +132,13 @@ export const clinicApi = {
         email,
         password,
       });
-      if (error) throw new Error(error.message || "Credenciales incorrectas");
+      if (error) {
+        const msg = (error.message ?? "").toLowerCase();
+        if (msg.includes("invalid login") || msg.includes("invalid_credentials")) {
+          throw new Error("Credenciales incorrectas. Verificá tu email y contraseña.");
+        }
+        throw new Error(error.message || "Credenciales incorrectas");
+      }
       if (!data.user) throw new Error("Credenciales incorrectas");
 
       const appMeta = data.user.app_metadata ?? {};
