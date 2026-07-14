@@ -66,12 +66,18 @@ export default function ActualizarContrasenaPage() {
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) throw updateError;
 
-      // Ensure app_metadata.role is set before re-authenticating.
-      // Users created via the registration flow may not have a role in app_metadata.
-      await fetch("/api/clinic/account/ensure-role", { method: "POST", credentials: "include" });
+      // 1. Set app_metadata.role BEFORE re-login so the JWT includes the role claim.
+      //    This endpoint uses the service role key — no session required (recovery is
+      //    already consumed by updateUser above).
+      if (userEmail) {
+        await fetch("/api/clinic/account/ensure-role", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: userEmail }),
+        });
+      }
 
-      // The recovery session is consumed after updateUser — re-authenticate
-      // using the same path as the login portal so all session state is set correctly.
+      // 2. Re-authenticate — the new JWT will have app_metadata.role set from step 1.
       if (userEmail) {
         await clinicApi.login(userEmail, password, "doctor");
       }

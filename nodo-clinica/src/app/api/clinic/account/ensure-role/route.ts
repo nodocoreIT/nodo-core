@@ -1,35 +1,49 @@
-import { NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/supabase/server";
 
 /**
  * POST /api/clinic/account/ensure-role
  *
- * Called during the password-setup activation flow. Looks up the authenticated
- * user in professionals or patients and sets app_metadata.role so that
- * subsequent getSession() calls return the correct portal role.
+ * Called during the password-setup activation flow BEFORE re-login.
+ * Accepts { email } in body, looks up the user in professionals/patients,
+ * and sets app_metadata.role via the service role key.
  *
- * Requires an active Supabase session (recovery or regular).
+ * Does NOT require an active session — the recovery session is consumed
+ * by updateUser() before this runs.
  */
-export async function POST(): Promise<NextResponse> {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const body = await request.json().catch(() => ({}));
+  const email = String(body.email ?? "").trim().toLowerCase();
 
-  if (error || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!email) {
+    return NextResponse.json({ error: "email is required" }, { status: 400 });
   }
 
-  // Determine role by checking which table the user belongs to
   const service = await createServiceClient();
 
+  // Determine role by checking which table the user belongs to
   const { data: professional } = await service
     .from("professionals")
-    .select("id")
-    .eq("auth_id", user.id)
+    .select("user_id")
+    .eq("email", email)
     .maybeSingle();
 
   const role: "medico" | "paciente" = professional ? "medico" : "paciente";
 
-  // Use auth admin to update app_metadata
+  // Resolve auth user ID: prefer user_id from professionals table,
+  // fall back to looking up patients, then listing auth users.
+  let authUserId: string | null = professional?.user_id ?? null;
+
+  if (!authUserId) {
+    const { data: patient } = await service
+      .from("patients")
+      .select("user_id")
+      .eq("email", email)
+      .maybeSingle();
+    authUserId = patient?.user_id ?? null;
+  }
+
+  // Last resort: find by email in auth.users
   const { createClient: createSupabaseClient } = await import("@supabase/supabase-js");
   const adminClient = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,8 +51,22 @@ export async function POST(): Promise<NextResponse> {
     { auth: { persistSession: false } },
   );
 
+  if (!authUserId) {
+    const { data: listData } = await adminClient.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const found = listData?.users?.find((u: any) => u.email === email);
+    authUserId = found?.id ?? null;
+  }
+
+  if (!authUserId) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
   const { error: updateError } = await adminClient.auth.admin.updateUserById(
-    user.id,
+    authUserId,
     { app_metadata: { role } },
   );
 
