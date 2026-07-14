@@ -292,39 +292,6 @@ export function LoginPortal() {
     <>
       {showTransition && <NodeTransitionOverlay isDoctor={isDoctor} />}
 
-      {/* Loading overlay */}
-      {loading && authMode === "register" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl px-10 py-8 flex flex-col items-center gap-4 w-[280px]">
-            <Loader2 className="h-10 w-10 text-brand animate-spin" />
-            <p className="text-[15px] font-medium text-slate-700">Enviando solicitud...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Register success modal */}
-      {registerSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl px-10 py-8 flex flex-col items-center gap-4 w-[340px] text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-teal-50">
-              <MailCheck className="h-8 w-8 text-brand" />
-            </div>
-            <div>
-              <h3 className="font-display font-bold text-ink text-[20px] mb-1">¡Activá tu cuenta!</h3>
-              <p className="text-slate2 text-[14px]">
-                Te enviamos un correo de verificación. Revisá tu casilla para continuar con el registro.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => { setRegisterSuccess(false); setAuthMode("login"); }}
-              className="w-full py-3 rounded-xl bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer"
-            >
-              Entendido
-            </button>
-          </div>
-        </div>
-      )}
       <a
         href="https://www.nodocore.com.ar/nodo-clinica"
         className="fixed top-[22px] right-[22px] z-10 inline-flex items-center gap-2 px-4 py-2 text-[14px] font-semibold rounded-md bg-brand text-white shadow-sm hover:bg-brand-600 active:scale-[.98] transition-all duration-150"
@@ -413,8 +380,29 @@ export function LoginPortal() {
         {/* ── Right form panel ── */}
         <main className="flex items-center justify-center p-8 bg-paper min-h-screen">
           <div className="w-[min(420px,100%)]">
+
+            {/* Register success — inline panel, no modal */}
+            {registerSuccess && (
+              <div className="flex flex-col items-center gap-4 py-8 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-teal-50">
+                  <MailCheck className="h-8 w-8 text-brand" />
+                </div>
+                <h2 className="font-display font-bold text-ink text-[24px]">¡Activá tu cuenta!</h2>
+                <p className="text-slate2 text-[14.5px] max-w-xs">
+                  Te enviamos un correo de verificación. Revisá tu casilla para continuar con el registro.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setRegisterSuccess(false); setAuthMode("login"); }}
+                  className="text-[13px] font-semibold text-brand hover:underline bg-transparent border-none cursor-pointer p-0 mt-2"
+                >
+                  Volver al inicio de sesión
+                </button>
+              </div>
+            )}
+
             {/* Tabs */}
-            {authMode !== "forgot" && <div className="flex border-b border-mist mb-6">
+            {!registerSuccess && authMode !== "forgot" && <div className="flex border-b border-mist mb-6">
               <button
                 type="button"
                 onClick={() => { setAuthMode("login"); setGeneralError(""); }}
@@ -451,7 +439,7 @@ export function LoginPortal() {
             </div>}
 
             {/* Branding inline (mobile / right panel header) */}
-            {authMode !== "forgot" && <div className="flex items-center gap-2.5 mb-5">
+            {!registerSuccess && authMode !== "forgot" && <div className="flex items-center gap-2.5 mb-5">
               <span
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
                 style={{
@@ -475,7 +463,7 @@ export function LoginPortal() {
               </div>
             </div>}
 
-            {authMode !== "forgot" && <>
+            {!registerSuccess && authMode !== "forgot" && <>
             <h1 className="font-display font-bold text-ink text-[26px] mb-1">
               {authMode === "login" ? "Iniciar sesión" : "Crear cuenta"}
             </h1>
@@ -517,7 +505,7 @@ export function LoginPortal() {
             </>}
 
             {/* Login form */}
-            {authMode === "login" && (
+            {!registerSuccess && authMode === "login" && (
               platformDoctor ? (
                 <>
                   {generalError && (
@@ -610,7 +598,7 @@ export function LoginPortal() {
             )}
 
             {/* Register form */}
-            {authMode === "register" && showRegister && (
+            {!registerSuccess && authMode === "register" && showRegister && (
               <form onSubmit={handleRegister} noValidate>
                 <div className="mb-3">
                   <label className="block text-[13px] font-semibold text-navy mb-1.5">Nombre completo</label>
@@ -651,7 +639,7 @@ export function LoginPortal() {
               </form>
             )}
 
-            {authMode === "register" && !showRegister && (
+            {!registerSuccess && authMode === "register" && !showRegister && (
               <div className="text-center py-8">
                 <h2 className="font-display font-bold text-ink text-[22px] mb-2">Registro vía NodoCore</h2>
                 <p className="text-slate2 text-[14px] mb-6">

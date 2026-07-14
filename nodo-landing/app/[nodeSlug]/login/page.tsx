@@ -1060,7 +1060,80 @@ function LoginForm() {
         {/* Form panel (right) */}
         <main className="flex items-center justify-center p-8 bg-paper min-h-screen">
           <div className="w-[min(420px,100%)]">
+
+            {/* ── Success / confirmation states — inline panel (no modal) ── */}
+            {successModal.open && (
+              <div className="flex flex-col items-center gap-4 py-8 text-center">
+                <div className="h-16 w-16 rounded-full flex items-center justify-center mx-auto"
+                  style={{ backgroundColor: "color-mix(in srgb, var(--color-brand) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--color-brand) 22%, transparent)" }}>
+                  {successModal.type === "reset_success" ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="var(--color-brand)" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8">
+                      <rect width="20" height="16" x="2" y="4" rx="2" />
+                      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                    </svg>
+                  )}
+                </div>
+
+                <h2 className="font-display font-bold text-ink text-[24px]">
+                  {successModal.type === "reset_success"
+                    ? "Contraseña actualizada"
+                    : successModal.type === "forgot_verify"
+                      ? "Revisá tu correo"
+                      : successModal.type === "medico"
+                        ? "¡Verificá tu casilla!"
+                        : successModal.type === "patient_verify"
+                          ? "¡Activá tu cuenta!"
+                          : "¡Bienvenido a NODO!"}
+                </h2>
+
+                <p className="text-slate2 text-[14.5px] max-w-xs leading-relaxed">
+                  {successModal.message}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (successModal.type === "reset_success") {
+                      setSuccessModal({ open: false, type: "reset_success", message: "" });
+                      setAuthMode("login");
+                    } else if (successModal.type === "forgot_verify") {
+                      setSuccessModal({ open: false, type: "forgot_verify", message: "" });
+                      setAuthMode("login");
+                    } else if (successModal.type === "medico") {
+                      setSuccessModal({ open: false, type: "medico", message: "" });
+                      router.push("/nodo-salud/clinica-virtual");
+                    } else if (successModal.type === "patient_verify") {
+                      setSuccessModal({ open: false, type: "patient_verify", message: "" });
+                      router.push(
+                        isInmoNode ? "/nodo-inmo"
+                          : isAutosNode ? "/nodo-autos"
+                          : isFinanzasNode ? "/nodo-finanzas"
+                          : isEcommerceNode ? "/nodo-ecommerce"
+                          : "/nodo-salud/clinica-virtual",
+                      );
+                    } else {
+                      setSuccessModal({ open: false, type: "paciente", message: "" });
+                      router.push("/panel");
+                    }
+                  }}
+                  className="text-[13px] font-semibold hover:underline bg-transparent border-none cursor-pointer p-0 mt-2"
+                  style={{ color: "var(--color-brand)" }}
+                >
+                  {successModal.type === "reset_success"
+                    ? "Ir al inicio de sesión"
+                    : successModal.type === "forgot_verify" || successModal.type === "medico" || successModal.type === "patient_verify"
+                      ? "Volver al inicio de sesión"
+                      : "Ingresar al Panel"}
+                </button>
+              </div>
+            )}
+
             {/* If node is Clinica Virtual or Inmo, show Iniciar / Registrar toggle */}
+            {!successModal.open && <>
             {(isClinicaNode || isSimpleRegisterNode) &&
               !showModulePicker &&
               (authMode === "login" || authMode === "register") && (
@@ -2037,225 +2110,11 @@ function LoginForm() {
                 ) : null}
               </div>
             )}
+            </>}
           </div>
         </main>
       </div>
 
-      {/* Premium Custom Modal */}
-      {successModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white text-ink rounded-2xl p-7 max-w-sm w-full shadow-2xl border border-mist text-center animate-in zoom-in-95 duration-200">
-            {successModal.type === "medico" ? (
-              // Doctor / Email verification view
-              <>
-                <div className="h-14 w-14 bg-brand/10 text-brand rounded-full flex items-center justify-center mx-auto mb-5 border border-brand/20">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-7 w-7"
-                  >
-                    <rect width="20" height="16" x="2" y="4" rx="2" />
-                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                  </svg>
-                </div>
-                <h3 className="font-display font-extrabold text-navy text-[21px] mb-2.5">
-                  ¡Verificá tu casilla!
-                </h3>
-                <p className="text-slate2 text-[14px] leading-relaxed mb-6">
-                  {successModal.message}
-                </p>
-                <button
-                  onClick={() => {
-                    setSuccessModal({
-                      open: false,
-                      type: "medico",
-                      message: "",
-                    });
-                    router.push("/nodo-salud/clinica-virtual");
-                  }}
-                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
-                >
-                  Entendido
-                </button>
-              </>
-            ) : successModal.type === "reset_success" ? (
-              <>
-                <div className="h-14 w-14 bg-brand/10 text-brand rounded-full flex items-center justify-center mx-auto mb-5 border border-brand/20">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-7 w-7"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <h3 className="font-display font-extrabold text-[var(--color-brand-kicker,var(--color-brand,#DA5A0E))] text-[21px] mb-2.5">
-                  Contraseña actualizada
-                </h3>
-                <p className="text-slate2 text-[14px] leading-relaxed mb-6">
-                  {successModal.message}
-                </p>
-                <button
-                  onClick={() => {
-                    setSuccessModal({
-                      open: false,
-                      type: "reset_success",
-                      message: "",
-                    });
-                    setAuthMode("login");
-                  }}
-                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
-                >
-                  Ir al inicio de sesión
-                </button>
-              </>
-            ) : successModal.type === "forgot_verify" ? (
-              // Forgot Password recovery email sent success view
-              <>
-                <div className="h-14 w-14 bg-brand/10 text-brand rounded-full flex items-center justify-center mx-auto mb-5 border border-brand/20">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-7 w-7"
-                  >
-                    <rect width="20" height="16" x="2" y="4" rx="2" />
-                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                  </svg>
-                </div>
-                <h3 className="font-display font-extrabold text-navy text-[21px] mb-2.5">
-                  ¡Recuperá tu cuenta!
-                </h3>
-                <p className="text-slate2 text-[14px] leading-relaxed mb-6">
-                  {successModal.message}
-                </p>
-                <button
-                  onClick={() => {
-                    setSuccessModal({
-                      open: false,
-                      type: "forgot_verify",
-                      message: "",
-                    });
-                    setAuthMode("login");
-                  }}
-                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
-                >
-                  Entendido
-                </button>
-              </>
-            ) : successModal.type === "patient_verify" ? (
-              // Patient / Email verification view
-              <>
-                <div className="h-14 w-14 bg-brand/10 text-brand rounded-full flex items-center justify-center mx-auto mb-5 border border-brand/20">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-7 w-7"
-                  >
-                    <rect width="20" height="16" x="2" y="4" rx="2" />
-                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                  </svg>
-                </div>
-                <h3 className="font-display font-extrabold text-navy text-[21px] mb-2.5">
-                  ¡Activá tu cuenta!
-                </h3>
-                <p className="text-slate2 text-[14px] leading-relaxed mb-6">
-                  {successModal.message}
-                </p>
-                <button
-                  onClick={() => {
-                    setSuccessModal({
-                      open: false,
-                      type: "patient_verify",
-                      message: "",
-                    });
-                    router.push(
-                      isInmoNode
-                        ? "/nodo-inmo"
-                        : isAutosNode
-                          ? "/nodo-autos"
-                          : isFinanzasNode
-                            ? "/nodo-finanzas"
-                            : isEcommerceNode
-                              ? "/nodo-ecommerce"
-                              : "/nodo-salud/clinica-virtual",
-                    );
-                  }}
-                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
-                >
-                  Entendido
-                </button>
-              </>
-            ) : (
-              // Patient / Google register success view
-              <>
-                <div className="h-14 w-14 bg-brand/10 text-brand rounded-full flex items-center justify-center mx-auto mb-5 border border-brand/20">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-7 w-7"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <h3 className="font-display font-extrabold text-brand text-[21px] mb-2.5">
-                  ¡Bienvenido a NODO!
-                </h3>
-                <p className="text-slate2 text-[14px] leading-relaxed mb-6">
-                  {successModal.message}
-                </p>
-                <button
-                  onClick={() => {
-                    setSuccessModal({
-                      open: false,
-                      type: "paciente",
-                      message: "",
-                    });
-                    router.push("/panel");
-                  }}
-                  className={`w-full py-3 rounded-lg bg-brand font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15 ${isEcommerceNode ? "text-black" : "text-white"}`}
-                >
-                  Ingresar al Panel
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </>
   );
 }
