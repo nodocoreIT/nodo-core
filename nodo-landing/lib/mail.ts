@@ -720,26 +720,21 @@ export async function sendAccountEnabledEmail({
   const badgeText  = theme.light ? brandColor : "#ffffff";
   const linkColor  = theme.light ? "#857f00" : brandColor;
 
-  // Use the white composite logo on the colored header (better contrast than the orange logo).
-  const whiteLogoPath = path.join(process.cwd(), "public/logos/logo compuesto estrella az letra blanca_50.png");
-  const attachments: nodemailer.SendMailOptions["attachments"] = fs.existsSync(whiteLogoPath)
-    ? [{ filename: "logo_blanco.png", path: whiteLogoPath, cid: "nodologo" }]
-    : (registrationLogoAttachments() ?? []);
-  const logoHtml = attachments?.length
-    ? `<img src="cid:nodologo" alt="NODO Core" style="height:28px;display:inline-block;margin-bottom:16px;"/><br/>`
-    : "";
+  // Use a public URL for the white logo — avoids CID attachment delays in mail clients.
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://www.nodocore.com.ar").replace(/\/$/, "");
+  const logoUrl = `${appUrl}/logos/logo%20compuesto%20estrella%20az%20letra%20blanca_50.png`;
+  const logoHtml = `<img src="${logoUrl}" alt="NODO Core" style="height:44px;width:auto;display:inline-block;margin-bottom:16px;"/><br/>`;
 
   await transporter.sendMail({
     from: `"NODO Core · Activación" <${USER}>`,
     to: email,
     subject: `Tu acceso a ${nodeLabel} fue habilitado`,
     text: `Hola ${nombre},\n\nTu acceso a ${nodeLabel} está listo. Configurá tu contraseña en el primer ingreso:\n\n${loginUrl}\n\nSaludos,\nNODO Core`,
-    attachments,
     html: `
-      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
 
         <!-- Header brandado -->
-        <div style="background-color:${brandColor};padding:28px 32px 24px;text-align:center;">
+        <div style="background-color:${brandColor};padding:36px 48px 28px;text-align:center;">
           ${logoHtml}
           <span style="display:inline-block;background:${badgeBg};color:${badgeText};font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 12px;border-radius:100px;">
             ◎ ${nodeLabel}
