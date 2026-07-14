@@ -3,17 +3,11 @@
 import { Suspense, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ObraSocialCombobox } from "@/components/ui/obra-social-combobox";
 import {
   User,
   Loader2,
-  ArrowLeft,
   CreditCard,
-  Check,
   CheckCircle,
   ImagePlus,
 } from "lucide-react";
@@ -37,6 +31,10 @@ const PLANS = [
   },
 ];
 
+const inputClass =
+  "mt-1 w-full rounded-lg px-3 py-2.5 text-sm bg-white border border-slate-200 text-navy placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/25 focus:border-teal-500 transition-shadow";
+const labelClass = "text-xs font-medium text-slate-600";
+
 interface DniSlotProps {
   label: string;
   file: File | null;
@@ -49,7 +47,7 @@ function DniSlot({ label, file, onChange }: DniSlotProps) {
 
   return (
     <div className="flex flex-col gap-1">
-      <Label>{label}</Label>
+      <label className={labelClass}>{label}</label>
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
@@ -98,24 +96,19 @@ function OnboardingPacienteContent() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 flex items-center justify-center p-4">
-        <Card className="border-red-200 max-w-md w-full">
-          <CardContent className="pt-6 text-center">
-            <p className="text-red-600 font-medium">
-              Link de onboarding inválido.
-            </p>
-            <p className="text-slate-500 text-sm mt-2">
-              Revisá tu correo electrónico y hacé clic en el link de
-              verificación para continuar.
-            </p>
-            <Link
-              href="/registro/paciente"
-              className="mt-4 inline-block text-teal-600 underline text-sm"
-            >
-              Volver al registro
-            </Link>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="rounded-2xl border border-red-200 bg-white p-8 max-w-md w-full text-center shadow-lg">
+          <p className="text-red-600 font-medium">Link de onboarding inválido.</p>
+          <p className="text-slate-500 text-sm mt-2">
+            Revisá tu correo electrónico y hacé clic en el link de verificación para continuar.
+          </p>
+          <Link
+            href="/registro/paciente"
+            className="mt-4 inline-block text-teal-600 underline text-sm"
+          >
+            Volver al registro
+          </Link>
+        </div>
       </div>
     );
   }
@@ -153,155 +146,153 @@ function OnboardingPacienteContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 py-8 px-4">
-      <div className="max-w-lg mx-auto">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-6"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Volver
-        </Link>
-
-        <Card className="border-slate-200 shadow-lg">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-600">
-                <User className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <CardTitle>Completá tu perfil</CardTitle>
-                <p className="text-sm text-slate-500">
-                  Un último paso para empezar a pedir turnos
-                </p>
-              </div>
+    <div className="min-h-screen bg-slate-50 py-10 px-4">
+      <div className="mx-auto w-full max-w-3xl">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="mb-4 flex flex-col items-center gap-3">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-50 border border-teal-200 text-teal-600">
+              <User className="h-6 w-6" />
+            </span>
+            <div className="flex items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logos/nodo ver clinica.png"
+                alt="NODO"
+                style={{ height: "24px", width: "auto" }}
+              />
+              <span className="text-slate-300 font-light text-2xl">|</span>
+              <span className="font-display font-extrabold text-navy text-2xl">Clínica</span>
             </div>
-          </CardHeader>
+          </div>
+          <h1 className="text-2xl font-semibold text-navy">Completá tu registro</h1>
+          <p className="text-sm mt-2 text-slate-500 max-w-md mx-auto">
+            Un último paso para empezar a pedir turnos y gestionar tu historial médico.
+          </p>
+        </div>
 
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="fullName">Nombre completo</Label>
-                <Input
-                  id="fullName"
-                  required
-                  value={form.fullName}
-                  onChange={(e) =>
-                    setForm({ ...form, fullName: e.target.value })
-                  }
-                  placeholder="Juan García"
-                  className="mt-1"
-                />
-              </div>
+        {/* Form card */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 md:p-10 shadow-lg">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Nombre completo */}
+            <div>
+              <label htmlFor="fullName" className={labelClass}>
+                Nombre completo
+              </label>
+              <input
+                id="fullName"
+                required
+                value={form.fullName}
+                onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                placeholder="Juan García"
+                className={inputClass}
+              />
+            </div>
 
+            {/* DNI + Dirección */}
+            <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="dni">Número de DNI</Label>
-                <Input
+                <label htmlFor="dni" className={labelClass}>
+                  Número de DNI
+                </label>
+                <input
                   id="dni"
                   required
                   value={form.dni}
                   onChange={(e) => setForm({ ...form, dni: e.target.value })}
                   placeholder="28660386"
-                  className="mt-1"
+                  className={inputClass}
                 />
               </div>
-
               <div>
-                <Label htmlFor="address">Dirección (opcional)</Label>
-                <Input
+                <label htmlFor="address" className={labelClass}>
+                  Dirección (opcional)
+                </label>
+                <input
                   id="address"
                   value={form.address}
-                  onChange={(e) =>
-                    setForm({ ...form, address: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
                   placeholder="Av. Corrientes 1234, CABA"
-                  className="mt-1"
+                  className={inputClass}
                 />
               </div>
+            </div>
 
-              <div>
-                <Label>Obra social (opcional)</Label>
-                <div className="mt-1">
-                  <ObraSocialCombobox
-                    value={form.obraSocial}
-                    onChange={(val) => setForm({ ...form, obraSocial: val })}
-                    placeholder="Buscar obra social..."
-                  />
-                </div>
+            {/* Obra social */}
+            <div>
+              <label className={labelClass}>Obra social (opcional)</label>
+              <div className="mt-1">
+                <ObraSocialCombobox
+                  value={form.obraSocial}
+                  onChange={(val) => setForm({ ...form, obraSocial: val })}
+                  placeholder="Buscar obra social..."
+                />
               </div>
+            </div>
 
+            {/* DNI upload */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 space-y-3">
               <div className="grid grid-cols-2 gap-4">
-                <DniSlot
-                  label="DNI frente"
-                  file={dniFront}
-                  onChange={setDniFront}
-                />
-                <DniSlot
-                  label="DNI dorso"
-                  file={dniBack}
-                  onChange={setDniBack}
-                />
+                <DniSlot label="DNI frente" file={dniFront} onChange={setDniFront} />
+                <DniSlot label="DNI dorso" file={dniBack} onChange={setDniBack} />
               </div>
               <p className="text-xs text-slate-400">
-                Las fotos del DNI son opcionales. Se usan para verificar tu
-                identidad.
+                Las fotos del DNI son opcionales. Se usan para verificar tu identidad.
               </p>
+            </div>
 
-              <div>
-                <Label className="flex items-center gap-2 mb-3">
-                  <CreditCard className="h-4 w-4" />
-                  Plan
-                </Label>
-                <div className="grid grid-cols-2 gap-3">
-                  {PLANS.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setPlan(p.id)}
-                      className={`rounded-xl border p-4 text-left transition-all ${
-                        plan === p.id
-                          ? "border-teal-500 bg-teal-50 ring-2 ring-teal-200"
-                          : "border-slate-200 hover:border-slate-300"
+            {/* Planes */}
+            <div>
+              <label className={`${labelClass} flex items-center gap-2 mb-3`}>
+                <CreditCard className="h-4 w-4" />
+                Plan
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {PLANS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPlan(p.id)}
+                    className={`rounded-lg px-4 py-3 text-left border font-medium transition-colors ${
+                      plan === p.id
+                        ? "border-teal-500 bg-teal-50 text-navy ring-1 ring-teal-400"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                    }`}
+                  >
+                    <span className="block text-sm font-semibold">{p.name}</span>
+                    <span
+                      className={`block text-xs mt-0.5 ${
+                        plan === p.id ? "text-teal-600" : "text-slate-400"
                       }`}
                     >
-                      <p className="font-semibold text-slate-800">{p.name}</p>
-                      <p className="text-lg font-bold text-teal-600 mt-1">
-                        {p.price}
-                        <span className="text-xs font-normal text-slate-400">
-                          {" "}
-                          {p.period}
-                        </span>
-                      </p>
-                      <ul className="mt-2 space-y-1">
-                        {p.features.map((f) => (
-                          <li
-                            key={f}
-                            className="text-xs text-slate-500 flex items-start gap-1"
-                          >
-                            <Check className="h-3 w-3 text-teal-500 mt-0.5 shrink-0" />
-                            {f}
-                          </li>
-                        ))}
-                      </ul>
-                    </button>
-                  ))}
-                </div>
+                      {p.price} {p.period}
+                    </span>
+                  </button>
+                ))}
               </div>
+            </div>
 
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-teal-600 hover:bg-teal-700"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "Confirmar y solicitar habilitación"
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded-lg py-3.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm w-full transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Confirmar y solicitar habilitación"
+              )}
+            </button>
+          </form>
+        </div>
+
+        {/* Footer */}
+        <p className="mt-6 text-center text-xs text-slate-400">
+          <a className="underline hover:text-slate-600" href="/">
+            Volver al inicio
+          </a>
+        </p>
       </div>
 
       {/* Success modal */}
@@ -332,7 +323,7 @@ export default function OnboardingPacientePage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-gradient-to-b from-slate-50 to-teal-50/40 flex items-center justify-center">
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
         </div>
       }
