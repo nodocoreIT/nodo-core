@@ -36,9 +36,9 @@ const nextConfig: NextConfig = {
     root: path.join(__dirname, ".."),
   },
   outputFileTracingIncludes: {
-    "/inmo/[[...slug]]": ["./public/inmo/index.html"],
-    "/autos/[[...slug]]": ["./public/autos/index.html"],
-    "/finanzas/[[...slug]]": ["./public/finanzas/index.html"],
+    "/inmo/[[...slug]]": [path.join(__dirname, "public/inmo/index.html")],
+    "/autos/[[...slug]]": [path.join(__dirname, "public/autos/index.html")],
+    "/finanzas/[[...slug]]": [path.join(__dirname, "public/finanzas/index.html")],
   },
   async rewrites() {
     if (isDev) {
