@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { KeyRound, Loader2, CheckCircle, Stethoscope } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { clinicApi } from "@/lib/clinic/client-api";
 
 export default function ActualizarContrasenaPage() {
   const router = useRouter();
@@ -66,9 +67,9 @@ export default function ActualizarContrasenaPage() {
       if (updateError) throw updateError;
 
       // The recovery session is consumed after updateUser — re-authenticate
-      // with the new password so the cookie-based session is valid before redirecting.
+      // using the same path as the login portal so all session state is set correctly.
       if (userEmail) {
-        await supabase.auth.signInWithPassword({ email: userEmail, password });
+        await clinicApi.login(userEmail, password, "doctor");
       }
 
       setSuccess(true);
