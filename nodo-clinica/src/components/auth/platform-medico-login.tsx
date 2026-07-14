@@ -78,8 +78,7 @@ export function PlatformMedicoLoginFields({
         return;
       }
 
-      const data = await clinicApi.syncPlatformSession();
-      toast.success(`Bienvenido/a, ${data.user.fullName}`);
+      await clinicApi.syncPlatformSession();
       window.location.replace("/medico/dashboard");
     } catch (err) {
       const msg =
@@ -96,8 +95,7 @@ export function PlatformMedicoLoginFields({
       <RequiredPasswordForm
         supabase={supabase}
         onSuccess={async () => {
-          const data = await clinicApi.syncPlatformSession();
-          toast.success(`Bienvenido/a, ${data.user.fullName}`);
+          await clinicApi.syncPlatformSession();
           window.location.replace("/medico/dashboard");
         }}
       />

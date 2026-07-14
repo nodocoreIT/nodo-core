@@ -63,12 +63,11 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
 
     setLoading(true);
     try {
-      const data = await clinicApi.login(
+      await clinicApi.login(
         form.email.trim(),
         form.password,
         defaultRole,
       );
-      toast.success(`Bienvenido/a, ${data.user.fullName}`);
       window.location.replace(isDoctor ? "/medico/dashboard" : "/paciente");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al ingresar";

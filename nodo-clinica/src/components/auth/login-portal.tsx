@@ -224,8 +224,7 @@ export function LoginPortal() {
     }
     setLoading(true);
     try {
-      const data = await clinicApi.login(form.email.trim(), form.password, role);
-      toast.success(`Bienvenido/a, ${data.user.fullName}`);
+      await clinicApi.login(form.email.trim(), form.password, role);
       setShowTransition(true);
       setTimeout(() => {
         window.location.replace(isDoctor ? "/medico/dashboard" : "/paciente");
