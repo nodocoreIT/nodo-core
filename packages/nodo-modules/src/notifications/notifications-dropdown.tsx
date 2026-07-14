@@ -162,7 +162,7 @@ export function NotificationsDropdown({
                     : "text-slate2 hover:text-navy",
                 )}
               >
-                Cerradas{dismissedCount > 0 ? ` (${dismissedCount})` : ""}
+                Cerradas{dismissed.filter((d) => !d.deleted).length > 0 ? ` (${dismissed.filter((d) => !d.deleted).length})` : ""}
               </button>
             </div>
           </div>
@@ -192,13 +192,13 @@ export function NotificationsDropdown({
                   />
                 ))
               )
-            ) : dismissed.length === 0 ? (
+            ) : dismissed.filter((d) => !d.deleted).length === 0 ? (
               <div className="flex flex-col items-center justify-center bg-white px-4 py-8 text-center">
                 <Bell className="h-8 w-8 text-slate2/40" />
                 <p className="mt-2 text-sm text-slate2">Sin notificaciones cerradas</p>
               </div>
             ) : (
-              dismissed.map((notif) => (
+              dismissed.filter((d) => !d.deleted).map((notif) => (
                 <ClosedNotificationRow
                   key={notif.id}
                   notif={notif}

@@ -8,6 +8,7 @@ export interface DismissedNotification {
   description: string;
   href: string;
   dismissedAt: string;
+  deleted?: boolean;
 }
 
 const STORAGE_PREFIX = "nodo-dismissed-notifications:";
@@ -103,7 +104,7 @@ export function useNotificationDismissals(storageKey: string) {
   const deleteDismissed = useCallback(
     (id: string) => {
       setDismissed((prev) => {
-        const next = prev.filter((d) => d.id !== id);
+        const next = prev.map((d) => (d.id === id ? { ...d, deleted: true } : d));
         persistToStorage(next);
         return next;
       });
