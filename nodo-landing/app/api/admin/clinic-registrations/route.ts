@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
-import { nodoAuthProjectParam } from "@/lib/supabase/nodo-auth-config";
 import { sendAccountEnabledEmail } from "@/lib/mail";
 
 async function requireAdmin() {
@@ -150,14 +149,10 @@ export async function POST(request: NextRequest) {
   }
 
   // Generate recovery link for password setup using nodo-clínica's own Supabase project.
-  // `next` must be a full URL pointing to the nodo-clinica app domain so the browser
-  // lands on the correct page after the auth/confirm token exchange.
-  const origin = new URL(request.url).origin;
-  const project = nodoAuthProjectParam("clinica");
+  // Redirect directly to the clinica app — no nodo-landing intermediary needed.
+  // Supabase handles the token exchange and appends #access_token=...&type=recovery.
   const clinicaAppUrl = (process.env.NODO_CLINICA_APP_URL ?? "https://clinica.nodocore.com.ar").replace(/\/$/, "");
-  const next = `${clinicaAppUrl}/actualizar-contrasena`;
-  const confirmQuery = `project=${encodeURIComponent(project)}&next=${encodeURIComponent(next)}`;
-  const redirectToUrl = `${origin}/auth/confirm?${confirmQuery}`;
+  const redirectToUrl = `${clinicaAppUrl}/actualizar-contrasena`;
 
   const nodoAdmin = createNodoAdminClient("clinica");
   if (!nodoAdmin) {
