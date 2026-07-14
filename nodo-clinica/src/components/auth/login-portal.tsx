@@ -268,12 +268,13 @@ export function LoginPortal() {
     if (!recoveryEmail.trim()) return;
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        recoveryEmail.trim(),
-        { redirectTo: `${window.location.origin}/actualizar-contrasena` }
-      );
-      if (resetError) throw resetError;
+      const res = await fetch("/api/clinic/account/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: recoveryEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Error al enviar el correo");
       setRecoverySent(true);
     } catch (err) {
       setGeneralError(err instanceof Error ? err.message : "Error al enviar el correo");

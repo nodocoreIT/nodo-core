@@ -29,6 +29,91 @@ function resolveOrigin(requestOrigin: string): string {
   return requestOrigin;
 }
 
+export async function sendPasswordResetEmail(params: {
+  email: string;
+  resetUrl: string;
+  origin: string;
+}): Promise<void> {
+  if (!isMailConfigured()) {
+    throw new Error(
+      "SMTP not configured: set ZOHO_SMTP_USER and ZOHO_SMTP_PASSWORD",
+    );
+  }
+
+  const { email, resetUrl } = params;
+  const origin = resolveOrigin(params.origin);
+  const logoUrl = `${origin}/logos/logo%20compuesto%20estrella%20az%20letra%20blancazzz.png`;
+
+  const transporter = nodemailer.createTransport({
+    host: HOST,
+    port: PORT,
+    secure: PORT === 465,
+    auth: { user: USER, pass: PASS },
+  });
+
+  await transporter.sendMail({
+    from: `"Nodo Clínica" <${USER}>`,
+    to: email,
+    subject: "Restablecé tu contraseña en NODO | Clínica Virtual",
+    text: [
+      `Hola,`,
+      ``,
+      `Recibimos una solicitud para restablecer tu contraseña en NODO | Clínica Virtual.`,
+      `Para crear una nueva contraseña, hacé clic en el siguiente enlace:`,
+      ``,
+      resetUrl,
+      ``,
+      `El enlace vence en 1 hora.`,
+      ``,
+      `Si no realizaste esta solicitud, ignorá este correo.`,
+    ].join("\n"),
+    html: `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #CCEBE9;">
+        <!-- Header -->
+        <div style="background-color:#0D9488;padding:36px 48px;text-align:center;">
+          <img
+            src="${logoUrl}"
+            alt="NODO Clínica"
+            style="height:44px;width:auto;display:inline-block;"
+          />
+        </div>
+
+        <!-- Body -->
+        <div style="padding:32px;">
+          <h2 style="color:#0D9488;margin-top:0;font-size:22px;">
+            Restablecé tu contraseña
+          </h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;">
+            Recibimos una solicitud para restablecer tu contraseña en
+            <strong>NODO | Clínica Virtual</strong>.
+            Hacé clic en el botón para crear una nueva:
+          </p>
+          <div style="margin:28px 0;text-align:center;">
+            <a
+              href="${resetUrl}"
+              style="background-color:#0D9488;color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;font-size:15px;letter-spacing:0.02em;"
+            >
+              Restablecer contraseña
+            </a>
+          </div>
+          <p style="color:#6B7280;font-size:12px;line-height:1.5;">
+            El enlace vence en 1 hora. Si el botón no funciona, copiá este
+            enlace en tu navegador:<br/>
+            <a href="${resetUrl}" style="color:#0D9488;word-break:break-all;">${resetUrl}</a>
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="background:#F0FAFA;padding:16px 32px;border-top:1px solid #CCEBE9;text-align:center;">
+          <p style="color:#9CA3AF;font-size:11px;margin:0;">
+            Si no realizaste esta solicitud, ignorá este correo. · © 2026 Nodo Core
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}
+
 export async function sendClinicVerificationEmail(params: {
   email: string;
   role: "medico" | "paciente";
