@@ -38,7 +38,7 @@ export function NotificationsDropdown({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
   const [isMobile, setIsMobile] = useState(false);
-  const { dismissed, dismissedCount, dismiss, deleteDismissed, filterActive } =
+  const { dismissed, dismiss, deleteDismissed, filterActive } =
     useNotificationDismissals(storageKey, initialDismissed);
 
   const activeItems = filterActive(items);
