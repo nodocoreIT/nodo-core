@@ -69,9 +69,8 @@ export function useNotificationDismissals(storageKey: string) {
     setDismissed(records);
   }, [storageKey]);
 
-  const persist = useCallback(
+  const persistToStorage = useCallback(
     (next: DismissedNotification[]) => {
-      setDismissed(next);
       try {
         localStorage.setItem(STORAGE_PREFIX + storageKey, JSON.stringify(next));
       } catch {
@@ -83,26 +82,33 @@ export function useNotificationDismissals(storageKey: string) {
 
   const dismiss = useCallback(
     (notification: AppNotification) => {
-      const record: DismissedNotification = {
-        id: notification.id,
-        kind: notification.kind,
-        title: notification.title,
-        description: notification.description,
-        href: notification.href,
-        dismissedAt: new Date().toISOString(),
-      };
-      const next = [...dismissed.filter((d) => d.id !== notification.id), record];
-      next.sort((a, b) => b.dismissedAt.localeCompare(a.dismissedAt));
-      persist(next);
+      setDismissed((prev) => {
+        const record: DismissedNotification = {
+          id: notification.id,
+          kind: notification.kind,
+          title: notification.title,
+          description: notification.description,
+          href: notification.href,
+          dismissedAt: new Date().toISOString(),
+        };
+        const next = [...prev.filter((d) => d.id !== notification.id), record];
+        next.sort((a, b) => b.dismissedAt.localeCompare(a.dismissedAt));
+        persistToStorage(next);
+        return next;
+      });
     },
-    [dismissed, persist],
+    [persistToStorage],
   );
 
   const deleteDismissed = useCallback(
     (id: string) => {
-      persist(dismissed.filter((d) => d.id !== id));
+      setDismissed((prev) => {
+        const next = prev.filter((d) => d.id !== id);
+        persistToStorage(next);
+        return next;
+      });
     },
-    [dismissed, persist],
+    [persistToStorage],
   );
 
   const filterActive = useCallback(
