@@ -16,15 +16,24 @@ export default function ActualizarContrasenaPage() {
   const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
-    // Supabase puts recovery tokens in the URL hash — the client library
-    // detects them automatically and establishes a session.
     const supabase = createClient();
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
-        setSessionReady(true);
+
+    // @supabase/ssr's createBrowserClient does NOT auto-process URL hash tokens
+    // (it's built for PKCE/code flow). Parse the hash manually and call setSession.
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    if (hash) {
+      const params = new URLSearchParams(hash.slice(1));
+      const access_token = params.get("access_token");
+      const refresh_token = params.get("refresh_token");
+      if (access_token && refresh_token) {
+        supabase.auth.setSession({ access_token, refresh_token }).then(({ error }) => {
+          if (!error) setSessionReady(true);
+        });
+        return;
       }
-    });
-    // Also check if there's already a session
+    }
+
+    // Fallback: check for an existing session (e.g. user refreshes the page)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) setSessionReady(true);
     });
