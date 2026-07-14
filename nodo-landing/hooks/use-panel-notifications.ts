@@ -12,11 +12,33 @@ import {
   type PanelTask,
 } from "@/lib/panel/build-panel-notifications";
 import type { AppNotification } from "@nodocore/nodo-modules/notifications";
+import type { DismissedNotification } from "@nodocore/nodo-modules/notifications";
 
 const POLL_MS = 60_000;
 
+async function fetchServerDismissals(): Promise<DismissedNotification[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("dismissed_panel_notifications")
+    .select("notification_id, kind, title, description, href, dismissed_at, deleted")
+    .eq("deleted", false);
+
+  if (error || !data) return [];
+
+  return data.map((row) => ({
+    id: row.notification_id as string,
+    kind: row.kind as string,
+    title: row.title as string,
+    description: row.description as string,
+    href: row.href as string,
+    dismissedAt: row.dismissed_at as string,
+    deleted: false,
+  }));
+}
+
 export function usePanelNotifications() {
   const [items, setItems] = useState<AppNotification[]>([]);
+  const [dismissedFromServer, setDismissedFromServer] = useState<DismissedNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +55,7 @@ export function usePanelNotifications() {
         { data: profiles, error: profilesErr },
         { data: splits, error: splitsErr },
         { data: feedbackRaw },
+        serverDismissals,
       ] = await Promise.all([
         supabase
           .from("client_units")
@@ -52,6 +75,7 @@ export function usePanelNotifications() {
           .gte("created_at", sevenDaysAgo)
           .order("created_at", { ascending: false })
           .limit(10),
+        fetchServerDismissals(),
       ]);
 
       const queryError =
@@ -64,7 +88,7 @@ export function usePanelNotifications() {
         0,
       );
 
-      const notifications = buildPanelNotifications({
+      const allNotifications = buildPanelNotifications({
         units: (units ?? []) as PanelClientUnit[],
         clients: (clients ?? []) as PanelClient[],
         tasks: (tasks ?? []) as PanelTask[],
@@ -75,7 +99,11 @@ export function usePanelNotifications() {
         feedbackNotifications: (feedbackRaw ?? []) as PanelFeedbackNotification[],
       });
 
-      setItems(notifications);
+      const dismissedIds = new Set(serverDismissals.map((d) => d.id));
+      const activeNotifications = allNotifications.filter((n) => !dismissedIds.has(n.id));
+
+      setDismissedFromServer(serverDismissals);
+      setItems(activeNotifications);
       setError(null);
     } catch (err) {
       setError(
@@ -95,11 +123,44 @@ export function usePanelNotifications() {
     return () => window.clearInterval(interval);
   }, [load]);
 
+  const dismissNotification = useCallback(async (notification: AppNotification) => {
+    try {
+      await fetch("/api/panel/notifications/dismiss", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notification_id: notification.id,
+          kind: notification.kind,
+          title: notification.title,
+          description: notification.description,
+          href: notification.href,
+        }),
+      });
+    } catch {
+      // best-effort — localStorage already saved it locally
+    }
+  }, []);
+
+  const deleteNotification = useCallback(async (id: string) => {
+    try {
+      await fetch("/api/panel/notifications/dismiss", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notification_id: id }),
+      });
+    } catch {
+      // best-effort
+    }
+  }, []);
+
   return {
     items,
     count: items.length,
     loading,
     error,
     refresh: load,
+    dismissedFromServer,
+    dismissNotification,
+    deleteNotification,
   };
 }

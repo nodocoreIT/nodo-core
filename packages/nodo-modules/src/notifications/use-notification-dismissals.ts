@@ -59,7 +59,10 @@ function migrateLegacyFinanzasDismissals(storageKey: string): DismissedNotificat
   }
 }
 
-export function useNotificationDismissals(storageKey: string) {
+export function useNotificationDismissals(
+  storageKey: string,
+  initialDismissed?: DismissedNotification[],
+) {
   const [dismissed, setDismissed] = useState<DismissedNotification[]>([]);
 
   useEffect(() => {
@@ -67,7 +70,16 @@ export function useNotificationDismissals(storageKey: string) {
     if (records.length === 0) {
       records = migrateLegacyFinanzasDismissals(storageKey);
     }
+    if (initialDismissed && initialDismissed.length > 0) {
+      // Merge: server entries take precedence; local entries fill the rest.
+      const serverIds = new Set(initialDismissed.map((d) => d.id));
+      const localOnly = records.filter((r) => !serverIds.has(r.id));
+      records = [...initialDismissed, ...localOnly].sort((a, b) =>
+        (b.dismissedAt ?? "").localeCompare(a.dismissedAt ?? ""),
+      );
+    }
     setDismissed(records);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
   const persistToStorage = useCallback(

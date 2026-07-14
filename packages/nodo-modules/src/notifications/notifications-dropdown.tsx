@@ -28,6 +28,9 @@ export function NotificationsDropdown({
   onNavigate,
   headerRingClass = "ring-[#EEF3F8]",
   storageKey = "default",
+  initialDismissed,
+  onDismiss,
+  onDelete,
 }: NotificationsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [tab, setTab] = useState<TabId>("pending");
@@ -36,7 +39,7 @@ export function NotificationsDropdown({
   const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
   const [isMobile, setIsMobile] = useState(false);
   const { dismissed, dismissedCount, dismiss, deleteDismissed, filterActive } =
-    useNotificationDismissals(storageKey);
+    useNotificationDismissals(storageKey, initialDismissed);
 
   const activeItems = filterActive(items);
   const count = activeItems.length;
@@ -84,6 +87,7 @@ export function NotificationsDropdown({
 
   function handleDismiss(notification: AppNotification) {
     dismiss(notification);
+    onDismiss?.(notification);
   }
 
   function handleNavigate(href: string) {
@@ -204,7 +208,10 @@ export function NotificationsDropdown({
                   notif={notif}
                   kindStyles={kindStyles}
                   onNavigate={handleNavigate}
-                  onDelete={() => deleteDismissed(notif.id)}
+                  onDelete={() => {
+                    deleteDismissed(notif.id);
+                    onDelete?.(notif.id);
+                  }}
                 />
               ))
             )}
