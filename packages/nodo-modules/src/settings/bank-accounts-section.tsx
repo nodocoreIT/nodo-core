@@ -1,3 +1,4 @@
+"use client";
 import { useState } from "react";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button, Input, Label } from "@nodocore/shared-components";

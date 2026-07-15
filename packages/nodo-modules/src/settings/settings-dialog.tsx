@@ -1,3 +1,4 @@
+"use client";
 // @ts-nocheck
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Loader2, Mail, UserPlus, Image as ImageIcon, BrainCircuit, CheckCircle2, AlertTriangle, Eye, EyeOff, Pencil, Trash2, Lock } from "lucide-react";

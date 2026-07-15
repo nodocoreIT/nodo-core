@@ -1,3 +1,4 @@
+"use client";
 import { useMemo, useState } from "react";
 import { Plus, ArrowUpRight, ArrowDownRight, Pencil, Trash2 } from "lucide-react";
 import {

@@ -1,3 +1,4 @@
+"use client";
 import { useState, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2 } from "lucide-react";
 import { Button } from "@nodocore/shared-components";

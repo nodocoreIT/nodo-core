@@ -1,3 +1,4 @@
+"use client";
 import { useCallback, useEffect, useState } from "react";
 import { useSupabase } from "@nodocore/shared-components";
 import type { OrgEntry } from "./types";
