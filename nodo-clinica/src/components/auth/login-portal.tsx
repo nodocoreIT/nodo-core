@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Stethoscope, User, Eye, EyeOff, Loader2, KeyRound, MailCheck } from "lucide-react";
-import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
 function NodeTransitionOverlay({ isDoctor }: { isDoctor: boolean }) {
@@ -232,7 +231,6 @@ export function LoginPortal() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al ingresar";
       setGeneralError(msg);
-      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -255,7 +253,6 @@ export function LoginPortal() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al registrarse";
       setGeneralError(msg);
-      toast.error(msg);
     } finally {
       setLoading(false);
     }
