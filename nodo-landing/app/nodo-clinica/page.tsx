@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Stethoscope } from "lucide-react";
+import { ArrowRight, Stethoscope } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 import { CLINICA_ACCENT, getNodoLogoSrc } from "@/lib/node-accents";
@@ -67,7 +67,7 @@ export default function Page() {
                   boxShadow: `0 8px 24px -8px rgba(${CLINICA_ACCENT.rgb},.45)`,
                 }}
               >
-                Ingresar al portal
+                Entrar al módulo   <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>

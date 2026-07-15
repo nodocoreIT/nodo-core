@@ -179,7 +179,7 @@ export default function NodoEcommercePage() {
                   boxShadow: `0 8px 24px -8px rgba(${A.rgb},.45)`,
                 }}
               >
-                Empezar ahora <ArrowRight className="h-4 w-4" />
+                Entrar al módulo <ArrowRight className="h-4 w-4" />
               </Link>
               <a
                 href="#funcionalidades"

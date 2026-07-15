@@ -182,7 +182,7 @@ export default function NodoAutosPage() {
                   boxShadow: `0 8px 24px -8px rgba(${accent.rgb},.45)`,
                 }}
               >
-                Entrar al Concesionario <ArrowRight className="h-4 w-4" />
+                Entrar al módulo <ArrowRight className="h-4 w-4" />
               </Link>
               <a
                 href="#precios"

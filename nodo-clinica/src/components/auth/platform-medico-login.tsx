@@ -101,19 +101,6 @@ export function PlatformMedicoLoginFields({
 
   return (
     <form onSubmit={handleSubmit} noValidate>
-      <p className="text-[13px] text-slate2 mb-4 rounded-md border border-mist bg-white px-3 py-2">
-        Accedé con la cuenta que activaste en{" "}
-        <a
-          href={CLINICA_REGISTRATION_URL}
-          className="font-semibold text-brand hover:underline"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          nodocore.com.ar
-        </a>
-        .
-      </p>
-
       <div className="mb-4">
         <label
           htmlFor="login-email"
