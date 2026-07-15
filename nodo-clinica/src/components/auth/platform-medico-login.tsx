@@ -7,10 +7,9 @@ import {
   fetchMustSetPassword,
   RequiredPasswordForm,
 } from "@nodocore/shared-components";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-import { clinicApi } from "@/lib/clinic/client-api";
 import { CLINICA_REGISTRATION_URL } from "@/lib/clinic/platform-config";
 
 interface PlatformMedicoLoginProps {
@@ -76,7 +75,6 @@ export function PlatformMedicoLoginFields({
         return;
       }
 
-      await clinicApi.syncPlatformSession();
       window.location.replace("/medico/dashboard");
     } catch (err) {
       const msg =
@@ -93,7 +91,6 @@ export function PlatformMedicoLoginFields({
       <RequiredPasswordForm
         supabase={supabase}
         onSuccess={async () => {
-          await clinicApi.syncPlatformSession();
           window.location.replace("/medico/dashboard");
         }}
       />
@@ -155,7 +152,11 @@ export function PlatformMedicoLoginFields({
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-slate2 hover:text-ink cursor-pointer bg-transparent border-none p-1"
           >
-            {showPassword ? "Ocultar" : "Ver"}
+            {showPassword ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
           </button>
         </div>
       </div>
