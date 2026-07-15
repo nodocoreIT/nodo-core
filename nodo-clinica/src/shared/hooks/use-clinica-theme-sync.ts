@@ -12,6 +12,7 @@
  */
 import { useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { isBrowserSupabaseEnabled } from "@/lib/clinic/config";
 import { useThemeStore, DEFAULT_SETTINGS, type ThemeSettings } from "./use-theme-settings";
 
 /**
@@ -22,6 +23,7 @@ export function useClinicaThemeSync() {
   const { setSettings } = useThemeStore();
 
   useEffect(() => {
+    if (!isBrowserSupabaseEnabled()) return;
     const supabase = createClient();
     supabase
       .from("office_settings")
@@ -42,6 +44,7 @@ export function useClinicaThemeSync() {
  * No .eq() needed — RLS handles row isolation.
  */
 export async function saveClinicaThemeSettings(settings: ThemeSettings): Promise<void> {
+  if (!isBrowserSupabaseEnabled()) return;
   const supabase = createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await supabase.from("office_settings").update({ theme_settings: settings as any });

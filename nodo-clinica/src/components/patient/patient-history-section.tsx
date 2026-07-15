@@ -152,14 +152,15 @@ function TimelineEntry({ item }: { item: PatientTimelineItem }) {
 }
 
 export function PatientHistorySection({
-  timeline,
+  timeline = [],
   loading = false,
 }: PatientHistorySectionProps) {
   const [filter, setFilter] = useState<FilterValue>("all");
 
   const filtered = useMemo(() => {
-    if (filter === "all") return timeline;
-    return timeline.filter((item) => item.kind === filter);
+    const items = timeline ?? [];
+    if (filter === "all") return items;
+    return items.filter((item) => item.kind === filter);
   }, [timeline, filter]);
 
   if (loading) {

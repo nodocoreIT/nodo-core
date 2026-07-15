@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { BookAppointmentDialog } from "@/components/patient/book-appointment-dialog";
 import { PatientHistorySection } from "@/components/patient/patient-history-section";
 import { clinicApi } from "@/lib/clinic/client-api";
+import type { PatientTimelineItem } from "@/lib/clinic/patient-timeline";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -84,6 +85,8 @@ export function PacientePortal() {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [timeline, setTimeline] = useState<PatientTimelineItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
 
   useEffect(() => {
     async function init() {
@@ -100,17 +103,22 @@ export function PacientePortal() {
           fullName: user.fullName,
           profilePhotoData: user.profilePhotoData,
         });
-        const [docs, apts] = await Promise.all([
+        const [docs, apts, history] = await Promise.all([
           clinicApi.getDoctors(),
           clinicApi.getPatientAppointments(user.id),
+          clinicApi.getPatientHistory(user.id).catch(() => ({ timeline: [] })),
         ]);
         setDoctors(Array.isArray(docs) ? docs : []);
         setAppointments(Array.isArray(apts) ? apts : []);
+        setTimeline(
+          Array.isArray(history.timeline) ? history.timeline : [],
+        );
       } catch (e) {
         toast.error("Error al cargar datos del portal");
         console.error(e);
       } finally {
         setLoading(false);
+        setHistoryLoading(false);
       }
     }
     init();
@@ -451,7 +459,13 @@ export function PacientePortal() {
           </section>
         )}
 
-        {patient && <PatientHistorySection patientId={patient.id} />}
+        {patient && (
+          <PatientHistorySection
+            patientId={patient.id}
+            timeline={timeline}
+            loading={historyLoading}
+          />
+        )}
       </main>
 
       {bookingDoctor && (

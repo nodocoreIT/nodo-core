@@ -86,6 +86,9 @@ export function useMedicoHomeAgenda(doctorId: string) {
       setUpcomingAppts(
         rows.filter((a) => localDateKeyFromIso(a.scheduledAt) > todayKey),
       );
+    } catch {
+      setTodayAppts([]);
+      setUpcomingAppts([]);
     } finally {
       setLoading(false);
     }

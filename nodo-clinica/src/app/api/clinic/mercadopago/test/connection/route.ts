@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isLocalMode } from "@/lib/clinic/config";
+import { getOrgMercadoPagoAccessToken } from "@/lib/clinic/db/payments";
 import { readDb } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
 import { getDoctorMercadoPagoAccessToken } from "@/lib/mercadopago/tokens";
@@ -6,29 +8,53 @@ import {
   getMercadoPagoUser,
   mercadoPagoTokenKind,
 } from "@/lib/mercadopago/client";
+import { requireAuth } from "@/lib/supabase/auth-guard";
 
 export const dynamic = "force-dynamic";
 
 /** Verifica que el token MP del médico logueado sea válido. */
 export async function GET(request: NextRequest) {
-  const session = await getSessionFromRequest(request);
-  if (!session || session.role !== "doctor") {
-    return NextResponse.json({ error: "Iniciá sesión como médico" }, { status: 401 });
+  let token: string | undefined;
+
+  if (isLocalMode()) {
+    const session = await getSessionFromRequest(request);
+    if (!session || session.role !== "doctor") {
+      return NextResponse.json(
+        { error: "Iniciá sesión como médico" },
+        { status: 401 },
+      );
+    }
+
+    const db = await readDb();
+    const doctor = db.doctors.find((d) => d.id === session.userId);
+    if (!doctor) {
+      return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+    }
+
+    token = await getDoctorMercadoPagoAccessToken(doctor);
+  } else {
+    const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    if (auth.user.role !== "doctor") {
+      return NextResponse.json(
+        { error: "Iniciá sesión como médico" },
+        { status: 401 },
+      );
+    }
+
+    if (!auth.user.org_id) {
+      return NextResponse.json({ error: "Org no encontrada" }, { status: 403 });
+    }
+
+    token = await getOrgMercadoPagoAccessToken(auth.user.org_id);
   }
 
-  const db = await readDb();
-  const doctor = db.doctors.find((d) => d.id === session.userId);
-  if (!doctor) {
-    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
-  }
-
-  const token = await getDoctorMercadoPagoAccessToken(doctor);
   if (!token) {
     return NextResponse.json(
       {
         ok: false,
         error:
-          "No hay Access Token. Conectá Mercado Pago (OAuth) o pegá un token de prueba en Cobros.",
+          "No hay cuenta vinculada. Usá «Vincular mi cuenta de Mercado Pago» en Cobros.",
       },
       { status: 400 },
     );

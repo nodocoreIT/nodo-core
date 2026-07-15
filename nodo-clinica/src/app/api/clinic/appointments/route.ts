@@ -42,6 +42,9 @@ import {
 import { buildPaymentReceiptAudit } from "@/lib/clinic/payment-receipt-audit";
 import { attachDocumentToAppointment } from "@/lib/clinic/appointment-documents";
 import { appointmentNeedsDoctorPaymentReview } from "@/lib/clinic/payment";
+import { isLocalMode } from "@/lib/clinic/config";
+import { handleAppointmentsGetLocal } from "@/lib/clinic/appointments-local-get";
+import { handleAppointmentsPostLocal } from "@/lib/clinic/appointments-local-post";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -75,6 +78,10 @@ function dedupeDoctorAppointments<
 // ── GET ───────────────────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
+  if (isLocalMode()) {
+    return handleAppointmentsGetLocal(request);
+  }
+
   const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
   const { user, supabase } = authResult;
@@ -376,6 +383,10 @@ export async function GET(request: NextRequest) {
 // ── POST ──────────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  if (isLocalMode()) {
+    return handleAppointmentsPostLocal(request);
+  }
+
   const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
   const { user, supabase } = authResult;

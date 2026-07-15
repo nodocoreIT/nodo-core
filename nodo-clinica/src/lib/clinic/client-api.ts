@@ -9,8 +9,15 @@ const SESSION_KEY = "clinica_local_session";
 
 let _supabasePromise: Promise<ReturnType<typeof import("@/lib/supabase/client").createClient>> | null = null;
 
+import { isBrowserSupabaseEnabled } from "@/lib/clinic/config";
+
+function useBrowserSupabaseAuth(): boolean {
+  if (typeof window === "undefined") return false;
+  return isBrowserSupabaseEnabled();
+}
+
 function getBrowserSupabase() {
-  if (typeof window === "undefined") return null;
+  if (!useBrowserSupabaseAuth()) return null;
   if (!_supabasePromise) {
     _supabasePromise = import("@/lib/supabase/client").then((m) => m.createClient());
   }
@@ -48,14 +55,20 @@ function clinicFetchOpts(): RequestInit {
   };
 }
 
-function parseJsonResponse(res: Response) {
-  const contentType = res.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) {
+async function parseJsonResponse(res: Response) {
+  const text = await res.text();
+  if (!text.trim()) {
     throw new Error(
-      `El servidor no respondió JSON (HTTP ${res.status}). Reiniciá npm run dev en future_nodes/nodo-clinica.`,
+      res.ok
+        ? "Respuesta vacía del servidor"
+        : `Error del servidor (HTTP ${res.status})`,
     );
   }
-  return res.json();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Respuesta inválida del servidor (HTTP ${res.status})`);
+  }
 }
 
 // ── Role helpers ──────────────────────────────────────────────────────────
@@ -111,7 +124,17 @@ export const clinicApi = {
       }
     }
 
-    // 2. Fallback: HTTP API
+    // 2. Local mode: clinic_session cookie + JSON DB
+    if (!useBrowserSupabaseAuth()) {
+      const res = await fetch(`${BASE}/api/clinic/auth/session`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      const data = await parseJsonResponse(res);
+      return { session: data.session ?? null, user: data.user ?? null };
+    }
+
+    // 3. Supabase: HTTP session API
     const res = await fetch(`${BASE}/api/clinic/account/session`, {
       credentials: "include",
     });
@@ -167,8 +190,8 @@ export const clinicApi = {
       };
     }
 
-    // Fallback: server-side login (shouldn't happen in browser)
-    const res = await fetch(`${BASE}/api/clinic/account/login`, {
+    // Local mode: JSON DB + clinic_session cookie
+    const res = await fetch(`${BASE}/api/clinic/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -258,7 +281,7 @@ export const clinicApi = {
       credentials: "include",
       cache: "no-store",
     });
-    const data = await res.json();
+    const data = await parseJsonResponse(res);
     if (!res.ok) {
       throw new Error(
         (data as { error?: string }).error || "Error al cargar médicos",
@@ -272,7 +295,7 @@ export const clinicApi = {
       `${BASE}/api/clinic/doctors?doctorId=${encodeURIComponent(doctorId)}`,
       { credentials: "include", cache: "no-store" },
     );
-    const data = await res.json();
+    const data = await parseJsonResponse(res);
     if (!res.ok) {
       throw new Error(
         (data as { error?: string }).error || "Error al cargar datos del médico",
@@ -328,7 +351,7 @@ export const clinicApi = {
         studyFiles,
       }),
     });
-    const data = await res.json();
+    const data = await parseJsonResponse(res);
     if (!res.ok) {
       const err = new Error(data.error || "Error al reservar") as Error & {
         checks?: unknown;
@@ -389,6 +412,20 @@ export const clinicApi = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al desconectar");
     return data as { ok: boolean };
+  },
+
+  async testMercadoPagoConnection() {
+    const res = await fetch(`${BASE}/api/clinic/mercadopago/test/connection`, {
+      credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al probar conexión");
+    return data as {
+      ok: boolean;
+      message?: string;
+      tokenKind?: string;
+      nickname?: string;
+    };
   },
 
   async testMercadoPagoQr(amount?: number) {
@@ -474,9 +511,9 @@ export const clinicApi = {
   async getPatientAppointments(patientId: string) {
     const res = await fetch(
       `${BASE}/api/clinic/appointments?patientId=${patientId}`,
-      clinicFetchOpts()
+      clinicFetchOpts(),
     );
-    return res.json();
+    return parseJsonResponse(res);
   },
 
   async getDoctorAppointments(
@@ -487,7 +524,7 @@ export const clinicApi = {
       `${BASE}/api/clinic/appointments?doctorId=${doctorId}&scope=${scope}`,
       clinicFetchOpts(),
     );
-    const data = await res.json();
+    const data = await parseJsonResponse(res);
     if (!res.ok) throw new Error(data.error || "Error al cargar turnos");
     return data;
   },
@@ -713,7 +750,7 @@ export const clinicApi = {
       `${BASE}/api/clinic/patient-history?${params}`,
       clinicFetchOpts()
     );
-    const data = await res.json();
+    const data = await parseJsonResponse(res);
     if (!res.ok) {
       throw new Error(data.error || "Error al cargar historial");
     }
@@ -845,7 +882,7 @@ export const clinicApi = {
       credentials: "include",
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await parseJsonResponse(res);
     if (!res.ok) throw new Error(data.error || "Error al validar comprobante");
     return data as {
       valid: boolean;
@@ -1121,6 +1158,8 @@ export const clinicApi = {
       configured: boolean;
       redirectUri?: string;
       clientId?: string;
+      checklist?: string[];
+      diagnoseUrl?: string;
       error?: string;
     };
   },

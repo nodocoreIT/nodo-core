@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readDb, publicDoctor, publicPatient } from "@/lib/clinic/local-db";
+import { verifyPassword } from "@/lib/clinic/password";
 import {
   jsonWithSession,
   clearSessionResponse,
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
 
   if (role === "doctor") {
     const doctor = db.doctors.find(
-      (d) => d.email === emailLower && d.password === password
+      (d) => d.email === emailLower && verifyPassword(password, d.password),
     );
     if (!doctor) {
       return NextResponse.json({ error: "Credenciales incorrectas" }, { status: 401 });
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
 
   if (role === "patient") {
     const patient = db.patients.find(
-      (p) => p.email === emailLower && p.password === password
+      (p) => p.email === emailLower && verifyPassword(password, p.password),
     );
     if (!patient) {
       return NextResponse.json({ error: "Credenciales incorrectas" }, { status: 401 });
