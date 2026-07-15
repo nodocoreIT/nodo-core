@@ -1,28 +1,22 @@
 "use client";
 
 import { Crown, Lock } from "lucide-react";
-import { useAuth } from "@nodocore/shared-components";
 import { cn } from "@/lib/utils";
 import { isProPlan } from "@/lib/nodo-chat/is-pro-plan";
-import { isPlatformMode } from "@/lib/clinic/platform-config";
 
 export interface PlanBadgeProps {
-  /** Plan local (modo JSON) cuando no hay JWT */
+  /** Plan passed explicitly from the caller (API session or local JSON). */
   fallbackPlan?: string | null;
   variant?: "default" | "sidebar";
   className?: string;
 }
 
-function PlanBadgeInner({
-  plan,
-  variant,
+export function PlanBadge({
+  fallbackPlan,
+  variant = "default",
   className,
-}: {
-  plan?: string | null;
-  variant: "default" | "sidebar";
-  className?: string;
-}) {
-  const isPro = isProPlan(plan);
+}: PlanBadgeProps) {
+  const isPro = isProPlan(fallbackPlan);
 
   return (
     <div
@@ -49,29 +43,5 @@ function PlanBadgeInner({
       )}
       <span>{isPro ? "Pro" : "Starter"}</span>
     </div>
-  );
-}
-
-function PlatformPlanBadge(props: Omit<PlanBadgeProps, "fallbackPlan">) {
-  const { plan } = useAuth();
-  return (
-    <PlanBadgeInner plan={plan} variant={props.variant ?? "default"} className={props.className} />
-  );
-}
-
-export function PlanBadge({
-  fallbackPlan,
-  variant = "default",
-  className,
-}: PlanBadgeProps) {
-  if (isPlatformMode()) {
-    return <PlatformPlanBadge variant={variant} className={className} />;
-  }
-  return (
-    <PlanBadgeInner
-      plan={fallbackPlan}
-      variant={variant}
-      className={className}
-    />
   );
 }
