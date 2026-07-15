@@ -35,14 +35,16 @@ export default function LoginBrandPanel({
       />
 
       <div className="login-brand-top relative z-1">
-        <Image
-          src={TOP_LOGO_SRC}
-          alt="NODO"
-          width={140}
-          height={30}
-          style={{ height: "30px", width: "auto" }}
-          priority
-        />
+        <a href="https://www.nodocore.com.ar" target="_blank" rel="noopener noreferrer">
+          <Image
+            src={TOP_LOGO_SRC}
+            alt="NODO"
+            width={140}
+            height={30}
+            style={{ height: "30px", width: "auto" }}
+            priority
+          />
+        </a>
       </div>
 
       <div className="login-brand-hero relative z-1 flex min-h-0 flex-1 flex-col items-center justify-center py-8">
