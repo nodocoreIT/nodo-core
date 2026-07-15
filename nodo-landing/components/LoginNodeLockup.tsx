@@ -15,7 +15,12 @@ export function LoginNodeLockup({
   size = "panel",
   theme = "dark",
 }: LoginNodeLockupProps) {
-  const wordmarkSrc = getNodoLogoSrc(wordmarkSlug ?? nodeCode);
+  const slug = wordmarkSlug ?? nodeCode;
+  const wordmarkSrc = getNodoLogoSrc(slug);
+  // Yellow wordmark is invisible on white — darken to a visible gold.
+  const needsDarkenFilter =
+    theme === "light" &&
+    (slug === "ecommerce" || slug === "nodo-ecommerce");
   const titleSize =
     size === "panel" ? "clamp(30px, 3vw, 40px)" : "clamp(22px, 2.4vw, 28px)";
   const wordmarkHeight =
@@ -32,7 +37,11 @@ export function LoginNodeLockup({
         src={wordmarkSrc}
         alt="NODO"
         className="inline-block shrink-0"
-        style={{ height: wordmarkHeight, width: "auto" }}
+        style={{
+          height: wordmarkHeight,
+          width: "auto",
+          ...(needsDarkenFilter ? { filter: "brightness(0.62)" } : {}),
+        }}
       />
       <span
         aria-hidden
@@ -43,7 +52,10 @@ export function LoginNodeLockup({
       </span>
       <span
         className={`font-display font-extrabold ${codeClass}`}
-        style={{ fontSize: titleSize, lineHeight: 1.1 }}
+        style={{
+          fontSize: titleSize,
+          lineHeight: 1.1,
+        }}
       >
         {nodeCode}
       </span>

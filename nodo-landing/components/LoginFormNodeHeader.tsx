@@ -18,15 +18,26 @@ export function LoginFormNodeHeader({
   accent,
   subtitle,
 }: LoginFormNodeHeaderProps) {
+  // Bright yellows (high R+G, low B) vanish on white backgrounds.
+  const channels = accent.rgb.split(",").map(Number);
+  const rVal = channels[0];
+  const gVal = channels[1];
+  const bVal = channels[2];
+  const isLightAccent = rVal > 200 && gVal > 200 && bVal < 100;
+
+  const darkGold = "#b89b00";
+
   return (
     <div className="mb-6">
       <div className="mb-4 flex items-center gap-3">
         <span
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
           style={{
-            backgroundColor: `rgba(${accent.rgb}, 0.12)`,
-            border: `1px solid rgba(${accent.rgb}, 0.28)`,
-            color: accent.brand,
+            backgroundColor: isLightAccent
+              ? "rgba(184, 155, 0, 0.12)"
+              : `rgba(${accent.rgb}, 0.12)`,
+            border: `1px solid ${isLightAccent ? "rgba(184, 155, 0, 0.35)" : `rgba(${accent.rgb}, 0.28)`}`,
+            color: isLightAccent ? darkGold : accent.brand,
           }}
         >
           <Icon aria-hidden className="h-5 w-5" strokeWidth={1.75} />
