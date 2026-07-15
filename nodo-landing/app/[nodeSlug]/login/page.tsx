@@ -790,7 +790,6 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
         const result = await submitPatientRegistration(
           fullName,
           email,
-          password,
           originUrl,
         );
 
