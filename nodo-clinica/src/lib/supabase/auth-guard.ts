@@ -101,66 +101,58 @@ export async function resolveProfessional(
 export async function requireAuth(
   _request?: NextRequest,
 ): Promise<AuthContext | NextResponse> {
-  if (isLocalMode()) {
-    const clinicSession = await getSession();
-    if (!clinicSession) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // 1. Try Supabase auth first — works in production and any env with Supabase configured.
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+
+    if (!error && user) {
+      const appMeta = user.app_metadata ?? {};
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          role: appMeta.role ?? "patient",
+          org_id: appMeta.org_id ?? null,
+        },
+        _professionalId: null,
+        supabase,
+      };
     }
-    const sessionRole =
-      clinicSession.role === "doctor" ? "doctor" : "patient";
-    return {
-      user: {
-        id: clinicSession.userId,
-        email: clinicSession.email,
-        role: sessionRole,
-        org_id: null,
-      },
-      _professionalId:
-        clinicSession.role === "doctor" ? clinicSession.userId : null,
-      supabase: null as unknown as SupabaseClient<Database>,
-    };
+
+    // 2. Fallback: ClinicSession JWT cookie (platform-sync logins or local mode).
+    const clinicSession = await getSession();
+    if (clinicSession) {
+      const sessionRole = clinicSession.role === "doctor" ? "doctor" : "patient";
+      return {
+        user: {
+          id: clinicSession.userId,
+          email: clinicSession.email,
+          role: sessionRole,
+          org_id: null,
+        },
+        _professionalId: clinicSession.role === "doctor" ? clinicSession.userId : null,
+        supabase,
+      };
+    }
+
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (!error && user) {
-    const appMeta = user.app_metadata ?? {};
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        role: appMeta.role ?? "patient",
-        org_id: appMeta.org_id ?? null,
-      },
-      _professionalId: null,
-      supabase,
-    };
-  }
-
-  // Fallback: ClinicSession JWT cookie
-  // getSession() runs validateSessionUser() which normalises userId to
-  // professionals.id for doctors, so _professionalId is reliable.
+  // 3. Local demo mode (no Supabase configured) — ClinicSession only.
   const clinicSession = await getSession();
-  if (clinicSession) {
-    const sessionRole =
-      clinicSession.role === "doctor" ? "doctor" : "patient";
-    return {
-      user: {
-        id: clinicSession.userId,
-        email: clinicSession.email,
-        role: sessionRole,
-        org_id: null,
-      },
-      _professionalId:
-        clinicSession.role === "doctor" ? clinicSession.userId : null,
-      supabase,
-    };
+  if (!clinicSession) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const sessionRole = clinicSession.role === "doctor" ? "doctor" : "patient";
+  return {
+    user: {
+      id: clinicSession.userId,
+      email: clinicSession.email,
+      role: sessionRole,
+      org_id: null,
+    },
+    _professionalId: clinicSession.role === "doctor" ? clinicSession.userId : null,
+    supabase: null as unknown as SupabaseClient<Database>,
+  };
 }
