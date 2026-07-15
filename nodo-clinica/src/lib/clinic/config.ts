@@ -1,13 +1,18 @@
 /**
- * Feature flag: when true, Supabase Auth is used for login/register/session.
- * When false, the legacy cookie-based session is used as a fallback.
- * Toggle via USE_SUPABASE_AUTH=true in .env.local.
+ * Local demo mode: true only when Supabase is not configured OR
+ * NEXT_PUBLIC_CLINIC_MODE=local is explicitly set.
+ * In production (Supabase URL + key present), this is always false.
  */
-export const USE_SUPABASE_AUTH = process.env.USE_SUPABASE_AUTH === "true";
-
 export function isLocalMode(): boolean {
-  return !USE_SUPABASE_AUTH;
+  if (process.env.NEXT_PUBLIC_CLINIC_MODE === "local") return true;
+  return (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
 }
+
+/** @deprecated use isLocalMode() */
+export const USE_SUPABASE_AUTH = !isLocalMode();
 
 /** Client-side: Supabase browser client only when URL+key exist and not local demo mode. */
 export function isBrowserSupabaseEnabled(): boolean {
