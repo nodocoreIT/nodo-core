@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import {
-  useAuth,
-  useSupabase,
   enforceNodeAccess,
   mapAuthLoginError,
   fetchMustSetPassword,
@@ -11,6 +9,7 @@ import {
 } from "@nodocore/shared-components";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { CLINICA_REGISTRATION_URL } from "@/lib/clinic/platform-config";
 
@@ -43,8 +42,7 @@ export function PlatformMedicoLoginFields({
   onEmailChange,
   onPasswordChange,
 }: PlatformMedicoLoginProps) {
-  const { signInWithPassword } = useAuth();
-  const supabase = useSupabase();
+  const supabase = getSupabaseBrowserClient();
   const [needsNewPassword, setNeedsNewPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,7 +55,7 @@ export function PlatformMedicoLoginFields({
 
     setLoading(true);
     try {
-      const { error: authError } = await signInWithPassword({
+      const { error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
