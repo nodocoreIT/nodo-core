@@ -85,3 +85,20 @@ h4 {
   letter-spacing: -0.02em;
   margin: 0;
 }
+
+/* Login split layout */
+@media (min-width: 881px) {
+  .login-split {
+    grid-template-columns: 1fr 1fr;
+  }
+  .login-brand-panel {
+    display: flex !important;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+}
+@media (max-width: 880px) {
+  .login-brand-panel {
+    display: none !important;
+  }
+}
