@@ -26,6 +26,7 @@ export function useClinicaThemeSync() {
     if (!isBrowserSupabaseEnabled()) return;
     const supabase = createClient();
     supabase
+      .schema("nodo_clinica")
       .from("office_settings")
       .select("theme_settings")
       .maybeSingle()
@@ -47,5 +48,5 @@ export async function saveClinicaThemeSettings(settings: ThemeSettings): Promise
   if (!isBrowserSupabaseEnabled()) return;
   const supabase = createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await supabase.from("office_settings").update({ theme_settings: settings as any });
+  await supabase.schema("nodo_clinica").from("office_settings").update({ theme_settings: settings as any });
 }
