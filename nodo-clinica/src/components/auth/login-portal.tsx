@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Stethoscope, User, Eye, EyeOff, Loader2, KeyRound, MailCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -190,8 +191,12 @@ type Role = "doctor" | "patient";
 type AuthMode = "login" | "register" | "forgot";
 
 export function LoginPortal() {
-  const [role, setRole] = useState<Role>("doctor");
-  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const searchParams = useSearchParams();
+  const initialMode = searchParams.get("mode") === "register" ? "register" : "login";
+  const initialRole = searchParams.get("role") === "paciente" ? "patient" : "doctor";
+
+  const [role, setRole] = useState<Role>(initialRole);
+  const [authMode, setAuthMode] = useState<AuthMode>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [generalError, setGeneralError] = useState("");
