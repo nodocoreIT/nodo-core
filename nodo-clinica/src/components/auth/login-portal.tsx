@@ -177,21 +177,8 @@ function NodeTransitionOverlay({ isDoctor }: { isDoctor: boolean }) {
     </>
   );
 }
-import dynamic from "next/dynamic";
 import { clinicApi } from "@/lib/clinic/client-api";
-import {
-  CLINICA_REGISTRATION_URL,
-  isOpenRegistrationAllowed,
-  isPlatformMode,
-} from "@/lib/clinic/platform-config";
-
-const PlatformMedicoLoginFields = dynamic(
-  () =>
-    import("@/components/auth/platform-medico-login").then((m) => ({
-      default: m.PlatformMedicoLoginFields,
-    })),
-  { ssr: false },
-);
+import { isOpenRegistrationAllowed } from "@/lib/clinic/platform-config";
 
 type Role = "doctor" | "patient";
 type AuthMode = "login" | "register" | "forgot";
@@ -208,8 +195,7 @@ export function LoginPortal() {
   const [recoverySent, setRecoverySent] = useState(false);
 
   const isDoctor = role === "doctor";
-  const platformDoctor = isDoctor && isPlatformMode();
-  const showRegister = isOpenRegistrationAllowed() && !platformDoctor;
+  const showRegister = isOpenRegistrationAllowed();
 
   const [form, setForm] = useState({
     email: "",
@@ -431,15 +417,6 @@ export function LoginPortal() {
                 >
                   Registrarse
                 </button>
-              ) : platformDoctor ? (
-                <a
-                  href={CLINICA_REGISTRATION_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 pb-3 text-center text-[15px] font-bold text-slate2 hover:text-brand transition-colors"
-                >
-                  Suscribirme
-                </a>
               ) : null}
             </div>}
 
@@ -511,27 +488,6 @@ export function LoginPortal() {
 
             {/* Login form */}
             {!registerSuccess && authMode === "login" && (
-              platformDoctor ? (
-                <>
-                  {generalError && (
-                    <p className="text-[13px] text-[#C0392B] mb-3 text-center">{generalError}</p>
-                  )}
-                  <PlatformMedicoLoginFields
-                    email={form.email}
-                    password={form.password}
-                    loading={loading}
-                    setLoading={setLoading}
-                    setGeneralError={setGeneralError}
-                    inputBase={inputBase}
-                    inputNormal={inputNormal}
-                    inputFocus={inputFocus}
-                    showPassword={showPassword}
-                    setShowPassword={setShowPassword}
-                    onEmailChange={(email) => setForm({ ...form, email })}
-                    onPasswordChange={(password) => setForm({ ...form, password })}
-                  />
-                </>
-              ) : (
                 <form onSubmit={handleLogin} noValidate>
                   <div className="mb-4">
                     <label htmlFor="login-email" className="block text-[13px] font-semibold text-navy mb-1.5">
@@ -599,7 +555,6 @@ export function LoginPortal() {
                   </button>
 
                 </form>
-              )
             )}
 
             {/* Register form */}
