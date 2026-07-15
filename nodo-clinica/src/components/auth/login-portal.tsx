@@ -177,13 +177,21 @@ function NodeTransitionOverlay({ isDoctor }: { isDoctor: boolean }) {
     </>
   );
 }
+import dynamic from "next/dynamic";
 import { clinicApi } from "@/lib/clinic/client-api";
 import {
   CLINICA_REGISTRATION_URL,
   isOpenRegistrationAllowed,
   isPlatformMode,
 } from "@/lib/clinic/platform-config";
-import { PlatformMedicoLoginFields } from "@/components/auth/platform-medico-login";
+
+const PlatformMedicoLoginFields = dynamic(
+  () =>
+    import("@/components/auth/platform-medico-login").then((m) => ({
+      default: m.PlatformMedicoLoginFields,
+    })),
+  { ssr: false },
+);
 
 type Role = "doctor" | "patient";
 type AuthMode = "login" | "register" | "forgot";
