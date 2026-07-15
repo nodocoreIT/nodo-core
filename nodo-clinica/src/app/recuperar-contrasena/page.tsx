@@ -3,8 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { KeyRound, Loader2, MailCheck } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-
 export default function RecuperarContrasenaPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,12 +15,13 @@ export default function RecuperarContrasenaPage() {
     if (!email.trim()) return;
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        email.trim(),
-        { redirectTo: `${window.location.origin}/actualizar-contrasena` }
-      );
-      if (resetError) throw resetError;
+      const res = await fetch("/api/clinic/account/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Error al enviar el correo");
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al enviar el correo");

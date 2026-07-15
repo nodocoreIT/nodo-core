@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useEffect, Fragment } from "react";
-import { createPortal } from "react-dom";
-import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, Mail, Database, AlertTriangle, Loader2 } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, RotateCcw, Database, AlertTriangle, Loader2 } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
 import { NODES, unitHasClientAccessCredentials, type NodeDef } from "@/lib/nodes";
-import { getNodeAccentByCode, getNodeAccentBySlug } from "@/lib/node-accents";
 import {
   defaultPlanCodeForUnit,
   getPlanSelectOptions,
@@ -59,25 +57,21 @@ type FormUnit = {
   provision_user_id: string | null;
 };
 
-type StatusMenuAnchor = {
-  unitId: string;
-  top: number;
-  left: number;
-};
-
 const STATUS_STYLES: Record<ClientStatus, { bg: string; color: string; label: string }> = {
   activo: { bg: "#E1F0E8", color: "#1F8A5B", label: "Activo" },
   onboarding: { bg: "#FCE9D8", color: "#B5630C", label: "Onboarding" },
   pausado: { bg: "var(--color-mist)", color: "var(--color-slate2)", label: "Pausado" },
   pending_review: { bg: "#FCE9D8", color: "#B5630C", label: "Pendiente revisión" },
-  pending_onboarding: { bg: "#E8EEF8", color: "#2A6FDB", label: "Pendiente de activación" },
+  pending_onboarding: { bg: "#E8EEF8", color: "#2A6FDB", label: "Onboarding pendiente" },
 };
 
-const ADMIN_TOGGLEABLE_STATUSES: ClientStatus[] = ["activo", "pausado"];
-
-function isAdminToggleableStatus(status: string): status is "activo" | "pausado" {
-  return status === "activo" || status === "pausado";
-}
+const ALL_STATUSES: ClientStatus[] = [
+  "activo",
+  "pausado",
+  "pending_review",
+  "pending_onboarding",
+  "onboarding",
+];
 
 function statusStyle(status: string) {
   return STATUS_STYLES[status as ClientStatus] ?? STATUS_STYLES.pausado;
@@ -98,59 +92,12 @@ function getAssignableNodes(usedCodes: string[]): NodeDef[] {
   return NODES.filter((node) => !used.has(node.code));
 }
 
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-}
-
-function normalizeClientEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-function deriveClientNameFromEmail(email: string): string {
-  const local = email.split("@")[0]?.replace(/[._-]+/g, " ").trim();
-  if (!local) return "Cliente";
-  return local.charAt(0).toUpperCase() + local.slice(1);
-}
-
-function isNewClientUnit(unit: FormUnit, prevUnits: ClientUnit[]): boolean {
-  return !prevUnits.some((p) => p.unit_code === unit.unit_code);
-}
-
-function showUnitOpsFields(unit: FormUnit, prevUnits: ClientUnit[]): boolean {
-  return !isNewClientUnit(unit, prevUnits) && isAdminToggleableStatus(unit.status);
-}
-
-function nodeLabelForCode(unitCode: string): string {
-  return NODES.find((n) => n.code === unitCode)?.label ?? unitCode;
-}
-
-function mapDbUnitToFormUnit(u: ClientUnit, planes: NodePlan[]): FormUnit {
-  return {
-    key: u.id,
-    unit_code: u.unit_code,
-    plan: normalizePlanCode(planes, u.unit_code, u.plan),
-    status: u.status,
-    progress: String(u.progress ?? 0),
-    access_url: u.access_url ?? "",
-    access_user: u.access_user ?? "",
-    access_password: u.access_password ?? "",
-    provisioned_at: u.provisioned_at ?? null,
-    provision_user_id: u.provision_user_id ?? null,
-  };
-}
-
-type ConfirmMergeExisting = {
-  client: Client;
-  newUnits: FormUnit[];
-  skippedUnitCodes: string[];
-};
-
 function createFormUnit(unitCode: string, planes: NodePlan[]): FormUnit {
   return {
     key: crypto.randomUUID(),
     unit_code: unitCode,
     plan: defaultPlanCodeForUnit(planes, unitCode),
-    status: "pending_onboarding",
+    status: "activo",
     progress: "0",
     access_url: "",
     access_user: "",
@@ -175,9 +122,8 @@ export default function ClientesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
-  const [statusMenu, setStatusMenu] = useState<StatusMenuAnchor | null>(null);
+  const [statusMenuUnitId, setStatusMenuUnitId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ ids: string[]; label: string } | null>(null);
-  const [confirmMergeExisting, setConfirmMergeExisting] = useState<ConfirmMergeExisting | null>(null);
   const [activeUnitKey, setActiveUnitKey] = useState<string>("");
   const [resettingUnitKey, setResettingUnitKey] = useState<string | null>(null);
   const [purgingUnitKey, setPurgingUnitKey] = useState<string | null>(null);
@@ -212,13 +158,13 @@ export default function ClientesPage() {
   }, []);
 
   useEffect(() => {
-    if (!statusMenu) return;
+    if (!statusMenuUnitId) return;
     function onDocClick() {
-      setStatusMenu(null);
+      setStatusMenuUnitId(null);
     }
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
-  }, [statusMenu]);
+  }, [statusMenuUnitId]);
 
   async function loadAll() {
     const supabase = createClient();
@@ -259,9 +205,7 @@ export default function ClientesPage() {
 
   // Stats (per-nodo)
   const activeCount = units.filter((u) => u.status === "activo").length;
-  const onboardingCount = units.filter(
-    (u) => u.status === "onboarding" || u.status === "pending_onboarding",
-  ).length;
+  const onboardingCount = units.filter((u) => u.status === "onboarding").length;
   const distinctUnits = new Set(units.map((u) => u.unit_code)).size;
   const avgProgress = units.length > 0
     ? Math.round(units.reduce((acc, u) => acc + (u.progress ?? 0), 0) / units.length)
@@ -273,7 +217,6 @@ export default function ClientesPage() {
     setFormEmail("");
     setFormPhone("");
     setFormSince(today);
-    setNoticeMessage(null);
     const firstUnit = createFormUnit(NODES[0]?.code ?? "", planes);
     setFormUnits([firstUnit]);
     setActiveUnitKey(firstUnit.key);
@@ -342,59 +285,13 @@ export default function ClientesPage() {
     }
   }
 
-  async function findClientByEmail(email: string): Promise<Client | null> {
-    const normalized = normalizeClientEmail(email);
-    const local = clients.find(
-      (c) => c.email && normalizeClientEmail(c.email) === normalized,
-    );
-    if (local) return local;
-
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("clients")
-      .select("id, name, email, phone, since, created_at")
-      .ilike("email", email.trim())
-      .maybeSingle();
-    return data;
-  }
-
-  async function handleSave(options?: {
-    skipDuplicateCheck?: boolean;
-    mergeTarget?: Client;
-    mergedUnits?: FormUnit[];
-  }) {
-    const unitsToSave = options?.mergedUnits ?? formUnits;
-    const targetClient = options?.mergeTarget ?? editingClient;
-    const prevUnits = targetClient ? (unitsByClient.get(targetClient.id) ?? []) : [];
-    const inviteEmail = (formEmail.trim() || targetClient?.email || "").trim().toLowerCase();
-    const isInviteForm = !targetClient;
-
-    if (isInviteForm) {
-      if (!inviteEmail) {
-        setError("El correo electrónico es obligatorio.");
-        return;
-      }
-      if (!isValidEmail(inviteEmail)) {
-        setError("Ingresá un correo electrónico válido.");
-        return;
-      }
-    } else if (!formName.trim()) {
+  async function handleSave() {
+    if (!formName.trim()) {
       setError("El nombre es obligatorio.");
       return;
     }
 
-    const hasNewInviteUnits = unitsToSave.some((u) => isNewClientUnit(u, prevUnits));
-    if (hasNewInviteUnits && !inviteEmail) {
-      setError("El cliente necesita un correo electrónico para enviar la invitación.");
-      return;
-    }
-    if (hasNewInviteUnits && inviteEmail && !isValidEmail(inviteEmail)) {
-      setError("Ingresá un correo electrónico válido para la invitación.");
-      return;
-    }
-
-    for (const u of unitsToSave) {
-      if (isNewClientUnit(u, prevUnits)) continue;
+    for (const u of formUnits) {
       if (u.status === "pausado") continue;
       if (!unitHasClientAccessCredentials(u.access_user)) continue;
       const pwd = u.access_password.trim();
@@ -408,72 +305,31 @@ export default function ClientesPage() {
       }
     }
 
-    const trimmedEmail = inviteEmail;
-    if (!options?.skipDuplicateCheck && trimmedEmail) {
-      const existing = await findClientByEmail(trimmedEmail);
-      if (existing) {
-        if (targetClient && existing.id === targetClient.id) {
-          // Editing same client — continue.
-        } else if (targetClient) {
-          setError(
-            `El correo ya está en uso por el cliente "${existing.name}". Usá otro email o editá ese cliente.`,
-          );
-          return;
-        } else {
-          const existingUnitCodes = new Set(
-            (unitsByClient.get(existing.id) ?? []).map((u) => u.unit_code),
-          );
-          const newUnits = unitsToSave.filter((u) => !existingUnitCodes.has(u.unit_code));
-          const skippedUnitCodes = unitsToSave
-            .filter((u) => existingUnitCodes.has(u.unit_code))
-            .map((u) => u.unit_code);
-
-          if (newUnits.length === 0) {
-            setError(
-              `Ya existe un cliente con el correo ${trimmedEmail} ("${existing.name}"). Esos nodos ya están asignados — editá el cliente desde la lista.`,
-            );
-            return;
-          }
-
-          setConfirmMergeExisting({ client: existing, newUnits, skippedUnitCodes });
-          return;
-        }
-      }
-    }
-
     setSaving(true);
     setError("");
     setNoticeMessage(null);
     const supabase = createClient();
 
-    const clientPayload = targetClient
-      ? {
-          name: formName.trim() || targetClient.name,
-          email: trimmedEmail || targetClient.email,
-          phone: formPhone.trim() || targetClient.phone,
-          since: targetClient.since ?? formSince,
-        }
-      : {
-          name: deriveClientNameFromEmail(trimmedEmail),
-          email: trimmedEmail,
-          phone: null,
-          since: formSince,
-        };
-
-    const clientDisplayName = targetClient?.name ?? deriveClientNameFromEmail(trimmedEmail);
+    const clientPayload = {
+      name: formName.trim(),
+      email: formEmail.trim() || null,
+      phone: formPhone.trim() || null,
+      since: formSince,
+    };
 
     let clientId: string;
 
     // Capture previous units before deleting — needed to detect provisioning changes.
+    const prevUnits = editingClient ? (unitsByClient.get(editingClient.id) ?? []) : [];
 
-    if (targetClient) {
-      const { error: err } = await supabase.from("clients").update(clientPayload).eq("id", targetClient.id);
+    if (editingClient) {
+      const { error: err } = await supabase.from("clients").update(clientPayload).eq("id", editingClient.id);
       if (err) {
         setError("Error al actualizar el cliente: " + err.message);
         setSaving(false);
         return;
       }
-      clientId = targetClient.id;
+      clientId = editingClient.id;
     } else {
       const { data: inserted, error: err } = await supabase.from("clients").insert(clientPayload).select().single();
       if (err || !inserted) {
@@ -485,20 +341,19 @@ export default function ClientesPage() {
     }
 
     // Carry over provisioned_at and provision_user_id when the access_user didn't change.
-    const unitRows = unitsToSave.map((u) => {
-      const isNew = isNewClientUnit(u, prevUnits);
+    const unitRows = formUnits.map((u) => {
       const prev = prevUnits.find((p) => p.unit_code === u.unit_code);
       const sameUser = prev?.access_user === u.access_user.trim() && !!u.access_user.trim();
       return {
         unit_code: u.unit_code,
         plan: normalizePlanCode(planes, u.unit_code, u.plan.trim()) || null,
-        status: isNew ? ("pending_onboarding" as ClientStatus) : u.status,
-        progress: isNew ? 0 : Math.max(0, Math.min(100, Number(u.progress) || 0)),
+        status: u.status,
+        progress: Math.max(0, Math.min(100, Number(u.progress) || 0)),
         access_url: u.access_url.trim() || null,
-        access_user: isNew ? trimmedEmail || null : u.access_user.trim() || null,
-        access_password: isNew ? null : u.access_password.trim() || null,
-        provisioned_at: isNew ? null : sameUser ? (prev?.provisioned_at ?? null) : null,
-        provision_user_id: isNew ? null : sameUser ? (prev?.provision_user_id ?? null) : null,
+        access_user: u.access_user.trim() || null,
+        access_password: u.access_password.trim() || null,
+        provisioned_at: sameUser ? (prev?.provisioned_at ?? null) : null,
+        provision_user_id: sameUser ? (prev?.provision_user_id ?? null) : null,
       };
     });
 
@@ -514,46 +369,16 @@ export default function ClientesPage() {
       return;
     }
 
-    const savedUnits = (unitsJson.units ?? []) as ClientUnit[];
-    const inviteErrors: string[] = [];
-    let invitesMailSent = 0;
-
-    for (const u of unitsToSave) {
-      if (!isNewClientUnit(u, prevUnits)) continue;
-      if (!trimmedEmail) {
-        inviteErrors.push(
-          `${NODES.find((n) => n.code === u.unit_code)?.label ?? u.unit_code}: falta correo para la invitación`,
-        );
-        continue;
-      }
-      const saved = savedUnits.find((s) => s.unit_code === u.unit_code);
-      if (!saved?.id) continue;
-
-      const inviteRes = await fetch("/api/admin/invite-client-unit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_unit_id: saved.id }),
-      });
-      const inviteJson = await inviteRes.json();
-      if (!inviteRes.ok || !inviteJson.ok) {
-        inviteErrors.push(
-          `${NODES.find((n) => n.code === u.unit_code)?.label ?? u.unit_code}: ${inviteJson.error ?? "error al enviar invitación"}`,
-        );
-      } else if (inviteJson.mail_sent) {
-        invitesMailSent += 1;
-      }
-    }
-
     // Map unit_code → nodo-user-id for suspend/reactivate (existing + newly provisioned).
     const provisionedUserIds = new Map<string, string>();
-    for (const u of unitsToSave) {
+    for (const u of formUnits) {
       if (u.provision_user_id) provisionedUserIds.set(u.unit_code, u.provision_user_id);
     }
 
     // Provision admin users for onboarding/activo nodos with new or changed credentials.
     const provisionErrors: string[] = [];
     const freshlyProvisioned = new Set<string>();
-    for (const u of unitsToSave) {
+    for (const u of formUnits) {
       const nodeDef = NODES.find((n) => n.code === u.unit_code);
       if (!nodeDef?.provisionable) continue;
       if (!u.access_user.trim() || !u.access_password.trim()) continue;
@@ -574,7 +399,7 @@ export default function ClientesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nodo_code: u.unit_code,
-          client_name: clientDisplayName,
+          client_name: formName.trim(),
           email: u.access_user.trim(),
           password: u.access_password.trim(),
           plan: u.plan.trim(),
@@ -608,19 +433,11 @@ export default function ClientesPage() {
       );
     }
 
-    // Sync password + Auth claims — only when credentials actually changed.
-    for (const u of unitsToSave) {
+    // Sync password + Auth claims on every save (idempotent repair for dashboard clients).
+    for (const u of formUnits) {
       if (!unitHasClientAccessCredentials(u.access_user)) continue;
       const newPassword = u.access_password.trim();
       if (!newPassword || u.status === "pausado") continue;
-
-      // Skip if this nodo's credentials are identical to what's already in the DB.
-      const prevForPwd = prevUnits.find((p) => p.unit_code === u.unit_code);
-      const credentialsUnchanged =
-        !!prevForPwd?.provisioned_at &&
-        prevForPwd.access_user === u.access_user.trim() &&
-        prevForPwd.access_password === newPassword;
-      if (credentialsUnchanged) continue;
 
       const nodeDef = NODES.find((n) => n.code === u.unit_code);
       const res = await fetch("/api/admin/client-unit-password-update", {
@@ -642,17 +459,12 @@ export default function ClientesPage() {
       }
     }
 
-    // Sync ban status: only when status changed or the nodo was just provisioned.
-    for (const u of unitsToSave) {
+    // Sync ban status: pausado → ban, onboarding/activo → unban.
+    for (const u of formUnits) {
       const nodeDef = NODES.find((n) => n.code === u.unit_code);
       if (!nodeDef?.provisionable) continue;
       const userId = provisionedUserIds.get(u.unit_code);
       if (!userId) continue;
-
-      const prevForStatus = prevUnits.find((p) => p.unit_code === u.unit_code);
-      const statusUnchanged = prevForStatus && prevForStatus.status === u.status;
-      if (statusUnchanged && !freshlyProvisioned.has(u.unit_code)) continue;
-
       await fetch("/api/nodo-suspend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -665,7 +477,7 @@ export default function ClientesPage() {
     }
 
     // Sync plan tier in nodo app_metadata when the plan changed or was set.
-    for (const u of unitsToSave) {
+    for (const u of formUnits) {
       const nodeDef = NODES.find((n) => n.code === u.unit_code);
       if (!nodeDef?.provisionable) continue;
 
@@ -685,51 +497,18 @@ export default function ClientesPage() {
           nodo_code: u.unit_code,
           user_id: userId,
           plan: normalizedNextPlan,
-          client_name: clientDisplayName,
         }),
       });
     }
 
     setSaving(false);
-    const allErrors = [...inviteErrors, ...provisionErrors];
-    if (allErrors.length > 0) {
-      setError("Cliente guardado. " + allErrors.join("; "));
+    if (provisionErrors.length > 0) {
+      setError("Cliente guardado. Error al crear accesos: " + provisionErrors.join("; "));
       loadAll();
       return;
     }
-    if (invitesMailSent > 0) {
-      setNoticeMessage(
-        invitesMailSent === 1
-          ? `Invitación enviada a ${trimmedEmail}. El nodo queda pendiente de activación.`
-          : `${invitesMailSent} invitaciones enviadas a ${trimmedEmail}. Los nodos quedan pendientes de activación.`,
-      );
-    }
     setShowForm(false);
     loadAll();
-  }
-
-  async function performMergeAndSave() {
-    if (!confirmMergeExisting) return;
-    const { client, newUnits } = confirmMergeExisting;
-    setConfirmMergeExisting(null);
-
-    const existingUnits = unitsByClient.get(client.id) ?? [];
-    const mappedExisting = existingUnits.map((u) => mapDbUnitToFormUnit(u, planes));
-    const accessEmail = formEmail.trim() || client.email || "";
-    const enrichedNewUnits = newUnits.map((u) =>
-      !u.access_user.trim() && accessEmail ? { ...u, access_user: accessEmail } : u,
-    );
-    const mergedUnits = [...mappedExisting, ...enrichedNewUnits];
-
-    setEditingClient(client);
-    setFormUnits(mergedUnits);
-    setActiveUnitKey(enrichedNewUnits[0]?.key ?? mappedExisting[0]?.key ?? "");
-
-    await handleSave({
-      skipDuplicateCheck: true,
-      mergeTarget: client,
-      mergedUnits,
-    });
   }
 
   function requestDelete(id: string, name: string) {
@@ -798,11 +577,11 @@ export default function ClientesPage() {
   async function resetUnitPassword(unit: FormUnit) {
     const savedUnitIds = new Set((editingClient ? unitsByClient.get(editingClient.id) : [])?.map((u) => u.id) ?? []);
     if (!editingClient || !savedUnitIds.has(unit.key)) {
-      setError("Primero guardá el cliente para poder enviar el email de recuperación.");
+      setError("Primero guardá el cliente para poder blanquear el acceso.");
       return;
     }
     if (!unit.access_user.trim()) {
-      setError("El nodo necesita un email de acceso para enviar la recuperación.");
+      setError("El nodo necesita un email de acceso para blanquear la contraseña.");
       return;
     }
 
@@ -817,12 +596,17 @@ export default function ClientesPage() {
     setResettingUnitKey(null);
 
     if (!res.ok || !json.ok) {
-      setError(json.error ?? "No se pudo enviar el email de recuperación.");
+      setError(json.error ?? "No se pudo blanquear la contraseña.");
       return;
     }
 
+    updateFormUnit(unit.key, {
+      access_password: json.password,
+      provision_user_id: json.user_id ?? unit.provision_user_id,
+    });
+    copy(json.password);
     setNoticeMessage(
-      `Se envió un email de recuperación de contraseña a ${unit.access_user}.`,
+      "Contraseña blanqueada. El usuario deberá definir una clave nueva al ingresar.",
     );
   }
 
@@ -914,7 +698,7 @@ export default function ClientesPage() {
 
   async function handleStatusChange(unitId: string, newStatus: ClientStatus) {
     setStatusUpdating(unitId);
-    setStatusMenu(null);
+    setStatusMenuUnitId(null);
     const res = await fetch("/api/admin/client-unit-status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -954,10 +738,7 @@ export default function ClientesPage() {
 
   const allSelected = filtered.length > 0 && selected.size === filtered.length;
   const activeFormUnit = formUnits.find((u) => u.key === activeUnitKey) ?? formUnits[0];
-  const formPrevUnits = editingClient ? (unitsByClient.get(editingClient.id) ?? []) : [];
-  const isInviteOnlyForm = !editingClient;
   const assignableNodes = getAssignableNodes(formUnits.map((u) => u.unit_code));
-  const statusMenuUnit = statusMenu ? units.find((u) => u.id === statusMenu.unitId) : null;
 
   return (
     <>
@@ -999,16 +780,10 @@ export default function ClientesPage() {
               </button>
             )}
             <button onClick={openAddForm} style={{ background: "var(--color-brand)", color: "white", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}>
-              + Invitar cliente
+              + Agregar cliente
             </button>
           </div>
         </div>
-
-        {noticeMessage && !showForm && (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "#E1F0E8", border: "1px solid #B8DFC9", borderRadius: 10, fontSize: 13, fontWeight: 600, color: "#1F8A5B" }}>
-            {noticeMessage}
-          </div>
-        )}
 
         {/* Table */}
         <div style={{ background: "white", border: "1px solid var(--color-mist)", borderRadius: 10, overflow: "hidden" }}>
@@ -1065,49 +840,76 @@ export default function ClientesPage() {
                             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                               {cu.map((u) => {
                                 const st = statusStyle(u.status);
-                                const menuOpen = statusMenu?.unitId === u.id;
-                                const canToggleStatus = isAdminToggleableStatus(u.status);
-                                const badgeStyle: React.CSSProperties = {
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  background: st.bg,
-                                  color: st.color,
-                                  border: "1px solid transparent",
-                                  borderRadius: 999,
-                                  padding: "4px 10px",
-                                };
+                                const menuOpen = statusMenuUnitId === u.id;
                                 return (
-                                  <div key={u.id}>
-                                    {canToggleStatus ? (
-                                      <button
-                                        type="button"
-                                        disabled={statusUpdating === u.id}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          const rect = e.currentTarget.getBoundingClientRect();
-                                          setStatusMenu(
-                                            menuOpen
-                                              ? null
-                                              : { unitId: u.id, top: rect.bottom + 4, left: rect.left },
-                                          );
-                                        }}
+                                  <div key={u.id} style={{ position: "relative" }}>
+                                    <button
+                                      type="button"
+                                      disabled={statusUpdating === u.id}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setStatusMenuUnitId(menuOpen ? null : u.id);
+                                      }}
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 6,
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        background: st.bg,
+                                        color: st.color,
+                                        border: "1px solid transparent",
+                                        borderRadius: 999,
+                                        padding: "4px 10px",
+                                        cursor: statusUpdating === u.id ? "not-allowed" : "pointer",
+                                        opacity: statusUpdating === u.id ? 0.6 : 1,
+                                      }}
+                                    >
+                                      <span style={{ fontSize: 10, opacity: 0.85 }}>{u.unit_code}</span>
+                                      {statusUpdating === u.id ? "…" : st.label}
+                                    </button>
+                                    {menuOpen && (
+                                      <div
                                         style={{
-                                          ...badgeStyle,
-                                          cursor: statusUpdating === u.id ? "not-allowed" : "pointer",
-                                          opacity: statusUpdating === u.id ? 0.6 : 1,
+                                          position: "absolute",
+                                          top: "100%",
+                                          left: 0,
+                                          marginTop: 4,
+                                          background: "white",
+                                          border: "1px solid var(--color-mist)",
+                                          borderRadius: 8,
+                                          boxShadow: "0 8px 24px rgba(18,30,47,.12)",
+                                          zIndex: 20,
+                                          minWidth: 180,
+                                          padding: 4,
                                         }}
                                       >
-                                        <span style={{ fontSize: 10, opacity: 0.85 }}>{u.unit_code}</span>
-                                        {statusUpdating === u.id ? "…" : st.label}
-                                      </button>
-                                    ) : (
-                                      <span style={{ ...badgeStyle, cursor: "default" }} title="El cliente cambia este estado al activar su cuenta">
-                                        <span style={{ fontSize: 10, opacity: 0.85 }}>{u.unit_code}</span>
-                                        {st.label}
-                                      </span>
+                                        {ALL_STATUSES.map((s) => {
+                                          const opt = statusStyle(s);
+                                          return (
+                                            <button
+                                              key={s}
+                                              type="button"
+                                              onClick={() => handleStatusChange(u.id, s)}
+                                              style={{
+                                                display: "block",
+                                                width: "100%",
+                                                textAlign: "left",
+                                                border: "none",
+                                                background: u.status === s ? "var(--color-paper)" : "transparent",
+                                                padding: "8px 10px",
+                                                fontSize: 12.5,
+                                                fontWeight: 600,
+                                                color: opt.color,
+                                                cursor: "pointer",
+                                                borderRadius: 6,
+                                              }}
+                                            >
+                                              {opt.label}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
                                     )}
                                   </div>
                                 );
@@ -1128,10 +930,20 @@ export default function ClientesPage() {
                               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                 {cu.map((u) => {
                                   const st = statusStyle(u.status);
+                                  const NODE_PILL_COLORS: Record<string, { bg: string; color: string }> = {
+                                    autos:     { bg: "#B62635", color: "#ffffff" },
+                                    finanzas:  { bg: "#05805C", color: "#ffffff" },
+                                    ecommerce: { bg: "#DCD500", color: "#000000" },
+                                    clinica:   { bg: "#0D7C73", color: "#ffffff" },
+                                    salud:     { bg: "#ff0077", color: "#ffffff" },
+                                    inmo:      { bg: "#CA460D", color: "#ffffff" },
+                                    legales:   { bg: "#530403", color: "#ffffff" }
+                                  };
+                                  const normalizedCode = (u.unit_code ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                                  const pillTheme = NODE_PILL_COLORS[normalizedCode] ?? { bg: "var(--color-mist-200)", color: "var(--color-navy)" };
                                   return (
-                                    <span key={u.id} style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 11.5, background: "var(--color-mist-200)", borderRadius: 6, padding: "3px 8px", color: "var(--color-navy)", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                    <span key={u.id} style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 11.5, background: pillTheme.bg, borderRadius: 6, padding: "3px 8px", color: pillTheme.color, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 }}>
                                       nodo | {u.unit_code}
-                                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: st.color }} />
                                     </span>
                                   );
                                 })}
@@ -1212,49 +1024,6 @@ export default function ClientesPage() {
             </table>
           )}
         </div>
-
-        {/* Merge duplicate email confirmation */}
-        {confirmMergeExisting && (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(18,30,47,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 110, padding: 16 }}>
-            <div style={{ background: "white", borderRadius: 12, width: "min(420px, 96vw)", boxShadow: "0 12px 40px rgba(18,30,47,.18)", padding: 24 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-navy)", fontFamily: "var(--font-display)" }}>
-                Correo ya registrado
-              </h3>
-              <p style={{ margin: "10px 0 0", fontSize: 14, color: "var(--color-slate2)", lineHeight: 1.5 }}>
-                Ya existe el cliente <strong style={{ color: "var(--color-ink)" }}>{confirmMergeExisting.client.name}</strong> con el correo{" "}
-                <strong style={{ color: "var(--color-ink)" }}>{confirmMergeExisting.client.email}</strong>.
-              </p>
-              <p style={{ margin: "10px 0 0", fontSize: 13.5, color: "var(--color-slate2)", lineHeight: 1.5 }}>
-                ¿Querés agregar {confirmMergeExisting.newUnits.length === 1 ? "este nodo" : "estos nodos"} a ese cliente?
-              </p>
-              <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 13.5, color: "var(--color-ink)", lineHeight: 1.6 }}>
-                {confirmMergeExisting.newUnits.map((u) => (
-                  <li key={u.key}>{nodeLabelForCode(u.unit_code)}</li>
-                ))}
-              </ul>
-              {confirmMergeExisting.skippedUnitCodes.length > 0 && (
-                <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--color-slate2)", lineHeight: 1.5 }}>
-                  {confirmMergeExisting.skippedUnitCodes.map(nodeLabelForCode).join(", ")} ya está asignado y no se duplicará.
-                </p>
-              )}
-              <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                <button
-                  onClick={() => void performMergeAndSave()}
-                  disabled={saving}
-                  style={{ flex: 1, background: "var(--color-brand)", color: "white", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", opacity: saving ? 0.7 : 1 }}
-                >
-                  Sí, agregar nodo{confirmMergeExisting.newUnits.length > 1 ? "s" : ""}
-                </button>
-                <button
-                  onClick={() => setConfirmMergeExisting(null)}
-                  style={{ flex: 1, background: "transparent", color: "var(--color-slate2)", border: "1px solid var(--color-mist)", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Delete confirmation modal */}
         {confirmDelete && (
@@ -1405,7 +1174,6 @@ export default function ClientesPage() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
                 {assignableNodes.map((node) => {
                   const Icon = node.Icon;
-                  const accent = getNodeAccentBySlug(node.slug);
                   return (
                     <button
                       key={node.code}
@@ -1417,9 +1185,8 @@ export default function ClientesPage() {
                         alignItems: "flex-start",
                         gap: 10,
                         textAlign: "left",
-                        background: `linear-gradient(145deg, rgba(${accent.rgb}, 0.08) 0%, var(--color-paper) 55%)`,
-                        border: `1px solid rgba(${accent.rgb}, 0.28)`,
-                        borderLeft: `4px solid ${accent.brand}`,
+                        background: "var(--color-paper)",
+                        border: "1px solid var(--color-mist)",
                         borderRadius: 12,
                         padding: "14px 16px",
                         cursor: "pointer",
@@ -1435,14 +1202,14 @@ export default function ClientesPage() {
                             width: 36,
                             height: 36,
                             borderRadius: 10,
-                            background: `rgba(${accent.rgb}, 0.14)`,
-                            color: accent.brand,
-                            border: `1px solid rgba(${accent.rgb}, 0.22)`,
+                            background: "white",
+                            color: "var(--color-navy)",
+                            border: "1px solid var(--color-mist)",
                           }}
                         >
                           <Icon size={18} strokeWidth={2.2} />
                         </span>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: accent.brand600 }}>{node.label}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-navy)" }}>{node.label}</span>
                       </div>
                       <span style={{ fontSize: 12.5, color: "var(--color-slate2)", lineHeight: 1.45 }}>
                         {node.description}
@@ -1460,67 +1227,38 @@ export default function ClientesPage() {
           </div>
         )}
 
-        {/* Full-screen overlay — blocks all interaction while processing */}
-        {showForm && (saving || resettingUnitKey || purgingUnitKey) && (
-          <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)", background: "rgba(18,30,47,.30)" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, background: "white", borderRadius: 16, padding: "28px 36px", boxShadow: "0 16px 48px rgba(18,30,47,.22)" }}>
-              <Loader2 size={34} style={{ color: "var(--color-brand)", animation: "spin 1s linear infinite" }} />
-              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-navy)", fontFamily: "var(--font-sans)" }}>{resettingUnitKey ? "Enviando email de recuperación..." : purgingUnitKey ? "Eliminando datos del nodo..." : "Guardando..."}</span>
-            </div>
-          </div>
-        )}
-
         {/* Form modal */}
         {showForm && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(18,30,47,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
-            <div style={{ background: "white", borderRadius: 12, width: "min(760px, 96vw)", maxHeight: "92vh", overflowY: "auto", boxShadow: "0 12px 40px rgba(18,30,47,.18)", position: "relative" }}>
+            <div style={{ background: "white", borderRadius: 12, width: "min(760px, 96vw)", maxHeight: "92vh", overflowY: "auto", boxShadow: "0 12px 40px rgba(18,30,47,.18)" }}>
               <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-mist)", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: "white", zIndex: 1 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-navy)", fontFamily: "var(--font-display)" }}>
-                  {editingClient ? "Editar cliente" : "Invitar cliente"}
+                  {editingClient ? "Editar cliente" : "Nuevo cliente"}
                 </h3>
-                <button onClick={() => setShowForm(false)} disabled={saving} style={{ background: "transparent", border: "none", cursor: saving ? "not-allowed" : "pointer", color: "var(--color-slate2)", fontSize: 20, lineHeight: 1, padding: "2px 4px" }}>×</button>
+                <button onClick={() => setShowForm(false)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--color-slate2)", fontSize: 20, lineHeight: 1, padding: "2px 4px" }}>×</button>
               </div>
 
               <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
-                {isInviteOnlyForm ? (
-                  <div>
-                    <label style={labelStyle}>Correo electrónico</label>
-                    <input
-                      type="email"
-                      value={formEmail}
-                      onChange={(e) => setFormEmail(e.target.value)}
-                      style={inputStyle}
-                      placeholder="cliente@ejemplo.com"
-                      autoComplete="off"
-                    />
-                    <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--color-slate2)", lineHeight: 1.45 }}>
-                      Al guardar, la persona recibirá un correo para activar su nodo. El estado quedará como pendiente de activación.
-                    </p>
+                <div>
+                  <label style={labelStyle}>Nombre</label>
+                  <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} style={inputStyle} placeholder="Nombre del cliente o empresa" autoComplete="off" />
+                </div>
+
+                <div style={{ display: "flex", gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>Email</label>
+                    <input type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} style={inputStyle} placeholder="cliente@ejemplo.com" autoComplete="off" />
                   </div>
-                ) : (
-                  <>
-                    <div>
-                      <label style={labelStyle}>Nombre</label>
-                      <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} style={inputStyle} placeholder="Nombre del cliente o empresa" autoComplete="off" />
-                    </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>Celular</label>
+                    <input type="text" value={formPhone} onChange={(e) => setFormPhone(e.target.value)} style={inputStyle} placeholder="+54 9 ..." autoComplete="off" />
+                  </div>
+                </div>
 
-                    <div style={{ display: "flex", gap: 12 }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={labelStyle}>Email</label>
-                        <input type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} style={inputStyle} placeholder="cliente@ejemplo.com" autoComplete="off" />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <label style={labelStyle}>Celular</label>
-                        <input type="text" value={formPhone} onChange={(e) => setFormPhone(e.target.value)} style={inputStyle} placeholder="+54 9 ..." autoComplete="off" />
-                      </div>
-                    </div>
-
-                    <div style={{ width: "50%" }}>
-                      <label style={labelStyle}>Cliente desde</label>
-                      <input type="date" value={formSince} onChange={(e) => setFormSince(e.target.value)} style={inputStyle} />
-                    </div>
-                  </>
-                )}
+                <div style={{ width: "50%" }}>
+                  <label style={labelStyle}>Cliente desde</label>
+                  <input type="date" value={formSince} onChange={(e) => setFormSince(e.target.value)} style={inputStyle} />
+                </div>
 
                 {/* Nodos */}
                 <div style={{ borderTop: "1px solid var(--color-mist)", paddingTop: 16 }}>
@@ -1560,10 +1298,8 @@ export default function ClientesPage() {
                     {formUnits.map((u, idx) => {
                       const active = activeFormUnit?.key === u.key;
                       const st = statusStyle(u.status);
-                      const nodeDef = NODES.find((n) => n.code === u.unit_code);
-                      const nodeLabel = nodeDef?.label ?? `Nodo ${idx + 1}`;
-                      const accent = getNodeAccentByCode(u.unit_code);
-                      const TabIcon = nodeDef?.Icon;
+                      const matchedNodeDef = NODES.find((n) => n.code.toLowerCase() === u.unit_code?.toLowerCase()) ?? NODES.find((n) => n.slug.toLowerCase() === u.unit_code?.toLowerCase());
+                      const nodeLabel = matchedNodeDef?.label ?? u.unit_code ?? `Nodo ${idx + 1}`;
                       return (
                         <button
                           key={u.key}
@@ -1573,11 +1309,9 @@ export default function ClientesPage() {
                             display: "flex",
                             alignItems: "center",
                             gap: 8,
-                            border: active
-                              ? `1px solid ${accent.brand}`
-                              : `1px solid rgba(${accent.rgb}, 0.28)`,
-                            background: active ? `rgba(${accent.rgb}, 0.1)` : "white",
-                            color: active ? accent.brand : accent.brand600,
+                            border: active ? "1px solid var(--color-brand)" : "1px solid var(--color-mist)",
+                            background: active ? "rgba(218,90,14,.08)" : "white",
+                            color: active ? "var(--color-brand)" : "var(--color-ink)",
                             borderRadius: 999,
                             padding: "8px 12px",
                             fontSize: 12.5,
@@ -1585,22 +1319,8 @@ export default function ClientesPage() {
                             cursor: "pointer",
                             whiteSpace: "nowrap",
                             fontFamily: "var(--font-sans)",
-                            boxShadow: active ? `0 2px 10px rgba(${accent.rgb}, 0.14)` : "none",
                           }}
                         >
-                          {TabIcon && (
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: accent.brand,
-                                opacity: active ? 1 : 0.85,
-                              }}
-                            >
-                              <TabIcon size={14} strokeWidth={2.2} />
-                            </span>
-                          )}
                           <span>{nodeLabel}</span>
                           <span style={{ width: 7, height: 7, borderRadius: "50%", background: st.color }} />
                         </button>
@@ -1608,39 +1328,16 @@ export default function ClientesPage() {
                     })}
                   </div>
 
-                  {activeFormUnit && (() => {
-                    const activeAccent = getNodeAccentByCode(activeFormUnit.unit_code);
-                    const activeNodeDef = NODES.find((n) => n.code === activeFormUnit.unit_code);
-                    return (
-                    <div style={{ border: "1px solid var(--color-mist)", borderLeft: `4px solid ${activeAccent.brand}`, borderRadius: 14, padding: 16, background: `linear-gradient(145deg, rgba(${activeAccent.rgb}, 0.06) 0%, var(--color-paper) 42%)` }}>
+                  {activeFormUnit && (
+                    <div style={{ border: "1px solid var(--color-mist)", borderRadius: 14, padding: 16, background: "var(--color-paper)" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          {activeNodeDef?.Icon && (
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                width: 36,
-                                height: 36,
-                                borderRadius: 10,
-                                background: `rgba(${activeAccent.rgb}, 0.14)`,
-                                color: activeAccent.brand,
-                              }}
-                            >
-                              <activeNodeDef.Icon size={18} strokeWidth={2.2} />
-                            </span>
-                          )}
                         <div>
-                          <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: activeAccent.brand600, fontFamily: "var(--font-display)" }}>
-                            {activeNodeDef?.label ?? "Nodo"}
+                          <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "var(--color-navy)", fontFamily: "var(--font-display)" }}>
+                            {NODES.find((n) => n.code === activeFormUnit.unit_code)?.label ?? "Nodo"}
                           </p>
                           <p style={{ margin: "3px 0 0", fontSize: 12.5, color: "var(--color-slate2)" }}>
-                            {showUnitOpsFields(activeFormUnit, formPrevUnits)
-                              ? "Configuración comercial, estado operativo y acceso del cliente."
-                              : "Elegí el módulo y el plan. Al guardar se envía la invitación por correo."}
+                            Configuración comercial, estado operativo y acceso del cliente.
                           </p>
-                        </div>
                         </div>
                         {formUnits.length > 1 && (
                           <button onClick={() => removeFormUnit(activeFormUnit.key)} aria-label="Quitar nodo" title="Quitar nodo" style={{ display: "flex", alignItems: "center", gap: 6, background: "white", color: "#C0392B", border: "1px solid #F5C6C2", borderRadius: 8, padding: "7px 10px", cursor: "pointer", fontSize: 12.5, fontWeight: 700, fontFamily: "var(--font-sans)" }}>
@@ -1654,7 +1351,7 @@ export default function ClientesPage() {
                         <p style={{ margin: "0 0 12px", fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-slate2)" }}>
                           Contratación
                         </p>
-                        <div style={{ display: "grid", gridTemplateColumns: showUnitOpsFields(activeFormUnit, formPrevUnits) ? "repeat(2, minmax(0, 1fr))" : "1fr", gap: 12 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
                           <div>
                             <label style={labelStyle}>Módulo</label>
                             <FormSelect
@@ -1694,52 +1391,28 @@ export default function ClientesPage() {
                               );
                             })()}
                           </div>
-                          {showUnitOpsFields(activeFormUnit, formPrevUnits) && (
-                            <>
-                              <div>
-                                <label style={labelStyle}>Estado</label>
-                                {isAdminToggleableStatus(activeFormUnit.status) ? (
-                                  <FormSelect
-                                    {...modalSelectProps}
-                                    value={activeFormUnit.status}
-                                    onChange={(value) => updateFormUnit(activeFormUnit.key, { status: value as ClientStatus })}
-                                    options={[
-                                      { value: "activo", label: "Activo" },
-                                      { value: "pausado", label: "Pausado" },
-                                    ]}
-                                  />
-                                ) : (
-                                  <div>
-                                    <span
-                                      style={{
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        fontSize: 12,
-                                        fontWeight: 600,
-                                        background: statusStyle(activeFormUnit.status).bg,
-                                        color: statusStyle(activeFormUnit.status).color,
-                                        borderRadius: 999,
-                                        padding: "6px 12px",
-                                      }}
-                                    >
-                                      {statusStyle(activeFormUnit.status).label}
-                                    </span>
-                                    <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "var(--color-slate2)", lineHeight: 1.45 }}>
-                                      Este estado lo define el cliente al activar su cuenta por correo. No se puede cambiar desde el panel.
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                              <div>
-                                <label style={labelStyle}>Avance (%)</label>
-                                <input type="number" value={activeFormUnit.progress} onChange={(e) => updateFormUnit(activeFormUnit.key, { progress: e.target.value })} style={inputStyle} min="0" max="100" />
-                              </div>
-                            </>
-                          )}
+                          <div>
+                            <label style={labelStyle}>Estado</label>
+                            <FormSelect
+                              {...modalSelectProps}
+                              value={activeFormUnit.status}
+                              onChange={(value) => updateFormUnit(activeFormUnit.key, { status: value as ClientStatus })}
+                              options={[
+                                { value: "activo", label: "Activo" },
+                                { value: "pausado", label: "Pausado" },
+                                { value: "pending_review", label: "Pendiente revisión" },
+                                { value: "pending_onboarding", label: "Onboarding pendiente" },
+                                { value: "onboarding", label: "Onboarding" },
+                              ]}
+                            />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Avance (%)</label>
+                            <input type="number" value={activeFormUnit.progress} onChange={(e) => updateFormUnit(activeFormUnit.key, { progress: e.target.value })} style={inputStyle} min="0" max="100" />
+                          </div>
                         </div>
                       </div>
 
-                      {showUnitOpsFields(activeFormUnit, formPrevUnits) && (
                       <div style={{ background: "white", border: "1px solid var(--color-mist)", borderRadius: 12, padding: 14 }}>
                         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
                           <div>
@@ -1747,7 +1420,7 @@ export default function ClientesPage() {
                               Acceso del cliente
                             </p>
                             <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--color-slate2)", lineHeight: 1.45 }}>
-                              Podés enviar un email de recuperación de contraseña al cliente desde acá.
+                              La contraseña real definida por el usuario no se puede consultar. Desde acá podés definir una temporal o blanquear el acceso.
                             </p>
                           </div>
                           {activeFormUnit.provisioned_at && (
@@ -1756,25 +1429,73 @@ export default function ClientesPage() {
                             </span>
                           )}
                         </div>
-                        <div>
-                          <label style={labelStyle}>Usuario (email)</label>
-                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            <input type="text" value={activeFormUnit.access_user} onChange={(e) => updateFormUnit(activeFormUnit.key, { access_user: e.target.value })} style={{ ...inputStyle, flex: 1 }} autoComplete="off" />
-                            {editingClient && unitHasClientAccessCredentials(activeFormUnit.access_user) && (
-                              <button
-                                type="button"
-                                onClick={() => resetUnitPassword(activeFormUnit)}
-                                disabled={resettingUnitKey === activeFormUnit.key}
-                                style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--color-navy)", color: "white", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, fontWeight: 700, cursor: resettingUnitKey === activeFormUnit.key ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", opacity: resettingUnitKey === activeFormUnit.key ? 0.65 : 1, flexShrink: 0, whiteSpace: "nowrap" }}
-                              >
-                                <Mail size={13} />
-                                {resettingUnitKey === activeFormUnit.key ? "Enviando..." : "Recuperar contraseña"}
-                              </button>
-                            )}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                          <div>
+                            <label style={labelStyle}>Usuario (email)</label>
+                            <input type="text" value={activeFormUnit.access_user} onChange={(e) => updateFormUnit(activeFormUnit.key, { access_user: e.target.value })} style={inputStyle} autoComplete="off" />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Contraseña temporal / inicial</label>
+                            <input type="text" value={activeFormUnit.access_password} onChange={(e) => updateFormUnit(activeFormUnit.key, { access_password: e.target.value })} style={inputStyle} autoComplete="off" />
                           </div>
                         </div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 12 }}>
+                          {(() => {
+                            const nodeDef = NODES.find((n) => n.code === activeFormUnit.unit_code);
+                            if (!unitHasClientAccessCredentials(activeFormUnit.access_user)) {
+                              return (
+                                <p style={{ margin: 0, fontSize: 11.5, color: "var(--color-slate2)" }}>
+                                  Completá el email de acceso para gestionar credenciales en cualquier nodo.
+                                </p>
+                              );
+                            }
+                            if (!activeFormUnit.access_password.trim()) {
+                              return (
+                                <p style={{ margin: 0, fontSize: 11.5, color: "#B5630C", fontWeight: 600 }}>
+                                  Definí una contraseña temporal o usá Blanquear para forzar cambio al ingresar.
+                                </p>
+                              );
+                            }
+                            if (activeFormUnit.status !== "activo" && activeFormUnit.status !== "onboarding") {
+                              return (
+                                <p style={{ margin: 0, fontSize: 11.5, color: "var(--color-slate2)" }}>
+                                  El acceso se sincroniza cuando el estado está activo u onboarding.
+                                </p>
+                              );
+                            }
+                            if (nodeDef?.provisionable && activeFormUnit.provisioned_at) {
+                              return (
+                                <p style={{ margin: 0, fontSize: 11.5, color: "#1F8A5B", fontWeight: 600 }}>
+                                  ✓ Acceso ya creado en {nodeDef.label}
+                                </p>
+                              );
+                            }
+                            if (nodeDef?.provisionable) {
+                              return (
+                                <p style={{ margin: 0, fontSize: 11.5, color: "#2A6FDB", fontWeight: 500 }}>
+                                  Al guardar se creará o actualizará el acceso en {nodeDef.label}.
+                                </p>
+                              );
+                            }
+                            return (
+                              <p style={{ margin: 0, fontSize: 11.5, color: "#2A6FDB", fontWeight: 500 }}>
+                                Al guardar se actualiza la contraseña en Auth para {nodeDef?.label ?? activeFormUnit.unit_code}.
+                              </p>
+                            );
+                          })()}
+                          {editingClient && unitHasClientAccessCredentials(activeFormUnit.access_user) && (
+                            <button
+                              type="button"
+                              onClick={() => resetUnitPassword(activeFormUnit)}
+                              disabled={resettingUnitKey === activeFormUnit.key}
+                              style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--color-navy)", color: "white", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, fontWeight: 700, cursor: resettingUnitKey === activeFormUnit.key ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", opacity: resettingUnitKey === activeFormUnit.key ? 0.65 : 1, flexShrink: 0 }}
+                            >
+                              <RotateCcw size={13} />
+                              {resettingUnitKey === activeFormUnit.key ? "Blanqueando..." : "Blanquear contraseña"}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      )}
 
                       {editingClient && activeFormUnit.provisioned_at && (
                         <div
@@ -1838,8 +1559,7 @@ export default function ClientesPage() {
                         </div>
                       )}
                     </div>
-                    );
-                  })()}
+                  )}
                 </div>
 
                 {noticeMessage && (
@@ -1848,8 +1568,8 @@ export default function ClientesPage() {
                 {error && <p style={{ margin: 0, fontSize: 12.5, color: "#C0392B" }}>{error}</p>}
 
                 <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-                  <button onClick={() => void handleSave()} disabled={saving} style={{ flex: 1, background: "var(--color-brand)", color: "white", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", opacity: saving ? 0.7 : 1 }}>
-                    {saving ? "Guardando..." : editingClient ? "Guardar cambios" : "Enviar invitación"}
+                  <button onClick={handleSave} disabled={saving} style={{ flex: 1, background: "var(--color-brand)", color: "white", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", opacity: saving ? 0.7 : 1 }}>
+                    {saving ? "Guardando..." : editingClient ? "Guardar cambios" : "Crear cliente"}
                   </button>
                   <button onClick={() => setShowForm(false)} style={{ flex: 1, background: "transparent", color: "var(--color-slate2)", border: "1px solid var(--color-mist)", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}>
                     Cancelar
@@ -1860,56 +1580,6 @@ export default function ClientesPage() {
           </div>
         )}
       </div>
-
-      {statusMenu &&
-        statusMenuUnit &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            role="menu"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "fixed",
-              top: statusMenu.top,
-              left: statusMenu.left,
-              background: "white",
-              border: "1px solid var(--color-mist)",
-              borderRadius: 8,
-              boxShadow: "0 8px 24px rgba(18,30,47,.12)",
-              zIndex: 200,
-              minWidth: 180,
-              padding: 4,
-            }}
-          >
-            {ADMIN_TOGGLEABLE_STATUSES.map((s) => {
-              const opt = statusStyle(s);
-              return (
-                <button
-                  key={s}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => handleStatusChange(statusMenuUnit.id, s)}
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    textAlign: "left",
-                    border: "none",
-                    background: statusMenuUnit.status === s ? "var(--color-paper)" : "transparent",
-                    padding: "8px 10px",
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    color: opt.color,
-                    cursor: "pointer",
-                    borderRadius: 6,
-                  }}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>,
-          document.body,
-        )}
     </>
   );
 }

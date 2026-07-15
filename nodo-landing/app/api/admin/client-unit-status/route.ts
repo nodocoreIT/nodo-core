@@ -39,20 +39,21 @@ export async function POST(request: NextRequest) {
   }
 
   const prev = unit.status;
-  const needsSuspend = status === "pausado" && prev !== "pausado";
   const needsReactivate = status === "activo" && prev === "pausado";
 
+  // Only lift existing auth bans when reactivating — do NOT ban when pausing.
+  // All nodos share one Supabase project, so auth bans are global and would
+  // affect every nodo. Per-nodo pause is handled by node_email_access.status
+  // (checked in the user_has_node_access RPC at login time).
   const nodeDef = NODES.find((n) => n.code === unit.unit_code);
-  if (nodeDef?.provisionable && (needsSuspend || needsReactivate)) {
+  if (nodeDef?.provisionable && needsReactivate) {
     const suspendResult = await setNodoAuthSuspendedForUnit(
       unit.unit_code,
       unit,
-      needsSuspend ? "suspend" : "reactivate",
+      "reactivate",
     );
-    if (!suspendResult.ok) {
-      return NextResponse.json({ error: suspendResult.error }, { status: 400 });
-    }
-    if (suspendResult.userId && !unit.provision_user_id) {
+    // Best-effort — don't block status change if unban fails
+    if (suspendResult.ok && suspendResult.userId && !unit.provision_user_id) {
       await admin
         .from("client_units")
         .update({ provision_user_id: suspendResult.userId })

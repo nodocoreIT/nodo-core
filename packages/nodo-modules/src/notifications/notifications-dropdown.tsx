@@ -28,6 +28,9 @@ export function NotificationsDropdown({
   onNavigate,
   headerRingClass = "ring-[#EEF3F8]",
   storageKey = "default",
+  initialDismissed,
+  onDismiss,
+  onDelete,
 }: NotificationsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [tab, setTab] = useState<TabId>("pending");
@@ -35,8 +38,8 @@ export function NotificationsDropdown({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
   const [isMobile, setIsMobile] = useState(false);
-  const { dismissed, dismissedCount, dismiss, deleteDismissed, filterActive } =
-    useNotificationDismissals(storageKey);
+  const { dismissed, dismiss, deleteDismissed, filterActive } =
+    useNotificationDismissals(storageKey, initialDismissed);
 
   const activeItems = filterActive(items);
   const count = activeItems.length;
@@ -84,6 +87,7 @@ export function NotificationsDropdown({
 
   function handleDismiss(notification: AppNotification) {
     dismiss(notification);
+    onDismiss?.(notification);
   }
 
   function handleNavigate(href: string) {
@@ -162,7 +166,7 @@ export function NotificationsDropdown({
                     : "text-slate2 hover:text-navy",
                 )}
               >
-                Cerradas{dismissedCount > 0 ? ` (${dismissedCount})` : ""}
+                Cerradas{dismissed.filter((d) => !d.deleted).length > 0 ? ` (${dismissed.filter((d) => !d.deleted).length})` : ""}
               </button>
             </div>
           </div>
@@ -192,19 +196,22 @@ export function NotificationsDropdown({
                   />
                 ))
               )
-            ) : dismissed.length === 0 ? (
+            ) : dismissed.filter((d) => !d.deleted).length === 0 ? (
               <div className="flex flex-col items-center justify-center bg-white px-4 py-8 text-center">
                 <Bell className="h-8 w-8 text-slate2/40" />
                 <p className="mt-2 text-sm text-slate2">Sin notificaciones cerradas</p>
               </div>
             ) : (
-              dismissed.map((notif) => (
+              dismissed.filter((d) => !d.deleted).map((notif) => (
                 <ClosedNotificationRow
                   key={notif.id}
                   notif={notif}
                   kindStyles={kindStyles}
                   onNavigate={handleNavigate}
-                  onDelete={() => deleteDismissed(notif.id)}
+                  onDelete={() => {
+                    deleteDismissed(notif.id);
+                    onDelete?.(notif.id);
+                  }}
                 />
               ))
             )}

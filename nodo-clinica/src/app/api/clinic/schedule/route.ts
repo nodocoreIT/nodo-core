@@ -450,7 +450,7 @@ export async function PUT(request: NextRequest) {
   const serviceClientPut = await (await import("@/lib/supabase/server")).createServiceClient();
   const { data: professional } = await serviceClientPut
     .from("professionals")
-    .select("id, office_settings(*)")
+    .select("id, org_id, office_settings(*)")
     .eq("id", me.id)
     .maybeSingle();
 
@@ -547,12 +547,15 @@ export async function PUT(request: NextRequest) {
     // Keep the labels in the response payload from existing data
   }
 
-  const { data: saved, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: saved, error } = await (serviceClientPut as any)
     .from("office_settings")
-    .update(updateData)
-    .eq("professional_id", professional.id)
+    .upsert(
+      { ...updateData, professional_id: (professional as any).id, org_id: (professional as any).org_id },
+      { onConflict: "professional_id" },
+    )
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json(

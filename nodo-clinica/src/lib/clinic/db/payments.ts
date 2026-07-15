@@ -57,13 +57,13 @@ export async function upsertPaymentCredentials(
       { onConflict: "org_id" },
     )
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error("[payments] upsertPaymentCredentials error", error);
     return null;
   }
-  return data as PaymentCredentialsRow;
+  return (data as PaymentCredentialsRow | null) ?? null;
 }
 
 /**

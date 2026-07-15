@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getNodeDefaultTheme, isEmptyThemeSettings } from "@nodocore/shared-components/lib/node-default-theme";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
+import { syncNodeEmailAccessForClient } from "@/lib/registration/client-unit-auth";
 import {
   finanzasThemeAppMetadata,
   seedInmoOrgProfileTheme,

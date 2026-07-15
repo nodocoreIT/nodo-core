@@ -155,7 +155,13 @@ export const clinicApi = {
         email,
         password,
       });
-      if (error) throw new Error(error.message || "Credenciales incorrectas");
+      if (error) {
+        const msg = (error.message ?? "").toLowerCase();
+        if (msg.includes("invalid login") || msg.includes("invalid_credentials")) {
+          throw new Error("Credenciales incorrectas. Verificá tu email y contraseña.");
+        }
+        throw new Error(error.message || "Credenciales incorrectas");
+      }
       if (!data.user) throw new Error("Credenciales incorrectas");
 
       const appMeta = data.user.app_metadata ?? {};
@@ -225,7 +231,7 @@ export const clinicApi = {
     licenseNumber: string;
     plan: string;
     token: string;
-  }): Promise<{ ok: boolean; actionLink: string }> {
+  }): Promise<{ ok: boolean }> {
     const res = await fetch(`${BASE}/api/clinic/account/onboarding/medico`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -234,12 +240,12 @@ export const clinicApi = {
     });
     const resData = await parseJsonResponse(res);
     if (!res.ok) throw new Error(resData.error || "Error en onboarding");
-    return resData as { ok: boolean; actionLink: string };
+    return resData as { ok: boolean };
   },
 
   async completeOnboardingPaciente(
     formData: FormData,
-  ): Promise<{ ok: boolean; actionLink: string }> {
+  ): Promise<{ ok: boolean }> {
     // No Content-Type header — browser sets multipart boundary automatically
     const res = await fetch(`${BASE}/api/clinic/account/onboarding/paciente`, {
       method: "POST",
@@ -248,7 +254,7 @@ export const clinicApi = {
     });
     const resData = await parseJsonResponse(res);
     if (!res.ok) throw new Error(resData.error || "Error en onboarding");
-    return resData as { ok: boolean; actionLink: string };
+    return resData as { ok: boolean };
   },
 
   async logout() {

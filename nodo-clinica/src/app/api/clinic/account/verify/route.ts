@@ -17,7 +17,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
   const role = searchParams.get("role");
-  const origin = new URL(request.url).origin;
+  const rawOrigin = new URL(request.url).origin;
+  const isLocal = /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(rawOrigin);
+  const origin = isLocal && process.env.NEXT_PUBLIC_BASE_URL
+    ? process.env.NEXT_PUBLIC_BASE_URL.replace(/\/$/, "")
+    : rawOrigin;
 
   if (!token || !role) {
     return NextResponse.redirect(
@@ -66,21 +70,24 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(new URL(`/login?error=role_mismatch`, request.url));
   }
 
-  // Create auth user
+  // Create auth user (ignore if already exists — user may have been created from nodo-landing)
   const { error: createError } = await serviceClient.auth.admin.createUser({
     email: pendingRow.email,
     email_confirm: true,
   });
 
   if (createError) {
-    const msg = createError.message.toLowerCase();
+    const msg = (createError.message ?? "").toLowerCase();
+    const code = (createError as { code?: string }).code ?? "";
     const alreadyExists =
-      msg.includes("already registered") ||
-      msg.includes("email already") ||
-      msg.includes("user already exists");
+      msg.includes("already") ||
+      msg.includes("exists") ||
+      msg.includes("registered") ||
+      code === "email_exists" ||
+      code === "user_already_exists";
 
     if (!alreadyExists) {
-      console.error("[verify] createUser error", createError);
+      console.error("[verify] createUser error", { message: createError.message, code, status: (createError as { status?: number }).status });
       return NextResponse.redirect(new URL(`/login?error=session_error`, request.url));
     }
   }

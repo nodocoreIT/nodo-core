@@ -24,6 +24,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const serviceClient = (await createServiceClient()) as any;
 
+    const CLINIC_ORG_ID =
+      process.env.CLINIC_ORG_ID ?? "843524dc-0c3b-4340-bc8e-e3ae5aa00fd2";
+
+    // Check if a professional/patient with this email already exists IN THIS ORG.
+    // Filtering by org_id ensures users registered in other nodos are not blocked.
+    const targetTable = role === "medico" ? "professionals" : "patients";
+    const { data: existing } = await serviceClient
+      .from(targetTable)
+      .select("id")
+      .eq("email", email.toLowerCase().trim())
+      .eq("org_id", CLINIC_ORG_ID)
+      .maybeSingle();
+
+    if (existing) {
+      return NextResponse.json(
+        {
+          error:
+            role === "medico"
+              ? "Ya existe un profesional registrado con este email."
+              : "Ya existe un paciente registrado con este email.",
+        },
+        { status: 409 },
+      );
+    }
+
     // Insert pending registration row. The unique partial index on (email, role)
     // WHERE verified_at IS NULL prevents duplicate pending rows.
     const { data: row, error: insertError } = await serviceClient

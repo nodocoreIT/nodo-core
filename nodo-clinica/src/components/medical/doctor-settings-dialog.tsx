@@ -506,6 +506,7 @@ export function DoctorSettingsDialog({
                           {s}
                           <button
                             type="button"
+<<<<<<< HEAD
                             onClick={() =>
                               setSpecialties((prev) => prev.filter((_, idx) => idx !== i))
                             }

@@ -13,6 +13,7 @@ const NODO_CLINICA_REMOTE_PREFIX =
     : (process.env.NODO_CLINICA_REMOTE_PREFIX ?? "/nodo-clinica").replace(/\/$/, "");
 const NODO_AUTOS_URL = process.env.NODO_AUTOS_URL ?? "http://localhost:5175";
 const NODO_FINANZAS_URL = process.env.NODO_FINANZAS_URL ?? "http://localhost:5176";
+const NODO_ECOMMERCE_URL = process.env.NODO_ECOMMERCE_URL ?? "http://localhost:3001";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -27,13 +28,17 @@ const nextConfig: NextConfig = {
   // can serve them via readFileSync. On Vercel, public/ is on the CDN
   // and not accessible from serverless functions unless explicitly traced.
   // Note: moved out of `experimental` in Next.js 15+.
-  outputFileTracingIncludes: {
-    "/inmo/[[...slug]]": ["./public/inmo/index.html"],
-    "/autos/[[...slug]]": ["./public/autos/index.html"],
-    "/finanzas/[[...slug]]": ["./public/finanzas/index.html"],
-  },
+  // Set turbopack root to the monorepo root so that pnpm symlinks
+  // (which resolve to node_modules/.pnpm/ under the workspace root)
+  // are reachable. Without this, Turbopack rejects the resolved path
+  // of next/package.json as being outside the project root.
   turbopack: {
-    root: path.resolve(__dirname, ".."),
+    root: path.join(__dirname, ".."),
+  },
+  outputFileTracingIncludes: {
+    "/inmo/[[...slug]]": [path.join(__dirname, "public/inmo/index.html")],
+    "/autos/[[...slug]]": [path.join(__dirname, "public/autos/index.html")],
+    "/finanzas/[[...slug]]": [path.join(__dirname, "public/finanzas/index.html")],
   },
   async rewrites() {
     if (isDev) {
@@ -57,6 +62,9 @@ const nextConfig: NextConfig = {
           // ── nodo-finanzas ──────────────────────────────────────────────────
           { source: "/finanzas", destination: `${NODO_FINANZAS_URL}/finanzas` },
           { source: "/finanzas/:path*", destination: `${NODO_FINANZAS_URL}/finanzas/:path*` },
+          // ── nodo-ecommerce ─────────────────────────────────────────────────
+          { source: "/ecommerce", destination: `${NODO_ECOMMERCE_URL}/ecommerce` },
+          { source: "/ecommerce/:path*", destination: `${NODO_ECOMMERCE_URL}/ecommerce/:path*` },
         ],
       };
     }

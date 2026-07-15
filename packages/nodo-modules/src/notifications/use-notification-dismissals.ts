@@ -8,6 +8,7 @@ export interface DismissedNotification {
   description: string;
   href: string;
   dismissedAt: string;
+  deleted?: boolean;
 }
 
 const STORAGE_PREFIX = "nodo-dismissed-notifications:";
@@ -58,7 +59,10 @@ function migrateLegacyFinanzasDismissals(storageKey: string): DismissedNotificat
   }
 }
 
-export function useNotificationDismissals(storageKey: string) {
+export function useNotificationDismissals(
+  storageKey: string,
+  initialDismissed?: DismissedNotification[],
+) {
   const [dismissed, setDismissed] = useState<DismissedNotification[]>([]);
 
   useEffect(() => {
@@ -66,12 +70,20 @@ export function useNotificationDismissals(storageKey: string) {
     if (records.length === 0) {
       records = migrateLegacyFinanzasDismissals(storageKey);
     }
+    if (initialDismissed && initialDismissed.length > 0) {
+      // Merge: server entries take precedence; local entries fill the rest.
+      const serverIds = new Set(initialDismissed.map((d) => d.id));
+      const localOnly = records.filter((r) => !serverIds.has(r.id));
+      records = [...initialDismissed, ...localOnly].sort((a, b) =>
+        (b.dismissedAt ?? "").localeCompare(a.dismissedAt ?? ""),
+      );
+    }
     setDismissed(records);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
-  const persist = useCallback(
+  const persistToStorage = useCallback(
     (next: DismissedNotification[]) => {
-      setDismissed(next);
       try {
         localStorage.setItem(STORAGE_PREFIX + storageKey, JSON.stringify(next));
       } catch {
@@ -83,26 +95,33 @@ export function useNotificationDismissals(storageKey: string) {
 
   const dismiss = useCallback(
     (notification: AppNotification) => {
-      const record: DismissedNotification = {
-        id: notification.id,
-        kind: notification.kind,
-        title: notification.title,
-        description: notification.description,
-        href: notification.href,
-        dismissedAt: new Date().toISOString(),
-      };
-      const next = [...dismissed.filter((d) => d.id !== notification.id), record];
-      next.sort((a, b) => b.dismissedAt.localeCompare(a.dismissedAt));
-      persist(next);
+      setDismissed((prev) => {
+        const record: DismissedNotification = {
+          id: notification.id,
+          kind: notification.kind,
+          title: notification.title,
+          description: notification.description,
+          href: notification.href,
+          dismissedAt: new Date().toISOString(),
+        };
+        const next = [...prev.filter((d) => d.id !== notification.id), record];
+        next.sort((a, b) => b.dismissedAt.localeCompare(a.dismissedAt));
+        persistToStorage(next);
+        return next;
+      });
     },
-    [dismissed, persist],
+    [persistToStorage],
   );
 
   const deleteDismissed = useCallback(
     (id: string) => {
-      persist(dismissed.filter((d) => d.id !== id));
+      setDismissed((prev) => {
+        const next = prev.map((d) => (d.id === id ? { ...d, deleted: true } : d));
+        persistToStorage(next);
+        return next;
+      });
     },
-    [dismissed, persist],
+    [persistToStorage],
   );
 
   const filterActive = useCallback(

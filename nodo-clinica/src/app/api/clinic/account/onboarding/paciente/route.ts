@@ -15,6 +15,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const token = formData.get("token") as string | null;
     const fullName = formData.get("fullName") as string | null;
+    const dni = formData.get("dni") as string | null;
     const address = formData.get("address") as string | null;
     const obraSocial = formData.get("obraSocial") as string | null;
     const plan = formData.get("plan") as string | null;
@@ -28,9 +29,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    if (!fullName || !plan) {
+    if (!fullName || !plan || !dni) {
       return NextResponse.json(
-        { error: "Se requieren fullName y plan." },
+        { error: "Se requieren fullName, dni y plan." },
         { status: 400 },
       );
     }
@@ -128,13 +129,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       dniBackPath = storagePath;
     }
 
+    // Split fullName into first/last for the DB columns
+    const nameParts = (fullName ?? "").trim().split(/\s+/);
+    const firstName = nameParts[0] ?? "";
+    const lastName = nameParts.slice(1).join(" ") || firstName;
+
     // Insert patient record (ignore duplicate — idempotent)
     const { error: patientError } = await serviceClient
       .from("patients")
       .insert({
         profile_id: userId,
         org_id: CLINIC_ORG_ID,
+        first_name: firstName,
+        last_name: lastName,
         full_name: fullName,
+        dni: dni.trim(),
         email: email.toLowerCase().trim(),
         address: address ?? null,
         obra_social: obraSocial ?? null,
@@ -151,27 +160,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Generate magic link to establish session — client navigates here immediately
-    const origin = new URL(request.url).origin;
-    const { data: linkData, error: linkError } =
-      await serviceClient.auth.admin.generateLink({
-        type: "magiclink",
-        email,
-        options: { redirectTo: `${origin}/paciente` },
-      });
-
-    if (linkError || !linkData?.properties?.action_link) {
-      console.error("[onboarding/paciente] generateLink error", linkError);
-      return NextResponse.json(
-        { error: "Error al generar sesión. Contactá a soporte." },
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      actionLink: linkData.properties.action_link,
-    });
+    return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[onboarding/paciente]", err);
     return NextResponse.json(

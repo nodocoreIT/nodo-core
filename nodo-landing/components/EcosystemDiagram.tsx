@@ -48,6 +48,9 @@ function kt(t: number, cycleDur: number) {
 const ACTIVE_TWO_LEG_DUR = 2.4;
 const ACTIVE_ONE_LEG_DUR = 1.8;
 const CORE_CLICKS_FOR_LOGIN = 5;
+
+/** Round to 4 decimal places to avoid SSR/client floating-point mismatches. */
+const r = (n: number) => Math.round(n * 10000) / 10000;
 const CORE_CLICK_RESET_MS = 2500;
 /** Core button size as % of diagram width (CORE_R * 2 / W). */
 const CORE_HIT_SIZE_PCT = ((CORE_R * 2) / W) * 100;
@@ -106,12 +109,12 @@ export default function EcosystemDiagram({
     const angle = ((-90 + (i * 360) / mainCount) * Math.PI) / 180;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
+    const x = r(CX + R * cos);
+    const y = r(CY + R * sin);
     return {
-      node, cos, sin,
-      x: CX + R * cos,
-      y: CY + R * sin,
-      left: `${((CX + R * cos) / W) * 100}%`,
-      top:  `${((CY + R * sin) / H) * 100}%`,
+      node, cos, sin, x, y,
+      left: `${r((x / W) * 100)}%`,
+      top:  `${r((y / H) * 100)}%`,
     };
   });
 
@@ -134,13 +137,13 @@ export default function EcosystemDiagram({
       const childAngle = parentAngle + angleOffset;
       const cos = Math.cos(childAngle);
       const sin = Math.sin(childAngle);
-      const x = parent.x + cos * SUB_ORBIT_R;
-      const y = parent.y + sin * SUB_ORBIT_R;
+      const x = r(parent.x + cos * SUB_ORBIT_R);
+      const y = r(parent.y + sin * SUB_ORBIT_R);
 
       return {
         node, cos, sin, x, y,
-        left: `${(x / W) * 100}%`,
-        top:  `${(y / H) * 100}%`,
+        left: `${r((x / W) * 100)}%`,
+        top:  `${r((y / H) * 100)}%`,
         parent,
         siblingIndex,
       };
@@ -397,6 +400,7 @@ export default function EcosystemDiagram({
             isActive={p.node.slug === activeNodeSlug}
             isLoginPage={isLoginPage}
             diameterCqw={SUB_SAT_DIAMETER_CQW}
+            labelFontScale={p.node.slug === "ecommerce" ? 0.82 : 1}
             isVisible={visible}
             subIndex={p.siblingIndex}
             onHoverChange={
@@ -429,6 +433,7 @@ function Satellite({
   isActive,
   isLoginPage,
   diameterCqw = SAT_DIAMETER_CQW,
+  labelFontScale = 1,
   onHoverChange,
   isVisible,          // undefined = main node (always visible, no animation)
   subIndex = 0,
@@ -439,6 +444,7 @@ function Satellite({
   isActive: boolean;
   isLoginPage: boolean;
   diameterCqw?: number;
+  labelFontScale?: number;
   onHoverChange?: (hovered: boolean) => void;
   isVisible?: boolean;  // only passed for sub-nodes
   subIndex?: number;
@@ -477,7 +483,7 @@ function Satellite({
         style={{ width: `${(diameterCqw / SAT_DIAMETER_CQW) * 4.4}cqw`, height: `${(diameterCqw / SAT_DIAMETER_CQW) * 4.4}cqw` }}
         strokeWidth={1.75}
       />
-      <span className="font-semibold leading-none" style={{ fontSize: `${(diameterCqw / SAT_DIAMETER_CQW) * 2.5}cqw` }}>
+      <span className="font-semibold leading-none" style={{ fontSize: `${(diameterCqw / SAT_DIAMETER_CQW) * 2.5 * labelFontScale}cqw` }}>
         {node.code}
       </span>
     </span>

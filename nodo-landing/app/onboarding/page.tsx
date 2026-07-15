@@ -369,8 +369,8 @@ function OnboardingForm() {
             <button
               type="submit"
               disabled={submitDisabled || !planChoice}
-              className="w-full rounded-lg py-3.5 text-sm font-semibold text-white disabled:opacity-50 hover:opacity-95 transition-opacity"
-              style={{ background: accent.brand }}
+              className="w-full rounded-lg py-3.5 text-sm font-semibold disabled:opacity-50 hover:opacity-95 transition-opacity"
+              style={{ background: accent.brand, color: "var(--color-brand-on, #ffffff)" }}
             >
               {loading ? "Enviando…" : "Confirmar y solicitar habilitación"}
             </button>

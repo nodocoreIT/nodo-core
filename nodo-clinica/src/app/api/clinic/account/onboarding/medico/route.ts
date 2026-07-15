@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createServiceClient, createSharedServiceClient } from "@/lib/supabase/server";
 
 const CLINIC_ORG_ID =
   process.env.CLINIC_ORG_ID ?? "843524dc-0c3b-4340-bc8e-e3ae5aa00fd2";
@@ -72,8 +72,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const userId = authUser.id;
 
-    // Insert into org_members (ignore duplicate — idempotent)
-    const { error: orgError } = await serviceClient
+    // Insert into org_members (shared schema — ignore duplicate)
+    const sharedClient = await createSharedServiceClient();
+    const { error: orgError } = await sharedClient
       .from("org_members")
       .insert({ user_id: userId, org_id: CLINIC_ORG_ID, role: "admin" });
 
@@ -85,12 +86,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // Split fullName into first/last for the DB columns
+    const nameParts = fullName.trim().split(/\s+/);
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(" ") || firstName;
+
     // Insert into professionals (ignore duplicate — idempotent)
     const { error: profError } = await serviceClient
       .from("professionals")
       .insert({
         user_id: userId,
         org_id: CLINIC_ORG_ID,
+        first_name: firstName,
+        last_name: lastName,
         full_name: fullName,
         email: email.toLowerCase().trim(),
         specialty,
@@ -107,27 +115,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Generate magic link to establish session — client navigates here immediately
-    const origin = new URL(request.url).origin;
-    const { data: linkData, error: linkError } =
-      await serviceClient.auth.admin.generateLink({
-        type: "magiclink",
-        email,
-        options: { redirectTo: `${origin}/medico/dashboard` },
-      });
-
-    if (linkError || !linkData?.properties?.action_link) {
-      console.error("[onboarding/medico] generateLink error", linkError);
-      return NextResponse.json(
-        { error: "Error al generar sesión. Contactá a soporte." },
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      actionLink: linkData.properties.action_link,
-    });
+    return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[onboarding/medico]", err);
     return NextResponse.json(

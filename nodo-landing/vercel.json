@@ -1,0 +1,10 @@
+{
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm --filter nodo-inmo --filter nodo-autos --filter nodo-finanzas build && pnpm build",
+  "crons": [
+    {
+      "path": "/api/cron/backup-orgs",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}

@@ -57,7 +57,7 @@ export function PasswordResetPanel({
 
   return (
     <form onSubmit={handleSubmit} noValidate className={className}>
-      <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-[var(--brand,#DA5A0E)]">
+      <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-[var(--color-brand-kicker,var(--color-brand,#DA5A0E))]">
         ◎ Restablecer contraseña
       </span>
       <h1 className="font-display font-bold text-ink text-[26px] mt-2 mb-1">
@@ -107,7 +107,7 @@ export function PasswordResetPanel({
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-3.5 rounded-md bg-[var(--color-brand,#DA5A0E)] text-white font-semibold text-[15px] hover:bg-[var(--color-brand-600,#C04E0B)] active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+        className="w-full py-3.5 rounded-md bg-[var(--color-brand,#DA5A0E)] text-[var(--color-brand-on,#ffffff)] font-semibold text-[15px] hover:bg-[var(--color-brand-600,#C04E0B)] active:scale-[.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
       >
         {loading ? "Restableciendo…" : "Restablecer contraseña"}
       </button>

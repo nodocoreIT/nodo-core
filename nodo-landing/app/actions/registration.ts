@@ -13,10 +13,10 @@ import {
   sendPatientVerificationEmail,
   sendInmoVerificationEmail,
   sendFinanzasVerificationEmail,
-  sendAutosVerificationEmail,
+  sendEcommerceVerificationEmail,
   sendAdminNewRegistrationEmail,
 } from "@/lib/mail";
-import { resolvePublicOriginFromRequest } from "@/lib/auth/public-origin";
+import { resolveRegistrationOrigin } from "@/lib/registration/origin";
 import {
   duplicateRegistrationMessage,
   isEmailRegisteredForNode,
@@ -34,16 +34,16 @@ async function sendVerificationEmail(
     await sendPatientVerificationEmail(payload);
     return;
   }
-  if (unitCode === "Inmo" || planLower === "inmo") {
+  if (planLower === "inmo" || unitCode === "Inmo") {
     await sendInmoVerificationEmail(payload);
     return;
   }
-  if (unitCode === "Finanzas" || planLower === "finanzas") {
+  if (planLower === "finanzas" || unitCode === "Finanzas") {
     await sendFinanzasVerificationEmail(payload);
     return;
   }
-  if (unitCode === "Autos" || planLower === "autos") {
-    await sendAutosVerificationEmail(payload);
+  if (planLower === "ecommerce" || unitCode === "Ecommerce") {
+    await sendEcommerceVerificationEmail(payload);
     return;
   }
   await sendRegistrationVerificationEmail({
@@ -85,7 +85,6 @@ export async function submitNodeRegistration(
   }
 
   const selfService = isSelfServicePlan(unitCode, plan);
-  // Legacy: only paciente (clínica) may still collect password at signup for immediate provision.
   if (selfService && !input.password) {
     return { status: "error", message: "La contraseña es obligatoria." };
   }
@@ -133,7 +132,7 @@ export async function submitNodeRegistration(
       };
     }
 
-    const emailOrigin = await resolvePublicOriginFromRequest(origin);
+    const emailOrigin = resolveRegistrationOrigin(origin);
     let mailSent = false;
 
     if (isMailConfigured()) {
@@ -246,7 +245,7 @@ export async function resendVerificationEmail(params: {
       return { status: "error", message: "El envío de correos no está configurado." };
     }
 
-    const emailOrigin = await resolvePublicOriginFromRequest(params.origin);
+    const emailOrigin = resolveRegistrationOrigin(params.origin);
     await sendVerificationEmail(unitCode, pending.plan, {
       nombre: pending.full_name,
       email,

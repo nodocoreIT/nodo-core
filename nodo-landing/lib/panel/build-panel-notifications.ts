@@ -208,9 +208,11 @@ export function buildPanelNotifications({
 
     const baseDesc = `${task.title} · ${getNodeLabel(task.unit_code)}`;
 
+    // Use a stable ID regardless of urgency state so localStorage dismissals
+    // survive transitions (upcoming → today → overdue).
     if (task.due_date < todayKey) {
       list.push({
-        id: `overdue-task-${task.id}`,
+        id: `task-${task.id}`,
         kind: "overdue_task",
         title: "Tarea vencida",
         description: baseDesc,
@@ -219,7 +221,7 @@ export function buildPanelNotifications({
       });
     } else if (task.due_date === todayKey) {
       list.push({
-        id: `today-task-${task.id}`,
+        id: `task-${task.id}`,
         kind: "today_task",
         title: "Tarea para hoy",
         description: baseDesc,
@@ -228,7 +230,7 @@ export function buildPanelNotifications({
       });
     } else if (task.due_date <= horizon) {
       list.push({
-        id: `upcoming-task-${task.id}`,
+        id: `task-${task.id}`,
         kind: "upcoming_task",
         title: "Tarea próxima",
         description: `${baseDesc} — vence ${task.due_date}`,

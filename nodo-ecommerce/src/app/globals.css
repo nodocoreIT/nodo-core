@@ -1,0 +1,184 @@
+@import "tailwindcss";
+
+@theme {
+  --color-gold: #D4AF37;
+  --color-gold-light: #E8CC6B;
+  --color-gold-dark: #B8960C;
+  --color-luxury-black: #000000;
+  --color-luxury-white: #FFFFFF;
+  --color-luxury-gray: #1A1A1A;
+  --color-luxury-gray-mid: #2D2D2D;
+  --color-luxury-gray-light: #888888;
+
+  --font-product: 'Outfit', sans-serif;
+
+  --animate-fade-in: fadeIn 0.6s ease-in-out;
+  --animate-shimmer: shimmer 2s linear infinite;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Rich text content rendered from TipTap HTML — used in dashboard editor and public pages */
+.rich-content            { color: inherit; }
+.rich-content *          { box-sizing: border-box; }
+/* Respect inline color styles set by the editor */
+.rich-content [style]    { color: unset; }
+.rich-content span[style*="color"]       { color: revert; }
+.rich-content span[style*="font-size"]   { font-size: revert; }
+.rich-content span[style*="font-family"] { font-family: revert; }
+/* Block elements */
+.rich-content p          { margin-bottom: 0.75em; }
+.rich-content h1         { font-size: 1.75em; font-weight: 700; margin-bottom: 0.5em; color: #fff; }
+.rich-content h2         { font-size: 1.4em;  font-weight: 700; margin-bottom: 0.5em; color: #fff; }
+.rich-content h3         { font-size: 1.15em; font-weight: 600; margin-bottom: 0.4em; color: #fff; }
+.rich-content strong     { font-weight: 700; }
+.rich-content em         { font-style: italic; }
+.rich-content u          { text-decoration: underline; }
+.rich-content s          { text-decoration: line-through; }
+.rich-content ul         { list-style: disc outside; margin-bottom: 0.75em; padding-left: 1.5em; }
+.rich-content ol         { list-style: decimal outside; margin-bottom: 0.75em; padding-left: 1.5em; }
+.rich-content li         { margin-bottom: 0.25em; }
+.rich-content a          { color: var(--color-gold); text-decoration: underline; }
+.rich-content hr         { border-color: #2D2D2D; margin: 1.5em 0; }
+.rich-content mark       { background-color: var(--color-gold); color: #000; padding: 0 2px; border-radius: 2px; }
+.rich-content img        { max-width: 100%; height: auto; border-radius: 4px; margin: 0.75em 0; }
+/* Text alignment set by TipTap as inline style */
+.rich-content p[style*="text-align: center"],
+.rich-content h1[style*="text-align: center"],
+.rich-content h2[style*="text-align: center"],
+.rich-content h3[style*="text-align: center"] { text-align: center; }
+.rich-content p[style*="text-align: right"],
+.rich-content h1[style*="text-align: right"],
+.rich-content h2[style*="text-align: right"],
+.rich-content h3[style*="text-align: right"]  { text-align: right; }
+.rich-content p[style*="text-align: justify"],
+.rich-content h1[style*="text-align: justify"],
+.rich-content h2[style*="text-align: justify"],
+.rich-content h3[style*="text-align: justify"]{ text-align: justify; }
+
+/* Light mode overrides — applied via data-theme="light" on <html> or any wrapper */
+html[data-theme="light"],
+[data-theme="light"] {
+  --color-luxury-black: #f5f4f0;
+  --color-luxury-gray: #eae9e4;
+  --color-luxury-gray-mid: #d0cec6;
+  --color-luxury-gray-light: #4a4a44;
+  --color-text: #111111;
+  --color-nav-subcategory: #8B6914;
+
+  color-scheme: light;
+}
+
+/* Override hardcoded Tailwind colors inside light-mode wrappers */
+[data-theme="light"] body,
+[data-theme="light"] .bg-black {
+  background-color: var(--color-luxury-black);
+}
+[data-theme="light"] .text-white {
+  color: var(--color-text);
+}
+[data-theme="light"] .hover\:text-white:hover {
+  color: var(--color-text);
+}
+[data-theme="light"] .text-\[\#555555\],
+[data-theme="light"] .text-\[\#444444\],
+[data-theme="light"] .text-\[\#333333\],
+[data-theme="light"] .text-\[\#444\],
+[data-theme="light"] .text-\[\#555\] {
+  color: #5a5a54;
+}
+[data-theme="light"] .bg-\[\#050505\],
+[data-theme="light"] .bg-\[\#0A0A0A\],
+[data-theme="light"] .bg-\[\#0D0D0D\],
+[data-theme="light"] .bg-\[\#111111\],
+[data-theme="light"] .bg-\[\#111\],
+[data-theme="light"] .bg-\[\#252525\] {
+  background-color: var(--color-luxury-black);
+}
+[data-theme="light"] .text-\[\#cccccc\] {
+  color: var(--color-text);
+}
+[data-theme="light"] .hover\:bg-\[\#111111\]:hover,
+[data-theme="light"] .hover\:bg-\[\#111\]:hover,
+[data-theme="light"] .hover\:bg-\[\#252525\]:hover {
+  background-color: var(--color-luxury-gray-mid);
+}
+[data-theme="light"] .bg-\[\#111111\]\/30 {
+  background-color: color-mix(in srgb, var(--color-luxury-gray) 30%, transparent);
+}
+[data-theme="light"] .border-\[\#333\],
+[data-theme="light"] .border-\[\#444\] {
+  border-color: var(--color-luxury-gray-mid);
+}
+[data-theme="light"] .placeholder-\[\#444444\]::placeholder,
+[data-theme="light"] .placeholder-\[\#444\]::placeholder {
+  color: #9a9a94;
+}
+
+.product-image-frame {
+  background-color: #111111;
+}
+
+[data-theme="light"] .product-image-frame {
+  background-color: #F5F4F0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-luxury-black);
+  color: var(--color-text, #ffffff);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+::selection {
+  background-color: var(--color-gold);
+  color: var(--color-luxury-black);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-luxury-black);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-gold);
+  border-radius: 3px;
+}

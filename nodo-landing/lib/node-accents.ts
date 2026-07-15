@@ -38,12 +38,12 @@ export const CONTABLE_ACCENT = {
   rgb: "124, 58, 237",
 } as const;
 
-/** Azul — no usado por otros nodos del ecosistema. */
+/** Amarillo neón — identidad visual de Nodo Ecommerce. */
 export const ECOMMERCE_ACCENT = {
-  brand: "#2563EB",
-  brand600: "#1E3A8A",
-  brand300: "#93C5FD",
-  rgb: "37, 99, 235",
+  brand: "#FFF600",
+  brand600: "#D4CC00",
+  brand300: "#FFFB80",
+  rgb: "255, 246, 0",
 } as const;
 
 export const DEFAULT_ACCENT = {
@@ -96,6 +96,7 @@ export function getLoginAccent(nodeParam: string): NodeAccent {
   if (nodeParam === "nodo-finanzas" || nodeParam === "finanzas") return FINANZAS_ACCENT;
   if (nodeParam === "nodo-obra" || nodeParam === "obra") return OBRA_ACCENT;
   if (isClinicaLoginNode(nodeParam)) return CLINICA_ACCENT;
+  if (nodeParam === "nodo-ecommerce" || nodeParam === "ecommerce") return ECOMMERCE_ACCENT;
   return DEFAULT_ACCENT;
 }
 
@@ -108,33 +109,50 @@ export function getNodoLogoSrc(nodeParamOrSlug: string): string {
   if (slug === "clinica" || slug === "clinica-virtual" || slug === "salud") {
     return "/logos/nodo%20ver%20clinica.png";
   }
+  if (slug === "ecommerce") return "/logos/nodo%20amar.png";
   return "/logos/nodo%20nar.png";
 }
 
 export function applyLoginAccent(accent: NodeAccent): () => void {
   const root = document.documentElement;
+  // Determine if the brand color is light (requires dark text on top).
+  // Only ecommerce yellow qualifies; all other brand colors are dark enough for white text.
+  const isLightBrand = accent.brand === ECOMMERCE_ACCENT.brand;
+  // --color-brand-on: text color to use ON TOP of the brand color background
+  // --color-brand-kicker: text color for kicker labels on a neutral (white/gray) background
+  const brandOn = isLightBrand ? "#000000" : "#ffffff";
+  const brandKicker = isLightBrand ? "#000000" : accent.brand;
+
   const previous = {
     brand: root.style.getPropertyValue("--color-brand"),
     brand600: root.style.getPropertyValue("--color-brand-600"),
     brand300: root.style.getPropertyValue("--color-brand-300"),
+    brandOn: root.style.getPropertyValue("--color-brand-on"),
+    brandKicker: root.style.getPropertyValue("--color-brand-kicker"),
     glow: root.style.getPropertyValue("--brand-glow"),
     glowStrong: root.style.getPropertyValue("--brand-glow-strong"),
     glowSoft: root.style.getPropertyValue("--brand-glow-soft"),
     focusRing: root.style.getPropertyValue("--login-focus-ring"),
+    colorRing: root.style.getPropertyValue("--color-ring"),
   };
 
   root.style.setProperty("--color-brand", accent.brand);
   root.style.setProperty("--color-brand-600", accent.brand600);
   root.style.setProperty("--color-brand-300", accent.brand300);
+  root.style.setProperty("--color-brand-on", brandOn);
+  root.style.setProperty("--color-brand-kicker", brandKicker);
   root.style.setProperty("--brand-glow", `rgba(${accent.rgb}, 0.4)`);
   root.style.setProperty("--brand-glow-strong", `rgba(${accent.rgb}, 0.55)`);
   root.style.setProperty("--brand-glow-soft", `rgba(${accent.rgb}, 0.2)`);
   root.style.setProperty("--login-focus-ring", `rgba(${accent.rgb}, 0.16)`);
+  root.style.setProperty("--color-ring", accent.brand);
 
   return () => {
     root.style.setProperty("--color-brand", previous.brand || DEFAULT_ACCENT.brand);
     root.style.setProperty("--color-brand-600", previous.brand600 || DEFAULT_ACCENT.brand600);
     root.style.setProperty("--color-brand-300", previous.brand300 || DEFAULT_ACCENT.brand300);
+    root.style.setProperty("--color-brand-on", previous.brandOn || "#ffffff");
+    root.style.setProperty("--color-brand-kicker", previous.brandKicker || DEFAULT_ACCENT.brand);
     root.style.setProperty("--brand-glow", previous.glow || "rgba(218, 90, 14, 0.4)");
     root.style.setProperty(
       "--brand-glow-strong",
@@ -148,6 +166,11 @@ export function applyLoginAccent(accent: NodeAccent): () => void {
       root.style.setProperty("--login-focus-ring", previous.focusRing);
     } else {
       root.style.removeProperty("--login-focus-ring");
+    }
+    if (previous.colorRing) {
+      root.style.setProperty("--color-ring", previous.colorRing);
+    } else {
+      root.style.removeProperty("--color-ring");
     }
   };
 }

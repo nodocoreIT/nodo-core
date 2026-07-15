@@ -58,7 +58,14 @@ export const PANEL_NOTIFICATION_KIND_STYLES = {
 
 export function NotificationsBell() {
   const router = useRouter();
-  const { items, loading, error } = usePanelNotifications();
+  const {
+    items,
+    loading,
+    error,
+    dismissedFromServer,
+    dismissNotification,
+    deleteNotification,
+  } = usePanelNotifications();
 
   return (
     <NotificationsDropdown
@@ -69,6 +76,9 @@ export function NotificationsBell() {
       onNavigate={(href) => router.push(href)}
       headerRingClass="ring-[#EEF3F8]"
       storageKey="panel"
+      initialDismissed={dismissedFromServer}
+      onDismiss={dismissNotification}
+      onDelete={deleteNotification}
     />
   );
 }

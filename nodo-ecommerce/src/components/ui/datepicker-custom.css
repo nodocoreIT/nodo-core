@@ -1,0 +1,95 @@
+/* Estilos custom para react-datepicker */
+
+.custom-datepicker {
+  background-color: #0A0A0A !important;
+  border: 1px solid #2D2D2D !important;
+  border-radius: 0 !important;
+  font-family: inherit !important;
+  color: white !important;
+}
+
+.custom-datepicker .react-datepicker__header {
+  background-color: #111111 !important;
+  border-bottom: 1px solid #2D2D2D !important;
+  border-radius: 0 !important;
+  padding-top: 10px !important;
+}
+
+.custom-datepicker .react-datepicker__current-month {
+  display: none !important;
+}
+
+.custom-datepicker .react-datepicker-time__header,
+.custom-datepicker .react-datepicker-year-header {
+  color: #D4AF37 !important;
+  text-transform: uppercase !important;
+  font-size: 0.8rem !important;
+  letter-spacing: 0.1em !important;
+}
+
+.custom-datepicker .react-datepicker__day-name {
+  color: #555555 !important;
+}
+
+.custom-datepicker .react-datepicker__day {
+  color: #cccccc !important;
+  transition: all 0.2s !important;
+}
+
+.custom-datepicker .react-datepicker__day:hover {
+  background-color: #D4AF37 !important;
+  color: black !important;
+  border-radius: 0 !important;
+}
+
+.custom-datepicker .react-datepicker__day--selected {
+  background-color: #D4AF37 !important;
+  color: black !important;
+  border-radius: 0 !important;
+  font-weight: bold !important;
+}
+
+.custom-datepicker .react-datepicker__day--keyboard-selected {
+  background-color: transparent !important;
+  border: 1px solid #D4AF37 !important;
+  color: #D4AF37 !important;
+}
+
+.custom-datepicker .react-datepicker__navigation--previous {
+  border-right-color: #D4AF37 !important;
+}
+
+.custom-datepicker .react-datepicker__navigation--next {
+  border-left-color: #D4AF37 !important;
+}
+
+/* Dropdowns de mes y año */
+/* Ajustes para que los CustomSelect sean compactos en el header */
+.custom-datepicker .relative button {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  padding-left: 8px !important;
+  padding-right: 4px !important;
+  font-size: 0.75rem !important;
+  height: 32px !important;
+}
+
+.custom-datepicker .relative button svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.custom-datepicker .relative div[class*="absolute"] {
+  max-height: 200px !important;
+}
+
+.custom-datepicker .relative div[class*="absolute"] button {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  height: auto !important;
+}
+
+.custom-datepicker .react-datepicker__triangle {
+  display: none !important;
+}
+

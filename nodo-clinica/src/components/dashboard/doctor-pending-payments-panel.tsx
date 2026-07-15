@@ -56,7 +56,7 @@ export function DoctorPendingPaymentsPanel({
 
   useEffect(() => {
     void load();
-    const interval = window.setInterval(() => void load(), 20_000);
+    const interval = window.setInterval(() => void load(), 180_000);
     return () => window.clearInterval(interval);
   }, [load]);
 
