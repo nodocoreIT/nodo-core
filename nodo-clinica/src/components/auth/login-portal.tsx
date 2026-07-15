@@ -3,7 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Stethoscope, User, Eye, EyeOff, Loader2, KeyRound, MailCheck } from "lucide-react";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { clinicApi } from "@/lib/clinic/client-api";
+import {
+  CLINICA_REGISTRATION_URL,
+  isOpenRegistrationAllowed,
+  isPlatformMode,
+} from "@/lib/clinic/platform-config";
+import { PlatformMedicoLoginFields } from "@/components/auth/platform-medico-login";
 
 function NodeTransitionOverlay({ isDoctor }: { isDoctor: boolean }) {
   return (
@@ -177,13 +185,6 @@ function NodeTransitionOverlay({ isDoctor }: { isDoctor: boolean }) {
     </>
   );
 }
-import { clinicApi } from "@/lib/clinic/client-api";
-import {
-  CLINICA_REGISTRATION_URL,
-  isOpenRegistrationAllowed,
-  isPlatformMode,
-} from "@/lib/clinic/platform-config";
-import { PlatformMedicoLoginFields } from "@/components/auth/platform-medico-login";
 
 type Role = "doctor" | "patient";
 type AuthMode = "login" | "register" | "forgot";
@@ -201,7 +202,8 @@ export function LoginPortal() {
 
   const isDoctor = role === "doctor";
   const platformDoctor = isDoctor && isPlatformMode();
-  const showRegister = isOpenRegistrationAllowed() && !platformDoctor;
+  // Patients can always register; doctors follow open-registration + platform rules
+  const showRegister = !isDoctor || (isOpenRegistrationAllowed() && !platformDoctor);
 
   const [form, setForm] = useState({
     email: "",
@@ -223,7 +225,8 @@ export function LoginPortal() {
     }
     setLoading(true);
     try {
-      await clinicApi.login(form.email.trim(), form.password, role);
+      const data = await clinicApi.login(form.email.trim(), form.password, role);
+      toast.success(`Bienvenido/a, ${data.user.fullName}`);
       setShowTransition(true);
       setTimeout(() => {
         window.location.replace(isDoctor ? "/medico/dashboard" : "/paciente");
@@ -231,6 +234,7 @@ export function LoginPortal() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al ingresar";
       setGeneralError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -253,6 +257,7 @@ export function LoginPortal() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al registrarse";
       setGeneralError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -264,13 +269,12 @@ export function LoginPortal() {
     if (!recoveryEmail.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/clinic/account/forgot-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: recoveryEmail.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Error al enviar el correo");
+      const supabase = createClient();
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        recoveryEmail.trim(),
+        { redirectTo: `${window.location.origin}/actualizar-contrasena` }
+      );
+      if (resetError) throw resetError;
       setRecoverySent(true);
     } catch (err) {
       setGeneralError(err instanceof Error ? err.message : "Error al enviar el correo");
@@ -288,6 +292,40 @@ export function LoginPortal() {
   return (
     <>
       {showTransition && <NodeTransitionOverlay isDoctor={isDoctor} />}
+
+      {/* Loading overlay */}
+      {loading && authMode === "register" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl px-10 py-8 flex flex-col items-center gap-4 w-[280px]">
+            <Loader2 className="h-10 w-10 text-brand animate-spin" />
+            <p className="text-[15px] font-medium text-slate-700">Enviando solicitud...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Register success modal */}
+      {registerSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl px-10 py-8 flex flex-col items-center gap-4 w-[340px] text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-teal-50">
+              <MailCheck className="h-8 w-8 text-brand" />
+            </div>
+            <div>
+              <h3 className="font-display font-bold text-ink text-[20px] mb-1">¡Activá tu cuenta!</h3>
+              <p className="text-slate2 text-[14px]">
+                Te enviamos un correo de verificación. Revisá tu casilla para continuar con el registro.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setRegisterSuccess(false); setAuthMode("login"); }}
+              className="w-full py-3 rounded-xl bg-brand text-white font-semibold text-[15px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
 
       <a
         href="https://www.nodocore.com.ar/nodo-clinica"
@@ -377,29 +415,8 @@ export function LoginPortal() {
         {/* ── Right form panel ── */}
         <main className="flex items-center justify-center p-8 bg-paper min-h-screen">
           <div className="w-[min(420px,100%)]">
-
-            {/* Register success — inline panel, no modal */}
-            {registerSuccess && (
-              <div className="flex flex-col items-center gap-4 py-8 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-teal-50">
-                  <MailCheck className="h-8 w-8 text-brand" />
-                </div>
-                <h2 className="font-display font-bold text-ink text-[24px]">¡Activá tu cuenta!</h2>
-                <p className="text-slate2 text-[14.5px] max-w-xs">
-                  Te enviamos un correo de verificación. Revisá tu casilla para continuar con el registro.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => { setRegisterSuccess(false); setAuthMode("login"); }}
-                  className="text-[13px] font-semibold text-brand hover:underline bg-transparent border-none cursor-pointer p-0 mt-2"
-                >
-                  Volver al inicio de sesión
-                </button>
-              </div>
-            )}
-
             {/* Tabs */}
-            {!registerSuccess && authMode !== "forgot" && <div className="flex border-b border-mist mb-6">
+            {authMode !== "forgot" && <div className="flex border-b border-mist mb-6">
               <button
                 type="button"
                 onClick={() => { setAuthMode("login"); setGeneralError(""); }}
@@ -436,7 +453,7 @@ export function LoginPortal() {
             </div>}
 
             {/* Branding inline (mobile / right panel header) */}
-            {!registerSuccess && authMode !== "forgot" && <div className="flex items-center gap-2.5 mb-5">
+            {authMode !== "forgot" && <div className="flex items-center gap-2.5 mb-5">
               <span
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
                 style={{
@@ -460,7 +477,7 @@ export function LoginPortal() {
               </div>
             </div>}
 
-            {!registerSuccess && authMode !== "forgot" && <>
+            {authMode !== "forgot" && <>
             <h1 className="font-display font-bold text-ink text-[26px] mb-1">
               {authMode === "login" ? "Iniciar sesión" : "Crear cuenta"}
             </h1>
@@ -502,7 +519,7 @@ export function LoginPortal() {
             </>}
 
             {/* Login form */}
-            {!registerSuccess && authMode === "login" && (
+            {authMode === "login" && (
               platformDoctor ? (
                 <>
                   {generalError && (
@@ -595,7 +612,7 @@ export function LoginPortal() {
             )}
 
             {/* Register form */}
-            {!registerSuccess && authMode === "register" && showRegister && (
+            {authMode === "register" && showRegister && (
               <form onSubmit={handleRegister} noValidate>
                 <div className="mb-3">
                   <label className="block text-[13px] font-semibold text-navy mb-1.5">Nombre completo</label>
@@ -636,7 +653,7 @@ export function LoginPortal() {
               </form>
             )}
 
-            {!registerSuccess && authMode === "register" && !showRegister && (
+            {authMode === "register" && !showRegister && (
               <div className="text-center py-8">
                 <h2 className="font-display font-bold text-ink text-[22px] mb-2">Registro vía NodoCore</h2>
                 <p className="text-slate2 text-[14px] mb-6">
