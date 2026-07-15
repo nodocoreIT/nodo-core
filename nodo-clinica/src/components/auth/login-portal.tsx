@@ -521,25 +521,21 @@ export function LoginPortal() {
             {/* Login form */}
             {authMode === "login" && (
               platformDoctor ? (
-                <>
-                  {generalError && (
-                    <p className="text-[13px] text-[#C0392B] mb-3 text-center">{generalError}</p>
-                  )}
-                  <PlatformMedicoLoginFields
-                    email={form.email}
-                    password={form.password}
-                    loading={loading}
-                    setLoading={setLoading}
-                    setGeneralError={setGeneralError}
-                    inputBase={inputBase}
-                    inputNormal={inputNormal}
-                    inputFocus={inputFocus}
-                    showPassword={showPassword}
-                    setShowPassword={setShowPassword}
-                    onEmailChange={(email) => setForm({ ...form, email })}
-                    onPasswordChange={(password) => setForm({ ...form, password })}
-                  />
-                </>
+                <PlatformMedicoLoginFields
+                  email={form.email}
+                  password={form.password}
+                  loading={loading}
+                  setLoading={setLoading}
+                  generalError={generalError}
+                  setGeneralError={setGeneralError}
+                  inputBase={inputBase}
+                  inputNormal={inputNormal}
+                  inputFocus={inputFocus}
+                  showPassword={showPassword}
+                  setShowPassword={setShowPassword}
+                  onEmailChange={(email) => setForm({ ...form, email })}
+                  onPasswordChange={(password) => setForm({ ...form, password })}
+                />
               ) : (
                 <form onSubmit={handleLogin} noValidate>
                   <div className="mb-4">

@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
-  transpilePackages: ["@nodocore/shared-components", "@base-ui/react"],
+  transpilePackages: ["@nodocore/shared-components", "@nodocore/nodo-modules", "@base-ui/react"],
   allowedDevOrigins: [
     "localhost",
     "127.0.0.1",

@@ -17,6 +17,7 @@ interface PlatformMedicoLoginProps {
   password: string;
   loading: boolean;
   setLoading: (v: boolean) => void;
+  generalError: string;
   setGeneralError: (msg: string) => void;
   inputBase: string;
   inputNormal: string;
@@ -32,6 +33,7 @@ export function PlatformMedicoLoginFields({
   password,
   loading,
   setLoading,
+  generalError,
   setGeneralError,
   inputBase,
   inputNormal,
@@ -160,6 +162,10 @@ export function PlatformMedicoLoginFields({
           </button>
         </div>
       </div>
+
+      {generalError && (
+        <p className="text-[13px] text-[#C0392B] mb-3 text-center">{generalError}</p>
+      )}
 
       <button
         type="submit"
