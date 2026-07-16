@@ -22,31 +22,60 @@ export default function ActualizarContrasenaPage() {
   useEffect(() => {
     const supabase = createClient();
 
-    // @supabase/ssr's createBrowserClient does NOT auto-process URL hash tokens
-    // (it's built for PKCE/code flow). Parse the hash manually and call setSession.
-    const hash = typeof window !== "undefined" ? window.location.hash : "";
-    if (hash) {
-      const params = new URLSearchParams(hash.slice(1));
-      const access_token = params.get("access_token");
-      const refresh_token = params.get("refresh_token");
-      if (access_token && refresh_token) {
-        supabase.auth.setSession({ access_token, refresh_token }).then(({ data, error }) => {
-          if (!error) {
-            setUserEmail(data.session?.user?.email ?? null);
-            setSessionReady(true);
-          }
-        });
-        return;
+    async function initSession() {
+      // 1. PKCE flow: ?code=<code> in query string
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get("code");
+      if (code) {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error && data.session) {
+          setUserEmail(data.session.user?.email ?? null);
+          setSessionReady(true);
+          window.history.replaceState({}, "", window.location.pathname);
+          return;
+        }
       }
+
+      // 2. Implicit flow: #access_token=...&refresh_token=... in hash
+      const hash = window.location.hash;
+      if (hash) {
+        const hashParams = new URLSearchParams(hash.slice(1));
+        const access_token = hashParams.get("access_token");
+        const refresh_token = hashParams.get("refresh_token");
+        if (access_token && refresh_token) {
+          const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
+          if (!error && data.session) {
+            setUserEmail(data.session.user?.email ?? null);
+            setSessionReady(true);
+            window.history.replaceState({}, "", window.location.pathname);
+            return;
+          }
+        }
+      }
+
+      // 3. Fallback: existing session in cookies.
+      // IMPORTANT: getSession() reads cookies but may not populate the client's
+      // internal _currentSession. Re-calling setSession() forces it into memory
+      // so that updateUser() doesn't throw "Auth session missing!".
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token && session?.refresh_token) {
+        const { data: refreshed } = await supabase.auth.setSession({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        });
+        if (refreshed.session) {
+          setUserEmail(refreshed.session.user?.email ?? null);
+          setSessionReady(true);
+          return;
+        }
+      }
+
+      // Nothing worked — show an error so the user knows to request a new link
+      setError("El enlace de recuperación expiró o ya fue usado. Solicitá uno nuevo.");
+      setSessionReady(true);
     }
 
-    // Fallback: check for an existing session (e.g. user refreshes the page)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setUserEmail(session.user?.email ?? null);
-        setSessionReady(true);
-      }
-    });
+    void initSession();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
