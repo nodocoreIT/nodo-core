@@ -109,7 +109,7 @@ export function SpecialtyCombobox({
           <Combobox.Popup
             className={cn(
               "max-h-(--available-height) w-(--anchor-width) overflow-y-auto rounded-lg p-1",
-              "bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10",
+              "bg-white text-slate-800 shadow-md ring-1 ring-black/10",
               "origin-(--transform-origin)",
               "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95",
               "data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
@@ -131,9 +131,9 @@ export function SpecialtyCombobox({
                 value={specialty.name}
                 className={cn(
                   "relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none",
-                  "focus:bg-accent focus:text-accent-foreground",
+                  "focus:bg-teal-50 focus:text-teal-800",
                   "data-disabled:pointer-events-none data-disabled:opacity-50",
-                  "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+                  "data-[highlighted]:bg-teal-50 data-[highlighted]:text-teal-800"
                 )}
               >
                 <Combobox.ItemIndicator className="flex items-center">

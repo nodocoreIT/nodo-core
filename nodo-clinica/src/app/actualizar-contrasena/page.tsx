@@ -120,9 +120,15 @@ export default function ActualizarContrasenaPage() {
       setSuccess(true);
       setTimeout(() => window.location.replace(redirectPath), 2000);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Error al actualizar contraseña",
-      );
+      const msg = err instanceof Error ? err.message : "";
+      const SUPABASE_ERRORS: Record<string, string> = {
+        "Auth session missing!": "La sesión expiró. Solicitá un nuevo enlace de recuperación.",
+        "Password should be at least 6 characters.": "La contraseña debe tener al menos 6 caracteres.",
+        "New password should be different from the old password.": "La nueva contraseña debe ser diferente a la anterior.",
+        "User not found": "Usuario no encontrado.",
+        "Invalid login credentials": "Credenciales incorrectas.",
+      };
+      setError(SUPABASE_ERRORS[msg] ?? msg || "Error al actualizar contraseña");
     } finally {
       setLoading(false);
     }
