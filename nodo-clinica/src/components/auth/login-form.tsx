@@ -286,16 +286,6 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between mb-5">
-                    <label className="flex items-center gap-2 text-[13px] text-slate2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        defaultChecked
-                        className="accent-brand"
-                      />
-                      Mantener sesión iniciada
-                    </label>
-                  </div>
 
                   {generalError && (
                     <p className="text-[13px] text-[#C0392B] mb-3 text-center">

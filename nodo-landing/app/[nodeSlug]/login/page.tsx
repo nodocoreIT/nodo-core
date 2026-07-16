@@ -1402,15 +1402,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                   </div>
 
                   {/* Remember + forgot */}
-                  <div className="flex items-center justify-between mb-5">
-                    <label className="flex items-center gap-2 text-[13px] text-slate2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        defaultChecked
-                        className="accent-brand"
-                      />
-                      Mantener sesión iniciada
-                    </label>
+                  <div className="flex justify-end mb-5">
                     <button
                       type="button"
                       onClick={() => {
