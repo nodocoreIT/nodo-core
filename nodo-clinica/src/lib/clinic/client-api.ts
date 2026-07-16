@@ -107,20 +107,32 @@ export const clinicApi = {
           const appMeta = authUser.app_metadata ?? {};
           const userMeta = authUser.user_metadata ?? {};
           const sessionRole = mapSessionRole(appMeta.role);
+
+          // A privileged user (doctor) can also log in as a patient.
+          // If they explicitly chose "patient" at login (stored in sessionStorage),
+          // honour that choice so the patient portal works correctly.
+          const stored = getClientSession();
+          const effectiveRole: "doctor" | "patient" =
+            stored?.userId === authUser.id &&
+            stored?.role === "patient" &&
+            sessionRole === "doctor"
+              ? "patient"
+              : sessionRole;
+
           const fullName: string =
             userMeta.full_name ?? userMeta.name ?? authUser.email ?? "";
           return {
             session: {
               userId: authUser.id,
               email: authUser.email,
-              role: sessionRole,
+              role: effectiveRole,
               org_id: appMeta.org_id ?? null,
             },
             user: {
               id: authUser.id,
               email: authUser.email,
               fullName,
-              role: sessionRole,
+              role: effectiveRole,
               subscriptionPlan: appMeta.plan ?? appMeta.subscription_plan ?? undefined,
               org_id: appMeta.org_id ?? null,
             },
@@ -177,12 +189,23 @@ export const clinicApi = {
         userMeta.full_name ?? data.user.email?.split("@")[0] ?? "";
       const sessionRole = mapSessionRole(appMeta.role);
 
-      // Backwards-compat: save to sessionStorage for components that still use it
+      const effectiveRole = role === "patient" ? "patient" : sessionRole;
+
+      // Save to sessionStorage for client components that still use it
       saveClientSession({
         userId: data.user.id,
-        role: role === "patient" ? "patient" : sessionRole,
+        role: effectiveRole,
         email: data.user.email ?? "",
         fullName,
+      });
+
+      // Persist role choice server-side via ClinicSession cookie so API routes
+      // (requireAuth) can honour a privileged user acting as "patient".
+      await fetch(`${BASE}/api/clinic/auth/set-role`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ role: effectiveRole }),
       });
 
       return {
@@ -190,10 +213,10 @@ export const clinicApi = {
           id: data.user.id,
           email: data.user.email,
           fullName,
-          role: sessionRole,
+          role: effectiveRole,
           org_id: appMeta.org_id ?? null,
         },
-        role: sessionRole,
+        role: effectiveRole,
       };
     }
 
@@ -865,7 +888,24 @@ export const clinicApi = {
 
   async updatePatientProfile(payload: {
     profilePhotoData?: string;
-    healthProfile?: import("@/lib/clinic/types").PatientHealthProfile;
+    firstName?: string;
+    lastName?: string;
+    fullName?: string;
+    phone?: string;
+    dni?: string;
+    address?: string;
+    healthProfile?: {
+      bloodType?: string | null;
+      obraSocial?: string | null;
+      insuranceNumber?: string | null;
+      allergies?: string | null;
+      chronicConditions?: string | null;
+      heightCm?: number | null;
+      weightKg?: number | null;
+      medications?: string | null;
+      emergencyContactName?: string | null;
+      emergencyContactPhone?: string | null;
+    };
   }) {
     const res = await fetch(`${BASE}/api/clinic/patients`, {
       method: "PUT",
@@ -876,6 +916,53 @@ export const clinicApi = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al actualizar perfil");
     return data;
+  },
+
+  async getPatientProfile() {
+    const res = await fetch(`${BASE}/api/clinic/patients/me`, clinicFetchOpts());
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al obtener perfil");
+    return data as {
+      id: string;
+      firstName: string;
+      lastName: string;
+      fullName: string;
+      email: string;
+      phone: string;
+      dni: string;
+      address: string;
+      profilePhotoUrl: string | null;
+      bloodType: string;
+      obraSocial: string;
+      insuranceNumber: string;
+      heightCm: number | null;
+      weightKg: number | null;
+      allergies: string;
+      chronicConditions: string;
+      medications: string;
+      emergencyContactName: string;
+      emergencyContactPhone: string;
+    };
+  },
+
+  async getObrasSociales(q?: string) {
+    const params = q ? `?q=${encodeURIComponent(q)}` : "";
+    const res = await fetch(`${BASE}/api/clinic/obras-sociales${params}`, clinicFetchOpts());
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar obras sociales");
+    return data as { obrasSociales: Array<{ id: string; name: string }> };
+  },
+
+  async suggestObraSocial(name: string) {
+    const res = await fetch(`${BASE}/api/clinic/obras-sociales`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al sugerir obra social");
+    return data as { created?: boolean; exists?: boolean; obraSocial: { id: string; name: string } };
   },
 
   async previewPaymentReceipt(payload: {

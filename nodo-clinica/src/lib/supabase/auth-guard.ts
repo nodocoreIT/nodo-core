@@ -108,11 +108,23 @@ export async function requireAuth(
 
     if (!error && user) {
       const appMeta = user.app_metadata ?? {};
+      const supabaseRole: string = appMeta.role ?? "patient";
+
+      // Check ClinicSession cookie in parallel — a privileged user (doctor/admin)
+      // may have explicitly chosen to act as "patient". If the ClinicSession is for
+      // the same auth user and carries role "patient", honour that choice (downgrade
+      // only — never allow escalation via this path).
+      const clinicSession = await getSession();
+      const effectiveRole =
+        clinicSession?.userId === user.id && clinicSession?.role === "patient"
+          ? "patient"
+          : supabaseRole;
+
       return {
         user: {
           id: user.id,
           email: user.email,
-          role: appMeta.role ?? "patient",
+          role: effectiveRole,
           org_id: appMeta.org_id ?? null,
         },
         _professionalId: null,

@@ -363,7 +363,7 @@ export function PacientePortal() {
         <section>
           <h2 className="text-lg font-semibold text-slate-800 mb-3 flex items-center gap-2">
             <Stethoscope className="h-5 w-5 text-blue-600" />
-            Médicos disponibles
+            aaa
           </h2>
           <div className="space-y-3">
             {doctors.map((doc) => {

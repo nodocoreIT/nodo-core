@@ -122,6 +122,11 @@ export interface PatientHealthProfile {
   emergencyContact?: string;
   notes?: string;
   updatedAt?: string;
+  // Insurance / obra social
+  obraSocial?: string;
+  insuranceNumber?: string;
+  // Contact
+  phone?: string;
 }
 
 export interface LocalPatient {

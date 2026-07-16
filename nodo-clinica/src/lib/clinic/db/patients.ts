@@ -28,9 +28,13 @@ export interface PatientInsert {
 }
 
 export interface PatientUpdate {
-  full_name?: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  full_name?: string | null;
   email?: string;
   phone?: string | null;
+  dni?: string | null;
+  address?: string | null;
   profile_photo_url?: string | null;
   date_of_birth?: string | null;
   medical_record_number?: string | null;
@@ -55,6 +59,11 @@ export interface HealthProfileUpsert {
   chronic_conditions?: string[] | null;
   insurance_provider?: string | null;
   insurance_number?: string | null;
+  height_cm?: number | null;
+  weight_kg?: number | null;
+  medications?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
 }
 
 /** Returns all patients for an org, optionally filtered by search query. */

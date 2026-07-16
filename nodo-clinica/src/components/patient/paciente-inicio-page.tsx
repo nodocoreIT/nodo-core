@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,19 +10,148 @@ import {
   Calendar,
   Loader2,
   ChevronRight,
-  Mail,
   Search,
+  ChevronsUpDown,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { BookAppointmentDialog } from "@/components/patient/book-appointment-dialog";
 import { clinicApi, getClientSession } from "@/lib/clinic/client-api";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import {
-  SPECIALTY_FILTERS,
-  doctorMatchesFilter,
-} from "@/lib/clinic/specialty-filters";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+
+// ── Specialty filter combobox (local data, no API) ─────────────────────────
+
+const ALL_SPECIALTIES = [
+  "Cardiología",
+  "Clínica Médica",
+  "Dermatología",
+  "Endocrinología",
+  "Gastroenterología",
+  "Ginecología",
+  "Infectología",
+  "Medicina General",
+  "Neurología",
+  "Nutrición",
+  "Oftalmología",
+  "Ortopedia y Traumatología",
+  "Otorrinolaringología",
+  "Pediatría",
+  "Psicología",
+  "Psiquiatría",
+  "Reumatología",
+  "Urología",
+];
+
+function SpecialtyFilterCombobox({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? ALL_SPECIALTIES.filter((s) => s.toLowerCase().includes(q)) : ALL_SPECIALTIES;
+  }, [query]);
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  function select(spec: string) {
+    onChange(spec);
+    setOpen(false);
+    setQuery("");
+  }
+
+  function clear(e: React.MouseEvent) {
+    e.stopPropagation();
+    onChange("all");
+    setOpen(false);
+    setQuery("");
+  }
+
+  const label = value === "all" ? "Buscar por especialidad..." : value;
+  const hasValue = value !== "all";
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => {
+          setOpen((o) => !o);
+          if (!open) setTimeout(() => inputRef.current?.focus(), 0);
+        }}
+        className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+      >
+        <span className={hasValue ? "font-medium text-emerald-700" : "text-slate-400"}>
+          {label}
+        </span>
+        {hasValue ? (
+          <X className="h-3.5 w-3.5 shrink-0 text-slate-400 hover:text-slate-700" onClick={clear} />
+        ) : (
+          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[220px] rounded-md border border-slate-200 bg-white shadow-lg">
+          <div className="border-b border-slate-100 p-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar especialidad..."
+              className="w-full rounded border-0 bg-slate-50 px-2.5 py-1.5 text-sm outline-none placeholder:text-slate-400"
+            />
+          </div>
+          <ul className="max-h-56 overflow-y-auto py-1" role="listbox">
+            <li
+              role="option"
+              aria-selected={value === "all"}
+              onClick={() => select("all")}
+              className="cursor-pointer px-3 py-1.5 text-sm text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
+            >
+              Todas las especialidades
+            </li>
+            {filtered.length === 0 && (
+              <li className="px-3 py-2 text-xs text-slate-400">Sin resultados</li>
+            )}
+            {filtered.map((spec) => (
+              <li
+                key={spec}
+                role="option"
+                aria-selected={value === spec}
+                onClick={() => select(spec)}
+                className={`cursor-pointer px-3 py-1.5 text-sm hover:bg-emerald-50 hover:text-emerald-700 ${
+                  value === spec ? "bg-emerald-50 font-medium text-emerald-700" : "text-slate-700"
+                }`}
+              >
+                {spec}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface Doctor {
   id: string;
@@ -56,9 +185,7 @@ export function PacienteInicioPage() {
     id: string;
     name: string;
   } | null>(null);
-  const [resendingId, setResendingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const [patientId, setPatientId] = useState<string | null>(null);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -85,7 +212,6 @@ export function PacienteInicioPage() {
           }
         }
 
-        setPatientId(resolvedPatientId);
 
         const docs = await clinicApi.getDoctors();
         setDoctors(Array.isArray(docs) ? docs : []);
@@ -108,12 +234,12 @@ export function PacienteInicioPage() {
   const filteredDoctors = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return doctors.filter((doc) => {
-      if (!doctorMatchesFilter(doc.specialty, specialtyFilter)) return false;
+      if (specialtyFilter !== "all" && doc.specialty?.trim() !== specialtyFilter) return false;
       if (!q) return true;
       return (
-        doc.fullName.toLowerCase().includes(q) ||
-        doc.specialty.toLowerCase().includes(q) ||
-        doc.licenseNumber.toLowerCase().includes(q)
+        (doc.fullName ?? "").toLowerCase().includes(q) ||
+        (doc.specialty ?? "").toLowerCase().includes(q) ||
+        (doc.licenseNumber ?? "").toLowerCase().includes(q)
       );
     });
   }, [doctors, searchQuery, specialtyFilter]);
@@ -257,48 +383,44 @@ export function PacienteInicioPage() {
       ))}
 
       <section>
-        <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-4">
-          <div className="flex-1">
-            <h2 className="text-lg font-semibold text-slate-800">Buscar médico</h2>
-            <p className="text-xs text-slate-500">
-              Filtrá por especialidad y pedí turno online
-            </p>
+        <div className="mb-3">
+        
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Nombre del médico..."
+                className="pl-9 pr-8 h-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-700"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="flex-1">
+              <SpecialtyFilterCombobox
+                value={specialtyFilter}
+                onChange={setSpecialtyFilter}
+              />
+            </div>
           </div>
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Nombre o especialidad..."
-              className="pl-9 h-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2 mb-4">
-          {SPECIALTY_FILTERS.map((f) => (
-            <Button
-              key={f.id}
-              size="sm"
-              variant={specialtyFilter === f.id ? "default" : "outline"}
-              className={
-                specialtyFilter === f.id
-                  ? "h-8 text-xs bg-emerald-700 hover:bg-emerald-800"
-                  : "h-8 text-xs"
-              }
-              onClick={() => setSpecialtyFilter(f.id)}
-            >
-              {f.label}
-            </Button>
-          ))}
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
           {filteredDoctors.length === 0 ? (
             <p className="text-sm text-slate-400 col-span-2 text-center py-8 bg-white rounded-xl border">
               {doctors.length === 0
-                ? "No hay médicos disponibles en este momento. Recargá la página o contactá al consultorio."
-                : "No hay médicos con ese criterio de búsqueda"}
+                ? "No hay médicos disponibles en este momento."
+                : specialtyFilter !== "all"
+                  ? `No hay médicos registrados en ${specialtyFilter} por el momento.`
+                  : "No hay médicos con ese criterio de búsqueda."}
             </p>
           ) : (
             filteredDoctors.map((doc) => (
