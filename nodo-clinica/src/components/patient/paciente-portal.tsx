@@ -91,8 +91,14 @@ export function PacientePortal() {
   useEffect(() => {
     async function init() {
       const { session, user } = await clinicApi.getSession();
-      if (!session || session.role !== "patient" || !user?.id) {
-        router.push("/login/paciente");
+      if (!session || !user?.id) {
+        router.push("/login");
+        setLoading(false);
+        return;
+      }
+      if (session.role !== "patient") {
+        // User has a privileged role (medico/admin) — send to doctor dashboard
+        router.push("/medico/dashboard");
         setLoading(false);
         return;
       }

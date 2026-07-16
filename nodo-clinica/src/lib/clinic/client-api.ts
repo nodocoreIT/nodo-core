@@ -96,22 +96,29 @@ export const clinicApi = {
       try {
         const supabase = await client;
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          const appMeta = session.user.app_metadata ?? {};
-          const userMeta = session.user.user_metadata ?? {};
+        // getUser() is more reliable when getSession() returns null — it verifies
+        // the token server-side (handles split-cookie edge cases and stale state).
+        let authUser = session?.user;
+        if (!authUser) {
+          const { data: { user: freshUser } } = await supabase.auth.getUser();
+          authUser = freshUser ?? undefined;
+        }
+        if (authUser) {
+          const appMeta = authUser.app_metadata ?? {};
+          const userMeta = authUser.user_metadata ?? {};
           const sessionRole = mapSessionRole(appMeta.role);
           const fullName: string =
-            userMeta.full_name ?? userMeta.name ?? session.user.email ?? "";
+            userMeta.full_name ?? userMeta.name ?? authUser.email ?? "";
           return {
             session: {
-              userId: session.user.id,
-              email: session.user.email,
+              userId: authUser.id,
+              email: authUser.email,
               role: sessionRole,
               org_id: appMeta.org_id ?? null,
             },
             user: {
-              id: session.user.id,
-              email: session.user.email,
+              id: authUser.id,
+              email: authUser.email,
               fullName,
               role: sessionRole,
               subscriptionPlan: appMeta.plan ?? appMeta.subscription_plan ?? undefined,

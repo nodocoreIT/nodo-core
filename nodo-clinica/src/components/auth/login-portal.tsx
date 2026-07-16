@@ -14,7 +14,7 @@ import {
 } from "@/lib/clinic/platform-config";
 import { PlatformMedicoLoginFields } from "@/components/auth/platform-medico-login";
 
-function NodeTransitionOverlay({ isDoctor }: { isDoctor: boolean }) {
+function NodeTransitionOverlay() {
   return (
     <>
       <style>{`
@@ -142,7 +142,7 @@ function NodeTransitionOverlay({ isDoctor }: { isDoctor: boolean }) {
                 color: "#ffffff",
               }}
             >
-              {isDoctor ? "Clínica" : "Portal"}
+              Clínica
             </span>
           </div>
         </div>
@@ -295,7 +295,7 @@ export function LoginPortal() {
 
   return (
     <>
-      {showTransition && <NodeTransitionOverlay isDoctor={isDoctor} />}
+      {showTransition && <NodeTransitionOverlay />}
 
       {/* Loading overlay */}
       {loading && authMode === "register" && (
