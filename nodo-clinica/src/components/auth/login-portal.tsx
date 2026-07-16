@@ -446,14 +446,17 @@ export function LoginPortal() {
                   Registrarse
                 </button>
               ) : platformDoctor ? (
-                <a
-                  href={CLINICA_REGISTRATION_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 pb-3 text-center text-[15px] font-bold text-slate2 hover:text-brand transition-colors"
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode("register"); setGeneralError(""); }}
+                  className={`flex-1 pb-3 text-[15px] font-bold transition-colors border-b-2 ${
+                    authMode === "register"
+                      ? "border-brand text-brand"
+                      : "border-transparent text-slate2 hover:text-navy"
+                  }`}
                 >
                   Suscribirme
-                </a>
+                </button>
               ) : null}
             </div>}
 
@@ -613,7 +616,7 @@ export function LoginPortal() {
             )}
 
             {/* Register form */}
-            {authMode === "register" && showRegister && (
+            {authMode === "register" && (showRegister || platformDoctor) && (
               <form onSubmit={handleRegister} noValidate>
                 <div className="mb-3">
                   <label className="block text-[13px] font-semibold text-navy mb-1.5">Nombre completo</label>
@@ -654,7 +657,7 @@ export function LoginPortal() {
               </form>
             )}
 
-            {authMode === "register" && !showRegister && (
+            {authMode === "register" && !showRegister && !platformDoctor && (
               <div className="text-center py-8">
                 <h2 className="font-display font-bold text-ink text-[22px] mb-2">Registro vía NodoCore</h2>
                 <p className="text-slate2 text-[14px] mb-6">
