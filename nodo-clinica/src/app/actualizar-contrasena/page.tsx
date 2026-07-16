@@ -128,7 +128,7 @@ export default function ActualizarContrasenaPage() {
         "User not found": "Usuario no encontrado.",
         "Invalid login credentials": "Credenciales incorrectas.",
       };
-      setError(SUPABASE_ERRORS[msg] ?? msg || "Error al actualizar contraseña");
+      setError((SUPABASE_ERRORS[msg] ?? msg) || "Error al actualizar contraseña");
     } finally {
       setLoading(false);
     }
