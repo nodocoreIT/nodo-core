@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { KeyRound, Loader2, CheckCircle, Stethoscope } from "lucide-react";
+import { KeyRound, Loader2, CheckCircle, Stethoscope, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { clinicApi } from "@/lib/clinic/client-api";
 
@@ -16,6 +16,8 @@ export default function ActualizarContrasenaPage() {
   const [error, setError] = useState("");
   const [sessionReady, setSessionReady] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -230,16 +232,25 @@ export default function ActualizarContrasenaPage() {
             >
               Nueva contraseña
             </label>
-            <input
-              id="new-password"
-              type="password"
-              placeholder="Mínimo 6 caracteres"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={`${inputBase} mb-4`}
-              required
-              minLength={6}
-            />
+            <div className="relative mb-4">
+              <input
+                id="new-password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Mínimo 6 caracteres"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`${inputBase} pr-12`}
+                required
+                minLength={6}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 bg-transparent border-none p-1 cursor-pointer"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
 
             <label
               htmlFor="confirm-password"
@@ -247,15 +258,24 @@ export default function ActualizarContrasenaPage() {
             >
               Confirmar contraseña
             </label>
-            <input
-              id="confirm-password"
-              type="password"
-              placeholder="Repetí tu contraseña"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              className={`${inputBase} mb-4`}
-              required
-            />
+            <div className="relative mb-4">
+              <input
+                id="confirm-password"
+                type={showConfirm ? "text" : "password"}
+                placeholder="Repetí tu contraseña"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                className={`${inputBase} pr-12`}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm(!showConfirm)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 bg-transparent border-none p-1 cursor-pointer"
+              >
+                {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
 
             {error && (
               <p className="text-[13px] text-[#C0392B] mb-4 text-center">

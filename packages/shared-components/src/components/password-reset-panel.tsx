@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { Eye, EyeOff } from "lucide-react";
 
 export type PasswordResetPanelProps = {
   /** Node label for headings, e.g. "Nodo Finanzas Personales". */
@@ -26,6 +27,8 @@ export function PasswordResetPanel({
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -69,32 +72,52 @@ export function PasswordResetPanel({
 
       <div className="mb-4 space-y-2">
         <Label htmlFor="shared-reset-pass">Nueva contraseña</Label>
-        <Input
-          id="shared-reset-pass"
-          type="password"
-          placeholder="Ingresé contraseña…"
-          value={password}
-          onChange={(e) => {
-            setPassword(e.target.value);
-            setFieldError(null);
-          }}
-          autoComplete="new-password"
-        />
+        <div className="relative">
+          <Input
+            id="shared-reset-pass"
+            type={showPassword ? "text" : "password"}
+            placeholder="Ingresé contraseña…"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setFieldError(null);
+            }}
+            autoComplete="new-password"
+            className="pr-10"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 bg-transparent border-none p-0 cursor-pointer"
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
 
       <div className="mb-4 space-y-2">
         <Label htmlFor="shared-reset-pass-confirm">Confirmar contraseña</Label>
-        <Input
-          id="shared-reset-pass-confirm"
-          type="password"
-          placeholder="Repetí la contraseña…"
-          value={confirmPassword}
-          onChange={(e) => {
-            setConfirmPassword(e.target.value);
-            setFieldError(null);
-          }}
-          autoComplete="new-password"
-        />
+        <div className="relative">
+          <Input
+            id="shared-reset-pass-confirm"
+            type={showConfirm ? "text" : "password"}
+            placeholder="Repetí la contraseña…"
+            value={confirmPassword}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              setFieldError(null);
+            }}
+            autoComplete="new-password"
+            className="pr-10"
+          />
+          <button
+            type="button"
+            onClick={() => setShowConfirm(!showConfirm)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 bg-transparent border-none p-0 cursor-pointer"
+          >
+            {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
         {fieldError && (
           <p className="text-[12.5px] text-[#C0392B] mt-1.5">{fieldError}</p>
         )}
