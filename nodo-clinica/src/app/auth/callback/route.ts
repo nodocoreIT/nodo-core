@@ -14,5 +14,9 @@ export async function GET(request: Request) {
     }
   }
 
+  // If we had a next param pointing to password reset, redirect there with error
+  if (next.includes("actualizar-contrasena")) {
+    return NextResponse.redirect(`${origin}${next}?error=link_expired`);
+  }
   return NextResponse.redirect(`${origin}/auth/login?error=auth`);
 }

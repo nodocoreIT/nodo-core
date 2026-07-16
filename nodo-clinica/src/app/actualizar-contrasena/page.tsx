@@ -23,20 +23,34 @@ export default function ActualizarContrasenaPage() {
     const supabase = createClient();
 
     async function initSession() {
-      // 1. PKCE flow: ?code=<code> in query string
       const searchParams = new URLSearchParams(window.location.search);
-      const code = searchParams.get("code");
-      if (code) {
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!error && data.session) {
-          setUserEmail(data.session.user?.email ?? null);
+
+      // Link expired — callback route forwarded this error
+      if (searchParams.get("error") === "link_expired") {
+        setError("El enlace de recuperación expiró o ya fue usado. Solicitá uno nuevo.");
+        setSessionReady(true);
+        return;
+      }
+
+      // 1. Normal path: /auth/callback already exchanged the code server-side
+      //    and set the session in cookies. getSession() reads those cookies.
+      //    Re-call setSession() to force the token into the client's memory so
+      //    that updateUser() doesn't throw "Auth session missing!".
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token && session?.refresh_token) {
+        const { data: refreshed } = await supabase.auth.setSession({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        });
+        if (refreshed.session) {
+          setUserEmail(refreshed.session.user?.email ?? null);
           setSessionReady(true);
-          window.history.replaceState({}, "", window.location.pathname);
           return;
         }
       }
 
-      // 2. Implicit flow: #access_token=...&refresh_token=... in hash
+      // 2. Fallback: implicit flow — #access_token=...&refresh_token=... in hash
+      //    (older Supabase projects or direct token links)
       const hash = window.location.hash;
       if (hash) {
         const hashParams = new URLSearchParams(hash.slice(1));
@@ -53,24 +67,7 @@ export default function ActualizarContrasenaPage() {
         }
       }
 
-      // 3. Fallback: existing session in cookies.
-      // IMPORTANT: getSession() reads cookies but may not populate the client's
-      // internal _currentSession. Re-calling setSession() forces it into memory
-      // so that updateUser() doesn't throw "Auth session missing!".
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.access_token && session?.refresh_token) {
-        const { data: refreshed } = await supabase.auth.setSession({
-          access_token: session.access_token,
-          refresh_token: session.refresh_token,
-        });
-        if (refreshed.session) {
-          setUserEmail(refreshed.session.user?.email ?? null);
-          setSessionReady(true);
-          return;
-        }
-      }
-
-      // Nothing worked — show an error so the user knows to request a new link
+      // Nothing worked
       setError("El enlace de recuperación expiró o ya fue usado. Solicitá uno nuevo.");
       setSessionReady(true);
     }

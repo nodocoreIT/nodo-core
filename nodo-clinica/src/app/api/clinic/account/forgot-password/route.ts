@@ -17,7 +17,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const origin = request.headers.get("origin") ?? process.env.NEXT_PUBLIC_BASE_URL ?? "";
-  const redirectTo = `${origin}/actualizar-contrasena`;
+  const redirectTo = `${origin}/auth/callback?next=/actualizar-contrasena`;
 
   // Use the admin SDK to generate a recovery link without sending the
   // default Supabase email.
