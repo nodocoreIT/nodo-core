@@ -232,7 +232,7 @@ export function LoginPortal() {
       await clinicApi.login(form.email.trim(), form.password, role);
       setShowTransition(true);
       setTimeout(() => {
-        window.location.replace(isDoctor ? "/medico/dashboard" : "/paciente/turnos");
+        window.location.replace(isDoctor ? "/medico/dashboard" : "/paciente");
       }, 1500);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al ingresar";
