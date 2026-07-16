@@ -23,6 +23,26 @@ ALTER TABLE nodo_clinica.patient_health_profiles
   ADD COLUMN IF NOT EXISTS emergency_contact_name  text,
   ADD COLUMN IF NOT EXISTS emergency_contact_phone text;
 
+-- Ensure patient_id has a unique constraint so upsert ON CONFLICT works.
+-- (Tables created manually via SQL editor may be missing this.)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'nodo_clinica.patient_health_profiles'::regclass
+      AND contype IN ('p', 'u')
+      AND conkey = ARRAY[
+        (SELECT attnum FROM pg_attribute
+         WHERE attrelid = 'nodo_clinica.patient_health_profiles'::regclass
+           AND attname = 'patient_id')
+      ]
+  ) THEN
+    ALTER TABLE nodo_clinica.patient_health_profiles
+      ADD CONSTRAINT patient_health_profiles_patient_id_key UNIQUE (patient_id);
+  END IF;
+END;
+$$;
+
 -- RLS: patients can read/write their own row
 ALTER TABLE nodo_clinica.patient_health_profiles ENABLE ROW LEVEL SECURITY;
 

@@ -51,7 +51,14 @@ export default function RootLayout({
         <AppProviders>
           <ThemeProvider>
             {children}
-            <Toaster position="top-right" richColors />
+            <Toaster
+  position="top-center"
+  richColors
+  style={{
+    top: "50%",
+    transform: "translateY(-50%)",
+  }}
+/>
           </ThemeProvider>
         </AppProviders>
       </body>

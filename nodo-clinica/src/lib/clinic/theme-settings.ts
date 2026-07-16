@@ -31,8 +31,8 @@ export const PATIENT_THEME_SETTINGS: DoctorThemeSettings = {
   buttonFontColor: "#ffffff",
   borderRadius: "md",
   fontFamily: "Inter",
-  logoType: "default",
-  brandText: "nodosalud",
+  logoType: "text",
+  brandText: "NODO Clínica",
 };
 
 export function mergeThemeSettings(

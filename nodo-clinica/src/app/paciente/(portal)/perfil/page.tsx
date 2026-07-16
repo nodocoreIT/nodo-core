@@ -70,6 +70,30 @@ const TABS: Tab[] = [
   },
 ];
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ProfileData {
+  id: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  dni: string;
+  address: string;
+  profilePhotoUrl: string | null;
+  bloodType: string;
+  obraSocial: string;
+  insuranceNumber: string;
+  heightCm: number | null;
+  weightKg: number | null;
+  allergies: string;
+  chronicConditions: string;
+  medications: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function readImageFile(file: File, maxKb = 400): Promise<string> {
@@ -87,17 +111,18 @@ function readImageFile(file: File, maxKb = 400): Promise<string> {
 
 // ─── Sub-panels ───────────────────────────────────────────────────────────────
 
-function TabPerfil() {
-  const [loading, setLoading] = useState(true);
+function TabPerfil({ initialData }: { initialData: ProfileData }) {
   const [saving, setSaving] = useState(false);
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [dni, setDni] = useState("");
-  const [address, setAddress] = useState("");
-  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState(initialData.firstName ?? "");
+  const [lastName, setLastName] = useState(initialData.lastName ?? "");
+  const [email, setEmail] = useState(initialData.email ?? "");
+  const [phone, setPhone] = useState(initialData.phone ?? "");
+  const [dni, setDni] = useState(initialData.dni ?? "");
+  const [address, setAddress] = useState(initialData.address ?? "");
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(
+    initialData.profilePhotoUrl ?? null
+  );
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -105,25 +130,6 @@ function TabPerfil() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const profile = await clinicApi.getPatientProfile();
-        setFirstName(profile.firstName ?? "");
-        setLastName(profile.lastName ?? "");
-        setEmail(profile.email ?? "");
-        setPhone(profile.phone ?? "");
-        setDni(profile.dni ?? "");
-        setAddress(profile.address ?? "");
-        setProfilePhotoUrl(profile.profilePhotoUrl ?? null);
-      } catch {
-        toast.error("Error al cargar el perfil");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
 
   const handlePhoto = async (file: File) => {
     try {
@@ -154,20 +160,14 @@ function TabPerfil() {
       }
 
       toast.success("Cambios guardados");
+      // Invalidate cache so next load fetches fresh data
+      try { sessionStorage.removeItem("clinic_patient_profile_cache"); } catch { /* ignore */ }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al guardar");
     } finally {
       setSaving(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
-      </div>
-    );
-  }
 
   return (
     <Card className="shadow-none border-0">
@@ -382,42 +382,27 @@ function TabPerfil() {
   );
 }
 
-function TabSalud() {
-  const [loading, setLoading] = useState(true);
+function TabSalud({ initialData }: { initialData: ProfileData }) {
   const [saving, setSaving] = useState(false);
 
-  const [bloodType, setBloodType] = useState("");
-  const [obraSocial, setObraSocial] = useState("");
-  const [insuranceNumber, setInsuranceNumber] = useState("");
-  const [heightCm, setHeightCm] = useState("");
-  const [weightKg, setWeightKg] = useState("");
-  const [allergies, setAllergies] = useState("");
-  const [chronicConditions, setChronicConditions] = useState("");
-  const [medications, setMedications] = useState("");
-  const [emergencyContactName, setEmergencyContactName] = useState("");
-  const [emergencyContactPhone, setEmergencyContactPhone] = useState("");
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const profile = await clinicApi.getPatientProfile();
-        setBloodType(profile.bloodType ?? "");
-        setObraSocial(profile.obraSocial ?? "");
-        setInsuranceNumber(profile.insuranceNumber ?? "");
-        setHeightCm(profile.heightCm != null ? String(profile.heightCm) : "");
-        setWeightKg(profile.weightKg != null ? String(profile.weightKg) : "");
-        setAllergies(profile.allergies ?? "");
-        setChronicConditions(profile.chronicConditions ?? "");
-        setMedications(profile.medications ?? "");
-        setEmergencyContactName(profile.emergencyContactName ?? "");
-        setEmergencyContactPhone(profile.emergencyContactPhone ?? "");
-      } catch {
-        toast.error("Error al cargar datos de salud");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  const [bloodType, setBloodType] = useState(initialData.bloodType ?? "");
+  const [obraSocial, setObraSocial] = useState(initialData.obraSocial ?? "");
+  const [insuranceNumber, setInsuranceNumber] = useState(initialData.insuranceNumber ?? "");
+  const [heightCm, setHeightCm] = useState(
+    initialData.heightCm != null ? String(initialData.heightCm) : ""
+  );
+  const [weightKg, setWeightKg] = useState(
+    initialData.weightKg != null ? String(initialData.weightKg) : ""
+  );
+  const [allergies, setAllergies] = useState(initialData.allergies ?? "");
+  const [chronicConditions, setChronicConditions] = useState(initialData.chronicConditions ?? "");
+  const [medications, setMedications] = useState(initialData.medications ?? "");
+  const [emergencyContactName, setEmergencyContactName] = useState(
+    initialData.emergencyContactName ?? ""
+  );
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState(
+    initialData.emergencyContactPhone ?? ""
+  );
 
   const handleSave = async () => {
     setSaving(true);
@@ -437,20 +422,13 @@ function TabSalud() {
         },
       });
       toast.success("Datos de salud actualizados");
+      try { sessionStorage.removeItem("clinic_patient_profile_cache"); } catch { /* ignore */ }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al guardar");
     } finally {
       setSaving(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
-      </div>
-    );
-  }
 
   return (
     <Card className="shadow-none border-0">
@@ -591,6 +569,8 @@ function TabSalud() {
                 value={emergencyContactName}
                 onChange={(e) => setEmergencyContactName(e.target.value)}
                 placeholder="Juan Pérez"
+                autoComplete="off"
+                className="bg-white"
               />
             </div>
             <div className="space-y-1.5">
@@ -601,6 +581,8 @@ function TabSalud() {
                 value={emergencyContactPhone}
                 onChange={(e) => setEmergencyContactPhone(e.target.value)}
                 placeholder="+54 9 11 xxxx-xxxx"
+                autoComplete="off"
+                className="bg-white"
               />
             </div>
           </div>
@@ -681,10 +663,57 @@ function TabIntegraciones() {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+const PROFILE_CACHE_KEY = "clinic_patient_profile_cache";
+
+function readProfileCache(): ProfileData | null {
+  try {
+    const raw = sessionStorage.getItem(PROFILE_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as ProfileData) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeProfileCache(data: ProfileData) {
+  try {
+    sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(data));
+  } catch { /* storage full — ignore */ }
+}
+
 export default function PacientePerfilPage() {
   const [activeTab, setActiveTab] = useState<TabId>("perfil");
+  const [profileData, setProfileData] = useState<ProfileData | null>(() => readProfileCache());
+  const [profileLoading, setProfileLoading] = useState(!readProfileCache());
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const profile = await clinicApi.getPatientProfile();
+        const data = profile as ProfileData;
+        setProfileData(data);
+        writeProfileCache(data);
+      } catch {
+        if (!profileData) toast.error("Error al cargar el perfil");
+      } finally {
+        setProfileLoading(false);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const currentTab = TABS.find((t) => t.id === activeTab)!;
+
+  if (profileLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+      </div>
+    );
+  }
+
+  if (!profileData) {
+    return null;
+  }
 
   return (
     <div className="flex h-full min-h-0">
@@ -751,8 +780,12 @@ export default function PacientePerfilPage() {
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-xl">
-            {activeTab === "perfil" && <TabPerfil />}
-            {activeTab === "salud" && <TabSalud />}
+            <div className={activeTab === "perfil" ? "" : "hidden"}>
+              <TabPerfil initialData={profileData} />
+            </div>
+            <div className={activeTab === "salud" ? "" : "hidden"}>
+              <TabSalud initialData={profileData} />
+            </div>
             {activeTab === "personalizacion" && <TabPersonalizacion />}
             {activeTab === "integraciones" && <TabIntegraciones />}
           </div>

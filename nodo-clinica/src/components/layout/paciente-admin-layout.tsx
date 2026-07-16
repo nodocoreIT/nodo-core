@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Stethoscope,
-  HeartPulse,
   FileText,
   Clock,
   Settings,
@@ -22,14 +21,14 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 
 const NAV_ITEMS = [
   { href: "/paciente", label: "Buscar médico", icon: Stethoscope },
-  { href: "/paciente/salud", label: "Mi salud", icon: HeartPulse },
+  { href: "/paciente/estudios", label: "Mis estudios", icon: FileText },
   { href: "/paciente/historial", label: "Historial", icon: FileText },
   { href: "/paciente/turnos", label: "Mis turnos", icon: Clock },
 ];
 
 const ROUTE_TITLES: Record<string, string> = {
   "/paciente": "Inicio",
-  "/paciente/salud": "Mi salud",
+  "/paciente/estudios": "Mis estudios",
   "/paciente/historial": "Historial clínico",
   "/paciente/turnos": "Mis turnos",
   "/paciente/perfil": "Mi perfil",
@@ -50,49 +49,45 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     async function check() {
+      let sessionUserId: string | null = null;
+      let sessionEmail: string = "";
+      let sessionFullName: string = "";
+      let sessionPhoto: string | undefined;
+
       const stored = getClientSession();
-      if (stored?.role === "patient") {
-        try {
-          const { session, user } = await clinicApi.getSession();
-          if (session?.role === "patient" && user?.id) {
-            setPatient({
-              id: user.id,
-              fullName: user.fullName,
-              email: user.email ?? session.email,
-              profilePhotoData: user.profilePhotoData,
-            });
-            setChecking(false);
-            return;
-          }
-        } catch {
-          /* fallback abajo */
+      try {
+        const { session, user } = await clinicApi.getSession();
+        if (session?.role === "patient" && user?.id) {
+          sessionUserId = user.id;
+          sessionEmail = user.email ?? session.email;
+          sessionFullName = user.fullName;
+          sessionPhoto = user.profilePhotoData;
         }
-        setPatient({
-          id: stored.userId,
-          fullName: stored.fullName,
-          email: stored.email,
-        });
-        setChecking(false);
+      } catch { /* ignore */ }
+
+      if (!sessionUserId && stored?.role === "patient") {
+        sessionUserId = stored.userId;
+        sessionEmail = stored.email;
+        sessionFullName = stored.fullName;
+      }
+
+      if (!sessionUserId) {
+        router.replace("/login/paciente");
         return;
       }
 
+      // Set immediate state so sidebar shows quickly
+      setPatient({ id: sessionUserId, fullName: sessionFullName, email: sessionEmail, profilePhotoData: sessionPhoto });
+      setChecking(false);
+
+      // Enrich with real name from DB (may differ from auth metadata)
       try {
-        const { session, user } = await clinicApi.getSession();
-        if (!session || session.role !== "patient" || !user?.id) {
-          router.replace("/login/paciente");
-          return; // keep spinner while navigating — don't call setChecking(false)
+        const profile = await clinicApi.getPatientProfile();
+        const dbName = [profile.firstName, profile.lastName].filter(Boolean).join(" ") || profile.fullName;
+        if (dbName) {
+          setPatient((prev) => prev ? { ...prev, fullName: dbName } : prev);
         }
-        setPatient({
-          id: user.id,
-          fullName: user.fullName,
-          email: user.email ?? session.email,
-          profilePhotoData: user.profilePhotoData,
-        });
-        setChecking(false);
-      } catch {
-        router.replace("/login/paciente");
-        // keep spinner while navigating — don't call setChecking(false)
-      }
+      } catch { /* non-critical */ }
     }
     void check();
   }, [router]);

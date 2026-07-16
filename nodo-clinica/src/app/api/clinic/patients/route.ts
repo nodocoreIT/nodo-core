@@ -254,7 +254,7 @@ export async function PUT(request: NextRequest) {
         return [val.trim()];
       };
 
-      await upsertHealthProfile(svc, {
+      const { error: hpError } = await upsertHealthProfile(svc, {
         patient_id: patientRow.id,
         ...(healthProfile.bloodType !== undefined && { blood_type: healthProfile.bloodType || null }),
         ...(healthProfile.obraSocial !== undefined && { insurance_provider: healthProfile.obraSocial || null }),
@@ -267,6 +267,14 @@ export async function PUT(request: NextRequest) {
         ...(healthProfile.emergencyContactName !== undefined && { emergency_contact_name: healthProfile.emergencyContactName }),
         ...(healthProfile.emergencyContactPhone !== undefined && { emergency_contact_phone: healthProfile.emergencyContactPhone }),
       });
+
+      if (hpError) {
+        console.error("[patients PUT] upsertHealthProfile failed:", hpError.message ?? hpError);
+        return NextResponse.json(
+          { error: `Error al guardar datos de salud: ${hpError.message}` },
+          { status: 500 },
+        );
+      }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

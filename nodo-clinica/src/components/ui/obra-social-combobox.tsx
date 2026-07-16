@@ -65,7 +65,7 @@ export function ObraSocialCombobox({
       })
       if (!res.ok) throw new Error("Error al agregar obra social")
       const data = await res.json()
-      const savedName: string = data.obraSocial?.name ?? newName
+      const savedName: string = (data.obraSocial?.name ?? newName).toUpperCase()
       onChange(savedName)
       setInputValue("")
     } catch {
@@ -125,7 +125,7 @@ export function ObraSocialCombobox({
             {!loading && results.map((os) => (
               <Combobox.Item
                 key={os.id}
-                value={os.name}
+                value={os.name.toUpperCase()}
                 className={cn(
                   "relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none",
                   "focus:bg-accent focus:text-accent-foreground",
@@ -136,7 +136,7 @@ export function ObraSocialCombobox({
                 <Combobox.ItemIndicator className="flex items-center">
                   <Check className="size-3.5" />
                 </Combobox.ItemIndicator>
-                {os.name}
+                {os.name.toUpperCase()}
               </Combobox.Item>
             ))}
 
@@ -160,7 +160,7 @@ export function ObraSocialCombobox({
                   <Plus className="size-3.5 shrink-0" />
                 )}
                 <span>
-                  Agregar: <span className="font-medium">{inputValue.trim()}</span>
+                  Agregar: <span className="font-medium">{inputValue.trim().toUpperCase()}</span>
                 </span>
               </div>
             )}
