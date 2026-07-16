@@ -526,6 +526,9 @@ export function LoginPortal() {
             </div>
             </>}
 
+            {/* Form area — fixed min-height prevents layout jump between tabs */}
+            <div className="min-h-[280px]">
+
             {/* Login form */}
             {authMode === "login" && (
               platformDoctor ? (
@@ -746,6 +749,8 @@ export function LoginPortal() {
                 </form>
               )
             )}
+
+            </div>{/* end min-h form area */}
           </div>
         </main>
       </div>
