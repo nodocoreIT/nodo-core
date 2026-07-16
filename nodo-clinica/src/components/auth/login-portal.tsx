@@ -547,6 +547,7 @@ export function LoginPortal() {
                   onEmailChange={(email) => setForm({ ...form, email })}
                   onPasswordChange={(password) => setForm({ ...form, password })}
                   onForgotPassword={() => { setAuthMode("forgot"); setGeneralError(""); setRecoverySent(false); }}
+                  onSuccess={() => setShowTransition(true)}
                 />
               ) : (
                 <form onSubmit={handleLogin} noValidate>

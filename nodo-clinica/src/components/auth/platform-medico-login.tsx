@@ -27,6 +27,7 @@ interface PlatformMedicoLoginProps {
   onEmailChange: (email: string) => void;
   onPasswordChange: (password: string) => void;
   onForgotPassword?: () => void;
+  onSuccess?: () => void;
 }
 
 export function PlatformMedicoLoginFields({
@@ -44,6 +45,7 @@ export function PlatformMedicoLoginFields({
   onEmailChange,
   onPasswordChange,
   onForgotPassword,
+  onSuccess,
 }: PlatformMedicoLoginProps) {
   const supabase = getSupabaseBrowserClient();
   const [needsNewPassword, setNeedsNewPassword] = useState(false);
@@ -79,6 +81,10 @@ export function PlatformMedicoLoginFields({
         return;
       }
 
+      if (onSuccess) {
+        onSuccess();
+        await new Promise((r) => setTimeout(r, 1500));
+      }
       window.location.replace("/medico/dashboard");
     } catch (err) {
       const msg =
