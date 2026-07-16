@@ -26,6 +26,7 @@ interface PlatformMedicoLoginProps {
   setShowPassword: (v: boolean) => void;
   onEmailChange: (email: string) => void;
   onPasswordChange: (password: string) => void;
+  onForgotPassword?: () => void;
 }
 
 export function PlatformMedicoLoginFields({
@@ -42,6 +43,7 @@ export function PlatformMedicoLoginFields({
   setShowPassword,
   onEmailChange,
   onPasswordChange,
+  onForgotPassword,
 }: PlatformMedicoLoginProps) {
   const supabase = getSupabaseBrowserClient();
   const [needsNewPassword, setNeedsNewPassword] = useState(false);
@@ -119,7 +121,7 @@ export function PlatformMedicoLoginFields({
         />
       </div>
 
-      <div className="mb-5">
+      <div className="mb-4">
         <label
           htmlFor="login-pass"
           className="block text-[13px] font-semibold text-navy mb-1.5"
@@ -149,6 +151,18 @@ export function PlatformMedicoLoginFields({
           </button>
         </div>
       </div>
+
+      {onForgotPassword && (
+        <div className="flex justify-end mb-5">
+          <button
+            type="button"
+            onClick={onForgotPassword}
+            className="text-[13px] font-semibold text-brand hover:underline bg-transparent border-none cursor-pointer p-0"
+          >
+            ¿Olvidó su contraseña?
+          </button>
+        </div>
+      )}
 
       {generalError && (
         <p className="text-[13px] text-[#C0392B] mb-3 text-center">{generalError}</p>
