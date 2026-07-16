@@ -448,8 +448,6 @@ export function LoginPortal() {
               ) : platformDoctor ? (
                 <a
                   href={CLINICA_REGISTRATION_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="flex-1 pb-3 text-center text-[15px] font-bold text-slate2 hover:text-brand transition-colors"
                 >
                   Suscribirme
@@ -664,8 +662,6 @@ export function LoginPortal() {
                 </p>
                 <a
                   href={CLINICA_REGISTRATION_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="inline-flex py-3 px-6 rounded-md bg-brand text-white font-semibold text-[15px] hover:bg-brand-600"
                 >
                   Ir a registrarme
