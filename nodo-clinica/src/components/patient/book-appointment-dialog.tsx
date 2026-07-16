@@ -667,18 +667,22 @@ export function BookAppointmentDialog({
               <p className="text-xs font-medium text-violet-900">
                 Subí el ticket / comprobante de transferencia
               </p>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/jpg,application/pdf"
-                className="text-xs w-full"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  setReceiptFile(file);
-                  setReceiptAudit(null);
-                  setValidationChecks(null);
-                  if (file) await runReceiptPreview(file);
-                }}
-              />
+              <label className="flex items-center justify-center gap-2 rounded-md border border-violet-300 bg-white px-3 py-2 text-xs font-medium text-violet-700 cursor-pointer hover:bg-violet-100">
+                <Upload className="h-4 w-4" />
+                Seleccionar archivo
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/jpg,application/pdf"
+                  className="sr-only"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setReceiptFile(file);
+                    setReceiptAudit(null);
+                    setValidationChecks(null);
+                    if (file) await runReceiptPreview(file);
+                  }}
+                />
+              </label>
               {receiptFile && (
                 <p className="text-[11px] text-slate-600 flex items-center gap-1">
                   <FileText className="h-3.5 w-3.5" />
