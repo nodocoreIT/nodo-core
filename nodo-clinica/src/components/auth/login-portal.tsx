@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Stethoscope, User, Eye, EyeOff, Loader2, KeyRound, MailCheck } from "lucide-react";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
 import { clinicApi } from "@/lib/clinic/client-api";
 import {
   CLINICA_REGISTRATION_URL,
@@ -273,12 +272,15 @@ export function LoginPortal() {
     if (!recoveryEmail.trim()) return;
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        recoveryEmail.trim(),
-        { redirectTo: `${window.location.origin}/actualizar-contrasena` }
-      );
-      if (resetError) throw resetError;
+      const res = await fetch("/api/clinic/account/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: recoveryEmail.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Error al enviar el correo");
+      }
       setRecoverySent(true);
     } catch (err) {
       setGeneralError(err instanceof Error ? err.message : "Error al enviar el correo");
