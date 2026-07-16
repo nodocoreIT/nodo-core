@@ -1,24 +1,18 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, useMemo, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { SupabaseProvider, AuthProvider } from "@nodocore/shared-components";
-import { createBrowserClient } from "@supabase/ssr";
-import { CLINICA_AUTH_CONFIG } from "@/lib/clinic/platform-config";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { CLINICA_AUTH_CONFIG, isPlatformMode } from "@/lib/clinic/platform-config";
 
-/**
- * Detect Supabase env vars at RUNTIME (not build time) so the providers
- * are always mounted when the browser has access to the public keys.
- * NEXT_PUBLIC_ vars are inlined at build time, but using explicit window
- * check ensures we never skip providers due to a stale build cache.
- */
-function useSupabaseClient() {
-  return useMemo(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return null;
-    return createBrowserClient(url, key);
-  }, []);
+function PlatformAuthProvider({ children }: { children: ReactNode }) {
+  const supabase = getSupabaseBrowserClient();
+  return (
+    <SupabaseProvider client={supabase}>
+      <AuthProvider config={CLINICA_AUTH_CONFIG}>{children}</AuthProvider>
+    </SupabaseProvider>
+  );
 }
 
 export function AppProviders({ children }: { children: ReactNode }) {
@@ -31,9 +25,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
       }),
   );
 
-  const supabase = useSupabaseClient();
-
-  if (!supabase) {
+  if (!isPlatformMode()) {
     return (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
@@ -41,9 +33,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SupabaseProvider client={supabase}>
-        <AuthProvider config={CLINICA_AUTH_CONFIG}>{children}</AuthProvider>
-      </SupabaseProvider>
+      <PlatformAuthProvider>{children}</PlatformAuthProvider>
     </QueryClientProvider>
   );
 }
