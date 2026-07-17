@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import {
   Calendar,
   Loader2,
-  ChevronRight,
   Search,
   ChevronsUpDown,
   X,
@@ -17,10 +15,8 @@ import {
 import { toast } from "sonner";
 import { BookAppointmentDialog } from "@/components/patient/book-appointment-dialog";
 import { WaitingRoomModal } from "@/components/patient/waiting-room-modal";
-import { clinicApi, getClientSession } from "@/lib/clinic/client-api";
+import { clinicApi } from "@/lib/clinic/client-api";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 
 // ── Specialty filter combobox (local data, no API) ─────────────────────────
 
@@ -166,19 +162,6 @@ interface Doctor {
   };
 }
 
-import type { PaymentReceiptAudit } from "@/lib/clinic/types";
-
-interface Appointment {
-  id: string;
-  doctorId: string;
-  scheduledAt: string;
-  status: string;
-  accessToken: string;
-  paymentStatus?: string;
-  paymentProvider?: "transfer" | "mercadopago";
-  paymentReceiptAudit?: PaymentReceiptAudit;
-  doctor?: Doctor;
-}
 
 export function PacienteInicioPage() {
   const [loading, setLoading] = useState(true);
@@ -188,42 +171,15 @@ export function PacienteInicioPage() {
   } | null>(null);
   const [waitingRoomToken, setWaitingRoomToken] = useState<string | null>(null);
   const [pendingBookedMessage, setPendingBookedMessage] = useState<string | null>(null);
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
 
   useEffect(() => {
     async function load() {
       try {
-        let resolvedPatientId: string | null = null;
-
-        try {
-          const { session, user } = await clinicApi.getSession();
-          if (session?.role === "patient" && user?.id) {
-            resolvedPatientId = user.id;
-          }
-        } catch {
-          /* fallback sessionStorage */
-        }
-
-        if (!resolvedPatientId) {
-          const stored = getClientSession();
-          if (stored?.role === "patient") {
-            resolvedPatientId = stored.userId;
-          }
-        }
-
-
         const docs = await clinicApi.getDoctors();
         setDoctors(Array.isArray(docs) ? docs : []);
-
-        if (resolvedPatientId) {
-          const apts =
-            await clinicApi.getPatientAppointments(resolvedPatientId);
-          setAppointments(Array.isArray(apts) ? apts : []);
-        }
       } catch (e) {
         toast.error("Error al cargar médicos");
         console.error(e);
@@ -247,36 +203,6 @@ export function PacienteInicioPage() {
     });
   }, [doctors, searchQuery, specialtyFilter]);
 
-  const pendingPayment = appointments.filter(
-    (a) => a.paymentStatus === "pending" && a.status === "scheduled",
-  );
-  const awaitingDoctorApproval = pendingPayment.filter(
-    (a) => !!a.paymentReceiptAudit,
-  );
-  const needsPaymentUpload = pendingPayment.filter(
-    (a) => !a.paymentReceiptAudit,
-  );
-
-  const handleCancelPending = async (apt: Appointment) => {
-    if (
-      !window.confirm(
-        "¿Cancelar este turno y liberar el horario? Podrás pedir otro turno con el mismo médico.",
-      )
-    ) {
-      return;
-    }
-    setCancellingId(apt.id);
-    try {
-      await clinicApi.cancelPendingAppointment(apt.accessToken);
-      setAppointments((prev) => prev.filter((a) => a.id !== apt.id));
-      toast.success("Turno cancelado. Ya podés reservar otro horario.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo cancelar");
-    } finally {
-      setCancellingId(null);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center py-16">
@@ -287,104 +213,6 @@ export function PacienteInicioPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {awaitingDoctorApproval.map((apt) => (
-        <Card key={apt.id} className="border-amber-300 bg-amber-50/60">
-          <CardContent className="pt-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <Badge className="bg-amber-600 mb-1">En revisión del médico</Badge>
-              <p className="font-medium">Dr/a. {apt.doctor?.fullName}</p>
-              <p className="text-xs text-slate-600 mt-1">
-                Subiste el comprobante. El médico debe aprobar el pago para
-                habilitar tu turno.
-              </p>
-              <p className="text-xs text-slate-500 mt-1">
-                {format(new Date(apt.scheduledAt), "dd MMM yyyy · HH:mm 'hs'", {
-                  locale: es,
-                })}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Link href={`/paciente/sala/${apt.accessToken}`}>
-                <Button variant="outline" className="border-amber-400 text-amber-900">
-                  Ver estado
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </Link>
-              <Button
-                variant="outline"
-                className="border-red-200 text-red-700"
-                disabled={cancellingId === apt.id}
-                onClick={() => void handleCancelPending(apt)}
-              >
-                {cancellingId === apt.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "Cancelar turno"
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-
-      {needsPaymentUpload.map((apt) => (
-        <Card key={apt.id} className="border-amber-200 bg-amber-50/50">
-          <CardContent className="pt-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <Badge className="bg-amber-600 mb-1">
-                {apt.paymentProvider === "mercadopago"
-                  ? "Pago con Mercado Pago pendiente"
-                  : "Pago pendiente"}
-              </Badge>
-              <p className="font-medium">Dr/a. {apt.doctor?.fullName}</p>
-              <p className="text-xs text-slate-500">
-                {format(new Date(apt.scheduledAt), "dd MMM yyyy · HH:mm 'hs'", {
-                  locale: es,
-                })}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Link href={`/paciente/sala/${apt.accessToken}`}>
-                <Button className="bg-amber-600 hover:bg-amber-700">
-                  Completar pago
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </Link>
-              <Button
-                variant="outline"
-                className="border-red-200 text-red-700"
-                disabled={cancellingId === apt.id}
-                onClick={() => void handleCancelPending(apt)}
-              >
-                {cancellingId === apt.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "Cancelar turno"
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-
-      {false && pendingPayment.map((apt) => (
-        <Card key={apt.id} className="border-emerald-200 bg-emerald-50/40">
-          <CardContent className="pt-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <Badge className="bg-emerald-600 mb-1">Turno activo</Badge>
-              <p className="font-medium">Dr/a. {apt.doctor?.fullName}</p>
-              <p className="text-xs text-slate-500">{apt.doctor?.specialty}</p>
-            </div>
-            <Link href={`/paciente/sala/${apt.accessToken}`}>
-              <Button className="bg-emerald-600 hover:bg-emerald-700">
-                Ir a sala
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      ))}
-
       <section>
         <div className="mb-3">
         
