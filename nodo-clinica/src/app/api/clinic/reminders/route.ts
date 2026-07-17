@@ -5,17 +5,9 @@ import {
   sendAppointmentReminderEmail,
 } from "@/lib/email/resend";
 import { formatReminderLabel } from "@/lib/email/reminder-label";
+import { appBaseUrl as baseUrl } from "@/lib/clinic/appointment-payment";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-
-function baseUrl() {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000")
-  );
-}
 
 /** Sends a test email to the doctor or resends a confirmation to a patient. */
 export async function POST(request: NextRequest) {

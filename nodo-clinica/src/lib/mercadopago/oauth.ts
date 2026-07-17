@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "crypto";
+import { appBaseUrl } from "@/lib/clinic/appointment-payment";
 
 const MP_AUTH_URL = "https://auth.mercadopago.com/authorization";
 const MP_TOKEN_URL = "https://api.mercadopago.com/oauth/token";
@@ -25,11 +26,7 @@ export function getMpOAuthConfig(): MpOAuthConfig | null {
   const clientSecret = process.env.MERCADOPAGO_CLIENT_SECRET?.trim();
   const redirectUri =
     process.env.MERCADOPAGO_OAUTH_REDIRECT_URI?.trim() ||
-    (process.env.NEXT_PUBLIC_APP_URL
-      ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/api/clinic/mercadopago/oauth/callback`
-      : process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}/api/clinic/mercadopago/oauth/callback`
-        : "http://localhost:3002/api/clinic/mercadopago/oauth/callback");
+    `${appBaseUrl()}/api/clinic/mercadopago/oauth/callback`;
 
   if (!clientId || !clientSecret) return null;
   return { clientId, clientSecret, redirectUri };

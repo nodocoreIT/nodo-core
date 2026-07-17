@@ -3,6 +3,7 @@ import { isLocalMode } from "@/lib/clinic/config";
 import { readDb, writeDb } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
 import { requireAuth } from "@/lib/supabase/auth-guard";
+import { appBaseUrl } from "@/lib/clinic/appointment-payment";
 import {
   exchangeAuthorizationCode,
   getMpOAuthConfig,
@@ -28,11 +29,7 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get("state");
   const error = searchParams.get("error");
 
-  const appBase =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3002");
+  const appBase = appBaseUrl();
 
   if (error) {
     return settingsRedirect(appBase, { mp: "error", mp_msg: error });

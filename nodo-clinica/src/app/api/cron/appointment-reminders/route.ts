@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isPaymentConfirmed } from "@/lib/clinic/payment";
 import { sendAppointmentReminderEmail } from "@/lib/email/resend";
+import { appBaseUrl } from "@/lib/clinic/appointment-payment";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -20,11 +21,7 @@ export async function GET(request: NextRequest) {
   const maxLatenessMs = 36 * 60 * 60 * 1000;
   let sent = 0;
 
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000");
+  const baseUrl = appBaseUrl();
 
   // Fetch appointments that are still pending a reminder
   const { data: appointments } = await supabase
