@@ -10,6 +10,7 @@ import { es } from "date-fns/locale";
 import { ChevronRight, Loader2, Mail, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { WaitingRoomModal } from "@/components/patient/waiting-room-modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const CANCELLABLE_STATUSES = ["scheduled"];
 const ACTIVE_STATUSES = ["scheduled", "waiting", "in_consultation"];
@@ -38,6 +39,9 @@ export default function PacienteTurnosPage() {
   const [cancellingToken, setCancellingToken] = useState<string | null>(null);
   const [deletingToken, setDeletingToken] = useState<string | null>(null);
   const [openToken, setOpenToken] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<
+    { type: "cancel" | "delete"; accessToken: string } | null
+  >(null);
 
   const load = useCallback(async () => {
     const { user } = await clinicApi.getSession();
@@ -66,13 +70,6 @@ export default function PacienteTurnosPage() {
   };
 
   const handleCancel = async (accessToken: string) => {
-    if (
-      !window.confirm(
-        "¿Cancelar este turno y liberar el horario? Podrás pedir otro con el mismo médico.",
-      )
-    ) {
-      return;
-    }
     setCancellingToken(accessToken);
     try {
       await clinicApi.cancelPendingAppointment(accessToken);
@@ -86,9 +83,6 @@ export default function PacienteTurnosPage() {
   };
 
   const handleDelete = async (accessToken: string) => {
-    if (!window.confirm("¿Eliminar este turno cancelado de tu lista?")) {
-      return;
-    }
     setDeletingToken(accessToken);
     try {
       await clinicApi.deleteCancelledAppointment(accessToken);
@@ -179,7 +173,9 @@ export default function PacienteTurnosPage() {
                           size="sm"
                           className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
                           disabled={cancellingToken === apt.accessToken}
-                          onClick={() => void handleCancel(apt.accessToken)}
+                          onClick={() =>
+                            setConfirmAction({ type: "cancel", accessToken: apt.accessToken })
+                          }
                         >
                           {cancellingToken === apt.accessToken ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -197,7 +193,9 @@ export default function PacienteTurnosPage() {
                         size="sm"
                         className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
                         disabled={deletingToken === apt.accessToken}
-                        onClick={() => void handleDelete(apt.accessToken)}
+                        onClick={() =>
+                          setConfirmAction({ type: "delete", accessToken: apt.accessToken })
+                        }
                       >
                         {deletingToken === apt.accessToken ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -221,6 +219,37 @@ export default function PacienteTurnosPage() {
             setOpenToken(null);
             void load();
           }
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!confirmAction}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+        title={
+          confirmAction?.type === "cancel"
+            ? "¿Cancelar este turno?"
+            : "¿Eliminar este turno de tu lista?"
+        }
+        description={
+          confirmAction?.type === "cancel"
+            ? "Se libera el horario y podés pedir otro con el mismo médico."
+            : "Esta acción no se puede deshacer."
+        }
+        confirmLabel={confirmAction?.type === "cancel" ? "Cancelar turno" : "Eliminar"}
+        cancelLabel="Volver"
+        loading={
+          confirmAction?.type === "cancel"
+            ? cancellingToken === confirmAction.accessToken
+            : deletingToken === confirmAction?.accessToken
+        }
+        onConfirm={async () => {
+          if (!confirmAction) return;
+          if (confirmAction.type === "cancel") {
+            await handleCancel(confirmAction.accessToken);
+          } else {
+            await handleDelete(confirmAction.accessToken);
+          }
+          setConfirmAction(null);
         }}
       />
     </>
