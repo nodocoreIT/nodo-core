@@ -127,11 +127,6 @@ export function DoctorSettingsDialog({
   const [saving, setSaving] = useState(false);
   const [testingReminder, setTestingReminder] = useState(false);
   const [mpOAuthConfigured, setMpOAuthConfigured] = useState<boolean | null>(null);
-  const [mpOAuthHelp, setMpOAuthHelp] = useState<{
-    redirectUri?: string;
-    checklist?: string[];
-    diagnoseUrl?: string;
-  } | null>(null);
   const [testingMpConnection, setTestingMpConnection] = useState(false);
   const [subscription, setSubscription] = useState<{
     status: string;
@@ -145,13 +140,6 @@ export function DoctorSettingsDialog({
   useEffect(() => {
     void clinicApi.getMercadoPagoOAuthConfig().then((cfg) => {
       setMpOAuthConfigured(!!cfg.configured);
-      if (cfg.configured) {
-        setMpOAuthHelp({
-          redirectUri: cfg.redirectUri,
-          checklist: cfg.checklist,
-          diagnoseUrl: cfg.diagnoseUrl,
-        });
-      }
     });
   }, []);
 
@@ -798,31 +786,6 @@ export function DoctorSettingsDialog({
                                 Te llevamos a Mercado Pago para iniciar sesión con tu cuenta
                                 vendedor y autorizar los cobros. No pegás contraseñas acá.
                               </p>
-                            )}
-                            {mpOAuthConfigured && mpOAuthHelp?.checklist && (
-                              <details className="text-[11px] text-slate-600 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
-                                <summary className="cursor-pointer font-medium text-slate-700">
-                                  ¿Error «Tenemos un problema» en Mercado Pago?
-                                </summary>
-                                <ol className="mt-2 list-decimal pl-4 space-y-1.5 leading-relaxed">
-                                  {mpOAuthHelp.checklist.map((item) => (
-                                    <li key={item}>{item}</li>
-                                  ))}
-                                </ol>
-                                {mpOAuthHelp.diagnoseUrl && (
-                                  <p className="mt-2">
-                                    Diagnóstico:{" "}
-                                    <a
-                                      href={mpOAuthHelp.diagnoseUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="text-[#009ee3] underline"
-                                    >
-                                      {mpOAuthHelp.diagnoseUrl}
-                                    </a>
-                                  </p>
-                                )}
-                              </details>
                             )}
                             <div className="flex justify-center">
                               <Button
