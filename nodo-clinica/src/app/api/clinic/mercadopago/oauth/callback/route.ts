@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isLocalMode } from "@/lib/clinic/config";
 import { readDb, writeDb } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
 import { appBaseUrl } from "@/lib/clinic/appointment-payment";
 import {
   exchangeAuthorizationCode,
@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
   const supabase = await createServiceClient();
   const { data: settings, error: settingsError } = await supabase
     .from("office_settings")
-    .select("org_id, payment")
+    .select("org_id, professional_id, payment")
     .not("payment->mercadopagoOAuthPending", "is", null);
 
   if (settingsError) {
@@ -142,7 +142,8 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) {
     return settingsRedirect(appBase, { mp: "error", mp_msg: "session_mismatch" });
   }
-  if (auth.user.org_id !== match.org_id) {
+  const professional = await resolveProfessional(auth);
+  if (!professional || professional.id !== match.professional_id) {
     return settingsRedirect(appBase, { mp: "error", mp_msg: "session_mismatch" });
   }
 
@@ -171,7 +172,7 @@ export async function GET(request: NextRequest) {
     await supabase
       .from("office_settings")
       .update({ payment: cleanedPayment })
-      .eq("org_id", match.org_id);
+      .eq("professional_id", match.professional_id);
 
     await clearOAuthTokensFromOfficeSettings(match.org_id);
 
@@ -184,7 +185,7 @@ export async function GET(request: NextRequest) {
     await supabase
       .from("office_settings")
       .update({ payment: cleanedPayment })
-      .eq("org_id", match.org_id);
+      .eq("professional_id", match.professional_id);
 
     return settingsRedirect(appBase, {
       mp: "error",

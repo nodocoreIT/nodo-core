@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isLocalMode } from "@/lib/clinic/config";
 import { writeDb } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
 import {
   buildAuthorizationUrl,
   generatePkcePair,
@@ -67,17 +67,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Org no encontrada" }, { status: 403 });
   }
 
+  const professional = await resolveProfessional(auth);
+  if (!professional) {
+    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+  }
+
   const supabase = await createServiceClient();
   const { data: existing, error: selectError } = await supabase
     .from("office_settings")
     .select("payment")
-    .eq("org_id", user.org_id)
+    .eq("professional_id", professional.id)
     .maybeSingle();
 
   if (selectError) {
     console.error("[mp-oauth] connect: failed to read office_settings", selectError);
     return NextResponse.json(
-      { error: `No se pudo leer la configuración de la org: ${selectError.message}` },
+      { error: `No se pudo leer la configuración del médico: ${selectError.message}` },
       { status: 500 },
     );
   }
@@ -87,6 +92,7 @@ export async function GET(request: NextRequest) {
     .from("office_settings")
     .upsert(
       {
+        professional_id: professional.id,
         org_id: user.org_id,
         payment: {
           ...payment,
@@ -94,7 +100,7 @@ export async function GET(request: NextRequest) {
           mercadopagoOAuthPending: { state, codeVerifier, createdAt: now },
         },
       },
-      { onConflict: "org_id" },
+      { onConflict: "professional_id" },
     );
 
   if (upsertError) {
