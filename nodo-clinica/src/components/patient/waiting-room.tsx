@@ -224,8 +224,8 @@ export function WaitingRoom({
       .from("appointments")
       .select(`
         *,
-        patient:patients(id, profile:profiles(full_name)),
-        doctor:profiles(full_name, specialty)
+        patient:patients(id, full_name),
+        doctor:professionals!appointments_doctor_id_fkey(full_name, specialty)
       `)
       .eq("access_token", accessToken)
       .single();
@@ -510,14 +510,14 @@ export function WaitingRoom({
   }
 
   const patientProfile = appointment.patient as
-    | { profile?: { full_name: string } }
+    | { full_name?: string }
     | undefined;
   const doctorProfile = appointment.doctor as
     | { full_name: string; specialty?: string }
     | undefined;
 
   const patientName =
-    meta?.patientName || patientProfile?.profile?.full_name || "Paciente";
+    meta?.patientName || patientProfile?.full_name || "Paciente";
   const doctorName = meta?.doctorName || doctorProfile?.full_name || "Médico";
   const doctorSpecialty = meta?.doctorSpecialty || doctorProfile?.specialty;
 

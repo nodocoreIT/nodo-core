@@ -34,7 +34,10 @@ type DataSource = "local" | "supabase";
 type AppointmentRow = Appointment & {
   patient?: {
     id: string;
-    profile?: { full_name: string; email: string };
+    full_name: string;
+    email: string;
+    phone?: string;
+    profile_photo_url?: string;
   };
 };
 
@@ -203,26 +206,31 @@ export function DoctorDashboard({
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("appointments")
       .select(`
         *,
-        patient:patients(
-          id,
-          profile:profiles(full_name, email)
-        )
+        patient:patients(id, full_name, email, phone, profile_photo_url)
       `)
       .eq("doctor_id", doctorId)
       .gte("scheduled_at", today.toISOString())
       .in("status", ["scheduled", "waiting", "in_consultation"])
       .order("queue_position");
 
+    if (error) {
+      console.error("[doctor-dashboard] failed to load queue", error);
+      return;
+    }
+
     if (data) {
       const rows = data as unknown as AppointmentRow[];
       const queue: QueuePatient[] = rows.map((apt) => ({
         appointmentId: apt.id,
         patientId: apt.patient_id,
-        patientName: apt.patient?.profile?.full_name || "Paciente",
+        patientName: apt.patient?.full_name || "Paciente",
+        patientEmail: apt.patient?.email,
+        patientPhone: apt.patient?.phone,
+        patientPhoto: apt.patient?.profile_photo_url,
         status: mapAppointmentStatusToLifecycle(apt.status),
         queuePosition: apt.queue_position,
         scheduledAt: apt.scheduled_at,
@@ -266,7 +274,7 @@ export function DoctorDashboard({
       const supabase = createClient();
       const { data } = await supabase
         .from("clinical_records")
-        .select("*, doctor:profiles(full_name)")
+        .select("*, doctor:professionals(full_name)")
         .eq("patient_id", patientId)
         .order("created_at", { ascending: false })
         .limit(20);
@@ -312,7 +320,7 @@ export function DoctorDashboard({
       .from("appointments")
       .select(`
         *,
-        patient:patients(id, profile:profiles(full_name, email))
+        patient:patients(id, full_name, email, phone, profile_photo_url)
       `)
       .eq("id", appointmentId)
       .single();
