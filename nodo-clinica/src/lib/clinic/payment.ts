@@ -81,6 +81,27 @@ export function appointmentNeedsDoctorPaymentReview(
   return apt.paymentStatus === "pending" || !apt.paymentReceiptAudit?.valid;
 }
 
+/** Same as appointmentNeedsDoctorPaymentReview but for raw snake_case Supabase rows. */
+export function appointmentNeedsDoctorPaymentReviewFromDbRow(
+  apt: {
+    status: string;
+    payment_status?: PaymentStatus;
+    payment_provider?: string;
+    payment_receipt_audit?: PaymentReceiptAudit;
+  },
+  opts?: { receiptDocumentCount?: number },
+): boolean {
+  return appointmentNeedsDoctorPaymentReview(
+    {
+      status: apt.status,
+      paymentStatus: apt.payment_status,
+      paymentProvider: apt.payment_provider,
+      paymentReceiptAudit: apt.payment_receipt_audit,
+    },
+    opts,
+  );
+}
+
 export function patientRequiresPayment(payment?: {
   requirePaymentBeforeBooking?: boolean;
 }): boolean {

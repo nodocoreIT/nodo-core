@@ -32,6 +32,7 @@ export default function PacienteTurnosPage() {
       status: string;
       accessToken: string;
       paymentStatus?: string;
+      needsReview?: boolean;
       doctor?: { fullName: string; specialty: string };
     }>
   >([]);
@@ -114,6 +115,7 @@ export default function PacienteTurnosPage() {
           {appointments.map((apt) => {
             const isActive = ACTIVE_STATUSES.includes(apt.status);
             const isPending = isActive && apt.paymentStatus === "pending";
+            const isPendingReview = isPending && !!apt.needsReview;
             const isCancelled = apt.status === "cancelled";
             const badgeColor = isCancelled
               ? "bg-red-600"
@@ -127,9 +129,11 @@ export default function PacienteTurnosPage() {
               <Card key={apt.id} className="border-slate-100">
                 <CardContent className="py-3 space-y-2">
                   <Badge className={badgeColor}>
-                    {isPending
-                      ? "Pago pendiente"
-                      : STATUS_LABEL[apt.status] ?? apt.status}
+                    {isPendingReview
+                      ? "En revisión"
+                      : isPending
+                        ? "Pago pendiente"
+                        : STATUS_LABEL[apt.status] ?? apt.status}
                   </Badge>
                   <div>
                     <p className="text-sm font-medium">Dr/a. {apt.doctor?.fullName}</p>
@@ -142,18 +146,24 @@ export default function PacienteTurnosPage() {
                   </div>
                   {isActive && (
                     <div className="flex items-center gap-2 pt-1">
-                      <Button
-                        size="sm"
-                        className={`h-8 text-xs flex-1 ${
-                          isPending
-                            ? "bg-amber-600 hover:bg-amber-700"
-                            : "bg-emerald-600 hover:bg-emerald-700"
-                        }`}
-                        onClick={() => setOpenToken(apt.accessToken)}
-                      >
-                        {isPending ? "Completar pago" : "Ver turno"}
-                        <ChevronRight className="h-3 w-3 ml-0.5" />
-                      </Button>
+                      {isPendingReview ? (
+                        <p className="text-xs text-slate-500 flex-1">
+                          Esperando aprobación del médico
+                        </p>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className={`h-8 text-xs flex-1 ${
+                            isPending
+                              ? "bg-amber-600 hover:bg-amber-700"
+                              : "bg-emerald-600 hover:bg-emerald-700"
+                          }`}
+                          onClick={() => setOpenToken(apt.accessToken)}
+                        >
+                          {isPending ? "Completar pago" : "Ver turno"}
+                          <ChevronRight className="h-3 w-3 ml-0.5" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

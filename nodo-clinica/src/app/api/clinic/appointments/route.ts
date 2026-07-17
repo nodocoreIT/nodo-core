@@ -42,7 +42,7 @@ import {
 } from "@/lib/clinic/cobros-receipt";
 import { buildPaymentReceiptAudit } from "@/lib/clinic/payment-receipt-audit";
 import { attachDocumentToAppointment } from "@/lib/clinic/appointment-documents";
-import { appointmentNeedsDoctorPaymentReview } from "@/lib/clinic/payment";
+import { appointmentNeedsDoctorPaymentReviewFromDbRow } from "@/lib/clinic/payment";
 import { isLocalMode } from "@/lib/clinic/config";
 import { handleAppointmentsGetLocal } from "@/lib/clinic/appointments-local-get";
 import { handleAppointmentsPostLocal } from "@/lib/clinic/appointments-local-post";
@@ -182,7 +182,9 @@ export async function GET(request: NextRequest) {
     const { data: appointments, error: appointmentsError } = patientRow
       ? await supabase
           .from("appointments")
-          .select("*, professionals!appointments_doctor_id_fkey(full_name, specialty)")
+          .select(
+            "*, professionals!appointments_doctor_id_fkey(full_name, specialty), patient_documents(*)",
+          )
           .eq("patient_id", patientRow.id)
           .eq("org_id", patientRow.org_id)
           .order("scheduled_at", { ascending: false })
@@ -206,6 +208,11 @@ export async function GET(request: NextRequest) {
         accessToken: apt.access_token,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         paymentStatus: (apt as any).payment_status,
+        needsReview: appointmentNeedsDoctorPaymentReviewFromDbRow(apt as never, {
+          receiptDocumentCount:
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ((apt as any).patient_documents ?? []).length,
+        }),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         doctor: (apt as any).professionals
           ? {
@@ -289,7 +296,7 @@ export async function GET(request: NextRequest) {
 
       const entries = (ledger ?? [])
         .filter((apt) =>
-          appointmentNeedsDoctorPaymentReview(apt as never, {
+          appointmentNeedsDoctorPaymentReviewFromDbRow(apt as never, {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             receiptDocumentCount: ((apt as any).patient_documents ?? []).length,
           }) ||
@@ -304,7 +311,7 @@ export async function GET(request: NextRequest) {
           paymentStatus: apt.payment_status,
           paymentProvider: apt.payment_provider,
           audit: apt.payment_receipt_audit,
-          needsReview: appointmentNeedsDoctorPaymentReview(apt as never, {
+          needsReview: appointmentNeedsDoctorPaymentReviewFromDbRow(apt as never, {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             receiptDocumentCount: ((apt as any).patient_documents ?? []).length,
           }),
@@ -330,7 +337,7 @@ export async function GET(request: NextRequest) {
 
       const pending = (all ?? [])
         .filter((apt) =>
-          appointmentNeedsDoctorPaymentReview(apt as never, {
+          appointmentNeedsDoctorPaymentReviewFromDbRow(apt as never, {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             receiptDocumentCount: ((apt as any).patient_documents ?? []).length,
           }),

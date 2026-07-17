@@ -28,6 +28,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { clinicApi } from "@/lib/clinic/client-api";
+import { currencySymbol } from "@/lib/clinic/currency";
 import {
   dayLabel,
   DEFAULT_AVAILABILITY,
@@ -737,18 +738,23 @@ export function DoctorOfficePanel({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Honorario consulta</Label>
-                <Input
-                  type="number"
-                  value={payment.consultationFee ?? ""}
-                  onChange={(e) =>
-                    setPayment((p) => ({
-                      ...p,
-                      consultationFee: Number(e.target.value) || undefined,
-                    }))
-                  }
-                  className="mt-1 h-9"
-                  placeholder="15000"
-                />
+                <div className="relative mt-1">
+                  <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-500">
+                    {currencySymbol(payment.currency)}
+                  </span>
+                  <Input
+                    type="number"
+                    value={payment.consultationFee ?? ""}
+                    onChange={(e) =>
+                      setPayment((p) => ({
+                        ...p,
+                        consultationFee: Number(e.target.value) || undefined,
+                      }))
+                    }
+                    className="h-9 pl-8"
+                    placeholder="15000"
+                  />
+                </div>
               </div>
               <div>
                 <Label className="text-xs">Moneda</Label>
