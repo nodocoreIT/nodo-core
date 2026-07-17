@@ -174,7 +174,7 @@ export async function GET(request: NextRequest) {
       .update({ payment: cleanedPayment })
       .eq("professional_id", match.professional_id);
 
-    await clearOAuthTokensFromOfficeSettings(match.org_id);
+    await clearOAuthTokensFromOfficeSettings(match.professional_id);
 
     return settingsRedirect(appBase, { mp: "connected" });
   } catch (err) {

@@ -81,11 +81,15 @@ async function buildSupabaseCheckout(appointmentId: string) {
     .eq("id", apt.patient_id)
     .maybeSingle();
 
-  const { data: officeSettings } = await supabase
+  const { data: officeSettings, error: officeSettingsError } = await supabase
     .from("office_settings")
     .select("payment")
-    .eq("org_id", apt.org_id)
+    .eq("professional_id", apt.doctor_id)
     .maybeSingle();
+
+  if (officeSettingsError) {
+    console.error("[mp-checkout] failed to read office_settings", officeSettingsError);
+  }
 
   const { data: professional } = await supabase
     .from("professionals")

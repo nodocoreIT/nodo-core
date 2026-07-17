@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isLocalMode } from "@/lib/clinic/config";
 import { writeDb } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +39,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Org no encontrada" }, { status: 403 });
   }
 
+  const professional = await resolveProfessional(auth);
+  if (!professional) {
+    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+  }
+
   const supabase = await createServiceClient();
 
   await supabase.from("payment_credentials").delete().eq("org_id", user.org_id);
@@ -46,7 +51,7 @@ export async function POST(request: NextRequest) {
   const { data: existing } = await supabase
     .from("office_settings")
     .select("payment")
-    .eq("org_id", user.org_id)
+    .eq("professional_id", professional.id)
     .maybeSingle();
 
   if (existing) {
@@ -64,7 +69,7 @@ export async function POST(request: NextRequest) {
     await supabase
       .from("office_settings")
       .update({ payment: cleaned })
-      .eq("org_id", user.org_id);
+      .eq("professional_id", professional.id);
   }
 
   return NextResponse.json({ ok: true });

@@ -101,13 +101,13 @@ export async function orgHasMercadoPagoConnection(
  * Called after tokens are migrated to payment_credentials table.
  */
 export async function clearOAuthTokensFromOfficeSettings(
-  orgId: string,
+  professionalId: string,
 ): Promise<void> {
   const supabase = await createServiceClient();
   const { data, error } = await supabase
     .from("office_settings")
     .select("payment")
-    .eq("org_id", orgId)
+    .eq("professional_id", professionalId)
     .maybeSingle();
 
   if (error || !data) return;
@@ -122,7 +122,7 @@ export async function clearOAuthTokensFromOfficeSettings(
   const { error: updateError } = await supabase
     .from("office_settings")
     .update({ payment: cleaned })
-    .eq("org_id", orgId);
+    .eq("professional_id", professionalId);
 
   if (updateError) {
     console.error("[payments] clearOAuthTokensFromOfficeSettings error", updateError);

@@ -65,7 +65,7 @@ export async function confirmAppointmentPaymentAndNotify(
   const { data: officeSettings } = await supabase
     .from("office_settings")
     .select("payment, reminder_settings")
-    .eq("org_id", apt.org_id)
+    .eq("professional_id", apt.doctor_id)
     .maybeSingle();
 
   const { data: professional } = await supabase

@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
   const { data: officeSettings } = await supabase
     .from("office_settings")
     .select("payment, availability")
-    .eq("org_id", professional.org_id)
+    .eq("professional_id", doctorId)
     .maybeSingle();
 
   const payment = (officeSettings?.payment as Record<string, unknown>) ?? {};

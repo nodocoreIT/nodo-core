@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
 import { getDoctorMercadoPagoAccessToken, orgHasMercadoPagoConnection } from "@/lib/mercadopago/tokens";
 import { createQrOrder, getQrOrder } from "@/lib/mercadopago/qr";
 import { randomUUID } from "crypto";
@@ -28,10 +28,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const professional = await resolveProfessional(auth);
+  if (!professional) {
+    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+  }
+
   const { data: officeSettings } = await supabase
     .from("office_settings")
     .select("payment")
-    .eq("org_id", user.org_id)
+    .eq("professional_id", professional.id)
     .maybeSingle();
 
   const payment = (officeSettings?.payment as Record<string, unknown>) ?? {};
@@ -64,10 +69,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: professional } = await supabase
+  const { data: professionalName } = await supabase
     .from("professionals")
     .select("full_name")
-    .eq("user_id", user.id)
+    .eq("id", professional.id)
     .maybeSingle();
 
   const externalRef = `test-qr-${randomUUID()}`;
@@ -77,7 +82,7 @@ export async function POST(request: NextRequest) {
       accessToken: token,
       amount,
       currency: (payment.currency as string | undefined),
-      description: `Prueba consulta — ${professional?.full_name ?? "Médico"}`,
+      description: `Prueba consulta — ${professionalName?.full_name ?? "Médico"}`,
       externalReference: externalRef,
       externalPosId: posId,
       mode: "dynamic",

@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
   const { data: officeSettings } = await supabase
     .from("office_settings")
     .select("payment, availability")
-    .eq("org_id", row.org_id as string)
+    .eq("professional_id", row.doctor_id as string)
     .maybeSingle();
 
   const { data: professional } = await supabase
