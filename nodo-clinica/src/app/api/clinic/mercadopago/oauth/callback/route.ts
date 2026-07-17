@@ -112,10 +112,14 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = await createServiceClient();
-  const { data: settings } = await supabase
+  const { data: settings, error: settingsError } = await supabase
     .from("office_settings")
     .select("org_id, payment")
     .not("payment->mercadopagoOAuthPending", "is", null);
+
+  if (settingsError) {
+    console.error("[mp-oauth] callback: failed to query pending OAuth state", settingsError);
+  }
 
   type OAuthPending = { state: string; codeVerifier: string; createdAt: string };
   const match = (settings ?? []).find((s) => {

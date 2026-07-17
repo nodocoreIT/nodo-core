@@ -68,14 +68,22 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = await createServiceClient();
-  const { data: existing } = await supabase
+  const { data: existing, error: selectError } = await supabase
     .from("office_settings")
     .select("payment")
     .eq("org_id", user.org_id)
     .maybeSingle();
 
+  if (selectError) {
+    console.error("[mp-oauth] connect: failed to read office_settings", selectError);
+    return NextResponse.json(
+      { error: `No se pudo leer la configuración de la org: ${selectError.message}` },
+      { status: 500 },
+    );
+  }
+
   const payment = (existing?.payment as Record<string, unknown>) ?? {};
-  await supabase
+  const { error: upsertError } = await supabase
     .from("office_settings")
     .upsert(
       {
@@ -88,6 +96,14 @@ export async function GET(request: NextRequest) {
       },
       { onConflict: "org_id" },
     );
+
+  if (upsertError) {
+    console.error("[mp-oauth] connect: failed to store pending OAuth state", upsertError);
+    return NextResponse.json(
+      { error: `No se pudo iniciar la vinculación: ${upsertError.message}` },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.redirect(
     buildAuthorizationUrl({
