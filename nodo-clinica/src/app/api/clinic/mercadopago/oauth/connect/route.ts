@@ -77,14 +77,17 @@ export async function GET(request: NextRequest) {
   const payment = (existing?.payment as Record<string, unknown>) ?? {};
   await supabase
     .from("office_settings")
-    .update({
-      payment: {
-        ...payment,
-        mercadopagoEnabled: true,
-        mercadopagoOAuthPending: { state, codeVerifier, createdAt: now },
+    .upsert(
+      {
+        org_id: user.org_id,
+        payment: {
+          ...payment,
+          mercadopagoEnabled: true,
+          mercadopagoOAuthPending: { state, codeVerifier, createdAt: now },
+        },
       },
-    })
-    .eq("org_id", user.org_id);
+      { onConflict: "org_id" },
+    );
 
   return NextResponse.redirect(
     buildAuthorizationUrl({

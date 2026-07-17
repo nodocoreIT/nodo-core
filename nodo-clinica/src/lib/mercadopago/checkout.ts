@@ -1,5 +1,4 @@
 import { isLocalMode } from "@/lib/clinic/config";
-import { getOrgMercadoPagoAccessToken } from "@/lib/clinic/db/payments";
 import { readDb, writeDb } from "@/lib/clinic/local-db";
 import { appBaseUrl } from "@/lib/clinic/appointment-payment";
 import { doctorUsesMercadoPago } from "@/lib/clinic/payment";
@@ -103,7 +102,7 @@ async function buildSupabaseCheckout(appointmentId: string) {
 
   if (!mercadopagoEnabled || fee <= 0) return null;
 
-  const token = await getOrgMercadoPagoAccessToken(apt.org_id);
+  const token = await getDoctorMercadoPagoAccessToken(apt.org_id);
   if (!token) return null;
 
   const base = appBaseUrl();

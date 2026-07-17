@@ -1,7 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { confirmAppointmentPaymentAndNotify } from "@/lib/clinic/appointment-payment";
 import { getPayment, type MpPaymentInfo } from "@/lib/mercadopago/client";
-import { getOrgMercadoPagoAccessToken } from "@/lib/clinic/db/payments";
+import { getDoctorMercadoPagoAccessToken } from "@/lib/mercadopago/tokens";
 
 export async function processMercadoPagoPaymentId(
   paymentId: string,
@@ -14,7 +14,7 @@ export async function processMercadoPagoPaymentId(
     .select("org_id");
 
   for (const org of orgs ?? []) {
-    const token = await getOrgMercadoPagoAccessToken(org.org_id);
+    const token = await getDoctorMercadoPagoAccessToken(org.org_id);
     if (!token) continue;
 
     let payment: MpPaymentInfo;
