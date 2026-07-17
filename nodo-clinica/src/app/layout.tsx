@@ -54,6 +54,7 @@ export default function RootLayout({
             <Toaster
               position="top-center"
               richColors
+              duration={2000}
               style={{
                 top: "50%",
                 left: "50%",
