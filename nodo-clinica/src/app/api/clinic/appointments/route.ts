@@ -549,6 +549,7 @@ export async function POST(request: NextRequest) {
     professional_id: doctorId,
     patient_id: patientRow.id,
     scheduled_at: when.toISOString(),
+    appointment_date: whenDateKey,
     status: "scheduled",
     queue_position: queueToday + 1,
     jitsi_room_id: `clinica-${doctorId.slice(-8)}-${Date.now()}`,

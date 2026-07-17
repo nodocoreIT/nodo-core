@@ -19,6 +19,7 @@ export interface AppointmentRow {
   professional_id: string;
   patient_id: string;
   scheduled_at: string;
+  appointment_date: string;
   status: AppointmentStatus;
   queue_position: number;
   jitsi_room_id: string;
@@ -44,6 +45,7 @@ export interface AppointmentInsert {
   professional_id: string;
   patient_id: string;
   scheduled_at: string;
+  appointment_date: string;
   status?: AppointmentStatus;
   queue_position?: number;
   jitsi_room_id: string;

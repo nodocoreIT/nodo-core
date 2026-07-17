@@ -90,29 +90,42 @@ const STEP_LABELS: Record<WizardStep, string> = {
 function WizardProgress({
   steps,
   current,
+  onSelect,
 }: {
   steps: WizardStep[];
   current: WizardStep;
+  onSelect: (step: WizardStep) => void;
 }) {
   const idx = steps.indexOf(current);
   return (
     <div className="flex items-center gap-1 mb-1">
-      {steps.map((s, i) => (
-        <div key={s} className="flex-1 flex flex-col items-center gap-0.5">
-          <div
-            className={`h-1.5 w-full rounded-full ${
-              i <= idx ? "bg-emerald-500" : "bg-slate-200"
-            }`}
-          />
-          <span
-            className={`text-[9px] hidden sm:block ${
-              i === idx ? "text-emerald-700 font-medium" : "text-slate-400"
+      {steps.map((s, i) => {
+        const visited = i < idx;
+        return (
+          <button
+            key={s}
+            type="button"
+            disabled={!visited}
+            onClick={() => onSelect(s)}
+            className={`flex-1 flex flex-col items-center gap-0.5 ${
+              visited ? "cursor-pointer" : "cursor-default"
             }`}
           >
-            {STEP_LABELS[s]}
-          </span>
-        </div>
-      ))}
+            <div
+              className={`h-1.5 w-full rounded-full ${
+                i <= idx ? "bg-emerald-500" : "bg-slate-200"
+              }`}
+            />
+            <span
+              className={`text-[11px] hidden sm:block ${
+                i === idx ? "text-emerald-700 font-medium" : "text-slate-400"
+              }`}
+            >
+              {STEP_LABELS[s]}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -284,6 +297,12 @@ export function BookAppointmentDialog({
   const goNext = () => {
     const idx = steps.indexOf(step);
     if (idx < steps.length - 1) setStep(steps[idx + 1]);
+  };
+
+  const goToStep = (target: WizardStep) => {
+    const idx = steps.indexOf(step);
+    const targetIdx = steps.indexOf(target);
+    if (targetIdx >= 0 && targetIdx < idx) setStep(target);
   };
 
   const toggleMic = () => {
@@ -488,7 +507,7 @@ export function BookAppointmentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[85%] sm:max-w-xl max-h-[90vh] overflow-y-auto px-8 pt-8">
         <DialogHeader>
-          <WizardProgress steps={steps} current={step} />
+          <WizardProgress steps={steps} current={step} onSelect={goToStep} />
           <DialogTitle className="flex items-center gap-2 text-base">
             {step === "slot" && <Calendar className="h-5 w-5 text-blue-600" />}
             {step === "payment" && (
