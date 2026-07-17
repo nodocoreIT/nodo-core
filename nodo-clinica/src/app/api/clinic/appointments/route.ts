@@ -124,7 +124,24 @@ export async function GET(request: NextRequest) {
       .lt("queue_position", apt.queue_position);
 
     return NextResponse.json({
-      appointment: apt,
+      appointment: {
+        id: apt.id,
+        patientId: apt.patient_id,
+        doctorId: apt.doctor_id,
+        scheduledAt: apt.scheduled_at,
+        status: apt.status,
+        queuePosition: apt.queue_position,
+        jitsiRoomId: apt.jitsi_room_id,
+        accessToken: apt.access_token,
+        tokenExpiresAt: apt.token_expires_at,
+        createdAt: apt.created_at,
+        updatedAt: apt.updated_at,
+        paymentStatus: apt.payment_status,
+        paymentProvider: apt.payment_provider,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        paymentReceiptAudit: (apt as any).payment_receipt_audit,
+        intakeReason: apt.intake_reason,
+      },
       patient: patient
         ? {
             id: patient.id,
@@ -154,14 +171,42 @@ export async function GET(request: NextRequest) {
   }
 
   if (patientId) {
-    const { data: appointments } = await supabase
-      .from("appointments")
-      .select("*, professionals(full_name, specialty)")
-      .eq("patient_id", patientId)
-      .eq("org_id", user.org_id ?? "")
-      .order("scheduled_at", { ascending: false });
+    // patientId here is the auth/profile id (as sent by the client session),
+    // not the patients-table row id that appointments.patient_id stores.
+    const { data: patientRow } = await supabase
+      .from("patients")
+      .select("id")
+      .eq("profile_id", patientId)
+      .maybeSingle();
 
-    return NextResponse.json(appointments ?? []);
+    const { data: appointments } = patientRow
+      ? await supabase
+          .from("appointments")
+          .select("*, professionals(full_name, specialty)")
+          .eq("patient_id", patientRow.id)
+          .eq("org_id", user.org_id ?? "")
+          .order("scheduled_at", { ascending: false })
+      : { data: [] };
+
+    return NextResponse.json(
+      (appointments ?? []).map((apt) => ({
+        id: apt.id,
+        scheduledAt: apt.scheduled_at,
+        status: apt.status,
+        accessToken: apt.access_token,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        paymentStatus: (apt as any).payment_status,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        doctor: (apt as any).professionals
+          ? {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              fullName: (apt as any).professionals.full_name,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              specialty: (apt as any).professionals.specialty,
+            }
+          : undefined,
+      })),
+    );
   }
 
   if (doctorId) {
@@ -457,6 +502,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: "Horario de turno inválido" },
       { status: 400 },
+    );
+  }
+
+  // A patient can't have two active appointments (with any doctor) less than
+  // 1 hour apart — booking exactly 1 hour apart is still allowed.
+  const oneHourMs = 60 * 60 * 1000;
+  const windowStart = new Date(when.getTime() - oneHourMs).toISOString();
+  const windowEnd = new Date(when.getTime() + oneHourMs).toISOString();
+
+  const { data: conflictingAppointments } = await supabase
+    .from("appointments")
+    .select("id")
+    .eq("patient_id", patientRow.id)
+    .in("status", ["scheduled", "waiting", "in_consultation"])
+    .gt("scheduled_at", windowStart)
+    .lt("scheduled_at", windowEnd);
+
+  if (conflictingAppointments && conflictingAppointments.length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "Ya tenés un turno reservado a menos de 1 hora de este horario. Elegí otro horario.",
+      },
+      { status: 409 },
     );
   }
 
