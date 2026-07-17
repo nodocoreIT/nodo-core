@@ -8,30 +8,7 @@ import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { SpecialtyCombobox } from "@/components/ui/specialty-combobox";
 import { NeuralNodesBackground } from "@/components/ui/neural-nodes-background";
-
-const PLANS = [
-  {
-    id: "trial",
-    name: "Prueba gratis",
-    price: "$0",
-    period: "30 días",
-    features: ["Hasta 20 consultas/mes", "Recetas PDF", "1 especialidad"],
-  },
-  {
-    id: "basico",
-    name: "Básico",
-    price: "$9.900",
-    period: "/mes",
-    features: ["Consultas ilimitadas", "Recetas + estudios", "Soporte email"],
-  },
-  {
-    id: "profesional",
-    name: "Profesional",
-    price: "$19.900",
-    period: "/mes",
-    features: ["Todo lo anterior", "Resumen SOAP con IA", "Multi-dispositivo"],
-  },
-];
+import { ONBOARDING_PLANS, formatPlanPrice } from "@/lib/clinic/subscription-plans";
 
 const inputClass =
   "mt-1 w-full rounded-lg px-3 py-2.5 text-sm bg-white border border-slate-200 text-navy placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/25 focus:border-teal-500 transition-shadow";
@@ -156,7 +133,7 @@ function OnboardingMedicoContent() {
             <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Plan de suscripción</p>
               <div className="grid sm:grid-cols-3 gap-3">
-                {PLANS.map((p) => (
+                {ONBOARDING_PLANS.map((p) => (
                   <button
                     key={p.id}
                     type="button"
@@ -169,7 +146,7 @@ function OnboardingMedicoContent() {
                   >
                     <span className="block text-sm font-semibold">{p.name}</span>
                     <span className={`block text-base font-bold mt-1 ${plan === p.id ? "text-teal-600" : "text-slate-500"}`}>
-                      {p.price} <span className="text-xs font-normal text-slate-400">{p.period}</span>
+                      {formatPlanPrice(p)} <span className="text-xs font-normal text-slate-400">{p.period}</span>
                     </span>
                     <ul className="mt-2 space-y-1">
                       {p.features.map((f) => (

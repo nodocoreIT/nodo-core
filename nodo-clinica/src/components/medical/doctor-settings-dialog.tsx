@@ -35,6 +35,7 @@ import {
 import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { currencySymbol, formatThousands, parseThousands } from "@/lib/clinic/currency";
+import { PAID_SUBSCRIPTION_PLANS, formatPlanPrice } from "@/lib/clinic/subscription-plans";
 import {
   dayLabel,
   DEFAULT_AVAILABILITY,
@@ -134,7 +135,8 @@ export function DoctorSettingsDialog({
     nextPaymentAt: string | null;
   } | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
-  const [startingSubscription, setStartingSubscription] = useState(false);
+  const [choosingPlan, setChoosingPlan] = useState(false);
+  const [startingPlanId, setStartingPlanId] = useState<string | null>(null);
   const loadGen = useRef(0);
 
   useEffect(() => {
@@ -261,6 +263,23 @@ export function DoctorSettingsDialog({
         return idx !== blockIndex;
       });
       return { ...prev, days: next };
+    });
+  };
+
+  const copyMondayToWeekdays = () => {
+    setAvailability((prev) => {
+      const monday = prev.days.filter((d) => d.dayOfWeek === 1);
+      if (!monday.length) return prev;
+      const rest = prev.days.filter((d) => ![2, 3, 4, 5].includes(d.dayOfWeek));
+      const copied = [2, 3, 4, 5].flatMap((dayOfWeek) =>
+        monday.map((b) => ({ ...b, dayOfWeek })),
+      );
+      return {
+        ...prev,
+        days: [...rest, ...copied].sort(
+          (a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime),
+        ),
+      };
     });
   };
 
@@ -410,78 +429,87 @@ export function DoctorSettingsDialog({
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs">Días que atiendo</Label>
-                    {ALL_DAYS.map((dow) => {
-                      const active = availability.days.some((d) => d.dayOfWeek === dow);
-                      const blocks = blocksForDay(dow);
-                      return (
-                        <div
-                          key={dow}
-                          className={`rounded-lg border p-2.5 ${
-                            active ? "border-blue-200 bg-blue-50/30" : "border-slate-100"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 mb-2">
-                            <input
-                              type="checkbox"
-                              checked={active}
-                              onChange={() => toggleDay(dow)}
-                              className="rounded"
-                            />
-                            <span className="text-sm font-medium">{dayLabel(dow)}</span>
-                          </div>
-                          {active && (
-                            <div className="space-y-2 pl-6">
-                              {blocks.map((block, blockIndex) => (
-                                <div
-                                  key={`${dow}-${blockIndex}`}
-                                  className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center"
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Días que atiendo</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-blue-600 hover:text-blue-700 disabled:opacity-40"
+                        disabled={blocksForDay(1).length === 0}
+                        onClick={copyMondayToWeekdays}
+                      >
+                        Copiar Lun a Vie
+                      </Button>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+                      {ALL_DAYS.map((dow) => {
+                        const active = availability.days.some((d) => d.dayOfWeek === dow);
+                        const blocks = blocksForDay(dow);
+                        return (
+                          <div
+                            key={dow}
+                            className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 ${
+                              active ? "bg-blue-50/30" : ""
+                            }`}
+                          >
+                            <label className="flex items-center gap-2 w-14 shrink-0 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={active}
+                                onChange={() => toggleDay(dow)}
+                                className="rounded"
+                              />
+                              <span className="text-sm font-medium">{dayLabel(dow)}</span>
+                            </label>
+                            {active ? (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {blocks.map((block, blockIndex) => (
+                                  <div key={blockIndex} className="flex items-center gap-1">
+                                    <Input
+                                      type="time"
+                                      value={block.startTime}
+                                      onChange={(e) =>
+                                        updateBlockTime(dow, blockIndex, "startTime", e.target.value)
+                                      }
+                                      className="h-7 w-26 text-xs px-1.5"
+                                    />
+                                    <span className="text-xs text-slate-400">a</span>
+                                    <Input
+                                      type="time"
+                                      value={block.endTime}
+                                      onChange={(e) =>
+                                        updateBlockTime(dow, blockIndex, "endTime", e.target.value)
+                                      }
+                                      className="h-7 w-26 text-xs px-1.5"
+                                    />
+                                    {blocks.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => removeBlockForDay(dow, blockIndex)}
+                                        className="text-red-500 hover:text-red-700 text-xs px-1"
+                                        aria-label="Quitar franja"
+                                      >
+                                        ✕
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => addBlockForDay(dow)}
+                                  className="text-xs text-blue-600 hover:text-blue-700 px-1"
                                 >
-                                  <Input
-                                    type="time"
-                                    value={block.startTime}
-                                    onChange={(e) =>
-                                      updateBlockTime(dow, blockIndex, "startTime", e.target.value)
-                                    }
-                                    className="h-8 text-sm"
-                                  />
-                                  <Input
-                                    type="time"
-                                    value={block.endTime}
-                                    onChange={(e) =>
-                                      updateBlockTime(dow, blockIndex, "endTime", e.target.value)
-                                    }
-                                    className="h-8 text-sm"
-                                  />
-                                  {blocks.length > 1 ? (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 px-2 text-xs text-red-600"
-                                      onClick={() => removeBlockForDay(dow, blockIndex)}
-                                    >
-                                      Quitar
-                                    </Button>
-                                  ) : (
-                                    <span className="w-14" />
-                                  )}
-                                </div>
-                              ))}
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => addBlockForDay(dow)}
-                              >
-                                + Otra franja en el día
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                                  + franja
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-400">No atiende</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </>
               )}
@@ -812,7 +840,22 @@ export function DoctorSettingsDialog({
                     Transferencia manual: alias/CBU abajo. MP tiene prioridad si está activo y hay
                     honorario cargado.
                   </p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-[6.5rem_1fr] gap-3">
+                    <div>
+                      <Label className="text-xs">Moneda</Label>
+                      <Select
+                        value={payment.currency ?? "ARS"}
+                        onValueChange={(v) => setPayment((p) => ({ ...p, currency: v }))}
+                      >
+                        <SelectTrigger className="mt-1 h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ARS">$AR</SelectItem>
+                          <SelectItem value="USD">U$S</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div>
                       <Label className="text-xs">Honorario consulta</Label>
                       <div className="relative mt-1">
@@ -829,25 +872,10 @@ export function DoctorSettingsDialog({
                               consultationFee: parseThousands(e.target.value),
                             }))
                           }
-                          className="h-9 pl-8"
+                          className={`h-9 ${payment.currency === "USD" ? "pl-12" : "pl-8"}`}
                           placeholder="15.000"
                         />
                       </div>
-                    </div>
-                    <div>
-                      <Label className="text-xs">Moneda</Label>
-                      <Select
-                        value={payment.currency ?? "ARS"}
-                        onValueChange={(v) => setPayment((p) => ({ ...p, currency: v }))}
-                      >
-                        <SelectTrigger className="mt-1 h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ARS">$AR</SelectItem>
-                          <SelectItem value="USD">U$S</SelectItem>
-                        </SelectContent>
-                      </Select>
                     </div>
                   </div>
                   <div>
@@ -964,39 +992,76 @@ export function DoctorSettingsDialog({
                       )}
                     </div>
                   ) : (
-                    <div className="rounded-md border border-amber-200 bg-amber-50/70 p-3 space-y-2">
+                    <div className="rounded-md border border-amber-200 bg-amber-50/70 p-3 space-y-3">
                       <p className="text-sm text-amber-900">
                         {subscription?.status === "expired"
                           ? "Tu suscripción no está activa."
-                          : "Todavía no tenés una suscripción paga a Nodo."}
+                          : "Todavía no tenés una suscripción paga a Nodocore."}
                       </p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="h-8 text-xs bg-violet-700 hover:bg-violet-800"
-                        disabled={startingSubscription}
-                        onClick={async () => {
-                          setStartingSubscription(true);
-                          try {
-                            const result = await clinicApi.startSubscriptionCheckout();
-                            window.location.href = result.initPoint;
-                          } catch (e) {
-                            toast.error(
-                              e instanceof Error
-                                ? e.message
-                                : "No se pudo iniciar la suscripción",
-                            );
-                          } finally {
-                            setStartingSubscription(false);
-                          }
-                        }}
-                      >
-                        {startingSubscription ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          "Suscribirme"
-                        )}
-                      </Button>
+                      {!choosingPlan ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-8 text-xs bg-violet-700 hover:bg-violet-800"
+                          onClick={() => setChoosingPlan(true)}
+                        >
+                          Suscribirme
+                        </Button>
+                      ) : (
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          {PAID_SUBSCRIPTION_PLANS.map((p) => (
+                            <div
+                              key={p.id}
+                              className="rounded-lg border border-violet-200 bg-white p-3 space-y-2"
+                            >
+                              <p className="text-sm font-semibold text-slate-800">{p.name}</p>
+                              <p className="text-base font-bold text-violet-700">
+                                {formatPlanPrice(p)}{" "}
+                                <span className="text-xs font-normal text-slate-400">
+                                  {p.period}
+                                </span>
+                              </p>
+                              <ul className="space-y-1">
+                                {p.features.map((f) => (
+                                  <li
+                                    key={f}
+                                    className="text-xs text-slate-500 flex items-center gap-1"
+                                  >
+                                    <span className="text-violet-500">✓</span> {f}
+                                  </li>
+                                ))}
+                              </ul>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="w-full h-8 text-xs bg-violet-700 hover:bg-violet-800"
+                                disabled={startingPlanId !== null}
+                                onClick={async () => {
+                                  setStartingPlanId(p.id);
+                                  try {
+                                    const result = await clinicApi.startSubscriptionCheckout(p.id);
+                                    window.location.href = result.initPoint;
+                                  } catch (e) {
+                                    toast.error(
+                                      e instanceof Error
+                                        ? e.message
+                                        : "No se pudo iniciar la suscripción",
+                                    );
+                                  } finally {
+                                    setStartingPlanId(null);
+                                  }
+                                }}
+                              >
+                                {startingPlanId === p.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  "Elegir este plan"
+                                )}
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </>

@@ -3,6 +3,7 @@ import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
 import { appBaseUrl } from "@/lib/clinic/appointment-payment";
 import { createPreapproval } from "@/lib/mercadopago/client";
 import { createServiceClient } from "@/lib/supabase/server";
+import { findSubscriptionPlan } from "@/lib/clinic/subscription-plans";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
   }
 
+  const body = await request.json().catch(() => ({}));
+  const plan = findSubscriptionPlan(String(body.planId ?? ""));
+  if (!plan) {
+    return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
+  }
+
   const nodoAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim();
   if (!nodoAccessToken) {
     return NextResponse.json(
@@ -61,36 +68,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const priceStr = process.env.NODO_SUBSCRIPTION_PRICE?.trim();
-  const price = priceStr ? Number(priceStr) : NaN;
-  if (!priceStr || Number.isNaN(price) || price <= 0) {
-    return NextResponse.json(
-      {
-        error:
-          "Falta configurar NODO_SUBSCRIPTION_PRICE (monto mensual en NODO_SUBSCRIPTION_CURRENCY) en el servidor.",
-      },
-      { status: 503 },
-    );
-  }
-  const currency = process.env.NODO_SUBSCRIPTION_CURRENCY?.trim() || "ARS";
-
   const base = appBaseUrl();
 
   try {
     const preapproval = await createPreapproval({
       accessToken: nodoAccessToken,
-      reason: "Suscripción mensual — Nodo Clínica",
+      reason: `Suscripción ${plan.name} — Nodo Clínica`,
       payerEmail: professional.email,
       externalReference: professional.id,
-      amount: price,
-      currency,
+      amount: plan.amount,
+      currency: plan.currency,
       backUrl: `${base}/medico/dashboard?settings=suscripcion`,
     });
 
     const supabase = await createServiceClient();
     await supabase
       .from("professionals")
-      .update({ mercadopago_preapproval_id: preapproval.id })
+      .update({ mercadopago_preapproval_id: preapproval.id, subscription_plan: plan.id })
       .eq("id", professional.id);
 
     return NextResponse.json({ initPoint: preapproval.initPoint });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { PlanGate } from "@nodocore/shared-components";
 import { NodoChatWidget } from "@/components/nodo-chat/nodo-chat-widget";
@@ -11,6 +11,7 @@ import { isPlatformMode } from "@/lib/clinic/platform-config";
 
 export function MedicoInterconsultasClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [doctor, setDoctor] = useState<{
     id: string;
     fullName: string;
@@ -47,6 +48,8 @@ export function MedicoInterconsultasClient() {
       doctorName={doctor.fullName}
       isPro={pro}
       embedded
+      initialPeerId={searchParams.get("peerId")}
+      initialPeerName={searchParams.get("peerName")}
     />
   );
 

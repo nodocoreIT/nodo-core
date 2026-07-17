@@ -458,10 +458,12 @@ export const clinicApi = {
     };
   },
 
-  async startSubscriptionCheckout() {
+  async startSubscriptionCheckout(planId: string) {
     const res = await fetch(`${BASE}/api/clinic/subscription/checkout`, {
       method: "POST",
       credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ planId }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al iniciar la suscripción");
@@ -1131,6 +1133,7 @@ export const clinicApi = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al cargar mensajes");
     return data as {
+      meId: string;
       messages: Array<{
         id: string;
         fromDoctorId: string;

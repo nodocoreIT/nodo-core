@@ -234,6 +234,23 @@ export function DoctorOfficePanel({
     }));
   };
 
+  const copyMondayToWeekdays = () => {
+    setAvailability((prev) => {
+      const monday = prev.days.filter((d) => d.dayOfWeek === 1);
+      if (!monday.length) return prev;
+      const rest = prev.days.filter((d) => ![2, 3, 4, 5].includes(d.dayOfWeek));
+      const copied = [2, 3, 4, 5].flatMap((dayOfWeek) =>
+        monday.map((b) => ({ ...b, dayOfWeek })),
+      );
+      return {
+        ...prev,
+        days: [...rest, ...copied].sort(
+          (a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime),
+        ),
+      };
+    });
+  };
+
   const removeBlockForDay = (dayOfWeek: number, blockIndex: number) => {
     setAvailability((prev) => {
       let idx = -1;
@@ -365,89 +382,88 @@ export function DoctorOfficePanel({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              <Label className="text-xs">Días que atiendo</Label>
-              {ALL_DAYS.map((dow) => {
-                const active = availability.days.some((d) => d.dayOfWeek === dow);
-                const blocks = blocksForDay(dow);
-                return (
-                  <div
-                    key={dow}
-                    className={`rounded-lg border p-2.5 ${
-                      active ? "border-blue-200 bg-blue-50/30" : "border-slate-100"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        checked={active}
-                        onChange={() => toggleDay(dow)}
-                        className="rounded"
-                      />
-                      <span className="text-sm font-medium">{dayLabel(dow)}</span>
-                    </div>
-                    {active && (
-                      <div className="space-y-2 pl-6">
-                        {blocks.map((block, blockIndex) => (
-                          <div
-                            key={`${dow}-${blockIndex}`}
-                            className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center"
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Días que atiendo</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-blue-600 hover:text-blue-700 disabled:opacity-40"
+                  disabled={blocksForDay(1).length === 0}
+                  onClick={copyMondayToWeekdays}
+                >
+                  Copiar Lun a Vie
+                </Button>
+              </div>
+              <div className="rounded-lg border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+                {ALL_DAYS.map((dow) => {
+                  const active = availability.days.some((d) => d.dayOfWeek === dow);
+                  const blocks = blocksForDay(dow);
+                  return (
+                    <div
+                      key={dow}
+                      className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 ${
+                        active ? "bg-blue-50/30" : ""
+                      }`}
+                    >
+                      <label className="flex items-center gap-2 w-14 shrink-0 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={active}
+                          onChange={() => toggleDay(dow)}
+                          className="rounded"
+                        />
+                        <span className="text-sm font-medium">{dayLabel(dow)}</span>
+                      </label>
+                      {active ? (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {blocks.map((block, blockIndex) => (
+                            <div key={blockIndex} className="flex items-center gap-1">
+                              <Input
+                                type="time"
+                                value={block.startTime}
+                                onChange={(e) =>
+                                  updateBlockTime(dow, blockIndex, "startTime", e.target.value)
+                                }
+                                className="h-7 w-26 text-xs px-1.5"
+                              />
+                              <span className="text-xs text-slate-400">a</span>
+                              <Input
+                                type="time"
+                                value={block.endTime}
+                                onChange={(e) =>
+                                  updateBlockTime(dow, blockIndex, "endTime", e.target.value)
+                                }
+                                className="h-7 w-26 text-xs px-1.5"
+                              />
+                              {blocks.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeBlockForDay(dow, blockIndex)}
+                                  className="text-red-500 hover:text-red-700 text-xs px-1"
+                                  aria-label="Quitar franja"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => addBlockForDay(dow)}
+                            className="text-xs text-blue-600 hover:text-blue-700 px-1"
                           >
-                            <Input
-                              type="time"
-                              value={block.startTime}
-                              onChange={(e) =>
-                                updateBlockTime(
-                                  dow,
-                                  blockIndex,
-                                  "startTime",
-                                  e.target.value,
-                                )
-                              }
-                              className="h-8 text-sm"
-                            />
-                            <Input
-                              type="time"
-                              value={block.endTime}
-                              onChange={(e) =>
-                                updateBlockTime(
-                                  dow,
-                                  blockIndex,
-                                  "endTime",
-                                  e.target.value,
-                                )
-                              }
-                              className="h-8 text-sm"
-                            />
-                            {blocks.length > 1 ? (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-2 text-xs text-red-600"
-                                onClick={() => removeBlockForDay(dow, blockIndex)}
-                              >
-                                Quitar
-                              </Button>
-                            ) : (
-                              <span className="w-14" />
-                            )}
-                          </div>
-                        ))}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs"
-                          onClick={() => addBlockForDay(dow)}
-                        >
-                          + Otra franja en el día
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                            + franja
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">No atiende</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </TabsContent>
 
@@ -701,7 +717,22 @@ export function DoctorOfficePanel({
               Transferencia manual: alias/CBU abajo. MP tiene prioridad si está activo
               y hay honorario cargado.
             </p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-[6.5rem_1fr] gap-3">
+              <div>
+                <Label className="text-xs">Moneda</Label>
+                <Select
+                  value={payment.currency ?? "ARS"}
+                  onValueChange={(v) => setPayment((p) => ({ ...p, currency: v }))}
+                >
+                  <SelectTrigger className="mt-1 h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ARS">$AR</SelectItem>
+                    <SelectItem value="USD">U$S</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div>
                 <Label className="text-xs">Honorario consulta</Label>
                 <div className="relative mt-1">
@@ -718,25 +749,10 @@ export function DoctorOfficePanel({
                         consultationFee: parseThousands(e.target.value),
                       }))
                     }
-                    className="h-9 pl-8"
+                    className={`h-9 ${payment.currency === "USD" ? "pl-12" : "pl-8"}`}
                     placeholder="15.000"
                   />
                 </div>
-              </div>
-              <div>
-                <Label className="text-xs">Moneda</Label>
-                <Select
-                  value={payment.currency ?? "ARS"}
-                  onValueChange={(v) => setPayment((p) => ({ ...p, currency: v }))}
-                >
-                  <SelectTrigger className="mt-1 h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ARS">$AR</SelectItem>
-                    <SelectItem value="USD">U$S</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
             <div>

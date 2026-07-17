@@ -30,6 +30,7 @@ export function NodoChatBell({
   const [items, setItems] = useState<
     Array<{
       id: string;
+      fromDoctorId: string;
       fromDoctorName: string;
       content: string;
       createdAt: string;
@@ -77,19 +78,29 @@ export function NodoChatBell({
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [open]);
 
-  const handleOpenChat = async () => {
+  const openChatWithPeer = async (peerId?: string, peerName?: string) => {
     setOpen(false);
     await clinicApi.markNodoChatRead();
     window.dispatchEvent(new CustomEvent("nodo-chat-read"));
     setCount(0);
     setItems([]);
-    if (chatEmbedded) return;
-    if (onOpenChat) {
-      onOpenChat();
+    if (!peerId) {
+      if (chatEmbedded) return;
+      if (onOpenChat) {
+        onOpenChat();
+        return;
+      }
+      router.push("/medico/interconsultas");
       return;
     }
-    router.push("/medico/interconsultas");
+    // Con peer específico: navegar siempre (incluso ya estando en /medico/interconsultas),
+    // así el widget detecta el cambio de peerId y abre esa conversación puntual.
+    const params = `?peerId=${encodeURIComponent(peerId)}&peerName=${encodeURIComponent(peerName ?? "")}`;
+    router.push(`/medico/interconsultas${params}`);
   };
+
+  const handleOpenChat = () =>
+    openChatWithPeer(items[0]?.fromDoctorId, items[0]?.fromDoctorName);
 
   if (!isPro) return null;
 
@@ -131,16 +142,22 @@ export function NodoChatBell({
           {items.length > 0 ? (
             <ul className="max-h-52 overflow-y-auto divide-y divide-mist">
               {items.map((item) => (
-                <li key={item.id} className="px-4 py-2.5">
-                  <p className="text-xs font-semibold text-navy truncate">
-                    {item.fromDoctorName}
-                  </p>
-                  <p className="text-[11px] text-slate2 line-clamp-2 mt-0.5">
-                    {item.content}
-                  </p>
-                  <p className="text-[10px] text-slate2/70 mt-1">
-                    {formatPreviewTime(item.createdAt)}
-                  </p>
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => openChatWithPeer(item.fromDoctorId, item.fromDoctorName)}
+                    className="w-full text-left px-4 py-2.5 hover:bg-paper transition-colors"
+                  >
+                    <p className="text-xs font-semibold text-navy truncate">
+                      {item.fromDoctorName}
+                    </p>
+                    <p className="text-[11px] text-slate2 line-clamp-2 mt-0.5">
+                      {item.content}
+                    </p>
+                    <p className="text-[10px] text-slate2/70 mt-1">
+                      {formatPreviewTime(item.createdAt)}
+                    </p>
+                  </button>
                 </li>
               ))}
             </ul>

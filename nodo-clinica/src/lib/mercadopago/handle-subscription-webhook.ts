@@ -34,7 +34,6 @@ export async function processMercadoPagoPreapprovalId(
     .from("professionals")
     .update({
       subscription_status: subscriptionStatus,
-      subscription_plan: "profesional",
       subscription_next_payment_at: preapproval.next_payment_date ?? null,
     })
     .eq("id", professional.id);

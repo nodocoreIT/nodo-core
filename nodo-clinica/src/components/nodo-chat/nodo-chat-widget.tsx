@@ -10,7 +10,6 @@ import {
   Users,
   Inbox,
   Circle,
-  ArrowLeft,
   Lock,
 } from "lucide-react";
 import { clinicApi } from "@/lib/clinic/client-api";
@@ -29,6 +28,9 @@ interface NodoChatWidgetProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onMarkRead?: () => void;
+  /** Abre directamente el chat con este colega (desde la campanita de notificaciones) */
+  initialPeerId?: string | null;
+  initialPeerName?: string | null;
 }
 
 function formatTime(iso: string) {
@@ -60,6 +62,8 @@ export function NodoChatWidget({
   open: controlledOpen,
   onOpenChange,
   onMarkRead,
+  initialPeerId,
+  initialPeerName,
 }: NodoChatWidgetProps) {
   const [internalOpen, setInternalOpen] = useState(embedded);
   const open = controlledOpen ?? internalOpen;
@@ -71,6 +75,7 @@ export function NodoChatWidget({
     [onOpenChange],
   );
   const [view, setView] = useState<View>("menu");
+  const [searchSectionTitle, setSearchSectionTitle] = useState("Buscar colega Pro");
   const [contacts, setContacts] = useState<NodoChatContact[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeContact, setActiveContact] = useState<NodoChatContact | null>(
@@ -78,6 +83,7 @@ export function NodoChatWidget({
   );
   const [activePeerId, setActivePeerId] = useState<string | null>(null);
   const [messages, setMessages] = useState<NodoChatMessage[]>([]);
+  const [meId, setMeId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -88,10 +94,11 @@ export function NodoChatWidget({
   const loadMessages = useCallback(async () => {
     if (!isPro) return;
     try {
-      const { messages: msgs } = await clinicApi.getInterconsultMessages(
+      const { messages: msgs, meId: id } = await clinicApi.getInterconsultMessages(
         activePeerId,
       );
       setMessages(msgs);
+      setMeId(id);
     } finally {
       setLoading(false);
     }
@@ -116,10 +123,12 @@ export function NodoChatWidget({
     loadContacts();
     const interval = setInterval(() => {
       clinicApi.pingInterconsultPresence();
-      if (view === "search") loadContacts(searchQuery);
+      if (view === "search" || (view === "chat" && !activeContact)) {
+        loadContacts(view === "search" ? searchQuery : "");
+      }
     }, 15_000);
     return () => clearInterval(interval);
-  }, [isPro, open, embedded, view, searchQuery, loadContacts]);
+  }, [isPro, open, embedded, view, activeContact, searchQuery, loadContacts]);
 
   useEffect(() => {
     if (view === "chat") {
@@ -186,6 +195,25 @@ export function NodoChatWidget({
     setActivePeerId(null);
   };
 
+  const appliedInitialPeerRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!initialPeerId || appliedInitialPeerRef.current === initialPeerId) return;
+    appliedInitialPeerRef.current = initialPeerId;
+    const match = contacts.find((c) => c.id === initialPeerId);
+    openChatWith(
+      match ?? {
+        id: initialPeerId,
+        fullName: initialPeerName ?? "Colega",
+        role: "Médico",
+        nodeSlug: "salud",
+        nodeLabel: "Nodo Salud",
+        plan: "pro",
+        online: false,
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPeerId, initialPeerName, contacts]);
+
   if (!isPro) {
     if (embedded) {
       return (
@@ -249,22 +277,21 @@ export function NodoChatWidget({
         )}
       </div>
 
-      {/* Sub-header conversación */}
-      {view === "chat" && (
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-mist bg-paper shrink-0">
+      {/* Sub-header (volver + título de sección) */}
+      {(view === "chat" || view === "search") && (
+        <div className="flex flex-col gap-1 px-3 py-2 border-b border-mist bg-paper shrink-0">
           <button
             type="button"
             onClick={goMenu}
-            className="p-1 rounded-md hover:bg-mist text-navy"
-            aria-label="Volver"
+            className="self-start text-xs text-brand font-semibold hover:underline"
           >
-            <ArrowLeft className="h-4 w-4" />
+            ← Volver al menú
           </button>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-navy truncate">
-              {activeContact?.fullName ?? "Sala general"}
+              {view === "chat" ? (activeContact?.fullName ?? "Sala general") : searchSectionTitle}
             </p>
-            {activeContact && (
+            {view === "chat" && activeContact && (
               <p className="text-[10px] text-slate2 flex items-center gap-1">
                 <Circle
                   className={cn(
@@ -277,6 +304,41 @@ export function NodoChatWidget({
                   : "No disponible — mensaje quedará guardado"}
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Colegas del nodo — visible en la sala general */}
+      {view === "chat" && !activeContact && contacts.length > 0 && (
+        <div className="border-b border-mist bg-white px-3 py-2 shrink-0">
+          <p className="text-[10px] font-semibold text-slate2 uppercase tracking-wide mb-1.5">
+            Colegas de tu nodo ({contacts.length})
+          </p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {contacts.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => openChatWith(c)}
+                className="flex flex-col items-center gap-1 shrink-0 w-14"
+                title={c.fullName}
+              >
+                <span className="relative">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-900 text-[10px] font-bold text-white">
+                    {initials(c.fullName)}
+                  </span>
+                  <Circle
+                    className={cn(
+                      "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 fill-current stroke-white stroke-[2]",
+                      c.online ? "text-emerald-500" : "text-slate2/40",
+                    )}
+                  />
+                </span>
+                <span className="text-[9px] text-slate2 truncate w-full text-center">
+                  {c.fullName.split(" ")[0]}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -301,6 +363,7 @@ export function NodoChatWidget({
                   label: "Buscar colega Pro",
                   sub: "Inmo, Salud, Legal…",
                   action: () => {
+                    setSearchSectionTitle("Buscar colega Pro");
                     setView("search");
                     loadContacts("");
                   },
@@ -316,6 +379,7 @@ export function NodoChatWidget({
                   label: "Mensajes dejados",
                   sub: "Para cuando no estén online",
                   action: () => {
+                    setSearchSectionTitle("Mensajes dejados");
                     setView("search");
                     loadContacts("");
                   },
@@ -355,13 +419,6 @@ export function NodoChatWidget({
                 className="w-full pl-9 pr-3 py-2.5 rounded-md border border-mist text-sm outline-none focus:border-brand"
               />
             </div>
-            <button
-              type="button"
-              onClick={goMenu}
-              className="text-xs text-brand font-semibold mb-2 hover:underline"
-            >
-              ← Volver al menú
-            </button>
             <div className="space-y-1.5">
               {contacts.length === 0 ? (
                 <p className="text-sm text-slate2 text-center py-6">
@@ -430,7 +487,7 @@ export function NodoChatWidget({
               </p>
             ) : (
               messages.map((msg) => {
-                const mine = msg.fromDoctorId === doctorId;
+                const mine = msg.fromDoctorId === meId;
                 return (
                   <div
                     key={msg.id}

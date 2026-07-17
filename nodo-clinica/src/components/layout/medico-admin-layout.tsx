@@ -132,6 +132,13 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   }, [doctor, refreshCobrosUnread]);
 
   useEffect(() => {
+    if (!doctor || !isPro) return;
+    clinicApi.pingInterconsultPresence();
+    const interval = setInterval(() => clinicApi.pingInterconsultPresence(), 30_000);
+    return () => clearInterval(interval);
+  }, [doctor, isPro]);
+
+  useEffect(() => {
     if (pathname === "/medico/cobros" && doctor) {
       clinicApi.markCobrosNotificationsRead().then(() => {
         setCobrosUnread(0);
@@ -213,6 +220,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = async () => {
     await clinicApi.logout();
+    useConsultorioStore.getState().resetSettings();
     router.push("/login");
   };
 
