@@ -5,6 +5,7 @@ import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
 import { isLocalMode } from "@/lib/clinic/config";
 import { readDb, writeDb, type DoctorPaymentSettings, type DoctorReminderSettings } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
+import { orgHasMercadoPagoConnection } from "@/lib/clinic/db/payments";
 
 const DOCTOR_ROLES = new Set(["admin", "super_admin", "medico", "agent", "doctor"]);
 import { mergeThemeSettings } from "@/lib/clinic/theme-settings";
@@ -29,8 +30,10 @@ function getAvailability(officeSettings: any) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ownPaymentForProfessional(payment?: any) {
-  if (!payment) return {};
+function ownPaymentForProfessional(payment?: any, orgConnected = false) {
+  if (!payment) {
+    return { mercadopagoConnected: orgConnected, hasMercadopagoToken: orgConnected };
+  }
   const {
     mercadopagoAccessToken,
     mercadopagoRefreshToken,
@@ -41,8 +44,9 @@ function ownPaymentForProfessional(payment?: any) {
   return {
     ...rest,
     mercadopagoAccessToken: token ? `····${token.slice(-4)}` : "",
-    hasMercadopagoToken: !!token || !!mercadopagoRefreshToken,
-    mercadopagoConnected: !!(payment.mercadopagoUserId || mercadopagoRefreshToken || token),
+    hasMercadopagoToken: !!token || !!mercadopagoRefreshToken || orgConnected,
+    mercadopagoConnected:
+      !!(payment.mercadopagoUserId || mercadopagoRefreshToken || token) || orgConnected,
     mercadopagoUserId: payment.mercadopagoUserId
       ? `···${payment.mercadopagoUserId.slice(-4)}`
       : undefined,
@@ -50,7 +54,7 @@ function ownPaymentForProfessional(payment?: any) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function doctorOfficePayload(professional: any, officeSettings: any) {
+function doctorOfficePayload(professional: any, officeSettings: any, orgConnected = false) {
   const availability = getAvailability(officeSettings);
   return {
     availability,
@@ -65,7 +69,7 @@ function doctorOfficePayload(professional: any, officeSettings: any) {
     signatureImageData: professional?.signature_image_url ?? "",
     profilePhotoData: professional?.profile_photo_url ?? "",
     bio: professional?.bio ?? "",
-    payment: ownPaymentForProfessional(officeSettings?.payment),
+    payment: ownPaymentForProfessional(officeSettings?.payment, orgConnected),
     reminderSettings: officeSettings?.reminder_settings ?? {
       enabled: false,
       minutesBefore: 1440,
@@ -182,7 +186,13 @@ export async function GET(request: NextRequest) {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return NextResponse.json(doctorOfficePayload(professional, (professional as any).office_settings));
+    const orgId = (professional as any).org_id as string | null;
+    const orgConnected = orgId ? await orgHasMercadoPagoConnection(orgId) : false;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return NextResponse.json(
+      doctorOfficePayload(professional, (professional as any).office_settings, orgConnected),
+    );
   }
 
   const doctorId = searchParams.get("doctorId");

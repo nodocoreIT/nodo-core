@@ -3,6 +3,7 @@ import { isLocalMode } from "@/lib/clinic/config";
 import { readDb, publicDoctor, publicDoctorSummary } from "@/lib/clinic/local-db";
 import { requireAuth } from "@/lib/supabase/auth-guard";
 import { createServiceClient } from "@/lib/supabase/server";
+import { orgHasMercadoPagoConnection } from "@/lib/clinic/db/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -64,8 +65,15 @@ export async function GET(request: NextRequest) {
       mercadopagoAccessToken?: unknown;
       mercadopagoRefreshToken?: unknown;
       mercadopagoPublicKey?: unknown;
+      consultationFee?: number;
       [k: string]: unknown;
     };
+
+    const orgConnected = professional.org_id
+      ? await orgHasMercadoPagoConnection(professional.org_id)
+      : false;
+    const consultationFee =
+      typeof safePayment.consultationFee === "number" ? safePayment.consultationFee : 0;
 
     return NextResponse.json({
       id: professional.id,
@@ -73,7 +81,10 @@ export async function GET(request: NextRequest) {
       specialty: professional.specialty,
       licenseNumber: professional.license_number,
       profilePhotoUrl: professional.profile_photo_url,
-      payment: safePayment,
+      payment: {
+        ...safePayment,
+        mercadopagoReady: orgConnected && consultationFee > 0,
+      },
     });
   }
 

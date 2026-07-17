@@ -24,6 +24,7 @@ import {
   doctorUsesMercadoPago,
 } from "@/lib/clinic/payment";
 import { isStrictPaymentValidation } from "@/lib/clinic/payment-validation";
+import { orgHasMercadoPagoConnection } from "@/lib/clinic/db/payments";
 import { sendAppointmentConfirmationEmail } from "@/lib/email/resend";
 import { formatReminderLabel } from "@/lib/email/reminder-label";
 import { buildCheckoutForAppointment } from "@/lib/mercadopago/checkout";
@@ -104,7 +105,11 @@ export async function GET(request: NextRequest) {
     const [{ data: patient }, { data: professional }, { count: waitingCount }, { data: docs }] =
       await Promise.all([
         supabase.from("patients").select("*").eq("id", apt.patient_id).maybeSingle(),
-        supabase.from("professionals").select("*").eq("id", apt.doctor_id).maybeSingle(),
+        supabase
+          .from("professionals")
+          .select("*, office_settings(*)")
+          .eq("id", apt.doctor_id)
+          .maybeSingle(),
         supabase
           .from("appointments")
           .select("*", { count: "exact", head: true })
@@ -122,6 +127,28 @@ export async function GET(request: NextRequest) {
       .eq("doctor_id", apt.doctor_id)
       .in("status", ["waiting", "in_consultation"])
       .lt("queue_position", apt.queue_position);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const officeSettingsPayment = ((professional as any)?.office_settings?.payment ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const consultationFee =
+      typeof officeSettingsPayment.consultationFee === "number"
+        ? officeSettingsPayment.consultationFee
+        : 0;
+    const orgConnected = professional?.org_id
+      ? await orgHasMercadoPagoConnection(professional.org_id)
+      : false;
+    const doctorPayment = {
+      consultationFee,
+      currency: (officeSettingsPayment.currency as string) ?? "ARS",
+      alias: officeSettingsPayment.alias as string | undefined,
+      cbu: officeSettingsPayment.cbu as string | undefined,
+      paymentInstructions: officeSettingsPayment.paymentInstructions as string | undefined,
+      qrImageData: officeSettingsPayment.qrImageData as string | undefined,
+      mercadopagoReady: orgConnected && consultationFee > 0,
+    };
 
     return NextResponse.json({
       appointment: {
@@ -155,6 +182,7 @@ export async function GET(request: NextRequest) {
             fullName: professional.full_name,
             specialty: professional.specialty,
             profilePhotoUrl: professional.profile_photo_url,
+            payment: doctorPayment,
           }
         : undefined,
       queuePosition: (aheadCount ?? 0) + 1,
