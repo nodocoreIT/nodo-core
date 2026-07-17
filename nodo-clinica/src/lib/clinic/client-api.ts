@@ -397,6 +397,7 @@ export const clinicApi = {
     }
     return data as {
       waitingRoomUrl: string;
+      accessToken?: string;
       checkoutUrl?: string;
       paymentProvider?: string;
       paymentPendingReview?: boolean;

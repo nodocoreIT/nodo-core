@@ -37,6 +37,8 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 interface WaitingRoomProps {
   accessToken: string;
   dataSource?: "local" | "supabase";
+  /** When provided, renders in embedded (modal) mode instead of a full page. */
+  onClose?: () => void;
 }
 
 interface WaitingMeta {
@@ -59,7 +61,11 @@ interface WaitingMeta {
 export function WaitingRoom({
   accessToken,
   dataSource = "supabase",
+  onClose,
 }: WaitingRoomProps) {
+  const embedded = !!onClose;
+  const outerClass = (bg: string, center = false) =>
+    embedded ? "" : `min-h-screen ${bg}${center ? " flex items-center justify-center" : ""} p-4`;
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [queuePosition, setQueuePosition] = useState(0);
   const [totalWaiting, setTotalWaiting] = useState(0);
@@ -465,7 +471,7 @@ export function WaitingRoom({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className={embedded ? "flex items-center justify-center py-12" : outerClass("bg-slate-50", true)}>
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
@@ -473,17 +479,19 @@ export function WaitingRoom({
 
   if (!appointment) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Card className="max-w-md">
+      <div className={embedded ? "" : outerClass("bg-slate-50", true)}>
+        <Card className={embedded ? "" : "max-w-md"}>
           <CardContent className="pt-6 text-center space-y-3">
             <p className="text-slate-600">
               {loadError || "Enlace inválido o expirado"}
             </p>
-            <Link href="/paciente">
-              <Button variant="outline" size="sm">
-                Volver al portal
-              </Button>
-            </Link>
+            {!embedded && (
+              <Link href="/paciente">
+                <Button variant="outline" size="sm">
+                  Volver al portal
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -505,7 +513,7 @@ export function WaitingRoom({
   const isInConsultation = appointment.status === "in_consultation";
   const isCompleted = appointment.status === "completed";
 
-  const backLink = (
+  const backLink = embedded ? null : (
     <Link
       href="/paciente"
       className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 mb-4"
@@ -541,7 +549,11 @@ export function WaitingRoom({
     try {
       await clinicApi.cancelPendingAppointment(accessToken);
       toast.success("Turno cancelado");
-      window.location.href = "/paciente";
+      if (embedded) {
+        onClose?.();
+      } else {
+        window.location.href = "/paciente";
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo cancelar");
     } finally {
@@ -551,8 +563,8 @@ export function WaitingRoom({
 
   if (paymentStatus === "rejected" || appointment.status === "cancelled") {
     return (
-      <div className="min-h-screen bg-slate-50 p-4">
-        <div className="max-w-lg mx-auto">
+      <div className={outerClass("bg-slate-50")}>
+        <div className={embedded ? "" : "max-w-lg mx-auto"}>
           {backLink}
           <Card className="border-red-200">
             <CardContent className="pt-6 text-center space-y-3">
@@ -564,11 +576,13 @@ export function WaitingRoom({
                 El médico no pudo confirmar tu comprobante de pago. Podés pedir
                 un nuevo turno desde el portal.
               </p>
-              <Link href="/paciente">
-                <Button className="bg-emerald-600 hover:bg-emerald-700">
-                  Volver al portal
-                </Button>
-              </Link>
+              {!embedded && (
+                <Link href="/paciente">
+                  <Button className="bg-emerald-600 hover:bg-emerald-700">
+                    Volver al portal
+                  </Button>
+                </Link>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -581,8 +595,8 @@ export function WaitingRoom({
 
   if (paymentStatus === "pending" && receiptAlreadySubmitted) {
     return (
-      <div className="min-h-screen bg-slate-50 p-4">
-        <div className="max-w-lg mx-auto">
+      <div className={outerClass("bg-slate-50")}>
+        <div className={embedded ? "" : "max-w-lg mx-auto"}>
           {backLink}
           <Card className="border-amber-300 bg-amber-50/30">
             <CardHeader>
@@ -657,8 +671,8 @@ export function WaitingRoom({
 
   if (paymentStatus === "pending") {
     return (
-      <div className="min-h-screen bg-slate-50 p-4">
-        <div className="max-w-lg mx-auto">
+      <div className={outerClass("bg-slate-50")}>
+        <div className={embedded ? "" : "max-w-lg mx-auto"}>
           {backLink}
           <Card className="border-amber-200">
             <CardHeader>
@@ -888,8 +902,8 @@ export function WaitingRoom({
 
   if (isInConsultation && videoEnded) {
     return (
-      <div className="min-h-screen bg-slate-900 p-4">
-        <div className="max-w-4xl mx-auto">
+      <div className={outerClass("bg-slate-900")}>
+        <div className={embedded ? "" : "max-w-4xl mx-auto"}>
           {backLink}
           <ConsultationEndScreen
             role="patient"
@@ -907,8 +921,8 @@ export function WaitingRoom({
 
   if (isInConsultation && !videoEnded) {
     return (
-      <div className="min-h-screen bg-slate-900 p-4">
-        <div className="max-w-4xl mx-auto">
+      <div className={outerClass("bg-slate-900")}>
+        <div className={embedded ? "" : "max-w-4xl mx-auto"}>
           {backLink}
           <div className="text-center mb-4">
             <Badge className="bg-emerald-600 text-white">
@@ -945,8 +959,8 @@ export function WaitingRoom({
 
   if (isCompleted) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
-        <div className="max-w-md w-full">
+      <div className={embedded ? "" : "min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4"}>
+        <div className={embedded ? "" : "max-w-md w-full"}>
           {backLink}
           <Card className="text-center">
             <CardContent className="pt-8 pb-6">
@@ -957,14 +971,23 @@ export function WaitingRoom({
               <p className="text-sm text-slate-500 mt-2">
                 Gracias por utilizar Clínica Virtual.
               </p>
-              <Button
-                className="mt-6 bg-emerald-600 hover:bg-emerald-700"
-                onClick={() => {
-                  window.location.href = "/paciente";
-                }}
-              >
-                Volver al portal
-              </Button>
+              {embedded ? (
+                <Button
+                  className="mt-6 bg-emerald-600 hover:bg-emerald-700"
+                  onClick={onClose}
+                >
+                  Cerrar
+                </Button>
+              ) : (
+                <Button
+                  className="mt-6 bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => {
+                    window.location.href = "/paciente";
+                  }}
+                >
+                  Volver al portal
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -978,8 +1001,8 @@ export function WaitingRoom({
       : 50;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50/40 to-slate-50">
-      <div className="max-w-lg mx-auto px-4 py-8 space-y-5">
+    <div className={embedded ? "" : "min-h-screen bg-gradient-to-b from-emerald-50/40 to-slate-50"}>
+      <div className={embedded ? "space-y-5" : "max-w-lg mx-auto px-4 py-8 space-y-5"}>
         {backLink}
         <div className="text-center space-y-3">
           <div className="flex items-center justify-center gap-4">

@@ -45,6 +45,10 @@ interface BookAppointmentDialogProps {
   doctorName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Called with the new appointment's access token once booking succeeds
+   * (no further payment redirect needed). If omitted, falls back to
+   * navigating to the waiting-room page. */
+  onBooked?: (accessToken: string) => void;
 }
 
 type WizardStep = "slot" | "payment" | "intake" | "studies" | "confirm";
@@ -135,6 +139,7 @@ export function BookAppointmentDialog({
   doctorName,
   open,
   onOpenChange,
+  onBooked,
 }: BookAppointmentDialogProps) {
   const [step, setStep] = useState<WizardStep>("slot");
   const [dates, setDates] = useState<{ date: string; label: string }[]>([]);
@@ -470,7 +475,11 @@ export function BookAppointmentDialog({
           : "Turno confirmado. Te esperamos en la sala virtual.",
       );
       onOpenChange(false);
-      window.location.assign(result.waitingRoomUrl);
+      if (onBooked && result.accessToken) {
+        onBooked(result.accessToken);
+      } else {
+        window.location.assign(result.waitingRoomUrl);
+      }
     } catch (e) {
       const err = e as Error & {
         checks?: ReceiptChecks;

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { BookAppointmentDialog } from "@/components/patient/book-appointment-dialog";
+import { WaitingRoomModal } from "@/components/patient/waiting-room-modal";
 import { clinicApi, getClientSession } from "@/lib/clinic/client-api";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { format } from "date-fns";
@@ -185,6 +186,7 @@ export function PacienteInicioPage() {
     id: string;
     name: string;
   } | null>(null);
+  const [waitingRoomToken, setWaitingRoomToken] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -468,8 +470,14 @@ export function PacienteInicioPage() {
           doctorName={bookingDoctor.name}
           open={!!bookingDoctor}
           onOpenChange={(open) => !open && setBookingDoctor(null)}
+          onBooked={(accessToken) => setWaitingRoomToken(accessToken)}
         />
       )}
+
+      <WaitingRoomModal
+        accessToken={waitingRoomToken}
+        onOpenChange={(open) => !open && setWaitingRoomToken(null)}
+      />
     </div>
   );
 }

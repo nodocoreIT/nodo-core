@@ -175,7 +175,7 @@ export async function GET(request: NextRequest) {
     // not the patients-table row id that appointments.patient_id stores.
     const { data: patientRow } = await supabase
       .from("patients")
-      .select("id")
+      .select("id, org_id")
       .eq("profile_id", patientId)
       .maybeSingle();
 
@@ -184,7 +184,7 @@ export async function GET(request: NextRequest) {
           .from("appointments")
           .select("*, professionals(full_name, specialty)")
           .eq("patient_id", patientRow.id)
-          .eq("org_id", user.org_id ?? "")
+          .eq("org_id", patientRow.org_id)
           .order("scheduled_at", { ascending: false })
       : { data: [] };
 
@@ -747,6 +747,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     appointment: apt,
     waitingRoomUrl,
+    accessToken: apt.access_token,
     requiresPayment,
     paymentProvider: "transfer",
     paymentPendingReview,
