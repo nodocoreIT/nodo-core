@@ -391,11 +391,6 @@ export function BookAppointmentDialog({
       toast.message("Esperá el análisis del comprobante…");
       return;
     }
-    if (transferRequired && receiptAudit && !receiptAudit.valid) {
-      toast.message(
-        "La IA no pudo validar todo automáticamente. Podés continuar: el médico revisará el comprobante.",
-      );
-    }
     goNext();
   };
 
@@ -817,7 +812,7 @@ export function BookAppointmentDialog({
                 </p>
               )}
               {receiptAudit && (
-                <ReceiptValidationCard audit={receiptAudit} title="Pago validado" />
+                <ReceiptValidationCard audit={receiptAudit} title="Pagaaao validado" />
               )}
               {intakeReason.trim() && (
                 <p className="text-xs text-slate-600 line-clamp-2">
