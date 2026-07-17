@@ -633,14 +633,7 @@ export function BookAppointmentDialog({
               disabled={!selectedSlot || loadingSlots || !paymentSettingsReady}
               onClick={handleContinueFromSlot}
             >
-              {!paymentSettingsReady ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Cargando…
-                </>
-              ) : (
-                "Continuar"
-              )}
+              Continuar
             </Button>
           </div>
         )}
