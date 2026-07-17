@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cotizador Interno · Dev &amp; Automatización</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b1420;
+    --panel:#101d2e;
+    --panel-alt:#16283d;
+    --line:#24405c;
+    --line-soft:#1b3049;
+    --accent:#5ee6c8;
+    --accent-dim:#3a9484;
+    --accent-2:#f2b134;
+    --danger:#ef6a6a;
+    --text:#e6edf3;
+    --text-muted:#8fa3b8;
+    --text-faint:#5d7288;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      linear-gradient(var(--bg), var(--bg)),
+      repeating-linear-gradient(0deg, var(--line-soft) 0px, transparent 1px, transparent 32px),
+      repeating-linear-gradient(90deg, var(--line-soft) 0px, transparent 1px, transparent 32px);
+    background-blend-mode:normal;
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    padding:28px 16px 60px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;}
+
+  header.top{
+    display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:20px;margin-bottom:28px;
+  }
+  .brand-eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;letter-spacing:0.12em;text-transform:uppercase;
+    color:var(--accent);margin-bottom:6px;
+  }
+  h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:clamp(24px,3.4vw,34px);
+    margin:0;font-weight:700;letter-spacing:-0.01em;
+  }
+  .subtitle{color:var(--text-muted);font-size:14px;margin-top:6px;max-width:520px;}
+  .badge-currency{
+    font-family:'JetBrains Mono',monospace;
+    border:1px solid var(--line);border-radius:6px;
+    padding:8px 14px;color:var(--accent);font-size:13px;
+    background:var(--panel-alt);white-space:nowrap;
+  }
+
+  .grid{display:grid;grid-template-columns:1.35fr 1fr;gap:24px;align-items:start;}
+  @media (max-width:920px){.grid{grid-template-columns:1fr;}}
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:22px 22px 24px;
+    margin-bottom:20px;
+  }
+  .step-label{
+    display:flex;align-items:baseline;gap:10px;margin-bottom:14px;
+  }
+  .step-num{
+    font-family:'JetBrains Mono',monospace;
+    color:var(--accent);font-size:13px;font-weight:600;
+  }
+  .step-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:17px;font-weight:600;
+  }
+  .step-hint{color:var(--text-muted);font-size:13px;margin:-8px 0 14px;line-height:1.5;}
+
+  label.field-label{
+    display:block;font-size:12.5px;color:var(--text-muted);
+    margin-bottom:6px;font-weight:500;
+  }
+  .field{margin-bottom:16px;}
+  select, input[type="number"]{
+    width:100%;background:var(--panel-alt);
+    border:1px solid var(--line);color:var(--text);
+    border-radius:8px;padding:10px 12px;font-size:14px;
+    font-family:'Inter',sans-serif;
+    appearance:none;-webkit-appearance:none;
+  }
+  select:focus, input:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  .select-wrap{position:relative;}
+  .select-wrap::after{
+    content:"▾";position:absolute;right:12px;top:50%;transform:translateY(-50%);
+    color:var(--text-faint);pointer-events:none;font-size:11px;
+  }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:520px){.row2{grid-template-columns:1fr;}}
+
+  .custom-rate{display:none;margin-top:10px;}
+  .custom-rate.visible{display:block;}
+
+  .ref-table{
+    margin-top:6px;border:1px solid var(--line);border-radius:8px;overflow:hidden;
+  }
+  .ref-table table{width:100%;border-collapse:collapse;font-size:13px;}
+  .ref-table th{
+    text-align:left;background:var(--panel-alt);color:var(--text-muted);
+    font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11.5px;
+    text-transform:uppercase;letter-spacing:0.04em;
+    padding:9px 12px;border-bottom:1px solid var(--line);
+  }
+  .ref-table td{padding:8px 12px;border-bottom:1px solid var(--line-soft);color:var(--text);}
+  .ref-table tr:last-child td{border-bottom:none;}
+  .ref-table td.hrs{font-family:'JetBrains Mono',monospace;color:var(--accent);white-space:nowrap;text-align:right;}
+
+  .maint-toggle{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .maint-toggle input{width:auto;}
+  .maint-extra{display:none;}
+  .maint-extra.visible{display:block;}
+
+  .checklist{margin-bottom:0;}
+  .checklist-item{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:9px 0;border-bottom:1px solid var(--line-soft);gap:10px;
+  }
+  .checklist-item:last-child{border-bottom:none;}
+  .checklist-item span{font-size:13.5px;}
+  .checklist-item input{width:auto;}
+
+  /* --- Terminal / ticket panel --- */
+  .terminal{
+    position:sticky;top:20px;
+    background:#0a1522;
+    border:1px solid var(--accent-dim);
+    border-radius:var(--radius);
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+    box-shadow:0 0 0 1px rgba(94,230,200,0.05), 0 10px 40px -12px rgba(0,0,0,0.6);
+    overflow:hidden;
+  }
+  .terminal-head{
+    background:var(--panel-alt);
+    padding:10px 16px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:8px;color:var(--text-muted);font-size:12px;
+  }
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .dot.r{background:#ef6a6a;} .dot.y{background:#f2b134;} .dot.g{background:#5ee6c8;}
+  .terminal-body{padding:18px 18px 20px;}
+  .t-line{display:flex;justify-content:space-between;padding:4px 0;color:var(--text-muted);}
+  .t-line .val{color:var(--text);}
+  .t-line.add .val{color:var(--accent);}
+  .t-line.sub .val{color:var(--danger);}
+  .t-divider{border:none;border-top:1px dashed var(--line);margin:10px 0;}
+  .t-divider.strong{border-top:1px solid var(--accent-dim);}
+  .t-total{display:flex;justify-content:space-between;padding:8px 0 4px;font-weight:700;font-size:15px;}
+  .t-total .val{color:var(--accent);}
+  .t-range{margin-top:14px;padding:12px 14px;background:var(--panel-alt);border-radius:8px;border:1px solid var(--line);}
+  .t-range-title{color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;}
+  .t-range-vals{display:flex;justify-content:space-between;font-size:13px;}
+  .t-range-vals b{color:var(--text);}
+  .t-sub{margin-top:14px;display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-muted);}
+  .t-sub .val{color:var(--text);}
+  .prompt{color:var(--accent);}
+
+  .footnote{
+    font-size:12px;color:var(--text-faint);line-height:1.6;margin-top:18px;
+    border-top:1px solid var(--line);padding-top:14px;
+  }
+  .footnote b{color:var(--text-muted);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <div class="brand-eyebrow">// herramienta interna</div>
+      <h1>Cotizador de proyectos</h1>
+      <p class="subtitle">Desarrollo web, paneles de administración y automatización con n8n. Calculá un precio justo antes de mandar el presupuesto.</p>
+    </div>
+    <div class="badge-currency">precios en USD</div>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: FORM -->
+    <div>
+
+      <div class="card">
+        <div class="step-label"><span class="step-num">01</span><span class="step-title">Tarifa base por hora</span></div>
+        <p class="step-hint">Es el punto de partida de todo lo demás. Si no la tienen clara, usen estos rangos como referencia para devs argentinos que facturan en USD, y ajústenla según su costo de vida real y experiencia.</p>
+        <div class="field">
+          <label class="field-label">Perfil / seniority del equipo</label>
+          <div class="select-wrap">
+            <select id="rateProfile">
+              <option value="18">Junior (USD 12–18/hora)</option>
+              <option value="28" selected>Semi-Senior (USD 20–35/hora)</option>
+              <option value="48">Senior (USD 35–60/hora)</option>
+              <option value="custom">Personalizada</option>
+            </select>
+          </div>
+        </div>
+        <div class="custom-rate" id="customRateWrap">
+          <label class="field-label">Tarifa personalizada (USD/hora)</label>
+          <input type="number" id="customRate" min="1" step="1" value="30">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="step-label"><span class="step-num">02</span><span class="step-title">Tipo de proyecto</span></div>
+        <p class="step-hint">Elegí la categoría para ver una tabla de referencia de horas típicas. Les sirve para armar su propia estimación en el paso 3 — no reemplaza su criterio, es un punto de partida.</p>
+        <div class="field">
+          <div class="select-wrap">
+            <select id="projectType">
+              <option value="web">Sitio web / landing institucional</option>
+              <option value="ecommerce">E-commerce</option>
+              <option value="webapp" selected>Web app / panel de administración</option>
+              <option value="n8n">Automatización (n8n / integraciones)</option>
+              <option value="mixto">Mixto (web app + automatización)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="ref-table" id="refTable"></div>
+      </div>
+
+      <div class="card">
+        <div class="step-label"><span class="step-num">03</span><span class="step-title">Horas estimadas</span></div>
+        <p class="step-hint">Sumá las horas de <b style="color:var(--text-muted)">todo el equipo combinado</b> (si los dos van a poner tiempo, va todo junto acá).</p>
+        <div class="row2">
+          <div class="field">
+            <label class="field-label">Horas totales estimadas</label>
+            <input type="number" id="hours" min="1" step="1" value="120">
+          </div>
+          <div class="field">
+            <label class="field-label">Cantidad de personas en el equipo</label>
+            <input type="number" id="people" min="1" step="1" value="2">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="step-label"><span class="step-num">04</span><span class="step-title">Riesgo y condiciones</span></div>
+        <p class="step-hint">Esto es lo que separa "cobrar justo" de "regalar el laburo": lo que no se ve en las horas, pero cuesta tiempo y plata igual.</p>
+
+        <div class="field">
+          <label class="field-label">Complejidad / incertidumbre del proyecto</label>
+          <div class="select-wrap">
+            <select id="risk">
+              <option value="0.10">Baja — requisitos claros, stack conocido (+10%)</option>
+              <option value="0.20" selected>Media — algunos puntos abiertos, integraciones nuevas (+20%)</option>
+              <option value="0.35">Alta — requisitos poco definidos, tecnología nueva (+35%)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Urgencia del cliente</label>
+          <div class="select-wrap">
+            <select id="urgency">
+              <option value="0" selected>Normal — plazo razonable (+0%)</option>
+              <option value="0.20">Rápido — hay que acelerar el ritmo habitual (+20%)</option>
+              <option value="0.40">Urgente — reorganizar todo lo demás para esto (+40%)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Forma de pago</label>
+          <div class="select-wrap">
+            <select id="payment">
+              <option value="-0.05">100% adelantado (–5%)</option>
+              <option value="0" selected>50% adelanto / 50% entrega (estándar)</option>
+              <option value="0.10">Contra entrega o en cuotas largas (+10%)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="step-label"><span class="step-num">05</span><span class="step-title">Mantenimiento (opcional)</span></div>
+        <div class="maint-toggle">
+          <input type="checkbox" id="maintCheck">
+          <label class="field-label" style="margin:0;" for="maintCheck">Ofrecer plan de mantenimiento mensual</label>
+        </div>
+        <div class="maint-extra" id="maintExtra">
+          <label class="field-label">% del valor del proyecto, por mes</label>
+          <input type="number" id="maintPct" min="1" max="30" step="1" value="8">
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: TERMINAL SUMMARY -->
+    <div class="terminal">
+      <div class="terminal-head">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span style="margin-left:6px;">cotizacion.sh</span>
+      </div>
+      <div class="terminal-body">
+        <div><span class="prompt">$</span> calcular --moneda usd</div>
+        <hr class="t-divider">
+        <div class="t-line"><span>horas estimadas</span><span class="val" id="outHours">120 hs</span></div>
+        <div class="t-line"><span>tarifa / hora</span><span class="val" id="outRate">USD 28</span></div>
+        <hr class="t-divider">
+        <div class="t-line"><span>subtotal</span><span class="val" id="outSubtotal">USD 3,360</span></div>
+        <div class="t-line add"><span id="outRiskLabel">+ riesgo (media 20%)</span><span class="val" id="outRiskVal">USD 672</span></div>
+        <div class="t-line add"><span id="outUrgLabel">+ urgencia (normal)</span><span class="val" id="outUrgVal">USD 0</span></div>
+        <div class="t-line" id="outPayLine"><span id="outPayLabel">forma de pago (estándar)</span><span class="val" id="outPayVal">USD 0</span></div>
+        <hr class="t-divider strong">
+        <div class="t-total"><span>TOTAL RECOMENDADO</span><span class="val" id="outTotal">USD 4,032</span></div>
+
+        <div class="t-range">
+          <div class="t-range-title">rango sugerido para negociar</div>
+          <div class="t-range-vals"><span>mínimo</span><b id="outMin">USD 3,629</b></div>
+          <div class="t-range-vals"><span>ideal</span><b id="outMid">USD 4,032</b></div>
+          <div class="t-range-vals"><span>premium</span><b id="outMax">USD 4,637</b></div>
+        </div>
+
+        <div class="t-sub"><span>por persona (<span id="outPeopleN">2</span>)</span><span class="val" id="outPerPerson">USD 2,016</span></div>
+        <div class="t-sub" id="outMaintLine" style="display:none;"><span>mantenimiento / mes</span><span class="val" id="outMaint">USD 0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="footnote">
+    <b>Nota:</b> los rangos de tarifa y horas de referencia son estimaciones generales del mercado freelance argentino orientado a clientes en USD, no una fuente oficial — ajústenlos con su propia experiencia y costos reales. Esta herramienta no reemplaza asesoramiento contable/impositivo (facturación como servicio de exportación, monotributo, etc.); consulten a un contador para eso.
+  </p>
+
+</div>
+
+<script>
+const REF_TABLES = {
+  web: {
+    caption: "Sitio web / landing — horas de referencia",
+    rows: [
+      ["Landing de una sola página (5–8 secciones)", "16–28 hs"],
+      ["Sitio institucional multi-página (5–10 páginas)", "30–50 hs"],
+      ["Formulario de contacto + integración email", "4–8 hs"],
+      ["Blog / sección de noticias con CMS simple", "15–25 hs"],
+      ["Optimización SEO básica + performance", "8–15 hs"],
+      ["Multi-idioma", "10–20 hs"]
+    ]
+  },
+  ecommerce: {
+    caption: "E-commerce — horas de referencia",
+    rows: [
+      ["Catálogo de productos + filtros", "20–35 hs"],
+      ["Carrito de compras + checkout", "20–35 hs"],
+      ["Integración de pagos (Mercado Pago / Stripe)", "12–25 hs"],
+      ["Gestión de stock e inventario", "15–30 hs"],
+      ["Panel admin para cargar productos", "20–35 hs"],
+      ["Envíos / integración con correo", "10–20 hs"]
+    ]
+  },
+  webapp: {
+    caption: "Web app / panel de administración — horas de referencia",
+    rows: [
+      ["Autenticación + roles y permisos", "15–25 hs"],
+      ["CRUD de entidades principales (por módulo)", "10–20 hs"],
+      ["Dashboard con métricas / gráficos", "20–40 hs"],
+      ["Exportación de reportes (PDF / Excel)", "8–15 hs"],
+      ["Notificaciones (email / push)", "8–15 hs"],
+      ["Integración con API externa", "10–20 hs"],
+      ["Tests automatizados", "15–30 hs"]
+    ]
+  },
+  n8n: {
+    caption: "Automatización n8n — horas de referencia",
+    rows: [
+      ["Flujo simple (1 trigger, 1–2 acciones)", "4–8 hs"],
+      ["Flujo medio (varios pasos, condicionales)", "10–20 hs"],
+      ["Flujo complejo (múltiples integraciones, reintentos, manejo de errores)", "20–40 hs"],
+      ["Por cada integración/API adicional", "5–10 hs"],
+      ["Dashboard de monitoreo de flujos", "15–25 hs"],
+      ["Documentación y capacitación al cliente", "5–10 hs"]
+    ]
+  },
+  mixto: {
+    caption: "Mixto (web app + automatización) — horas de referencia",
+    rows: [
+      ["Base de web app (auth + CRUD + dashboard)", "80–150 hs"],
+      ["Automatizaciones conectadas (por flujo)", "10–25 hs"],
+      ["Integración entre el panel y n8n (webhooks, triggers)", "10–20 hs"],
+      ["Monitoreo y logs centralizados", "12–20 hs"]
+    ]
+  }
+};
+
+function renderRefTable(type){
+  const data = REF_TABLES[type];
+  const el = document.getElementById('refTable');
+  let html = `<table><thead><tr><th colspan="2">${data.caption}</th></tr></thead><tbody>`;
+  data.rows.forEach(r => {
+    html += `<tr><td>${r[0]}</td><td class="hrs">${r[1]}</td></tr>`;
+  });
+  html += `</tbody></table>`;
+  el.innerHTML = html;
+}
+
+function fmt(n){
+  return "USD " + Math.round(n).toLocaleString('en-US');
+}
+
+function getRate(){
+  const sel = document.getElementById('rateProfile');
+  if(sel.value === 'custom'){
+    return parseFloat(document.getElementById('customRate').value) || 0;
+  }
+  return parseFloat(sel.value);
+}
+
+function recalc(){
+  const rate = getRate();
+  const hours = parseFloat(document.getElementById('hours').value) || 0;
+  const people = Math.max(1, parseInt(document.getElementById('people').value) || 1);
+  const riskPct = parseFloat(document.getElementById('risk').value);
+  const urgPct = parseFloat(document.getElementById('urgency').value);
+  const payPct = parseFloat(document.getElementById('payment').value);
+
+  const subtotal = rate * hours;
+  const riskVal = subtotal * riskPct;
+  const urgVal = subtotal * urgPct;
+  const payVal = subtotal * payPct;
+
+  const total = subtotal + riskVal + urgVal + payVal;
+  const min = total * 0.9;
+  const max = total * 1.15;
+  const perPerson = total / people;
+
+  document.getElementById('outHours').textContent = hours.toLocaleString('en-US') + " hs";
+  document.getElementById('outRate').textContent = "USD " + rate;
+  document.getElementById('outSubtotal').textContent = fmt(subtotal);
+
+  const riskLabelText = document.getElementById('risk').selectedOptions[0].text.split('—')[0].trim().toLowerCase();
+  document.getElementById('outRiskLabel').textContent = `+ riesgo (${riskLabelText} ${Math.round(riskPct*100)}%)`;
+  document.getElementById('outRiskVal').textContent = fmt(riskVal);
+
+  const urgLabelText = document.getElementById('urgency').selectedOptions[0].text.split('—')[0].trim().toLowerCase();
+  document.getElementById('outUrgLabel').textContent = `+ urgencia (${urgLabelText})`;
+  document.getElementById('outUrgVal').textContent = fmt(urgVal);
+
+  const payLine = document.getElementById('outPayLine');
+  const payLabel = document.getElementById('outPayLabel');
+  const payValEl = document.getElementById('outPayVal');
+  if(payPct === 0){
+    payLine.className = 't-line';
+    payLabel.textContent = 'forma de pago (estándar)';
+    payValEl.textContent = fmt(0);
+  } else if(payPct < 0){
+    payLine.className = 't-line sub';
+    payLabel.textContent = `– descuento adelanto (${Math.round(payPct*100)}%)`;
+    payValEl.textContent = fmt(payVal);
+  } else {
+    payLine.className = 't-line add';
+    payLabel.textContent = `+ recargo por plazo de pago (${Math.round(payPct*100)}%)`;
+    payValEl.textContent = fmt(payVal);
+  }
+
+  document.getElementById('outTotal').textContent = fmt(total);
+  document.getElementById('outMin').textContent = fmt(min);
+  document.getElementById('outMid').textContent = fmt(total);
+  document.getElementById('outMax').textContent = fmt(max);
+  document.getElementById('outPeopleN').textContent = people;
+  document.getElementById('outPerPerson').textContent = fmt(perPerson);
+
+  const maintCheck = document.getElementById('maintCheck').checked;
+  const maintLine = document.getElementById('outMaintLine');
+  if(maintCheck){
+    const pct = parseFloat(document.getElementById('maintPct').value) || 0;
+    maintLine.style.display = 'flex';
+    document.getElementById('outMaint').textContent = fmt(total * (pct/100));
+  } else {
+    maintLine.style.display = 'none';
+  }
+}
+
+document.getElementById('rateProfile').addEventListener('change', function(){
+  document.getElementById('customRateWrap').classList.toggle('visible', this.value === 'custom');
+  recalc();
+});
+document.getElementById('projectType').addEventListener('change', function(){
+  renderRefTable(this.value);
+});
+document.getElementById('maintCheck').addEventListener('change', function(){
+  document.getElementById('maintExtra').classList.toggle('visible', this.checked);
+  recalc();
+});
+
+['customRate','hours','people','risk','urgency','payment','maintPct'].forEach(id => {
+  document.getElementById(id).addEventListener('input', recalc);
+  document.getElementById(id).addEventListener('change', recalc);
+});
+
+renderRefTable('webapp');
+recalc();
+</script>
+</body>
+</html>

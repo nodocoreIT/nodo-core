@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cotizador Interno · Dev &amp; Automatización</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <div class="brand-eyebrow">// herramienta interna</div>
+      <h1>Cotizador de proyectos</h1>
+      <p class="subtitle">Desarrollo web, paneles de administración y automatización con n8n. Calculá un precio justo antes de mandar el presupuesto.</p>
+    </div>
+    <div class="header-actions">
+      <div class="select-wrap" style="width:130px">
+        <select id="currency">
+          <option value="USD">USD</option>
+          <option value="ARS">ARS</option>
+        </select>
+      </div>
+      <div class="fx-wrap" id="fxWrap">
+        <label class="field-label" style="margin:0;white-space:nowrap">TC USD→ARS</label>
+        <input type="number" id="fxRate" min="1" step="1" value="1200">
+      </div>
+      <div class="badge-currency" id="badgeCurrency">precios en USD</div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div>
+
+      <div class="card">
+        <div class="step-label"><span class="step-num">00</span><span class="step-title">Datos del presupuesto</span></div>
+        <p class="step-hint">Tu marca y los datos del cliente. El logo aparece en el PDF exportado.</p>
+
+        <div class="brand-row">
+          <div class="logo-upload">
+            <div class="logo-preview" id="logoPreview"><span>Sin logo</span></div>
+            <label class="btn-sm logo-btn">
+              Subir logo
+              <input type="file" id="logoInput" accept="image/*" hidden>
+            </label>
+            <button type="button" class="btn-sm btn-ghost" id="btnRemoveLogo" style="display:none">Quitar</button>
+          </div>
+          <div class="brand-fields">
+            <div class="field">
+              <label class="field-label">Nombre de tu empresa / equipo</label>
+              <input type="text" id="companyName" placeholder="Ej: Mi Estudio Dev">
+            </div>
+            <div class="row2">
+              <div class="field">
+                <label class="field-label">Email de contacto</label>
+                <input type="text" id="companyEmail" placeholder="hola@tuempresa.com">
+              </div>
+              <div class="field">
+                <label class="field-label">Teléfono (opcional)</label>
+                <input type="text" id="companyPhone" placeholder="+54 9 ...">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row2">
+          <div class="field">
+            <label class="field-label">Cliente</label>
+            <input type="text" id="clientName" placeholder="Nombre o empresa del cliente">
+          </div>
+          <div class="field">
+            <label class="field-label">Nombre del proyecto</label>
+            <input type="text" id="projectTitle" placeholder="Ej: Tienda online + automatización pedidos">
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">Validez del presupuesto (días)</label>
+          <input type="number" id="validityDays" min="1" max="90" step="1" value="15" style="max-width:120px">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="step-label"><span class="step-num">01</span><span class="step-title">Tarifa base por hora</span></div>
+          <div class="select-wrap">
+            <select id="rateProfile">
+              <option value="18">Junior (USD 12–18/hora)</option>
+              <option value="28" selected>Semi-Senior (USD 20–35/hora)</option>
+              <option value="48">Senior (USD 35–60/hora)</option>
+              <option value="custom">Personalizada</option>
+            </select>
+          </div>
+        </div>
+        <div class="custom-rate" id="customRateWrap">
+          <label class="field-label">Tarifa personalizada (USD/hora)</label>
+          <input type="number" id="customRate" min="1" step="1" value="30">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="step-label"><span class="step-num">02</span><span class="step-title">Tipo de proyecto e ítems</span></div>
+        <p class="step-hint">Podés combinar categorías — por ejemplo E-commerce + Automatización. Marcá los ítems de cada una.</p>
+        <div class="field">
+          <label class="field-label">Categorías del proyecto (elegí una o más)</label>
+          <div class="type-chips" id="projectTypes"></div>
+        </div>
+
+        <div id="refTables"></div>
+        <div class="checklist-sum" id="checklistSum">Seleccionados: <b>0 hs</b></div>
+
+        <div class="custom-items">
+          <div class="custom-items-head">
+            <span>Ítems propios</span>
+            <button type="button" class="btn-sm" id="btnAddCustom">+ Agregar ítem</button>
+          </div>
+          <div id="customItemsList"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="step-label"><span class="step-num">03</span><span class="step-title">Horas estimadas</span></div>
+        <p class="step-hint">Sumá las horas de <b style="color:var(--text-muted)">todo el equipo combinado</b>.</p>
+        <div class="row2">
+          <div class="field">
+            <label class="field-label">Horas totales estimadas</label>
+            <input type="number" id="hours" min="1" step="1" value="120">
+            <p class="hours-note" id="hoursNote">Marcá ítems arriba o ingresá las horas manualmente.</p>
+          </div>
+          <div class="field">
+            <label class="field-label">Cantidad de personas en el equipo</label>
+            <input type="number" id="people" min="1" step="1" value="2">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="step-label"><span class="step-num">04</span><span class="step-title">Riesgo y condiciones</span></div>
+        <p class="step-hint">Lo que no se ve en las horas pero cuesta tiempo y plata igual.</p>
+
+        <div class="field">
+          <label class="field-label">Complejidad / incertidumbre del proyecto</label>
+          <div class="select-wrap">
+            <select id="risk">
+              <option value="0.10">Baja — requisitos claros, stack conocido (+10%)</option>
+              <option value="0.20" selected>Media — algunos puntos abiertos, integraciones nuevas (+20%)</option>
+              <option value="0.35">Alta — requisitos poco definidos, tecnología nueva (+35%)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Urgencia del cliente</label>
+          <div class="select-wrap">
+            <select id="urgency">
+              <option value="0" selected>Normal — plazo razonable (+0%)</option>
+              <option value="0.20">Rápido — hay que acelerar el ritmo habitual (+20%)</option>
+              <option value="0.40">Urgente — reorganizar todo lo demás para esto (+40%)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Forma de pago</label>
+          <div class="select-wrap">
+            <select id="payment">
+              <option value="-0.05">100% adelantado (–5%)</option>
+              <option value="0" selected>50% adelanto / 50% entrega (estándar)</option>
+              <option value="0.10">Contra entrega o en cuotas largas (+10%)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="step-label"><span class="step-num">05</span><span class="step-title">Mantenimiento (opcional)</span></div>
+        <div class="maint-toggle">
+          <input type="checkbox" id="maintCheck">
+          <label class="field-label" style="margin:0;" for="maintCheck">Ofrecer plan de mantenimiento mensual</label>
+        </div>
+        <div class="maint-extra" id="maintExtra">
+          <label class="field-label">% del valor del proyecto, por mes</label>
+          <input type="number" id="maintPct" min="1" max="30" step="1" value="8">
+        </div>
+        <div class="field" style="margin-top:16px;margin-bottom:0">
+          <label class="field-label">Exclusiones del presupuesto (aparece en el PDF)</label>
+          <textarea id="exclusions" rows="3" placeholder="Opcional. Si lo dejás vacío, usamos exclusiones estándar (hosting, contenido, etc.)"></textarea>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="terminal">
+      <div class="terminal-head">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span style="margin-left:6px;">cotizacion.sh</span>
+      </div>
+      <div class="terminal-body">
+        <div><span class="prompt">$</span> calcular --moneda usd</div>
+        <hr class="t-divider">
+        <div class="t-line"><span>horas estimadas</span><span class="val" id="outHours">120 hs</span></div>
+        <div class="t-line"><span>tarifa / hora</span><span class="val" id="outRate">USD 28</span></div>
+        <hr class="t-divider">
+        <div class="t-line"><span>subtotal</span><span class="val" id="outSubtotal">USD 3,360</span></div>
+        <div class="t-line add"><span id="outRiskLabel">+ riesgo (media 20%)</span><span class="val" id="outRiskVal">USD 672</span></div>
+        <div class="t-line add"><span id="outUrgLabel">+ urgencia (normal)</span><span class="val" id="outUrgVal">USD 0</span></div>
+        <div class="t-line" id="outPayLine"><span id="outPayLabel">forma de pago (estándar)</span><span class="val" id="outPayVal">USD 0</span></div>
+        <hr class="t-divider strong">
+        <div class="t-total"><span>TOTAL RECOMENDADO</span><span class="val" id="outTotal">USD 4,032</span></div>
+
+        <div class="t-range">
+          <div class="t-range-title">rango sugerido para negociar</div>
+          <div class="t-range-vals"><span>mínimo</span><b id="outMin">USD 3,629</b></div>
+          <div class="t-range-vals"><span>ideal</span><b id="outMid">USD 4,032</b></div>
+          <div class="t-range-vals"><span>premium</span><b id="outMax">USD 4,637</b></div>
+        </div>
+
+        <div class="t-sub"><span>por persona (<span id="outPeopleN">2</span>)</span><span class="val" id="outPerPerson">USD 2,016</span></div>
+        <div class="t-sub" id="outMaintLine" style="display:none;"><span>mantenimiento / mes</span><span class="val" id="outMaint">USD 0</span></div>
+
+        <div class="terminal-actions">
+          <button type="button" class="btn-copy" id="btnExportPdf">Exportar PDF</button>
+          <button type="button" class="btn-copy btn-secondary" id="btnCopy">Copiar texto</button>
+          <button type="button" class="btn-reset" id="btnReset">Resetear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="footnote">
+    <b>Nota:</b> los rangos de tarifa y horas son estimaciones generales — ajústenlos con su experiencia. No reemplaza asesoramiento contable/impositivo.
+  </p>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>
