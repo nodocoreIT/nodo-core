@@ -21,7 +21,7 @@ export const PAID_SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: "basico",
     name: "Básico",
-    amount: 9900,
+    amount: 100,
     currency: "ARS",
     period: "/mes",
     features: ["Consultas ilimitadas", "Recetas + estudios", "Soporte email"],
