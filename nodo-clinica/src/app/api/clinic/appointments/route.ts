@@ -173,20 +173,30 @@ export async function GET(request: NextRequest) {
   if (patientId) {
     // patientId here is the auth/profile id (as sent by the client session),
     // not the patients-table row id that appointments.patient_id stores.
-    const { data: patientRow } = await supabase
+    const { data: patientRow, error: patientRowError } = await supabase
       .from("patients")
       .select("id, org_id")
       .eq("profile_id", patientId)
       .maybeSingle();
 
-    const { data: appointments } = patientRow
+    const { data: appointments, error: appointmentsError } = patientRow
       ? await supabase
           .from("appointments")
           .select("*, professionals(full_name, specialty)")
           .eq("patient_id", patientRow.id)
           .eq("org_id", patientRow.org_id)
           .order("scheduled_at", { ascending: false })
-      : { data: [] };
+      : { data: [], error: null };
+
+    if (searchParams.get("debug") === "1") {
+      return NextResponse.json({
+        authUserId: user.id,
+        patientRow,
+        patientRowError,
+        appointmentsCount: appointments?.length ?? 0,
+        appointmentsError,
+      });
+    }
 
     return NextResponse.json(
       (appointments ?? []).map((apt) => ({

@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Stethoscope, User, Eye, EyeOff, Loader2, KeyRound, MailCheck } from "lucide-react";
-import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
 import {
   CLINICA_REGISTRATION_URL,
@@ -237,7 +236,6 @@ export function LoginPortal() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al ingresar";
       setGeneralError(msg);
-      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -260,7 +258,6 @@ export function LoginPortal() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al registrarse";
       setGeneralError(msg);
-      toast.error(msg);
     } finally {
       setLoading(false);
     }

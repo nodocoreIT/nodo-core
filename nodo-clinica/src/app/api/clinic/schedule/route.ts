@@ -10,11 +10,10 @@ const DOCTOR_ROLES = new Set(["admin", "super_admin", "medico", "agent", "doctor
 import { mergeThemeSettings } from "@/lib/clinic/theme-settings";
 import {
   DEFAULT_AVAILABILITY,
-  getAvailableDateKeys,
-  generateSlotsForDate,
+  getCalendarDayStates,
+  getAllSlotsForDate,
   normalizeAvailability,
   localDateKeyFromIso,
-  formatDateKeyShortLabel,
   type DoctorAvailability,
 } from "@/lib/clinic/schedule";
 
@@ -212,12 +211,7 @@ export async function GET(request: NextRequest) {
       .map((a) => a.scheduledAt);
 
     if (!dateStr) {
-      const dates = getAvailableDateKeys(availability, 28, allBooked).map(
-        (dateKey) => ({
-          date: dateKey,
-          label: formatDateKeyShortLabel(dateKey),
-        }),
-      );
+      const dates = getCalendarDayStates(availability, 60, allBooked);
       return NextResponse.json({
         dates,
         slotDurationMinutes: availability.slotDurationMinutes,
@@ -233,7 +227,7 @@ export async function GET(request: NextRequest) {
     }
 
     const booked = allBooked.filter((t) => localDateKeyFromIso(t) === dateStr);
-    const slots = generateSlotsForDate(dateStr, availability, booked);
+    const slots = getAllSlotsForDate(dateStr, availability, booked);
     return NextResponse.json({
       slots,
       slotDurationMinutes: availability.slotDurationMinutes,
@@ -268,12 +262,7 @@ export async function GET(request: NextRequest) {
   const allBooked = (bookedApts ?? []).map((a) => a.scheduled_at);
 
   if (!dateStr) {
-    const dates = getAvailableDateKeys(availability, 28, allBooked).map(
-      (dateKey) => ({
-        date: dateKey,
-        label: formatDateKeyShortLabel(dateKey),
-      }),
-    );
+    const dates = getCalendarDayStates(availability, 60, allBooked);
     return NextResponse.json({
       dates,
       slotDurationMinutes: availability.slotDurationMinutes,
@@ -289,7 +278,7 @@ export async function GET(request: NextRequest) {
   }
 
   const booked = allBooked.filter((t) => localDateKeyFromIso(t) === dateStr);
-  const slots = generateSlotsForDate(dateStr, availability, booked);
+  const slots = getAllSlotsForDate(dateStr, availability, booked);
   return NextResponse.json({
     slots,
     slotDurationMinutes: availability.slotDurationMinutes,

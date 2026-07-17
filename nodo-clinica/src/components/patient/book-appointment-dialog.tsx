@@ -31,6 +31,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseLocalDate, formatDateKeyLabel, clinicTimeLabelFromIso } from "@/lib/clinic/schedule";
 import { ConsultationPaymentPanel } from "@/components/patient/consultation-payment-panel";
+import { MonthCalendar, type CalendarDay } from "@/components/patient/month-calendar";
 import { ReceiptValidationCard } from "@/components/patient/receipt-validation-card";
 import {
   patientRequiresPayment,
@@ -142,9 +143,11 @@ export function BookAppointmentDialog({
   onBooked,
 }: BookAppointmentDialogProps) {
   const [step, setStep] = useState<WizardStep>("slot");
-  const [dates, setDates] = useState<{ date: string; label: string }[]>([]);
+  const [dates, setDates] = useState<CalendarDay[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [slots, setSlots] = useState<{ iso: string; label: string }[]>([]);
+  const [slots, setSlots] = useState<
+    { iso: string; label: string; status: "available" | "booked" }[]
+  >([]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [loadingDates, setLoadingDates] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -273,8 +276,11 @@ export function BookAppointmentDialog({
       .then((data) => {
         const nextSlots = data.slots ?? [];
         setSlots(nextSlots);
-        if (nextSlots.length === 1) {
-          setSelectedSlot(nextSlots[0].iso);
+        const availableSlots = nextSlots.filter(
+          (s: { status: string }) => s.status === "available",
+        );
+        if (availableSlots.length === 1) {
+          setSelectedSlot(availableSlots[0].iso);
         }
       })
       .finally(() => setLoadingSlots(false));
@@ -553,29 +559,16 @@ export function BookAppointmentDialog({
                 <div className="flex justify-center py-4">
                   <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
                 </div>
-              ) : dates.length === 0 ? (
+              ) : dates.every((d) => d.status !== "available") ? (
                 <p className="text-sm text-slate-400 text-center py-4 bg-slate-50 rounded-lg">
                   No hay turnos disponibles.
                 </p>
               ) : (
-                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                  {dates.map((d) => (
-                    <Button
-                      key={d.date}
-                      type="button"
-                      size="sm"
-                      variant={selectedDate === d.date ? "default" : "outline"}
-                      className={
-                        selectedDate === d.date
-                          ? "bg-emerald-700 hover:bg-emerald-800"
-                          : ""
-                      }
-                      onClick={() => setSelectedDate(d.date)}
-                    >
-                      {d.label}
-                    </Button>
-                  ))}
-                </div>
+                <MonthCalendar
+                  days={dates}
+                  selectedDate={selectedDate}
+                  onSelectDate={setSelectedDate}
+                />
               )}
             </div>
 
@@ -592,34 +585,43 @@ export function BookAppointmentDialog({
                   <div className="flex justify-center py-4">
                     <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
                   </div>
-                ) : slots.length === 0 ? (
+                ) : slots.every((s) => s.status !== "available") ? (
                   <p className="text-sm text-amber-700 text-center py-4 bg-amber-50 rounded-lg border border-amber-100">
                     No hay horarios libres este día. Probá con otro día.
                   </p>
                 ) : (
                   <div className="grid grid-cols-4 gap-2">
-                    {slots.map((slot) => (
-                      <Button
-                        key={slot.iso}
-                        type="button"
-                        size="sm"
-                        variant={selectedSlot === slot.iso ? "default" : "outline"}
-                        className={
-                          selectedSlot === slot.iso
-                            ? "bg-emerald-600 hover:bg-emerald-700"
-                            : ""
-                        }
-                        onClick={() => setSelectedSlot(slot.iso)}
-                      >
-                        {slot.label}
-                      </Button>
-                    ))}
+                    {slots.map((slot) => {
+                      const isBooked = slot.status === "booked";
+                      const isSelected = selectedSlot === slot.iso;
+                      return (
+                        <button
+                          key={slot.iso}
+                          type="button"
+                          disabled={isBooked}
+                          title={isBooked ? "Turno ocupado" : undefined}
+                          onClick={() => !isBooked && setSelectedSlot(slot.iso)}
+                          className={`h-9 rounded-md border text-sm transition-colors ${
+                            isBooked
+                              ? "bg-red-50 text-red-400 border-red-200 line-through cursor-not-allowed"
+                              : isSelected
+                                ? "bg-emerald-600 text-white border-emerald-600"
+                                : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                          }`}
+                        >
+                          {slot.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
             )}
 
-            {selectedDate && !selectedSlot && !loadingSlots && slots.length > 0 && (
+            {selectedDate &&
+              !selectedSlot &&
+              !loadingSlots &&
+              slots.some((s) => s.status === "available") && (
               <p className="text-xs text-slate-500 text-center">
                 Seleccioná un horario de la lista para continuar.
               </p>

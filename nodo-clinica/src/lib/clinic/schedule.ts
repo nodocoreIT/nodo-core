@@ -328,3 +328,82 @@ export function getAvailableDates(
     parseLocalDate,
   );
 }
+
+export type CalendarDayStatus = "available" | "full" | "closed";
+
+/** Every day in range, classified for the calendar view (not just the available ones). */
+export function getCalendarDayStates(
+  availability: DoctorAvailability,
+  daysAhead = 28,
+  bookedTimes: string[] = [],
+): { date: string; label: string; status: CalendarDayStatus }[] {
+  const normalized = normalizeAvailability(availability);
+  const blocked = new Set(availability.blockedDates ?? []);
+  const todayKey = localDateKeyFromDate(new Date());
+  const days: { date: string; label: string; status: CalendarDayStatus }[] = [];
+
+  for (let i = 0; i < daysAhead; i++) {
+    const dateKey = addDaysToDateKey(todayKey, i);
+    const dow = clinicDayOfWeek(dateKey);
+    const isWorkingDay = normalized.days.some((d) => d.dayOfWeek === dow);
+
+    if (!isWorkingDay || blocked.has(dateKey)) {
+      days.push({ date: dateKey, label: formatDateKeyShortLabel(dateKey), status: "closed" });
+      continue;
+    }
+
+    const dayBooked = bookedTimes.filter((t) => localDateKeyFromIso(t) === dateKey);
+    const slots = generateSlotsForDate(dateKey, normalized, dayBooked);
+    days.push({
+      date: dateKey,
+      label: formatDateKeyShortLabel(dateKey),
+      status: slots.length > 0 ? "available" : "full",
+    });
+  }
+
+  return days;
+}
+
+export type SlotStatus = "available" | "booked";
+
+/** Every slot on the doctor's grid for a day, including booked ones (with status). */
+export function getAllSlotsForDate(
+  dateKey: string,
+  availability: DoctorAvailability,
+  bookedTimes: string[],
+): { iso: string; label: string; status: SlotStatus }[] {
+  const normalized = normalizeAvailability(availability);
+  const dow = clinicDayOfWeek(dateKey);
+  const dayBlocks = normalized.days.filter((d) => d.dayOfWeek === dow);
+  if (dayBlocks.length === 0) return [];
+
+  const slots: { iso: string; label: string; status: SlotStatus }[] = [];
+  const seen = new Set<string>();
+  const bookedSet = new Set(bookedTimes.map((t) => t.slice(0, 16)));
+  const duration = normalized.slotDurationMinutes;
+  const now = new Date();
+
+  for (const block of dayBlocks) {
+    let cursorMin = timeToMinutes(block.startTime);
+    const endMin = timeToMinutes(block.endTime);
+
+    while (cursorMin + duration <= endMin) {
+      const hh = Math.floor(cursorMin / 60);
+      const mm = cursorMin % 60;
+      const time = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+      const iso = argentinaDateTimeToIso(dateKey, time);
+
+      if (!seen.has(iso) && isAfter(new Date(iso), now)) {
+        seen.add(iso);
+        slots.push({
+          iso,
+          label: formatClinicTimeLabel(iso),
+          status: bookedSet.has(iso.slice(0, 16)) ? "booked" : "available",
+        });
+      }
+      cursorMin += duration;
+    }
+  }
+
+  return slots;
+}
