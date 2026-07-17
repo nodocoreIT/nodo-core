@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const { data: me } = await supabase
     .from("professionals")
     .select("id")
-    .eq("auth_user_id", user.id)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (!me) {
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
   const { data: me } = await supabase
     .from("professionals")
     .select("id")
-    .eq("auth_user_id", user.id)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (!me) {
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     .from("doctor_presence")
     .upsert(
       { professional_id: me.id, org_id: user.org_id, last_seen: now },
-      { onConflict: "professional_id,org_id" },
+      { onConflict: "professional_id" },
     );
 
   return NextResponse.json({ ok: true });

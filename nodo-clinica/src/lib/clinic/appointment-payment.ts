@@ -70,7 +70,7 @@ export async function confirmAppointmentPaymentAndNotify(
 
   const { data: professional } = await supabase
     .from("professionals")
-    .select("full_name, auth_user_id")
+    .select("full_name")
     .eq("id", apt.doctor_id)
     .maybeSingle();
 

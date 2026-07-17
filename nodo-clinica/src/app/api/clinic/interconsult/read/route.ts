@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   const { data: me } = await supabase
     .from("professionals")
     .select("id")
-    .eq("auth_user_id", user.id)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (!me) {
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     .from("chat_read_cursors")
     .upsert(
       { professional_id: me.id, org_id: user.org_id, read_at: now },
-      { onConflict: "professional_id,org_id" },
+      { onConflict: "professional_id" },
     );
 
   return NextResponse.json({ readAt: now });

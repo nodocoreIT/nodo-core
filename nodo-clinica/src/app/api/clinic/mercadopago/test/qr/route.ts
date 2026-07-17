@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
   const { data: professional } = await supabase
     .from("professionals")
     .select("full_name")
-    .eq("auth_user_id", user.id)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   const externalRef = `test-qr-${randomUUID()}`;

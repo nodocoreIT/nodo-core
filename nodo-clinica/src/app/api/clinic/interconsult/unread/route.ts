@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const { data: me } = await supabase
     .from("professionals")
     .select("id")
-    .eq("auth_user_id", user.id)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (!me) {

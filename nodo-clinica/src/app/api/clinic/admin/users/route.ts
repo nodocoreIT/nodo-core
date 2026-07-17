@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
   const { data: professionals } = await supabase
     .from("professionals")
-    .select("id, full_name, email, specialty, auth_user_id")
+    .select("id, full_name, email, specialty, user_id")
     .eq("org_id", auth.user.org_id);
 
   const { data: patients } = await supabase
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     const { data: professional, error: profError } = await supabase
       .from("professionals")
       .insert({
-        auth_user_id: authUserId,
+        user_id: authUserId,
         org_id: auth.user.org_id,
         full_name: String(fullName).trim(),
         email: emailLower,

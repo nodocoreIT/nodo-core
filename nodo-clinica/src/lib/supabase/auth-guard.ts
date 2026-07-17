@@ -5,6 +5,15 @@ import { isLocalMode } from "@/lib/clinic/config";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
+/** app_metadata.role can be Spanish ("medico"/"paciente", set by the account/* flows) or
+ *  English ("doctor"/"patient", set by the legacy ClinicSession flows). Callers of
+ *  requireAuth should only ever have to check the English canonical values. */
+function normalizeRole(role: string): string {
+  if (role === "medico") return "doctor";
+  if (role === "paciente") return "patient";
+  return role;
+}
+
 export interface AuthContext {
   user: {
     id: string;
@@ -118,7 +127,7 @@ export async function requireAuth(
       const effectiveRole =
         clinicSession?.userId === user.id && clinicSession?.role === "patient"
           ? "patient"
-          : supabaseRole;
+          : normalizeRole(supabaseRole);
 
       return {
         user: {
