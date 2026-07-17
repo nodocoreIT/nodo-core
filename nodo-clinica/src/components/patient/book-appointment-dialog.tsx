@@ -149,6 +149,7 @@ export function BookAppointmentDialog({
   const [paymentSettingsReady, setPaymentSettingsReady] = useState(false);
   const [receiptAudit, setReceiptAudit] = useState<PaymentReceiptAudit | null>(null);
   const [validatingReceipt, setValidatingReceipt] = useState(false);
+  const [receiptWarning, setReceiptWarning] = useState<string | null>(null);
 
   const showPaymentStep =
     patientShowsPaymentStep(resolvedPayment) || paymentRequiredOverride;
@@ -344,6 +345,7 @@ export function BookAppointmentDialog({
     setValidatingReceipt(true);
     setReceiptAudit(null);
     setValidationChecks(null);
+    setReceiptWarning(null);
     try {
       const result = await clinicApi.previewPaymentReceipt({
         doctorId,
@@ -362,7 +364,7 @@ export function BookAppointmentDialog({
         const failed = result.checks
           ? Object.values(result.checks).find((c) => !c.pass)?.detail
           : result.reasons?.[0];
-        toast.warning(failed ?? "Revisá los datos del comprobante");
+        setReceiptWarning(failed ?? "Revisá los datos del comprobante");
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo analizar el comprobante");
@@ -674,6 +676,7 @@ export function BookAppointmentDialog({
                     setReceiptFile(file);
                     setReceiptAudit(null);
                     setValidationChecks(null);
+                    setReceiptWarning(null);
                     if (file) await runReceiptPreview(file);
                   }}
                 />
@@ -688,6 +691,11 @@ export function BookAppointmentDialog({
                 audit={receiptAudit}
                 loading={validatingReceipt}
               />
+              {receiptWarning && (
+                <p className="text-[11px] text-red-800 bg-red-50 border border-red-200 rounded-md px-2 py-1.5">
+                  {receiptWarning}
+                </p>
+              )}
               {receiptAudit && !receiptAudit.valid && receiptFile && (
                 <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
                   La validación automática no fue concluyente. Podés continuar:
