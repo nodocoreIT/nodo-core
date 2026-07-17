@@ -562,6 +562,21 @@ export const clinicApi = {
     return data;
   },
 
+  async deleteCancelledAppointment(accessToken: string) {
+    const res = await fetch(`${BASE}/api/clinic/appointments`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        accessToken,
+        action: "patientDeleteCancelledAppointment",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al eliminar turno");
+    return data;
+  },
+
   async getPatientAppointments(patientId: string) {
     const res = await fetch(
       `${BASE}/api/clinic/appointments?patientId=${patientId}`,

@@ -36,6 +36,7 @@ export default function PacienteTurnosPage() {
   >([]);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [cancellingToken, setCancellingToken] = useState<string | null>(null);
+  const [deletingToken, setDeletingToken] = useState<string | null>(null);
   const [openToken, setOpenToken] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -84,6 +85,22 @@ export default function PacienteTurnosPage() {
     }
   };
 
+  const handleDelete = async (accessToken: string) => {
+    if (!window.confirm("¿Eliminar este turno cancelado de tu lista?")) {
+      return;
+    }
+    setDeletingToken(accessToken);
+    try {
+      await clinicApi.deleteCancelledAppointment(accessToken);
+      toast.success("Turno eliminado");
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo eliminar");
+    } finally {
+      setDeletingToken(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-16">
@@ -103,24 +120,19 @@ export default function PacienteTurnosPage() {
           {appointments.map((apt) => {
             const isActive = ACTIVE_STATUSES.includes(apt.status);
             const isPending = isActive && apt.paymentStatus === "pending";
-            const cardColor = isPending
-              ? "border-amber-200 bg-amber-50/60"
-              : isActive
-                ? "border-emerald-200 bg-emerald-50/40"
-                : "border-slate-100";
+            const isCancelled = apt.status === "cancelled";
+            const badgeColor = isCancelled
+              ? "bg-red-600"
+              : isPending
+                ? "bg-amber-600"
+                : isActive
+                  ? "bg-emerald-600"
+                  : "bg-slate-400";
 
             return (
-              <Card key={apt.id} className={cardColor}>
+              <Card key={apt.id} className="border-slate-100">
                 <CardContent className="py-3 space-y-2">
-                  <Badge
-                    className={
-                      isPending
-                        ? "bg-amber-600"
-                        : isActive
-                          ? "bg-emerald-600"
-                          : "bg-slate-400"
-                    }
-                  >
+                  <Badge className={badgeColor}>
                     {isPending
                       ? "Pago pendiente"
                       : STATUS_LABEL[apt.status] ?? apt.status}
@@ -176,6 +188,23 @@ export default function PacienteTurnosPage() {
                           )}
                         </Button>
                       )}
+                    </div>
+                  )}
+                  {isCancelled && (
+                    <div className="flex items-center justify-end pt-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        disabled={deletingToken === apt.accessToken}
+                        onClick={() => void handleDelete(apt.accessToken)}
+                      >
+                        {deletingToken === apt.accessToken ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
                     </div>
                   )}
                 </CardContent>

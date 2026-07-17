@@ -843,6 +843,34 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json(updated);
   }
 
+  if (action === "patientDeleteCancelledAppointment" && accessToken) {
+    const { data: apt } = await getAppointmentByToken(supabase, accessToken);
+    if (!apt) {
+      return NextResponse.json(
+        { error: "Turno no encontrado" },
+        { status: 404 },
+      );
+    }
+    if (user.role === "patient") {
+      const { data: patientRow } = await supabase
+        .from("patients")
+        .select("id")
+        .eq("profile_id", user.id)
+        .maybeSingle();
+      if (patientRow && patientRow.id !== apt.patient_id) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+    }
+    if (apt.status !== "cancelled") {
+      return NextResponse.json(
+        { error: "Solo se pueden eliminar turnos cancelados" },
+        { status: 400 },
+      );
+    }
+    await supabase.from("appointments").delete().eq("id", apt.id);
+    return NextResponse.json({ ok: true });
+  }
+
   if (action === "confirmPayment" && accessToken) {
     const { data: apt } = await getAppointmentByToken(supabase, accessToken);
     if (!apt) {
