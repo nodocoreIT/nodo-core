@@ -134,6 +134,103 @@ export function mercadoPagoTokenKind(
   return "production";
 }
 
+export interface MpPreapprovalResult {
+  id: string;
+  status: string;
+  initPoint?: string;
+}
+
+/**
+ * Creates a recurring subscription charge (Preapproval) using NODO's OWN
+ * production access token — this is Nodo billing the doctor, not the doctor
+ * billing a patient. Never pass a doctor's OAuth token here.
+ */
+export async function createPreapproval(params: {
+  accessToken: string;
+  reason: string;
+  payerEmail: string;
+  externalReference: string;
+  amount: number;
+  currency?: string;
+  backUrl: string;
+}): Promise<MpPreapprovalResult> {
+  const body = {
+    reason: params.reason.slice(0, 256),
+    payer_email: params.payerEmail,
+    external_reference: params.externalReference,
+    back_url: params.backUrl,
+    auto_recurring: {
+      frequency: 1,
+      frequency_type: "months",
+      transaction_amount: params.amount,
+      currency_id: mpCurrency(params.currency),
+    },
+    status: "pending",
+  };
+
+  const res = await fetch(`${MP_API}/preapproval`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${params.accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(
+      data.message || data.error || "Error al crear la suscripción en Mercado Pago",
+    );
+  }
+
+  return {
+    id: data.id,
+    status: data.status,
+    initPoint: data.init_point,
+  };
+}
+
+export interface MpPreapprovalInfo {
+  id: string;
+  status: string;
+  external_reference?: string;
+  next_payment_date?: string;
+}
+
+export async function getPreapproval(
+  accessToken: string,
+  preapprovalId: string,
+): Promise<MpPreapprovalInfo> {
+  const res = await fetch(`${MP_API}/preapproval/${preapprovalId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || "Error al consultar la suscripción en Mercado Pago");
+  }
+  return data as MpPreapprovalInfo;
+}
+
+/** Cancels a recurring subscription (Preapproval) using Nodo's own access token. */
+export async function cancelPreapproval(
+  accessToken: string,
+  preapprovalId: string,
+): Promise<void> {
+  const res = await fetch(`${MP_API}/preapproval/${preapprovalId}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ status: "cancelled" }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Error al cancelar la suscripción en Mercado Pago");
+  }
+}
+
 export async function getMercadoPagoUser(accessToken: string): Promise<{
   id: number;
   nickname?: string;

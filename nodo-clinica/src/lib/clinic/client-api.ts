@@ -445,6 +445,29 @@ export const clinicApi = {
     return data as { ok: boolean };
   },
 
+  async getSubscriptionStatus() {
+    const res = await fetch(`${BASE}/api/clinic/subscription/checkout`, {
+      credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al consultar la suscripción");
+    return data as {
+      status: string;
+      plan: string | null;
+      nextPaymentAt: string | null;
+    };
+  },
+
+  async startSubscriptionCheckout() {
+    const res = await fetch(`${BASE}/api/clinic/subscription/checkout`, {
+      method: "POST",
+      credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al iniciar la suscripción");
+    return data as { initPoint: string };
+  },
+
   async testMercadoPagoConnection() {
     const res = await fetch(`${BASE}/api/clinic/mercadopago/test/connection`, {
       credentials: "include",

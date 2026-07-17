@@ -30,6 +30,7 @@ import {
   CalendarOff,
   Bell,
   Palette,
+  Receipt,
 } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
@@ -53,12 +54,20 @@ import { useConsultorioTheme } from "@/hooks/use-consultorio-theme";
 
 const ALL_DAYS = [1, 2, 3, 4, 5, 6, 0];
 
-export type SectionId = "agenda" | "perfil" | "cobros" | "avisos" | "libres" | "apariencia";
+export type SectionId =
+  | "agenda"
+  | "perfil"
+  | "cobros"
+  | "suscripcion"
+  | "avisos"
+  | "libres"
+  | "apariencia";
 
 const SECTIONS: { id: SectionId; label: string; icon: React.ElementType }[] = [
   { id: "agenda", label: "Agenda", icon: CalendarClock },
   { id: "perfil", label: "Perfil", icon: User },
   { id: "cobros", label: "Cobros", icon: CreditCard },
+  { id: "suscripcion", label: "Suscripción", icon: Receipt },
   { id: "avisos", label: "Recordatorios", icon: Bell },
   { id: "libres", label: "Días libres", icon: CalendarOff },
   { id: "apariencia", label: "Apariencia", icon: Palette },
@@ -123,6 +132,13 @@ export function DoctorSettingsDialog({
     diagnoseUrl?: string;
   } | null>(null);
   const [testingMpConnection, setTestingMpConnection] = useState(false);
+  const [subscription, setSubscription] = useState<{
+    status: string;
+    plan: string | null;
+    nextPaymentAt: string | null;
+  } | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [startingSubscription, setStartingSubscription] = useState(false);
   const loadGen = useRef(0);
 
   useEffect(() => {
@@ -137,6 +153,16 @@ export function DoctorSettingsDialog({
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (activeSection !== "suscripcion" || subscription || subscriptionLoading) return;
+    setSubscriptionLoading(true);
+    clinicApi
+      .getSubscriptionStatus()
+      .then(setSubscription)
+      .catch(() => toast.error("No se pudo consultar el estado de la suscripción"))
+      .finally(() => setSubscriptionLoading(false));
+  }, [activeSection, subscription, subscriptionLoading]);
 
   type OfficeData = Record<string, unknown>;
 
@@ -969,6 +995,74 @@ export function DoctorSettingsDialog({
                   <p className="text-[10px] text-slate-400 text-center">
                     El paciente verá honorarios y datos de pago al pedir turno.
                   </p>
+                </>
+              )}
+
+              {/* ── Suscripción a Nodo ── */}
+              {activeSection === "suscripcion" && (
+                <>
+                  <div className="rounded-lg border border-violet-200 bg-violet-50/60 p-3 space-y-1.5">
+                    <p className="text-sm font-medium text-violet-950">
+                      Suscripción mensual a Nodo Clínica
+                    </p>
+                    <p className="text-[11px] text-violet-900/90 leading-relaxed">
+                      Esto es distinto de "Cobros": acá es Nodo cobrándote a vos por usar la
+                      plataforma, no vos cobrando a tus pacientes.
+                    </p>
+                  </div>
+
+                  {subscriptionLoading ? (
+                    <div className="flex justify-center py-6">
+                      <Loader2 className="h-5 w-5 animate-spin text-violet-600" />
+                    </div>
+                  ) : subscription?.status === "active" ? (
+                    <div className="rounded-md border border-emerald-200 bg-emerald-50/80 p-3 space-y-1">
+                      <p className="text-sm font-medium text-emerald-900">Suscripción activa</p>
+                      {subscription.nextPaymentAt && (
+                        <p className="text-[11px] text-emerald-800">
+                          Próximo cobro:{" "}
+                          {format(new Date(subscription.nextPaymentAt), "dd MMM yyyy", {
+                            locale: es,
+                          })}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-amber-200 bg-amber-50/70 p-3 space-y-2">
+                      <p className="text-sm text-amber-900">
+                        {subscription?.status === "expired"
+                          ? "Tu suscripción no está activa."
+                          : "Todavía no tenés una suscripción paga a Nodo."}
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 text-xs bg-violet-700 hover:bg-violet-800"
+                        disabled={startingSubscription}
+                        onClick={async () => {
+                          setStartingSubscription(true);
+                          try {
+                            const result = await clinicApi.startSubscriptionCheckout();
+                            window.location.href = result.initPoint;
+                          } catch (e) {
+                            toast.error(
+                              e instanceof Error
+                                ? e.message
+                                : "No se pudo iniciar la suscripción",
+                            );
+                          } finally {
+                            setStartingSubscription(false);
+                          }
+                        }}
+                      >
+                        {startingSubscription ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          "Suscribirme"
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </>
               )}
 
