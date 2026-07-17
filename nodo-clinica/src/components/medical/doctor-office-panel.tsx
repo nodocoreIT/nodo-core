@@ -678,42 +678,8 @@ export function DoctorOfficePanel({
                         }}
                       >
                         <CreditCard className="h-4 w-4 mr-2" />
-                        Conectar con Mercado Pago (OAuth)
+                        Vincular mi cuenta de Mercado Pago
                       </Button>
-                      <details className="rounded-md border border-amber-200 bg-amber-50/80 p-3 text-[11px] text-amber-950">
-                        <summary className="cursor-pointer font-semibold">
-                          ¿OAuth falla? Modo prueba — pegar Access Token
-                        </summary>
-                        <p className="mt-2 text-amber-900/90 leading-relaxed">
-                          En Mercado Pago → Credenciales de prueba, copiá el{" "}
-                          <strong>Access Token</strong> (APP_USR-…) del vendedor
-                          de prueba y pegalo acá. No uses el Public Key ni el
-                          N.º de aplicación como secret en Vercel.
-                        </p>
-                        <Input
-                          value={payment.mercadopagoAccessToken ?? ""}
-                          onChange={(e) =>
-                            setPayment((p) => ({
-                              ...p,
-                              mercadopagoAccessToken: e.target.value,
-                            }))
-                          }
-                          placeholder="APP_USR-..."
-                          className="mt-2 h-9 font-mono text-[10px]"
-                        />
-                        <p className="mt-2 text-amber-800/80">
-                          Después tocá{" "}
-                          <strong>Guardar honorarios y alias</strong>. Diagnóstico:{" "}
-                          <a
-                            href="/api/clinic/mercadopago/oauth/diagnose"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline"
-                          >
-                            /api/clinic/mercadopago/oauth/diagnose
-                          </a>
-                        </p>
-                      </details>
                       <p className="text-[11px] text-slate-500">
                         OAuth redirige a MP con PKCE. En sandbox, iniciá sesión
                         con el usuario TESTUSER… de tu panel MP.

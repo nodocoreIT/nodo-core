@@ -784,101 +784,60 @@ export function DoctorSettingsDialog({
                             </Button>
                           </div>
                         ) : (
-                          <div className="space-y-4">
-                            <div className="rounded-md border border-slate-200 bg-white p-3 space-y-2">
-                              <p className="text-xs font-medium text-slate-800">
-                                Opción 1 — Vincular con Mercado Pago (recomendado)
+                          <div className="rounded-md border border-slate-200 bg-white p-3 space-y-2">
+                            {mpOAuthConfigured === false ? (
+                              <p className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-2 leading-relaxed">
+                                El botón OAuth requiere que la <strong>plataforma</strong> tenga
+                                configurada la app en{" "}
+                                <code className="text-[10px]">nodo-clinica/.env.local</code>{" "}
+                                (<code className="text-[10px]">MERCADOPAGO_CLIENT_ID</code> y{" "}
+                                <code className="text-[10px]">MERCADOPAGO_CLIENT_SECRET</code>).
                               </p>
-                              {mpOAuthConfigured === false ? (
-                                <p className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-2 leading-relaxed">
-                                  El botón OAuth requiere que la <strong>plataforma</strong> tenga
-                                  configurada la app en{" "}
-                                  <code className="text-[10px]">nodo-clinica/.env.local</code>{" "}
-                                  (<code className="text-[10px]">MERCADOPAGO_CLIENT_ID</code> y{" "}
-                                  <code className="text-[10px]">MERCADOPAGO_CLIENT_SECRET</code>).
-                                  Mientras tanto usá la opción 2 abajo.
-                                </p>
-                              ) : (
-                                <p className="text-[11px] text-slate-600">
-                                  Te llevamos a Mercado Pago para iniciar sesión con tu cuenta
-                                  vendedor y autorizar los cobros. No pegás contraseñas acá.
-                                </p>
-                              )}
-                              {mpOAuthConfigured && mpOAuthHelp?.checklist && (
-                                <details className="text-[11px] text-slate-600 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
-                                  <summary className="cursor-pointer font-medium text-slate-700">
-                                    ¿Error «Tenemos un problema» en Mercado Pago?
-                                  </summary>
-                                  <ol className="mt-2 list-decimal pl-4 space-y-1.5 leading-relaxed">
-                                    {mpOAuthHelp.checklist.map((item) => (
-                                      <li key={item}>{item}</li>
-                                    ))}
-                                  </ol>
-                                  {mpOAuthHelp.diagnoseUrl && (
-                                    <p className="mt-2">
-                                      Diagnóstico:{" "}
-                                      <a
-                                        href={mpOAuthHelp.diagnoseUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="text-[#009ee3] underline"
-                                      >
-                                        {mpOAuthHelp.diagnoseUrl}
-                                      </a>
-                                    </p>
-                                  )}
-                                </details>
-                              )}
-                              <div className="flex justify-center">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  className="h-9 px-5 text-sm bg-[#009ee3] hover:bg-[#008ecf] text-white"
-                                  disabled={mpOAuthConfigured !== true}
-                                  onClick={() => {
-                                    window.location.href =
-                                      "/api/clinic/mercadopago/oauth/connect";
-                                  }}
-                                >
-                                  <CreditCard className="h-4 w-4 mr-2" />
-                                  Vincular mi cuenta de Mercado Pago
-                                </Button>
-                              </div>
-                            </div>
-
-                            <div className="rounded-md border border-[#009ee3]/25 bg-white p-3 space-y-2">
-                              <p className="text-xs font-medium text-slate-800">
-                                Opción 2 — Pegar Access Token de tu cuenta
+                            ) : (
+                              <p className="text-[11px] text-slate-600">
+                                Te llevamos a Mercado Pago para iniciar sesión con tu cuenta
+                                vendedor y autorizar los cobros. No pegás contraseñas acá.
                               </p>
-                              <p className="text-[11px] text-slate-600 leading-relaxed">
-                                En{" "}
-                                <a
-                                  href="https://www.mercadopago.com.ar/developers/panel/app"
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-[#009ee3] underline"
-                                >
-                                  Mercado Pago Developers
-                                </a>
-                                {" "}→ tu aplicación → <strong>Credenciales</strong>, copiá el{" "}
-                                <strong>Access Token</strong> de tu cuenta vendedor (prueba:
-                                <code className="text-[10px]"> TEST-…</code> / producción:{" "}
-                                <code className="text-[10px]">APP_USR-…</code>) y pegalo acá.
-                                Después tocá <strong>Guardar cambios</strong> y{" "}
-                                <strong>Probar conexión</strong>.
-                              </p>
-                              <Input
-                                value={payment.mercadopagoAccessToken ?? ""}
-                                onChange={(e) =>
-                                  setPayment((p) => ({
-                                    ...p,
-                                    mercadopagoAccessToken: e.target.value,
-                                  }))
-                                }
-                                placeholder="TEST-… o APP_USR-…"
-                                className="h-9 font-mono text-[11px]"
-                                autoComplete="off"
-                              />
+                            )}
+                            {mpOAuthConfigured && mpOAuthHelp?.checklist && (
+                              <details className="text-[11px] text-slate-600 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
+                                <summary className="cursor-pointer font-medium text-slate-700">
+                                  ¿Error «Tenemos un problema» en Mercado Pago?
+                                </summary>
+                                <ol className="mt-2 list-decimal pl-4 space-y-1.5 leading-relaxed">
+                                  {mpOAuthHelp.checklist.map((item) => (
+                                    <li key={item}>{item}</li>
+                                  ))}
+                                </ol>
+                                {mpOAuthHelp.diagnoseUrl && (
+                                  <p className="mt-2">
+                                    Diagnóstico:{" "}
+                                    <a
+                                      href={mpOAuthHelp.diagnoseUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-[#009ee3] underline"
+                                    >
+                                      {mpOAuthHelp.diagnoseUrl}
+                                    </a>
+                                  </p>
+                                )}
+                              </details>
+                            )}
+                            <div className="flex justify-center">
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-9 px-5 text-sm bg-[#009ee3] hover:bg-[#008ecf] text-white"
+                                disabled={mpOAuthConfigured !== true}
+                                onClick={() => {
+                                  window.location.href =
+                                    "/api/clinic/mercadopago/oauth/connect";
+                                }}
+                              >
+                                <CreditCard className="h-4 w-4 mr-2" />
+                                Vincular mi cuenta de Mercado Pago
+                              </Button>
                             </div>
                           </div>
                         )}
