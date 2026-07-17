@@ -546,6 +546,7 @@ export async function POST(request: NextRequest) {
   const { data: apt, error: insertError } = await createAppointment(supabase, {
     org_id: patientRow.org_id,
     doctor_id: doctorId,
+    professional_id: doctorId,
     patient_id: patientRow.id,
     scheduled_at: when.toISOString(),
     status: "scheduled",

@@ -16,6 +16,7 @@ export interface AppointmentRow {
   id: string;
   org_id: string;
   doctor_id: string;
+  professional_id: string;
   patient_id: string;
   scheduled_at: string;
   status: AppointmentStatus;
@@ -40,6 +41,7 @@ export interface AppointmentRow {
 export interface AppointmentInsert {
   org_id: string;
   doctor_id: string;
+  professional_id: string;
   patient_id: string;
   scheduled_at: string;
   status?: AppointmentStatus;

@@ -486,7 +486,7 @@ export function BookAppointmentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto px-8 pt-8">
+      <DialogContent className="max-w-[85%] sm:max-w-xl max-h-[90vh] overflow-y-auto px-8 pt-8">
         <DialogHeader>
           <WizardProgress steps={steps} current={step} />
           <DialogTitle className="flex items-center gap-2 text-base">
@@ -820,7 +820,7 @@ export function BookAppointmentDialog({
                 </p>
               )}
               {receiptAudit && (
-                <ReceiptValidationCard audit={receiptAudit} title="Pagaaao validado" />
+                <ReceiptValidationCard audit={receiptAudit} title="Verificación del Pago" />
               )}
               {intakeReason.trim() && (
                 <p className="text-xs text-slate-600 line-clamp-2">
