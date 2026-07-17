@@ -101,7 +101,7 @@ export function MonthCalendar({ days, selectedDate, onSelectDate }: MonthCalenda
           const info = dayByKey.get(key);
           const isSelected = selectedDate === key;
           const base =
-            "aspect-square flex items-center justify-center rounded-md text-xs";
+            "h-8 flex items-center justify-center rounded-md text-xs";
 
           if (!inMonth) {
             return <div key={key} className={`${base} text-transparent`} />;

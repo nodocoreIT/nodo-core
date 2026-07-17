@@ -20,7 +20,7 @@ const hanken = Hanken_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Nodo | Clinicas",
+  title: "Nodo | Clinica",
   description:
     "Telemedicina profesional con agenda, videoconsultas, historial clínico e informes con IA.",
   icons: {
