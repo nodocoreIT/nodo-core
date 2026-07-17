@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     supabase
       .from("appointments")
       .select(
-        "id, scheduled_at, status, doctor_id, professionals(full_name, specialty), patient_documents(*), clinical_notes(*)",
+        "id, scheduled_at, status, doctor_id, professionals!appointments_doctor_id_fkey(full_name, specialty), patient_documents(*), clinical_notes(*)",
       )
       .eq("patient_id", patientId)
       .eq("org_id", user.org_id ?? "")

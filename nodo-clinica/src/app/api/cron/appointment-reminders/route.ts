@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   // Fetch appointments that are still pending a reminder
   const { data: appointments } = await supabase
     .from("appointments")
-    .select("*, patients(email, full_name), professionals(full_name, office_settings(reminder_settings))")
+    .select("*, patients(email, full_name), professionals!appointments_doctor_id_fkey(full_name, office_settings(reminder_settings))")
     .in("status", ["scheduled", "waiting"])
     .is("reminder_sent_at", null);
 

@@ -239,11 +239,15 @@ export async function GET(request: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
   const { supabase } = authResult;
 
-  const { data: professional } = await supabase
+  const { data: professional, error: professionalError } = await supabase
     .from("professionals")
     .select("*, office_settings(*)")
     .eq("id", doctorId)
     .maybeSingle();
+
+  if (searchParams.get("debug") === "1") {
+    return NextResponse.json({ professional, professionalError });
+  }
 
   if (!professional) {
     return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });

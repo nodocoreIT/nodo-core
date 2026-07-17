@@ -182,7 +182,7 @@ export async function GET(request: NextRequest) {
     const { data: appointments, error: appointmentsError } = patientRow
       ? await supabase
           .from("appointments")
-          .select("*, professionals(full_name, specialty)")
+          .select("*, professionals!appointments_doctor_id_fkey(full_name, specialty)")
           .eq("patient_id", patientRow.id)
           .eq("org_id", patientRow.org_id)
           .order("scheduled_at", { ascending: false })

@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
   // List documents
   let docsQuery = supabase
     .from("patient_documents")
-    .select("*, appointments(scheduled_at, professionals(full_name))")
+    .select("*, appointments(scheduled_at, professionals!appointments_doctor_id_fkey(full_name))")
     .order("uploaded_at", { ascending: false });
 
   if (accessToken) {

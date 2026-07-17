@@ -22,7 +22,7 @@ export async function confirmAppointmentPaymentAndNotify(
 
   const { data: apt, error: aptError } = await supabase
     .from("appointments")
-    .select("*, patients(full_name, email), professionals(full_name, org_id)")
+    .select("*, patients(full_name, email), professionals!appointments_doctor_id_fkey(full_name, org_id)")
     .eq("id", appointmentId)
     .maybeSingle();
 
