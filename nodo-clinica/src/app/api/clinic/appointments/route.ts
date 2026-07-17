@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/supabase/auth-guard";
 import {
@@ -549,10 +550,11 @@ export async function POST(request: NextRequest) {
     professional_id: doctorId,
     patient_id: patientRow.id,
     scheduled_at: when.toISOString(),
-    appointment_date: whenDateKey,
+    appointment_date: when.toISOString(),
     status: "scheduled",
     queue_position: queueToday + 1,
     jitsi_room_id: `clinica-${doctorId.slice(-8)}-${Date.now()}`,
+    access_token: randomUUID(),
     token_expires_at: tokenExpires.toISOString(),
     payment_status: paymentStatus as "waived" | "pending" | "confirmed",
     payment_provider: usesMercadoPago ? "mercadopago" : "transfer",

@@ -49,6 +49,7 @@ export interface AppointmentInsert {
   status?: AppointmentStatus;
   queue_position?: number;
   jitsi_room_id: string;
+  access_token: string;
   token_expires_at: string;
   payment_status?: PaymentStatus;
   payment_confirmed_at?: string | null;
