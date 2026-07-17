@@ -39,6 +39,8 @@ interface WaitingRoomProps {
   dataSource?: "local" | "supabase";
   /** When provided, renders in embedded (modal) mode instead of a full page. */
   onClose?: () => void;
+  /** Called once, right after the appointment finishes loading successfully. */
+  onReady?: () => void;
 }
 
 interface WaitingMeta {
@@ -62,8 +64,10 @@ export function WaitingRoom({
   accessToken,
   dataSource = "supabase",
   onClose,
+  onReady,
 }: WaitingRoomProps) {
   const embedded = !!onClose;
+  const readyNotifiedRef = useRef(false);
   const outerClass = (bg: string, center = false) =>
     embedded ? "" : `min-h-screen ${bg}${center ? " flex items-center justify-center" : ""} p-4`;
   const [appointment, setAppointment] = useState<Appointment | null>(null);
@@ -351,6 +355,13 @@ export function WaitingRoom({
   useEffect(() => {
     loadAppointment();
   }, [loadAppointment]);
+
+  useEffect(() => {
+    if (!isLoading && appointment && !readyNotifiedRef.current) {
+      readyNotifiedRef.current = true;
+      onReady?.();
+    }
+  }, [isLoading, appointment, onReady]);
 
   useEffect(() => {
     const mp = searchParams.get("mp");

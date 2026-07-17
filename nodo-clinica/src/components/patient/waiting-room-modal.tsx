@@ -6,11 +6,14 @@ import { WaitingRoom } from "@/components/patient/waiting-room";
 interface WaitingRoomModalProps {
   accessToken: string | null;
   onOpenChange: (open: boolean) => void;
+  /** Called once, right after the appointment finishes loading successfully. */
+  onReady?: () => void;
 }
 
 export function WaitingRoomModal({
   accessToken,
   onOpenChange,
+  onReady,
 }: WaitingRoomModalProps) {
   return (
     <Dialog open={!!accessToken} onOpenChange={onOpenChange}>
@@ -21,6 +24,7 @@ export function WaitingRoomModal({
             accessToken={accessToken}
             dataSource="local"
             onClose={() => onOpenChange(false)}
+            onReady={onReady}
           />
         )}
       </DialogContent>

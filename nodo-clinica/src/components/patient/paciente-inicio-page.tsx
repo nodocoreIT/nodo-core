@@ -187,6 +187,7 @@ export function PacienteInicioPage() {
     name: string;
   } | null>(null);
   const [waitingRoomToken, setWaitingRoomToken] = useState<string | null>(null);
+  const [pendingBookedMessage, setPendingBookedMessage] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -470,13 +471,22 @@ export function PacienteInicioPage() {
           doctorName={bookingDoctor.name}
           open={!!bookingDoctor}
           onOpenChange={(open) => !open && setBookingDoctor(null)}
-          onBooked={(accessToken) => setWaitingRoomToken(accessToken)}
+          onBooked={(accessToken, message) => {
+            setPendingBookedMessage(message);
+            setWaitingRoomToken(accessToken);
+          }}
         />
       )}
 
       <WaitingRoomModal
         accessToken={waitingRoomToken}
         onOpenChange={(open) => !open && setWaitingRoomToken(null)}
+        onReady={() => {
+          if (pendingBookedMessage) {
+            toast.success(pendingBookedMessage);
+            setPendingBookedMessage(null);
+          }
+        }}
       />
     </div>
   );

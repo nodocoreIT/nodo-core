@@ -46,10 +46,11 @@ interface BookAppointmentDialogProps {
   doctorName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Called with the new appointment's access token once booking succeeds
-   * (no further payment redirect needed). If omitted, falls back to
-   * navigating to the waiting-room page. */
-  onBooked?: (accessToken: string) => void;
+  /** Called with the new appointment's access token and a success message
+   * once booking succeeds (no further payment redirect needed). The message
+   * should be shown once the waiting-room modal has finished loading, not
+   * immediately. If omitted, falls back to navigating to the waiting-room page. */
+  onBooked?: (accessToken: string, message: string) => void;
 }
 
 type WizardStep = "slot" | "payment" | "intake" | "studies" | "confirm";
@@ -475,15 +476,14 @@ export function BookAppointmentDialog({
         return;
       }
 
-      toast.success(
-        result.paymentPendingReview
-          ? "Turno reservado. El médico revisará tu comprobante antes de la consulta."
-          : "Turno confirmado. Te esperamos en la sala virtual.",
-      );
+      const successMessage = result.paymentPendingReview
+        ? "Turno reservado. El médico revisará tu comprobante antes de la consulta."
+        : "Turno confirmado. Te esperamos en la sala virtual.";
       onOpenChange(false);
       if (onBooked && result.accessToken) {
-        onBooked(result.accessToken);
+        onBooked(result.accessToken, successMessage);
       } else {
+        toast.success(successMessage);
         window.location.assign(result.waitingRoomUrl);
       }
     } catch (e) {
@@ -520,7 +520,7 @@ export function BookAppointmentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[85%] sm:max-w-xl max-h-[90vh] overflow-y-auto px-8 pt-8">
+      <DialogContent className="max-w-[85%] sm:max-w-2xl max-h-[95vh] overflow-y-auto px-8 pt-8">
         <DialogHeader>
           <WizardProgress steps={steps} current={step} onSelect={goToStep} />
           <DialogTitle className="flex items-center gap-2 text-base">
