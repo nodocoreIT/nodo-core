@@ -28,7 +28,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { clinicApi } from "@/lib/clinic/client-api";
-import { currencySymbol } from "@/lib/clinic/currency";
+import { currencySymbol, formatThousands, parseThousands } from "@/lib/clinic/currency";
 import {
   dayLabel,
   DEFAULT_AVAILABILITY,
@@ -743,28 +743,34 @@ export function DoctorOfficePanel({
                     {currencySymbol(payment.currency)}
                   </span>
                   <Input
-                    type="number"
-                    value={payment.consultationFee ?? ""}
+                    type="text"
+                    inputMode="numeric"
+                    value={formatThousands(payment.consultationFee)}
                     onChange={(e) =>
                       setPayment((p) => ({
                         ...p,
-                        consultationFee: Number(e.target.value) || undefined,
+                        consultationFee: parseThousands(e.target.value),
                       }))
                     }
                     className="h-9 pl-8"
-                    placeholder="15000"
+                    placeholder="15.000"
                   />
                 </div>
               </div>
               <div>
                 <Label className="text-xs">Moneda</Label>
-                <Input
+                <Select
                   value={payment.currency ?? "ARS"}
-                  onChange={(e) =>
-                    setPayment((p) => ({ ...p, currency: e.target.value }))
-                  }
-                  className="mt-1 h-9"
-                />
+                  onValueChange={(v) => setPayment((p) => ({ ...p, currency: v }))}
+                >
+                  <SelectTrigger className="mt-1 h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ARS">$AR</SelectItem>
+                    <SelectItem value="USD">U$S</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div>
