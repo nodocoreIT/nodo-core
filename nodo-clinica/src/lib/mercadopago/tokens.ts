@@ -106,15 +106,14 @@ export async function getDoctorMercadoPagoAccessToken(
     return creds.access_token.trim();
   }
 
-  const envToken =
-    process.env.CLINIC_MERCADOPAGO_ACCESS_TOKEN?.trim() ||
-    process.env.MERCADOPAGO_ACCESS_TOKEN?.trim();
-
-  if (!needsRefresh) return envToken || undefined;
-  if (!creds?.refresh_token) return envToken || undefined;
+  // No env-var fallback here: MERCADOPAGO_ACCESS_TOKEN is Nodo's own platform
+  // token (doctor subscription billing), never a stand-in for a doctor's own
+  // linked account. No creds row means the doctor hasn't connected — full stop.
+  if (!needsRefresh) return undefined;
+  if (!creds?.refresh_token) return undefined;
 
   const config = getMpOAuthConfig();
-  if (!config) return creds?.access_token || envToken || undefined;
+  if (!config) return creds?.access_token || undefined;
 
   try {
     const refreshed = await refreshOAuthToken({
@@ -137,6 +136,6 @@ export async function getDoctorMercadoPagoAccessToken(
     return refreshed.access_token;
   } catch (err) {
     console.error("[mp-tokens] refresh failed", err);
-    return creds?.access_token || envToken || undefined;
+    return creds?.access_token || undefined;
   }
 }

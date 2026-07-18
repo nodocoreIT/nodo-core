@@ -71,21 +71,16 @@ export async function upsertPaymentCredentials(
 
 /**
  * Returns the MercadoPago access token for a professional, using service_role only.
- * Falls back to env vars for legacy/test setups.
+ * No env-var fallback: MERCADOPAGO_ACCESS_TOKEN is Nodo's own platform token
+ * (used to bill doctors' subscriptions to Nodo) and must never be reused to
+ * collect a doctor's patient payments — each doctor's token comes only from
+ * their own linked payment_credentials row.
  */
 export async function getProfessionalMercadoPagoAccessToken(
   professionalId: string,
 ): Promise<string | undefined> {
   const creds = await getPaymentCredentials(professionalId);
-  if (creds?.access_token?.trim()) {
-    return creds.access_token.trim();
-  }
-  // Env var fallback for legacy / test setups
-  return (
-    process.env.CLINIC_MERCADOPAGO_ACCESS_TOKEN?.trim() ||
-    process.env.MERCADOPAGO_ACCESS_TOKEN?.trim() ||
-    undefined
-  );
+  return creds?.access_token?.trim() || undefined;
 }
 
 /**
