@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createServiceClient();
 
-  await supabase.from("payment_credentials").delete().eq("org_id", user.org_id);
+  await supabase.from("payment_credentials").delete().eq("professional_id", professional.id);
 
   const { data: existing } = await supabase
     .from("office_settings")

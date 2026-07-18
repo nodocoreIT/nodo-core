@@ -24,7 +24,7 @@ import {
   doctorUsesMercadoPago,
 } from "@/lib/clinic/payment";
 import { isStrictPaymentValidation } from "@/lib/clinic/payment-validation";
-import { orgHasMercadoPagoConnection } from "@/lib/clinic/db/payments";
+import { professionalHasMercadoPagoConnection } from "@/lib/clinic/db/payments";
 import { sendAppointmentConfirmationEmail } from "@/lib/email/resend";
 import { formatReminderLabel } from "@/lib/email/reminder-label";
 import { buildCheckoutForAppointment } from "@/lib/mercadopago/checkout";
@@ -137,8 +137,8 @@ export async function GET(request: NextRequest) {
       typeof officeSettingsPayment.consultationFee === "number"
         ? officeSettingsPayment.consultationFee
         : 0;
-    const orgConnected = professional?.org_id
-      ? await orgHasMercadoPagoConnection(professional.org_id)
+    const mpConnected = professional?.id
+      ? await professionalHasMercadoPagoConnection(professional.id)
       : false;
     const doctorPayment = {
       consultationFee,
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
       cbu: officeSettingsPayment.cbu as string | undefined,
       paymentInstructions: officeSettingsPayment.paymentInstructions as string | undefined,
       qrImageData: officeSettingsPayment.qrImageData as string | undefined,
-      mercadopagoReady: orgConnected && consultationFee > 0,
+      mercadopagoReady: mpConnected && consultationFee > 0,
     };
 
     return NextResponse.json({

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
-import { getDoctorMercadoPagoAccessToken, orgHasMercadoPagoConnection } from "@/lib/mercadopago/tokens";
+import { getDoctorMercadoPagoAccessToken, professionalHasMercadoPagoConnection } from "@/lib/mercadopago/tokens";
 import { createQrOrder, getQrOrder } from "@/lib/mercadopago/qr";
 import { randomUUID } from "crypto";
 
@@ -20,17 +20,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Org no encontrada" }, { status: 403 });
   }
 
-  const hasConnection = await orgHasMercadoPagoConnection(user.org_id);
+  const professional = await resolveProfessional(auth);
+  if (!professional) {
+    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+  }
+
+  const hasConnection = await professionalHasMercadoPagoConnection(professional.id);
   if (!hasConnection) {
     return NextResponse.json(
       { error: "Conectá Mercado Pago primero (OAuth)" },
       { status: 400 },
     );
-  }
-
-  const professional = await resolveProfessional(auth);
-  if (!professional) {
-    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
   }
 
   const { data: officeSettings } = await supabase
@@ -61,10 +61,10 @@ export async function POST(request: NextRequest) {
   const amount =
     typeof body.amount === "number" && body.amount > 0 ? body.amount : fee;
 
-  const token = await getDoctorMercadoPagoAccessToken(user.org_id);
+  const token = await getDoctorMercadoPagoAccessToken(professional.id);
   if (!token) {
     return NextResponse.json(
-      { error: "No se pudo obtener Access Token del org" },
+      { error: "No se pudo obtener Access Token del médico" },
       { status: 500 },
     );
   }
@@ -116,12 +116,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Org no encontrada" }, { status: 403 });
   }
 
+  const professional = await resolveProfessional(auth);
+  if (!professional) {
+    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+  }
+
   const orderId = new URL(request.url).searchParams.get("orderId");
   if (!orderId) {
     return NextResponse.json({ error: "orderId requerido" }, { status: 400 });
   }
 
-  const token = await getDoctorMercadoPagoAccessToken(user.org_id);
+  const token = await getDoctorMercadoPagoAccessToken(professional.id);
   if (!token) {
     return NextResponse.json({ error: "Sin token MP" }, { status: 400 });
   }

@@ -5,7 +5,7 @@ import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
 import { isLocalMode } from "@/lib/clinic/config";
 import { readDb, writeDb, type DoctorPaymentSettings, type DoctorReminderSettings } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
-import { orgHasMercadoPagoConnection } from "@/lib/clinic/db/payments";
+import { professionalHasMercadoPagoConnection } from "@/lib/clinic/db/payments";
 
 const DOCTOR_ROLES = new Set(["admin", "super_admin", "medico", "agent", "doctor"]);
 import { mergeThemeSettings } from "@/lib/clinic/theme-settings";
@@ -185,13 +185,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const orgId = (professional as any).org_id as string | null;
-    const orgConnected = orgId ? await orgHasMercadoPagoConnection(orgId) : false;
+    const mpConnected = await professionalHasMercadoPagoConnection(me.id);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return NextResponse.json(
-      doctorOfficePayload(professional, (professional as any).office_settings, orgConnected),
+      doctorOfficePayload(professional, (professional as any).office_settings, mpConnected),
     );
   }
 

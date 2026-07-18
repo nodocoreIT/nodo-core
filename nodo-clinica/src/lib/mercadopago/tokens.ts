@@ -1,7 +1,7 @@
 import { isLocalMode } from "@/lib/clinic/config";
 import {
   getPaymentCredentials,
-  getOrgMercadoPagoAccessToken,
+  getProfessionalMercadoPagoAccessToken,
 } from "@/lib/clinic/db/payments";
 import { readDb, writeDb, type LocalDoctor } from "@/lib/clinic/local-db";
 import {
@@ -16,28 +16,35 @@ import {
 } from "@/lib/mercadopago/oauth";
 import { createServiceClient } from "@/lib/supabase/server";
 
-export { getOrgMercadoPagoAccessToken, doctorHasMercadoPagoConnection, readStoredAccessToken };
+export {
+  getProfessionalMercadoPagoAccessToken,
+  doctorHasMercadoPagoConnection,
+  readStoredAccessToken,
+};
 
-export async function orgHasMercadoPagoConnection(orgId: string): Promise<boolean> {
+/** Each doctor links their own Mercado Pago account — never shared across an org. */
+export async function professionalHasMercadoPagoConnection(
+  professionalId: string,
+): Promise<boolean> {
   if (isLocalMode()) {
     const db = await readDb();
-    const doctor = db.doctors.find((d) => d.orgId === orgId || d.id === orgId);
+    const doctor = db.doctors.find((d) => d.id === professionalId);
     return doctor ? doctorHasMercadoPagoConnection(doctor) : false;
   }
-  const token = await getOrgMercadoPagoAccessToken(orgId);
+  const token = await getProfessionalMercadoPagoAccessToken(professionalId);
   return !!token;
 }
 
-/** Access token del médico/org; refresca OAuth si corresponde. Nunca exponer al cliente. */
+/** Access token del médico; refresca OAuth si corresponde. Nunca exponer al cliente. */
 export async function getDoctorMercadoPagoAccessToken(
-  doctorOrOrgId: LocalDoctor | string,
+  doctorOrProfessionalId: LocalDoctor | string,
 ): Promise<string | undefined> {
   if (isLocalMode()) {
     const db = await readDb();
     const doctor =
-      typeof doctorOrOrgId === "string"
-        ? db.doctors.find((d) => d.id === doctorOrOrgId)
-        : doctorOrOrgId;
+      typeof doctorOrProfessionalId === "string"
+        ? db.doctors.find((d) => d.id === doctorOrProfessionalId)
+        : doctorOrProfessionalId;
     if (!doctor?.payment?.mercadopagoEnabled) return undefined;
 
     const payment = doctor.payment;
@@ -85,10 +92,13 @@ export async function getDoctorMercadoPagoAccessToken(
     }
   }
 
-  const orgId = typeof doctorOrOrgId === "string" ? doctorOrOrgId : doctorOrOrgId.orgId;
-  if (!orgId) return undefined;
+  const professionalId =
+    typeof doctorOrProfessionalId === "string"
+      ? doctorOrProfessionalId
+      : doctorOrProfessionalId.id;
+  if (!professionalId) return undefined;
 
-  const creds = await getPaymentCredentials(orgId);
+  const creds = await getPaymentCredentials(professionalId);
   const needsRefresh =
     !!creds?.refresh_token && isTokenExpired(creds.token_expires_at ?? undefined);
 
@@ -122,7 +132,7 @@ export async function getDoctorMercadoPagoAccessToken(
         ...(expiresAt ? { token_expires_at: expiresAt } : {}),
         updated_at: new Date().toISOString(),
       })
-      .eq("org_id", orgId);
+      .eq("professional_id", professionalId);
 
     return refreshed.access_token;
   } catch (err) {

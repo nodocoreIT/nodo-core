@@ -8,13 +8,13 @@ export async function processMercadoPagoPaymentId(
 ): Promise<{ ok: boolean; appointmentId?: string; skipped?: string }> {
   const supabase = await createServiceClient();
 
-  // Get all orgs that have payment credentials
-  const { data: orgs } = await supabase
+  // Get all professionals that have office_settings (each doctor's own MP token)
+  const { data: settings } = await supabase
     .from("office_settings")
-    .select("org_id");
+    .select("professional_id");
 
-  for (const org of orgs ?? []) {
-    const token = await getDoctorMercadoPagoAccessToken(org.org_id);
+  for (const s of settings ?? []) {
+    const token = await getDoctorMercadoPagoAccessToken(s.professional_id);
     if (!token) continue;
 
     let payment: MpPaymentInfo;
@@ -37,7 +37,7 @@ export async function processMercadoPagoPaymentId(
       .from("appointments")
       .select("id, doctor_id, org_id")
       .eq("id", appointmentId)
-      .eq("org_id", org.org_id)
+      .eq("doctor_id", s.professional_id)
       .maybeSingle();
 
     if (!apt) continue;

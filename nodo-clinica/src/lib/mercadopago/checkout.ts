@@ -106,7 +106,7 @@ async function buildSupabaseCheckout(appointmentId: string) {
 
   if (!mercadopagoEnabled || fee <= 0) return null;
 
-  const token = await getDoctorMercadoPagoAccessToken(apt.org_id);
+  const token = await getDoctorMercadoPagoAccessToken(apt.doctor_id);
   if (!token) return null;
 
   const base = appBaseUrl();

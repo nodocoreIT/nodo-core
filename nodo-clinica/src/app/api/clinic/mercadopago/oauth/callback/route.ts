@@ -157,7 +157,8 @@ export async function GET(request: NextRequest) {
 
     const expiresAt = tokenExpiresAtIso(tokens.expires_in);
 
-    await upsertPaymentCredentials(match.org_id, {
+    await upsertPaymentCredentials(match.professional_id, {
+      org_id: match.org_id,
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token ?? null,
       public_key: tokens.public_key ?? null,

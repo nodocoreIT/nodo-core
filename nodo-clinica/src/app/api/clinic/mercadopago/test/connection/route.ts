@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isLocalMode } from "@/lib/clinic/config";
-import { getOrgMercadoPagoAccessToken } from "@/lib/clinic/db/payments";
+import { getProfessionalMercadoPagoAccessToken } from "@/lib/clinic/db/payments";
 import { readDb } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
 import { getDoctorMercadoPagoAccessToken } from "@/lib/mercadopago/tokens";
@@ -8,7 +8,7 @@ import {
   getMercadoPagoUser,
   mercadoPagoTokenKind,
 } from "@/lib/mercadopago/client";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +46,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Org no encontrada" }, { status: 403 });
     }
 
-    token = await getOrgMercadoPagoAccessToken(auth.user.org_id);
+    const professional = await resolveProfessional(auth);
+    if (!professional) {
+      return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+    }
+
+    token = await getProfessionalMercadoPagoAccessToken(professional.id);
   }
 
   if (!token) {

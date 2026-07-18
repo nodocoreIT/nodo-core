@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 
 export interface PaymentCredentialsRow {
   id: string;
+  professional_id: string;
   org_id: string;
   access_token: string;
   refresh_token: string | null;
@@ -12,6 +13,7 @@ export interface PaymentCredentialsRow {
 }
 
 export interface PaymentCredentialsUpsert {
+  professional_id: string;
   org_id: string;
   access_token: string;
   refresh_token?: string | null;
@@ -20,18 +22,19 @@ export interface PaymentCredentialsUpsert {
 }
 
 /**
- * Reads MercadoPago OAuth credentials for an org.
+ * Reads MercadoPago OAuth credentials for a professional (each doctor links
+ * their own account — this is NOT shared across an org).
  * ALWAYS uses service_role client — never the authenticated client.
  * (RLS blocks authenticated access to payment_credentials by design.)
  */
 export async function getPaymentCredentials(
-  orgId: string,
+  professionalId: string,
 ): Promise<PaymentCredentialsRow | null> {
   const supabase = await createServiceClient();
   const { data, error } = await supabase
     .from("payment_credentials")
     .select("*")
-    .eq("org_id", orgId)
+    .eq("professional_id", professionalId)
     .maybeSingle();
 
   if (error) {
@@ -42,19 +45,19 @@ export async function getPaymentCredentials(
 }
 
 /**
- * Upserts MercadoPago OAuth credentials for an org.
+ * Upserts MercadoPago OAuth credentials for a professional.
  * ALWAYS uses service_role client.
  */
 export async function upsertPaymentCredentials(
-  orgId: string,
-  tokens: Omit<PaymentCredentialsUpsert, "org_id">,
+  professionalId: string,
+  tokens: Omit<PaymentCredentialsUpsert, "professional_id">,
 ): Promise<PaymentCredentialsRow | null> {
   const supabase = await createServiceClient();
   const { data, error } = await supabase
     .from("payment_credentials")
     .upsert(
-      { org_id: orgId, ...tokens, updated_at: new Date().toISOString() },
-      { onConflict: "org_id" },
+      { professional_id: professionalId, ...tokens, updated_at: new Date().toISOString() },
+      { onConflict: "professional_id" },
     )
     .select()
     .maybeSingle();
@@ -67,13 +70,13 @@ export async function upsertPaymentCredentials(
 }
 
 /**
- * Returns the MercadoPago access token for an org, using service_role only.
+ * Returns the MercadoPago access token for a professional, using service_role only.
  * Falls back to env vars for legacy/test setups.
  */
-export async function getOrgMercadoPagoAccessToken(
-  orgId: string,
+export async function getProfessionalMercadoPagoAccessToken(
+  professionalId: string,
 ): Promise<string | undefined> {
-  const creds = await getPaymentCredentials(orgId);
+  const creds = await getPaymentCredentials(professionalId);
   if (creds?.access_token?.trim()) {
     return creds.access_token.trim();
   }
@@ -86,12 +89,12 @@ export async function getOrgMercadoPagoAccessToken(
 }
 
 /**
- * Returns true if the org has valid MercadoPago credentials stored.
+ * Returns true if the professional has valid MercadoPago credentials stored.
  */
-export async function orgHasMercadoPagoConnection(
-  orgId: string,
+export async function professionalHasMercadoPagoConnection(
+  professionalId: string,
 ): Promise<boolean> {
-  const token = await getOrgMercadoPagoAccessToken(orgId);
+  const token = await getProfessionalMercadoPagoAccessToken(professionalId);
   return !!token;
 }
 
