@@ -65,9 +65,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
+  const { data: existingAuthUser } = await adminClient.auth.admin.getUserById(authUserId);
+  const currentAppMetadata = existingAuthUser?.user?.app_metadata ?? {};
+
   const { error: updateError } = await adminClient.auth.admin.updateUserById(
     authUserId,
-    { app_metadata: { role } },
+    {
+      app_metadata: {
+        ...currentAppMetadata,
+        role,
+        // This route runs right after a successful password reset
+        // (actualizar-contrasena) — clear the forced-password flag here.
+        must_set_password: false,
+      },
+    },
   );
 
   if (updateError) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { jsonWithSession } from "@/lib/clinic/session";
 
 export async function POST(request: NextRequest) {
@@ -19,14 +19,39 @@ export async function POST(request: NextRequest) {
 
     const appMeta = data.user.app_metadata ?? {};
     const rawRole: string = appMeta.role ?? "patient";
-    const fullName: string =
-      data.user.user_metadata?.full_name ?? data.user.email?.split("@")[0] ?? "";
 
     // If the client explicitly requests the patient portal, honour it.
     // For doctor portal requests, only privileged accounts get the doctor role.
     const isPrivileged = ["super_admin", "admin", "medico", "agent"].includes(rawRole);
     const sessionRole: "doctor" | "patient" =
       requestedRole === "patient" ? "patient" : isPrivileged ? "doctor" : "patient";
+
+    // Prefer the canonical name from professionals/patients over
+    // user_metadata.full_name, which is only set once at provisioning time
+    // and can carry stale/wrong data (e.g. a name from a different account).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const serviceClient = (await createServiceClient()) as any;
+    let canonicalName: string | null = null;
+    if (sessionRole === "doctor") {
+      const { data: professional } = await serviceClient
+        .from("professionals")
+        .select("full_name")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
+      canonicalName = professional?.full_name ?? null;
+    } else {
+      const { data: patient } = await serviceClient
+        .from("patients")
+        .select("full_name")
+        .eq("profile_id", data.user.id)
+        .maybeSingle();
+      canonicalName = patient?.full_name ?? null;
+    }
+    const fullName: string =
+      canonicalName ??
+      data.user.user_metadata?.full_name ??
+      data.user.email?.split("@")[0] ??
+      "";
 
     // Use jsonWithSession so the ClinicSession cookie is set directly on the
     // response object (response.cookies.set), which is the only reliable way
