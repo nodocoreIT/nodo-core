@@ -151,7 +151,10 @@ export function DashboardPage() {
 
   // Account balances for quick-view cards
   const cuentaMercadoPago = finanzas.cuentas
-    .filter((c) => c.nombre.toLowerCase().includes('mercado'))
+    .filter((c) => {
+      const n = c.nombre.toLowerCase();
+      return n.includes('mercado') && !n.includes('reserva');
+    })
     .sort((a, b) => b.saldoActual - a.saldoActual)[0];
   const cuentasSantander = finanzas.cuentas.filter(
     (c) => c.nombre.toLowerCase().includes('santander'),
