@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
   let query = svc
     .from("doctor_tasks")
     .select("*")
-    .eq("professional_id", me.id)
+    .eq("doctor_id", me.id)
     .order("created_at", { ascending: false });
 
   if (due) query = query.eq("due_date", due);
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     tasks: (tasks ?? []).map((t: Record<string, unknown>) => ({
       id: t.id,
-      doctorId: t.professional_id,
+      doctorId: t.doctor_id,
       title: t.title,
       dueDate: t.due_date,
       done: t.done,
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
   const resolved = await resolveDoctor(request);
   if (resolved instanceof NextResponse) return resolved;
   if ("error" in resolved) return resolved.error;
-  const { me } = resolved;
+  const { me, auth } = resolved;
 
   const body = await request.json();
   const title = String(body.title ?? "").trim();
@@ -112,7 +112,8 @@ export async function POST(request: NextRequest) {
     .from("doctor_tasks")
     .insert({
       id: randomUUID(),
-      professional_id: me.id,
+      org_id: auth.user.org_id,
+      doctor_id: me.id,
       title,
       due_date: body.dueDate ? String(body.dueDate) : null,
       done: false,
@@ -128,7 +129,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     task: {
       id: task.id,
-      doctorId: task.professional_id,
+      doctorId: task.doctor_id,
       title: task.title,
       dueDate: task.due_date,
       done: task.done,
@@ -182,7 +183,7 @@ export async function PATCH(request: NextRequest) {
     .from("doctor_tasks")
     .update(updates)
     .eq("id", taskId)
-    .eq("professional_id", me.id)
+    .eq("doctor_id", me.id)
     .select()
     .maybeSingle();
 
@@ -220,7 +221,7 @@ export async function DELETE(request: NextRequest) {
     .from("doctor_tasks")
     .delete()
     .eq("id", taskId)
-    .eq("professional_id", me.id);
+    .eq("doctor_id", me.id);
 
   return NextResponse.json({ ok: true });
 }
