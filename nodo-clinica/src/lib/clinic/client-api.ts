@@ -119,8 +119,25 @@ export const clinicApi = {
               ? "patient"
               : sessionRole;
 
-          const fullName: string =
+          // user_metadata.full_name is set once at provisioning time and can
+          // go stale (e.g. carry a name from a different account). Prefer the
+          // canonical name resolved server-side from professionals/patients.
+          let fullName: string =
             userMeta.full_name ?? userMeta.name ?? authUser.email ?? "";
+          try {
+            const sessionRes = await fetch(`${BASE}/api/clinic/account/session`, {
+              credentials: "include",
+              cache: "no-store",
+            });
+            if (sessionRes.ok) {
+              const sessionData = await parseJsonResponse(sessionRes);
+              if (sessionData.user?.fullName) {
+                fullName = sessionData.user.fullName;
+              }
+            }
+          } catch {
+            /* keep the user_metadata fallback */
+          }
           return {
             session: {
               userId: authUser.id,
