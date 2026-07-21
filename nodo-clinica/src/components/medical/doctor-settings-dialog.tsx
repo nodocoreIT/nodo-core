@@ -964,35 +964,6 @@ export function DoctorSettingsDialog({
                       className="mt-1 text-sm"
                     />
                   </div>
-                  <div>
-                    <Label className="text-xs flex items-center gap-1">
-                      <CreditCard className="h-3.5 w-3.5" />
-                      QR de cobro (Mercado Pago, etc.)
-                    </Label>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      className="mt-1 h-9 text-xs cursor-pointer file:cursor-pointer file:bg-brand file:text-white file:border-0 file:rounded file:px-3 file:text-xs file:font-medium hover:border-brand/50 transition-colors"
-                      onChange={async (e) => {
-                        const f = e.target.files?.[0];
-                        if (!f) return;
-                        try {
-                          const data = await readImageFile(f, 500);
-                          setPayment((p) => ({ ...p, qrImageData: data }));
-                        } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Error");
-                        }
-                      }}
-                    />
-                    {payment.qrImageData && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={payment.qrImageData}
-                        alt="QR pago"
-                        className="mt-2 max-h-40 mx-auto border rounded-lg"
-                      />
-                    )}
-                  </div>
                   <p className="text-[11px] text-slate-500 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2">
                     Para revisar comprobantes, validaciones y aprobar pagos, usá el menú{" "}
                     <Link href="/medico/cobros" className="font-semibold text-brand hover:underline">
