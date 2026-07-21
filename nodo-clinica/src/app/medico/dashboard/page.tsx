@@ -22,6 +22,16 @@ export default function MedicoDashboardPage() {
     });
   }, [router]);
 
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const fullName = (e as CustomEvent<{ fullName?: string }>).detail?.fullName;
+      if (!fullName) return;
+      setDoctor((d) => (d ? { ...d, fullName } : d));
+    };
+    window.addEventListener("nodo:profile-updated", handler);
+    return () => window.removeEventListener("nodo:profile-updated", handler);
+  }, []);
+
   if (!doctor) {
     return (
       <div className="flex items-center justify-center py-20">

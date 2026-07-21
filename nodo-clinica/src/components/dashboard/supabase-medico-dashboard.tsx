@@ -18,7 +18,7 @@ export async function SupabaseMedicoDashboard({
     // professionals.id regardless of whether it was platform-sync or clinic login.
     const { data: professional } = await serviceClient
       .from("professionals")
-      .select("id, full_name, specialty, license_number")
+      .select("id, full_name, specialty, license_number, profile_photo_url")
       .eq("id", clinicSession.userId)
       .maybeSingle();
 
@@ -29,6 +29,7 @@ export async function SupabaseMedicoDashboard({
           doctorName={professional.full_name}
           doctorSpecialty={professional.specialty ?? undefined}
           doctorLicense={professional.license_number ?? undefined}
+          doctorPhoto={professional.profile_photo_url ?? undefined}
           dataSource="supabase"
           embedded={embedded}
         />
@@ -46,7 +47,7 @@ export async function SupabaseMedicoDashboard({
   if (user) {
     const { data: professional } = await serviceClient
       .from("professionals")
-      .select("id, full_name, specialty, license_number")
+      .select("id, full_name, specialty, license_number, profile_photo_url")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -57,6 +58,7 @@ export async function SupabaseMedicoDashboard({
           doctorName={professional.full_name}
           doctorSpecialty={professional.specialty ?? undefined}
           doctorLicense={professional.license_number ?? undefined}
+          doctorPhoto={professional.profile_photo_url ?? undefined}
           dataSource="supabase"
           embedded={embedded}
         />

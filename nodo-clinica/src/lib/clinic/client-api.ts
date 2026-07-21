@@ -124,6 +124,7 @@ export const clinicApi = {
           // canonical name resolved server-side from professionals/patients.
           let fullName: string =
             userMeta.full_name ?? userMeta.name ?? authUser.email ?? "";
+          let profilePhotoUrl: string | undefined;
           try {
             const sessionRes = await fetch(`${BASE}/api/clinic/account/session`, {
               credentials: "include",
@@ -134,6 +135,7 @@ export const clinicApi = {
               if (sessionData.user?.fullName) {
                 fullName = sessionData.user.fullName;
               }
+              profilePhotoUrl = sessionData.user?.profilePhotoUrl;
             }
           } catch {
             /* keep the user_metadata fallback */
@@ -149,6 +151,7 @@ export const clinicApi = {
               id: authUser.id,
               email: authUser.email,
               fullName,
+              profilePhotoUrl,
               role: effectiveRole,
               subscriptionPlan: appMeta.plan ?? appMeta.subscription_plan ?? undefined,
               org_id: appMeta.org_id ?? null,
@@ -659,6 +662,71 @@ export const clinicApi = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al rechazar pago");
+    return data;
+  },
+
+  async getDoctorAppointmentsMonth(doctorId: string, monthKey: string) {
+    const res = await fetch(
+      `${BASE}/api/clinic/appointments?doctorId=${doctorId}&scope=month&month=${monthKey}`,
+      clinicFetchOpts(),
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar el calendario de turnos");
+    return data as { days: Array<{ date: string; count: number; patientCount: number }> };
+  },
+
+  async getDoctorAppointmentsDay(doctorId: string, dateKey: string) {
+    const res = await fetch(
+      `${BASE}/api/clinic/appointments?doctorId=${doctorId}&scope=day&date=${dateKey}`,
+      clinicFetchOpts(),
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar los turnos del día");
+    return data as { appointments: Array<Record<string, unknown>> };
+  },
+
+  async doctorCancelAppointments(appointmentIds: string[]) {
+    const res = await fetch(`${BASE}/api/clinic/appointments`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ appointmentIds, action: "doctorCancelAppointments" }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cancelar turnos");
+    return data as {
+      results: Array<{
+        id: string;
+        ok: boolean;
+        requiresRefund?: boolean;
+        paymentProvider?: string | null;
+        mercadopagoPaymentId?: string | null;
+        error?: string;
+      }>;
+    };
+  },
+
+  async refundAppointmentMercadoPago(appointmentId: string) {
+    const res = await fetch(`${BASE}/api/clinic/appointments`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ appointmentId, action: "refundAppointmentMercadoPago" }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al reembolsar el pago");
+    return data;
+  },
+
+  async markAppointmentRefundedManually(appointmentId: string) {
+    const res = await fetch(`${BASE}/api/clinic/appointments`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ appointmentId, action: "markAppointmentRefundedManually" }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al registrar la devolución");
     return data;
   },
 

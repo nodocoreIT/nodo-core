@@ -44,7 +44,7 @@ interface Doctor {
   specialty: string;
   licenseNumber: string;
   subscriptionPlan: string;
-  profilePhotoData?: string;
+  profilePhotoUrl?: string;
   bio?: string;
   payment?: {
     consultationFee?: number;
@@ -375,7 +375,7 @@ export function PacientePortal() {
                   <div className="flex items-center gap-3">
                     <UserAvatar
                       name={doc.fullName}
-                      photoUrl={doc.profilePhotoData}
+                      photoUrl={doc.profilePhotoUrl}
                       size="lg"
                     />
                     <div className="flex-1 min-w-0">

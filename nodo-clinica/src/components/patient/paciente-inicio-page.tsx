@@ -155,7 +155,7 @@ interface Doctor {
   fullName: string;
   specialty: string;
   licenseNumber: string;
-  profilePhotoData?: string;
+  profilePhotoUrl?: string;
   payment?: {
     requirePaymentBeforeBooking?: boolean;
     mercadopagoEnabled?: boolean;
@@ -263,7 +263,7 @@ export function PacienteInicioPage() {
                     <div className="flex items-start gap-3">
                       <UserAvatar
                         name={doc.fullName}
-                        photoUrl={doc.profilePhotoData}
+                        photoUrl={doc.profilePhotoUrl}
                         size="lg"
                       />
                       <div className="min-w-0 flex-1">

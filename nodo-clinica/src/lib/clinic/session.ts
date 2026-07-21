@@ -11,6 +11,7 @@ export interface ClinicSession {
   role: SessionRole;
   email: string;
   fullName: string;
+  profilePhotoUrl?: string;
 }
 
 const COOKIE = "clinica_session";
@@ -75,7 +76,7 @@ async function validateSessionUser(
     const supabase = await createServiceClient();
     const { data: professional } = await supabase
       .from("professionals")
-      .select("id, email, full_name")
+      .select("id, email, full_name, profile_photo_url")
       .or(`id.eq.${session.userId},user_id.eq.${session.userId}`)
       .maybeSingle();
 
@@ -85,6 +86,7 @@ async function validateSessionUser(
       role: "doctor",
       email: professional.email,
       fullName: professional.full_name,
+      profilePhotoUrl: professional.profile_photo_url ?? undefined,
     };
   }
 

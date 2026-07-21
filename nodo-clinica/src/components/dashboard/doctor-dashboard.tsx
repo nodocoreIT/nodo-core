@@ -46,6 +46,7 @@ interface DoctorDashboardProps {
   doctorName: string;
   doctorSpecialty?: string;
   doctorLicense?: string;
+  doctorPhoto?: string;
   dataSource?: DataSource;
   embedded?: boolean;
 }
@@ -94,6 +95,7 @@ export function DoctorDashboard({
   doctorName,
   doctorSpecialty,
   doctorLicense,
+  doctorPhoto: doctorPhotoProp,
   dataSource = "supabase",
   embedded = false,
 }: DoctorDashboardProps) {
@@ -110,7 +112,7 @@ export function DoctorDashboard({
     hasActiveSession,
     dismissConsultation,
   } = useConsultationStore();
-  const [doctorPhoto, setDoctorPhoto] = useState<string>();
+  const [doctorPhoto, setDoctorPhoto] = useState<string | undefined>(doctorPhotoProp);
   const [googleCalendarId, setGoogleCalendarId] = useState<string>();
   const [previewPatient, setPreviewPatient] = useState<QueuePatient | null>(
     null

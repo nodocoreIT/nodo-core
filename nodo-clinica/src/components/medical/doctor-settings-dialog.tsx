@@ -126,6 +126,9 @@ export function DoctorSettingsDialog({
   const { hydrateSettings } = useConsultorioTheme();
   const [newBlockDate, setNewBlockDate] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [saveResult, setSaveResult] = useState<{ status: "success" | "error"; message?: string } | null>(null);
+  const saveResultTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [testingReminder, setTestingReminder] = useState(false);
   const [mpOAuthConfigured, setMpOAuthConfigured] = useState<boolean | null>(null);
   const [testingMpConnection, setTestingMpConnection] = useState(false);
@@ -138,6 +141,12 @@ export function DoctorSettingsDialog({
   const [choosingPlan, setChoosingPlan] = useState(false);
   const [startingPlanId, setStartingPlanId] = useState<string | null>(null);
   const loadGen = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      if (saveResultTimeout.current) clearTimeout(saveResultTimeout.current);
+    };
+  }, []);
 
   useEffect(() => {
     void clinicApi.getMercadoPagoOAuthConfig().then((cfg) => {
@@ -285,6 +294,8 @@ export function DoctorSettingsDialog({
 
   const handleSave = async () => {
     setSaving(true);
+    if (saveResultTimeout.current) clearTimeout(saveResultTimeout.current);
+    setSaveResult(null);
     try {
       const result = await clinicApi.saveDoctorOffice({
         fullName,
@@ -304,13 +315,25 @@ export function DoctorSettingsDialog({
       if (result.office) {
         loadGen.current += 1;
         applyOfficeData(result.office);
+        window.dispatchEvent(
+          new CustomEvent("nodo:profile-updated", {
+            detail: {
+              fullName: result.office.fullName,
+              profilePhotoUrl: result.office.profilePhotoData,
+            },
+          }),
+        );
       }
       hydrateSettings(themeSettings);
-      toast.success("Configuración guardada");
+      setSaveResult({ status: "success" });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al guardar");
+      setSaveResult({
+        status: "error",
+        message: e instanceof Error ? e.message : "Error al guardar",
+      });
     } finally {
       setSaving(false);
+      saveResultTimeout.current = setTimeout(() => setSaveResult(null), 3000);
     }
   };
 
@@ -599,27 +622,48 @@ export function DoctorSettingsDialog({
                     </div>
                     <div>
                       <Label className="text-xs">Foto de perfil</Label>
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        className="mt-1 h-9 text-xs cursor-pointer file:cursor-pointer file:bg-brand file:text-white file:border-0 file:rounded file:px-3 file:text-xs file:font-medium hover:border-brand/50 transition-colors"
-                        onChange={async (e) => {
-                          const f = e.target.files?.[0];
-                          if (!f) return;
-                          try {
-                            const photoData = await readImageFile(f);
-                            setProfilePhotoData(photoData);
-                            const result = await clinicApi.saveDoctorOffice({ profilePhotoData: photoData });
-                            if (result.office) {
-                              loadGen.current += 1;
-                              applyOfficeData(result.office);
+                      <div className="mt-1 flex items-center gap-2">
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          disabled={uploadingPhoto}
+                          className="h-9 text-xs cursor-pointer file:cursor-pointer file:bg-brand file:text-white file:border-0 file:rounded file:px-3 file:text-xs file:font-medium hover:border-brand/50 transition-colors disabled:opacity-60"
+                          onChange={async (e) => {
+                            const f = e.target.files?.[0];
+                            if (!f) return;
+                            setUploadingPhoto(true);
+                            if (saveResultTimeout.current) clearTimeout(saveResultTimeout.current);
+                            setSaveResult(null);
+                            try {
+                              const photoData = await readImageFile(f);
+                              setProfilePhotoData(photoData);
+                              const result = await clinicApi.saveDoctorOffice({ profilePhotoData: photoData });
+                              if (result.office) {
+                                loadGen.current += 1;
+                                applyOfficeData(result.office);
+                                window.dispatchEvent(
+                                  new CustomEvent("nodo:profile-updated", {
+                                    detail: {
+                                      fullName: result.office.fullName,
+                                      profilePhotoUrl: result.office.profilePhotoData,
+                                    },
+                                  }),
+                                );
+                              }
+                              setSaveResult({ status: "success" });
+                            } catch (err) {
+                              setSaveResult({
+                                status: "error",
+                                message: err instanceof Error ? err.message : "Error al guardar la foto",
+                              });
+                            } finally {
+                              setUploadingPhoto(false);
+                              saveResultTimeout.current = setTimeout(() => setSaveResult(null), 3000);
                             }
-                            toast.success("Foto de perfil guardada");
-                          } catch (err) {
-                            toast.error(err instanceof Error ? err.message : "Error");
-                          }
-                        }}
-                      />
+                          }}
+                        />
+                        {uploadingPhoto && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
+                      </div>
                     </div>
                   </div>
                   <div>
@@ -1242,18 +1286,27 @@ export function DoctorSettingsDialog({
             <p className="text-[10px] text-slate-400 hidden sm:block">
               Un solo guardado para agenda, perfil, cobros, recordatorios y apariencia.
             </p>
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="ml-auto gap-2"
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
+            <div className="ml-auto flex flex-col items-end gap-1">
+              <Button onClick={handleSave} disabled={saving} className="gap-2">
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                {saving ? "Guardando..." : "Guardar cambios"}
+              </Button>
+              {saveResult && (
+                <p
+                  className={`text-[11px] ${
+                    saveResult.status === "success" ? "text-emerald-600" : "text-red-600"
+                  }`}
+                >
+                  {saveResult.status === "success"
+                    ? "Guardado exitoso"
+                    : (saveResult.message ?? "Error al guardar")}
+                </p>
               )}
-              Guardar cambios
-            </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
