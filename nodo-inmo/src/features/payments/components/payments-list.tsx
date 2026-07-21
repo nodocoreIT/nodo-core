@@ -180,13 +180,6 @@ export function PaymentsList() {
     });
   }
 
-  async function handleBulkDelete() {
-    const ids = Array.from(selectedIds);
-    if (ids.length === 0) return;
-    await deletePayments.mutateAsync(ids);
-    setSelectedIds(new Set());
-  }
-
   function openCollectDialog(id: string) {
     setSearchParams((prev) => {
       prev.set("collect", id);
