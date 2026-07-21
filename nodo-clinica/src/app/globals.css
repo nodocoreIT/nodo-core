@@ -192,4 +192,18 @@ h1, h2, h3, h4 {
   [role="button"]:not([aria-disabled="true"]) {
     cursor: pointer;
   }
+  /* Hide the browser's built-in password reveal/clear icon so it doesn't
+     double up with our own custom show/hide toggle button. */
+  input[type="password"]::-ms-reveal,
+  input[type="password"]::-ms-clear {
+    display: none;
+  }
+  input[type="password"]::-webkit-credentials-auto-fill-button,
+  input[type="password"]::-webkit-strong-password-auto-fill-button {
+    visibility: hidden;
+    display: none !important;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+  }
 }
