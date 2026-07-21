@@ -61,7 +61,7 @@ export interface DoctorReminderSettings {
   minutesBefore?: number;
 }
 
-export type PaymentStatus = "pending" | "confirmed" | "waived" | "rejected";
+export type PaymentStatus = "pending" | "confirmed" | "waived" | "rejected" | "refunded" | "refund_failed";
 
 export interface PaymentReceiptAudit {
   validatedAt: string;

@@ -12,6 +12,7 @@ import {
   X,
   MessageSquare,
   Wallet,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/nodo/brand-mark";
@@ -58,6 +59,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/medico/dashboard", label: "Inicio", icon: LayoutDashboard },
   { href: "/medico/consultorio", label: "Consultorio", icon: Stethoscope },
+  { href: "/medico/turnos-programados", label: "Turnos Programados", icon: CalendarDays },
   { href: "/medico/cobros", label: "Cobros", icon: Wallet },
   { href: "/medico/interconsultas", label: "Interconsultas", icon: MessageSquare },
 ];
@@ -65,6 +67,7 @@ const NAV_ITEMS: NavItem[] = [
 const ROUTE_TITLES: Record<string, string> = {
   "/medico/dashboard": "Inicio",
   "/medico/consultorio": "Consultorio",
+  "/medico/turnos-programados": "Turnos Programados",
   "/medico/cobros": "Cobros",
   "/medico/interconsultas": "Interconsultas",
 };
@@ -95,6 +98,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
     fullName: string;
     email: string;
     subscriptionPlan?: string;
+    profilePhotoUrl?: string;
   } | null>(null);
   const [checking, setChecking] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -158,6 +162,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
         fullName: user.fullName,
         email: user.email ?? session.email,
         subscriptionPlan: user.subscriptionPlan,
+        profilePhotoUrl: user.profilePhotoUrl,
       });
       try {
         const office = await clinicApi.getDoctorSchedule(user.id);
@@ -216,6 +221,24 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
     };
     window.addEventListener("nodo:open-settings", handler);
     return () => window.removeEventListener("nodo:open-settings", handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ fullName?: string; profilePhotoUrl?: string }>).detail;
+      if (!detail) return;
+      setDoctor((d) =>
+        d
+          ? {
+              ...d,
+              fullName: detail.fullName ?? d.fullName,
+              profilePhotoUrl: detail.profilePhotoUrl ?? d.profilePhotoUrl,
+            }
+          : d,
+      );
+    };
+    window.addEventListener("nodo:profile-updated", handler);
+    return () => window.removeEventListener("nodo:profile-updated", handler);
   }, []);
 
   const handleLogout = async () => {
@@ -331,8 +354,17 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
 
           <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] p-3 space-y-2">
             <div className="flex items-center gap-3 px-1 py-1">
-              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[var(--sidebar-primary)] text-xs font-bold text-[var(--sidebar-primary-foreground)]">
-                {initials(displayName)}
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--sidebar-primary)] text-xs font-bold text-[var(--sidebar-primary-foreground)]">
+                {doctor?.profilePhotoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={doctor.profilePhotoUrl}
+                    alt={displayName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  initials(displayName)
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-white">

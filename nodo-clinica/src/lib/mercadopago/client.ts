@@ -107,6 +107,34 @@ export async function getPayment(
   return data as MpPaymentInfo;
 }
 
+export interface MpRefundResult {
+  id: number;
+  payment_id: number;
+  amount: number;
+  status: string;
+}
+
+/** Full refund of a payment (no body = refund the entire amount, per MP's API). */
+export async function refundPayment(
+  accessToken: string,
+  paymentId: string,
+): Promise<MpRefundResult> {
+  const res = await fetch(`${MP_API}/v1/payments/${paymentId}/refunds`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      // Prevents a duplicate refund if the caller retries after a timeout.
+      "X-Idempotency-Key": paymentId,
+    },
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || data.error || "Error al reembolsar el pago en Mercado Pago");
+  }
+  return data as MpRefundResult;
+}
+
 export interface MpUser {
   id: number;
   nickname: string;

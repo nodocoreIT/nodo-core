@@ -10,7 +10,10 @@ export type AppointmentStatus =
   | "completed"
   | "cancelled";
 
-export type PaymentStatus = "pending" | "confirmed" | "waived";
+export type PaymentStatus = "pending" | "confirmed" | "waived" | "refunded" | "refund_failed";
+
+export type RefundMethod = "mercadopago" | "transfer_manual";
+export type CancelledBy = "patient" | "doctor";
 
 export interface AppointmentRow {
   id: string;
@@ -35,6 +38,13 @@ export interface AppointmentRow {
   mercadopago_preference_id: string | null;
   mercadopago_payment_id: string | null;
   confirmation_email_sent_at: string | null;
+  refund_method: RefundMethod | null;
+  refund_amount: number | null;
+  refund_id: string | null;
+  refunded_at: string | null;
+  refund_notes: string | null;
+  cancelled_by: CancelledBy | null;
+  cancelled_at: string | null;
   created_at: string;
   updated_at: string;
 }

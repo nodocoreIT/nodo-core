@@ -1,6 +1,11 @@
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
+import { createServiceClient } from "@/lib/supabase/server";
+import {
+  refundAppointmentViaMercadoPago,
+  markAppointmentRefundedManually,
+} from "@/lib/clinic/appointment-refund";
 import {
   getAppointments,
   getAppointmentByToken,
@@ -397,6 +402,80 @@ export async function GET(request: NextRequest) {
         }));
 
       return NextResponse.json(pending);
+    }
+
+    if (scope === "month") {
+      const monthParam = searchParams.get("month");
+      const now = new Date();
+      const monthKey =
+        monthParam && /^\d{4}-\d{2}$/.test(monthParam)
+          ? monthParam
+          : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const [yearStr, monthStr] = monthKey.split("-");
+      const lastDay = new Date(Number(yearStr), Number(monthStr), 0).getDate();
+      const monthStart = `${monthKey}-01T00:00:00`;
+      const monthEnd = `${monthKey}-${String(lastDay).padStart(2, "0")}T23:59:59`;
+
+      const { data: apts } = await supabase
+        .from("appointments")
+        .select("id, scheduled_at, patient_id")
+        .eq("doctor_id", doctorId)
+        .neq("status", "cancelled")
+        .gte("scheduled_at", monthStart)
+        .lte("scheduled_at", monthEnd)
+        .order("scheduled_at", { ascending: true });
+
+      const byDate = new Map<string, { count: number; patientIds: Set<string> }>();
+      for (const apt of apts ?? []) {
+        const dateKey = localDateKeyFromIso(apt.scheduled_at);
+        const entry = byDate.get(dateKey) ?? { count: 0, patientIds: new Set<string>() };
+        entry.count += 1;
+        entry.patientIds.add(apt.patient_id);
+        byDate.set(dateKey, entry);
+      }
+
+      const days = Array.from(byDate.entries()).map(([date, entry]) => ({
+        date,
+        count: entry.count,
+        patientCount: entry.patientIds.size,
+      }));
+
+      return NextResponse.json({ days });
+    }
+
+    if (scope === "day") {
+      const dateKey = searchParams.get("date");
+      if (!dateKey) {
+        return NextResponse.json({ error: "Falta el parámetro date" }, { status: 400 });
+      }
+
+      const { data: apts } = await supabase
+        .from("appointments")
+        .select("*, patients(id, full_name, email, phone, profile_photo_url)")
+        .eq("doctor_id", doctorId)
+        .neq("status", "cancelled")
+        .gte("scheduled_at", `${dateKey}T00:00:00`)
+        .lte("scheduled_at", `${dateKey}T23:59:59`)
+        .order("scheduled_at", { ascending: true });
+
+      const appointments = (apts ?? []).map((apt) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const patient = (apt as any).patients;
+        return {
+          ...apt,
+          patient: patient
+            ? {
+                id: patient.id,
+                fullName: patient.full_name,
+                email: patient.email,
+                phone: patient.phone,
+                profilePhotoUrl: patient.profile_photo_url,
+              }
+            : undefined,
+        };
+      });
+
+      return NextResponse.json({ appointments });
     }
 
     // Default: upcoming / today / active
@@ -993,6 +1072,74 @@ export async function PATCH(request: NextRequest) {
       .select()
       .single();
     return NextResponse.json(updated);
+  }
+
+  if (action === "doctorCancelAppointments" && Array.isArray(body.appointmentIds)) {
+    if (user.role === "patient") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+    const me = await resolveProfessional(authResult);
+    if (!me) {
+      return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+    }
+
+    const svc = await createServiceClient();
+    const { data: apts, error: fetchErr } = await svc
+      .from("appointments")
+      .select("*")
+      .in("id", body.appointmentIds)
+      .eq("doctor_id", me.id)
+      .neq("status", "cancelled");
+    if (fetchErr) {
+      return NextResponse.json({ error: fetchErr.message }, { status: 400 });
+    }
+
+    const results = [];
+    for (const apt of apts ?? []) {
+      const { error: cancelError } = await svc
+        .from("appointments")
+        .update({
+          status: "cancelled",
+          cancelled_by: "doctor",
+          cancelled_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", apt.id);
+      results.push(
+        cancelError
+          ? { id: apt.id, ok: false, error: cancelError.message }
+          : {
+              id: apt.id,
+              ok: true,
+              requiresRefund: apt.payment_status === "confirmed",
+              paymentProvider: apt.payment_provider,
+              mercadopagoPaymentId: apt.mercadopago_payment_id,
+            },
+      );
+    }
+    return NextResponse.json({ results });
+  }
+
+  if (action === "refundAppointmentMercadoPago" && appointmentId) {
+    if (user.role === "patient") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+    const result = await refundAppointmentViaMercadoPago(appointmentId);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+    return NextResponse.json(result.appointment);
+  }
+
+  if (action === "markAppointmentRefundedManually" && appointmentId) {
+    if (user.role === "patient") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+    const result = await markAppointmentRefundedManually(appointmentId);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+    return NextResponse.json(result.appointment);
   }
 
   if (action === "clearStuck" && doctorId) {
