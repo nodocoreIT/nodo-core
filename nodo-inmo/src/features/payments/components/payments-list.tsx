@@ -30,6 +30,16 @@ import { isArchivedContract } from "@/features/contracts/lib/contract-archive";
 import { PaymentCollectDialog } from "./payment-collect-dialog";
 import { useDeletePayments, useAnnulPayment } from "../hooks/use-delete-payment";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/components/ui/alert-dialog";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -75,6 +85,7 @@ export function PaymentsList() {
   const deletePayments = useDeletePayments();
   const annulPayment = useAnnulPayment();
   const [viewPayment, setViewViewPayment] = useState<PaymentWithRelations | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
 
   useEffect(() => {
     const next: Filter =
@@ -169,13 +180,6 @@ export function PaymentsList() {
     });
   }
 
-  async function handleBulkDelete() {
-    const ids = Array.from(selectedIds);
-    if (ids.length === 0) return;
-    await deletePayments.mutateAsync(ids);
-    setSelectedIds(new Set());
-  }
-
   function openCollectDialog(id: string) {
     setSearchParams((prev) => {
       prev.set("collect", id);
@@ -225,7 +229,10 @@ export function PaymentsList() {
             size="sm"
             className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10"
             disabled={deletePayments.isPending}
-            onClick={() => void handleBulkDelete()}
+            onClick={() => {
+              const ids = Array.from(selectedIds);
+              if (ids.length > 0) setPendingDelete(ids);
+            }}
           >
             <Trash2 className="h-4 w-4" />
             {deletePayments.isPending ? "Eliminando…" : "Eliminar seleccionadas"}
@@ -444,7 +451,7 @@ export function PaymentsList() {
                               size="sm"
                               aria-label="Eliminar cuota"
                               disabled={deletePayments.isPending}
-                              onClick={() => void deletePayments.mutateAsync([p.id])}
+                              onClick={() => setPendingDelete([p.id])}
                               className="gap-1 text-destructive hover:bg-destructive/10"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -506,6 +513,40 @@ export function PaymentsList() {
           }
         }}
       />
+
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingDelete?.length === 1
+                ? "¿Eliminar esta cuota?"
+                : `¿Eliminar estas ${pendingDelete?.length ?? 0} cuotas?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer.{" "}
+              {pendingDelete?.length === 1 ? "La cuota" : "Las cuotas"} se eliminarán permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => {
+                if (!pendingDelete) return;
+                void deletePayments.mutateAsync(pendingDelete).then(() => {
+                  if (pendingDelete.length > 1) setSelectedIds(new Set());
+                  setPendingDelete(null);
+                });
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={!!viewPayment}
