@@ -498,10 +498,16 @@ export async function PUT(request: NextRequest) {
   if (googleCalendarId !== undefined) professionalUpdate.google_calendar_id = googleCalendarId;
 
   if (Object.keys(professionalUpdate).length > 0) {
-    await supabase
+    const { error: professionalUpdateError } = await serviceClientPut
       .from("professionals")
       .update(professionalUpdate)
       .eq("id", professional.id);
+    if (professionalUpdateError) {
+      return NextResponse.json(
+        { error: professionalUpdateError.message ?? "Error al guardar el perfil" },
+        { status: 400 },
+      );
+    }
   }
 
   if (payment !== undefined) {
@@ -566,11 +572,16 @@ export async function PUT(request: NextRequest) {
   }
 
   // Re-fetch updated professional for signature/bio/photo fields
-  const { data: updatedProfessional } = await supabase
+  const { data: updatedProfessional } = await serviceClientPut
     .from("professionals")
     .select("*")
     .eq("id", professional.id)
     .maybeSingle();
 
-  return NextResponse.json({ ok: true, office: doctorOfficePayload(updatedProfessional, saved) });
+  const mpConnected = await professionalHasMercadoPagoConnection(professional.id);
+
+  return NextResponse.json({
+    ok: true,
+    office: doctorOfficePayload(updatedProfessional, saved, mpConnected),
+  });
 }
