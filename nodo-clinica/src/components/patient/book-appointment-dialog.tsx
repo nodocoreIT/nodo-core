@@ -60,6 +60,7 @@ interface PaymentInfo {
   currency?: string;
   alias?: string;
   cbu?: string;
+  beneficiaryName?: string;
   bankName?: string;
   paymentInstructions?: string;
   qrImageData?: string;

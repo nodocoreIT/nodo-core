@@ -158,6 +158,73 @@ function resultFromParsed(
   };
 }
 
+/** Google AI Studio keys look like AIza… — reject other tokens early. */
+function resolveGeminiApiKey(): string | null {
+  const raw = process.env.GEMINI_API_KEY?.trim();
+  if (!raw) return null;
+  if (!raw.startsWith("AIza")) {
+    console.warn(
+      "[payment-receipt] GEMINI_API_KEY no parece una key de Google AI Studio (debe empezar con AIza…)",
+    );
+    return null;
+  }
+  return raw;
+}
+
+function isMockPaymentReceiptEnabled(): boolean {
+  return (
+    process.env.CLINIC_MOCK_PAYMENT_RECEIPT === "true" ||
+    process.env.NEXT_PUBLIC_CLINIC_MOCK_PAYMENT_RECEIPT === "true"
+  );
+}
+
+/**
+ * Texto de un comprobante real de prueba (transferencia ARS 100 → TOULEMONDE…).
+ * Sirve para ejercitar la comparación monto/CBU/titular/fecha sin Gemini.
+ */
+export const MOCK_TRANSFER_RECEIPT_TEXT = [
+  "Comprobante de Transferencia",
+  "Fecha y hora 21 de julio 2026 - 08:10hs",
+  "Monto debitado $100,00",
+  "Cuenta destino TOULEMONDE RAMIRO SANTIAGO",
+  "CBU destino 0720102488000038115640",
+  "CUIT destino 20286603867",
+  "Nombre remitente Juan Esteban Mendia",
+  "Concepto VAR",
+  "id Op. WY7ZEPN6YMR6GKM42Q0M51",
+].join(" ");
+
+function resultFromReceiptText(
+  input: PaymentReceiptValidationInput,
+  text: string,
+  strictMode: boolean,
+  sourceNote: string,
+): PaymentReceiptValidationResult | null {
+  if (text.length < 20) return null;
+  const extracted = parseTransferReceiptText(text);
+  if (!extracted.amount && !extracted.recipient && !extracted.date && !extracted.cbu) {
+    return null;
+  }
+
+  return resultFromParsed(
+    input,
+    {
+      amount: extracted.amount ?? null,
+      date: extracted.date ?? null,
+      time: extracted.time ?? null,
+      recipient: extracted.recipient ?? null,
+      cbu: extracted.cbu ?? null,
+      payerName: extracted.payerName ?? null,
+      operationId: extracted.operationId ?? null,
+      looksLikeTransferReceipt: true,
+      confidence: 90,
+      notes: sourceNote,
+    },
+    strictMode,
+    sourceNote,
+  );
+}
+
 async function tryGeminiParse(
   apiKey: string,
   input: PaymentReceiptValidationInput,
@@ -183,6 +250,10 @@ async function tryGeminiParse(
     } catch (err) {
       lastError = err;
       console.warn(`[payment-receipt] model ${modelName} failed`, err);
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/API_KEY_INVALID|API key not valid/i.test(msg)) {
+        throw err;
+      }
     }
   }
   throw lastError ?? new Error("Ningún modelo de IA respondió");
@@ -198,27 +269,24 @@ function tryTextParseFallback(
   if (!isPdf) return null;
 
   const text = extractPdfVisibleText(input.imageBase64);
-  if (text.length < 20) return null;
-
-  const extracted = parseTransferReceiptText(text);
-  if (!extracted.amount && !extracted.recipient && !extracted.date) return null;
-
-  return resultFromParsed(
+  return resultFromReceiptText(
     input,
-    {
-      amount: extracted.amount ?? null,
-      date: extracted.date ?? null,
-      time: extracted.time ?? null,
-      recipient: extracted.recipient ?? null,
-      cbu: extracted.cbu ?? null,
-      payerName: extracted.payerName ?? null,
-      operationId: extracted.operationId ?? null,
-      looksLikeTransferReceipt: true,
-      confidence: 85,
-      notes: "Comprobante leído del PDF (sin IA)",
-    },
+    text,
     strictMode,
-    "Validación por lectura directa del PDF",
+    "Comprobante leído del PDF (sin IA)",
+  );
+}
+
+function tryMockReceiptFallback(
+  input: PaymentReceiptValidationInput,
+  strictMode: boolean,
+): PaymentReceiptValidationResult | null {
+  if (!isMockPaymentReceiptEnabled()) return null;
+  return resultFromReceiptText(
+    input,
+    MOCK_TRANSFER_RECEIPT_TEXT,
+    strictMode,
+    "Mock local: datos del comprobante de prueba (sin Gemini)",
   );
 }
 
@@ -239,11 +307,13 @@ export async function validatePaymentReceipt(
     };
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = resolveGeminiApiKey();
 
   if (!apiKey) {
     const textFallback = tryTextParseFallback(input, strictMode);
     if (textFallback) return textFallback;
+    const mockFallback = tryMockReceiptFallback(input, strictMode);
+    if (mockFallback) return mockFallback;
     return validatePaymentReceiptHeuristic(input, strictMode);
   }
 
@@ -262,18 +332,25 @@ export async function validatePaymentReceipt(
     console.error("[payment-receipt] Gemini error", err);
     const textFallback = tryTextParseFallback(input, strictMode);
     if (textFallback) return textFallback;
+    const mockFallback = tryMockReceiptFallback(input, strictMode);
+    if (mockFallback) return mockFallback;
 
     const fallback = validatePaymentReceiptHeuristic(input, strictMode);
     if (!strictMode || fallback.valid) return fallback;
+
+    const geminiHint = /API_KEY_INVALID|API key not valid/i.test(
+      err instanceof Error ? err.message : String(err),
+    )
+      ? "GEMINI_API_KEY inválida: usá una key de Google AI Studio (empieza con AIza…)"
+      : "Verificá GEMINI_API_KEY o activá CLINIC_MOCK_PAYMENT_RECEIPT=true en local";
 
     return {
       ...fallback,
       valid: false,
       reasons: [
         "No se pudo analizar el comprobante con IA",
-        err instanceof Error ? err.message : "Error de servicio de IA",
+        geminiHint,
         "Probá subir una captura JPG/PNG del comprobante",
-        "Verificá que GEMINI_API_KEY esté configurada en Vercel",
       ],
     };
   }

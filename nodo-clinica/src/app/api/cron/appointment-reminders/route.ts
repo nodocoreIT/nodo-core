@@ -3,6 +3,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { isPaymentConfirmed } from "@/lib/clinic/payment";
 import { sendAppointmentReminderEmail } from "@/lib/email/resend";
 import { appBaseUrl } from "@/lib/clinic/appointment-payment";
+import { isLocalMode } from "@/lib/clinic/config";
+import { readDb, writeDb } from "@/lib/clinic/local-db";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -15,6 +17,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  if (isLocalMode()) {
+    return runLocalReminders();
+  }
+
   const supabase = await createServiceClient();
   const now = Date.now();
   /** Hobby tier: cron runs once/day; send if already past reminder time (up to 36 h tolerance). */
@@ -23,10 +29,11 @@ export async function GET(request: NextRequest) {
 
   const baseUrl = appBaseUrl();
 
-  // Fetch appointments that are still pending a reminder
   const { data: appointments } = await supabase
     .from("appointments")
-    .select("*, patients(email, full_name), professionals!appointments_doctor_id_fkey(full_name, office_settings(reminder_settings))")
+    .select(
+      "*, patients(email, full_name), professionals!appointments_doctor_id_fkey(full_name, office_settings(reminder_settings))",
+    )
     .in("status", ["scheduled", "waiting"])
     .is("reminder_sent_at", null);
 
@@ -80,4 +87,66 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, sent });
+}
+
+async function runLocalReminders() {
+  const now = Date.now();
+  const maxLatenessMs = 36 * 60 * 60 * 1000;
+  const baseUrl = appBaseUrl();
+  const override = process.env.REMINDER_TEST_EMAIL?.trim();
+  let sent = 0;
+  const idsToMark: string[] = [];
+
+  const db = await readDb();
+  for (const apt of db.appointments) {
+    if (apt.status !== "scheduled" && apt.status !== "waiting") continue;
+    if (apt.reminderSentAt) continue;
+    if (!isPaymentConfirmed(apt)) continue;
+
+    const doctor = db.doctors.find((d) => d.id === apt.doctorId);
+    const patient = db.patients.find((p) => p.id === apt.patientId);
+    if (!doctor?.reminderSettings?.enabled || !patient) continue;
+
+    const minutesBefore = doctor.reminderSettings.minutesBefore ?? 1440;
+    const scheduledMs = new Date(apt.scheduledAt).getTime();
+    const remindAt = scheduledMs - minutesBefore * 60 * 1000;
+
+    if (now < remindAt) continue;
+    if (now - remindAt > maxLatenessMs) continue;
+    if (now >= scheduledMs) continue;
+
+    const scheduledLabel = format(
+      new Date(apt.scheduledAt),
+      "EEEE d 'de' MMMM 'a las' HH:mm 'hs'",
+      { locale: es },
+    );
+
+    try {
+      const result = await sendAppointmentReminderEmail({
+        patientEmail: override || patient.email,
+        patientName: patient.fullName,
+        doctorName: doctor.fullName,
+        scheduledAt: scheduledLabel,
+        waitingRoomUrl: `${baseUrl}/paciente/sala/${apt.accessToken}`,
+      });
+      if (!result.mock) {
+        idsToMark.push(apt.id);
+        sent++;
+      }
+    } catch (err) {
+      console.error("[Reminder local] failed for", apt.id, err);
+    }
+  }
+
+  if (idsToMark.length) {
+    const nowIso = new Date().toISOString();
+    await writeDb((draft) => {
+      for (const id of idsToMark) {
+        const apt = draft.appointments.find((a) => a.id === id);
+        if (apt) apt.reminderSentAt = nowIso;
+      }
+    });
+  }
+
+  return NextResponse.json({ ok: true, sent, mode: "local" });
 }

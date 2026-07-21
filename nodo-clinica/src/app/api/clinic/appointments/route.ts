@@ -52,6 +52,7 @@ import { appointmentNeedsDoctorPaymentReviewFromDbRow } from "@/lib/clinic/payme
 import { isLocalMode } from "@/lib/clinic/config";
 import { handleAppointmentsGetLocal } from "@/lib/clinic/appointments-local-get";
 import { handleAppointmentsPostLocal } from "@/lib/clinic/appointments-local-post";
+import { handleAppointmentsPatchLocal } from "@/lib/clinic/appointments-local-patch";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -877,6 +878,10 @@ export async function POST(request: NextRequest) {
 // ── PATCH ─────────────────────────────────────────────────────────────────────
 
 export async function PATCH(request: NextRequest) {
+  if (isLocalMode()) {
+    return handleAppointmentsPatchLocal(request);
+  }
+
   const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
   const { user, supabase } = authResult;

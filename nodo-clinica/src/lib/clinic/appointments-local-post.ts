@@ -279,6 +279,7 @@ export async function handleAppointmentsPostLocal(request: NextRequest) {
   if (paymentPendingReview) {
     await notifyDoctorTransferPendingReview({
       doctorId: doctor.id,
+      orgId: doctor.id,
       appointmentId: apt.id,
       patientName: patient.fullName,
     });

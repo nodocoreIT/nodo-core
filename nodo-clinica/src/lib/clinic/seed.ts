@@ -25,11 +25,15 @@ export function buildClinicSeed(now = new Date()): ClinicDatabase {
         availability: DEFAULT_AVAILABILITY,
         signatureText: "Dr. Demo 1 — MN 10001",
         bio: "Consultorio demo Nodo Salud — Doc. Demo 1.",
+        // Mock alineado a un comprobante de prueba (CBU/titular/$100) para validar transferencia.
         payment: {
           currency: "ARS",
-          consultationFee: 25000,
-          alias: "demo.salud.mp",
+          consultationFee: 100,
+          alias: "toulemonde.ramiro",
+          cbu: "0720102488000038115640",
+          beneficiaryName: "TOULEMONDE RAMIRO SANTIAGO",
           requirePaymentBeforeBooking: true,
+          mercadopagoEnabled: false,
         },
         reminderSettings: { enabled: false, minutesBefore: 1440 },
         themeSettings: DEFAULT_THEME_SETTINGS,
