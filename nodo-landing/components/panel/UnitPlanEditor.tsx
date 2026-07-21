@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
-import { annualMonthlyFromMonthly } from "@/lib/panel/planes";
+import { annualTotalFromMonthly } from "@/lib/panel/planes";
 import {
   deleteFeature,
   deleteFeatureGroup,
@@ -63,6 +63,77 @@ function tempId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
+function formatCurrency(value: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency || "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(value || 0);
+  } catch {
+    return `$${value || 0}`;
+  }
+}
+
+function parseCurrencyInput(raw: string): number {
+  const cleaned = raw.replace(/[^0-9.]/g, "");
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function CurrencyInput({
+  value,
+  currency,
+  onChange,
+  readOnly = false,
+}: {
+  value: number;
+  currency: string;
+  onChange?: (value: number) => void;
+  readOnly?: boolean;
+}) {
+  const [focused, setFocused] = useState(false);
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    if (!focused) setDraft(String(value));
+  }, [value, focused]);
+
+  if (readOnly) {
+    return (
+      <div
+        style={{
+          ...inputStyle,
+          background: "var(--color-mist-200)",
+          color: "var(--color-navy)",
+          fontWeight: 600,
+        }}
+      >
+        {formatCurrency(value, currency)}
+      </div>
+    );
+  }
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={focused ? draft : formatCurrency(value, currency)}
+      onFocus={() => {
+        setFocused(true);
+        setDraft(String(value));
+      }}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        setFocused(false);
+        onChange?.(parseCurrencyInput(draft));
+      }}
+      style={inputStyle}
+    />
+  );
+}
+
 export function UnitPlanEditor({ node }: UnitPlanEditorProps) {
   const unitCode = node.code;
   const [planes, setPlanes] = useState<EditablePlan[]>([]);
@@ -98,8 +169,8 @@ export function UnitPlanEditor({ node }: UnitPlanEditorProps) {
       prev.map((plan) => {
         if (plan.id !== planId) return plan;
         const next = { ...plan, ...patch };
-        if (patch.price_monthly !== undefined && patch.price_annual_monthly === undefined) {
-          next.price_annual_monthly = annualMonthlyFromMonthly(Number(patch.price_monthly) || 0);
+        if (patch.price_monthly !== undefined) {
+          next.price_annual_monthly = annualTotalFromMonthly(Number(patch.price_monthly) || 0);
         }
         return next;
       }),
@@ -219,7 +290,11 @@ export function UnitPlanEditor({ node }: UnitPlanEditorProps) {
     setNotice("");
     try {
       const supabase = createClient();
-      await saveUnitPlanConfig(supabase, unitCode, planes, groups, features);
+      const planesToSave = planes.map((plan) => ({
+        ...plan,
+        price_annual_monthly: annualTotalFromMonthly(Number(plan.price_monthly) || 0),
+      }));
+      await saveUnitPlanConfig(supabase, unitCode, planesToSave, groups, features);
       setNotice("Configuración guardada.");
       await reload();
     } catch (err) {
@@ -258,7 +333,7 @@ export function UnitPlanEditor({ node }: UnitPlanEditorProps) {
               {node.description}
             </p>
             <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--color-slate2)" }}>
-              Definí precios y qué incluye cada plan. El pago anual usa 2 meses de descuento (10 cuotas por 12 meses).
+              Definí precios y qué incluye cada plan. El anual se calcula solo: bonifica 2 meses (10 × mensual) y no se edita a mano.
             </p>
           </div>
           <button
@@ -320,7 +395,7 @@ export function UnitPlanEditor({ node }: UnitPlanEditorProps) {
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
                   <thead>
                     <tr>
-                      {["Código", "Nombre", "Mensual (USD)", "Anual / mes", "Orden", "Activo", ""].map((col) => (
+                      {["Código", "Nombre", "Mensual", "Anual", "Orden", "Activo", ""].map((col) => (
                         <th key={col || "actions"} style={thStyle}>
                           {col}
                         </th>
@@ -356,27 +431,17 @@ export function UnitPlanEditor({ node }: UnitPlanEditorProps) {
                               />
                             </td>
                             <td style={tdStyle}>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
+                              <CurrencyInput
                                 value={plan.price_monthly}
-                                onChange={(e) =>
-                                  updatePlan(plan.id, { price_monthly: Number(e.target.value) })
-                                }
-                                style={inputStyle}
+                                currency={plan.currency}
+                                onChange={(value) => updatePlan(plan.id, { price_monthly: value })}
                               />
                             </td>
                             <td style={tdStyle}>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={plan.price_annual_monthly}
-                                onChange={(e) =>
-                                  updatePlan(plan.id, { price_annual_monthly: Number(e.target.value) })
-                                }
-                                style={inputStyle}
+                              <CurrencyInput
+                                value={annualTotalFromMonthly(Number(plan.price_monthly) || 0)}
+                                currency={plan.currency}
+                                readOnly
                               />
                             </td>
                             <td style={{ ...tdStyle, width: 80 }}>

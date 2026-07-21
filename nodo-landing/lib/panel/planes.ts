@@ -12,9 +12,9 @@ export type NodePlan = {
   is_active: boolean;
 };
 
-/** Monthly rate when billed annually (2 months free → pay 10 months for 12). */
-export function annualMonthlyFromMonthly(monthly: number): number {
-  return Math.round((monthly * 10) / 12 * 100) / 100;
+/** Total annual price when billed upfront (2 months free → pay for 10 of 12). */
+export function annualTotalFromMonthly(monthly: number): number {
+  return Math.round(monthly * 10 * 100) / 100;
 }
 
 export function getPlansForUnit(planes: NodePlan[], unitCode: string): NodePlan[] {

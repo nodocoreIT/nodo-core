@@ -1,5 +1,5 @@
 import type { createClient } from "@/lib/supabase/client";
-import { annualMonthlyFromMonthly, type NodePlan } from "@/lib/panel/planes";
+import { annualTotalFromMonthly, type NodePlan } from "@/lib/panel/planes";
 
 type AppSupabase = ReturnType<typeof createClient>;
 
@@ -95,7 +95,7 @@ export async function saveUnitPlanConfig(
       label: plan.label.trim(),
       price_monthly: Number(plan.price_monthly) || 0,
       price_annual_monthly:
-        Number(plan.price_annual_monthly) || annualMonthlyFromMonthly(Number(plan.price_monthly) || 0),
+        Number(plan.price_annual_monthly) || annualTotalFromMonthly(Number(plan.price_monthly) || 0),
       currency: plan.currency || "USD",
       sort_order: plan.sort_order,
       is_active: plan.is_active,
