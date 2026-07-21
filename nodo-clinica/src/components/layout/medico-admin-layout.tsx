@@ -171,8 +171,23 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
             mergeThemeSettings(office.themeSettings),
           );
         }
+        const photo =
+          typeof office.profilePhotoData === "string" && office.profilePhotoData
+            ? office.profilePhotoData
+            : undefined;
+        if (photo || office.fullName) {
+          setDoctor((d) =>
+            d
+              ? {
+                  ...d,
+                  fullName: office.fullName || d.fullName,
+                  profilePhotoUrl: photo ?? d.profilePhotoUrl,
+                }
+              : d,
+          );
+        }
       } catch {
-        /* tema local por defecto */
+        /* tema / foto local por defecto */
       }
       setChecking(false);
     });

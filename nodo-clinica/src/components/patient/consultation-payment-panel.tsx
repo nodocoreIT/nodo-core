@@ -9,6 +9,7 @@ interface PaymentInfo {
   currency?: string;
   alias?: string;
   cbu?: string;
+  beneficiaryName?: string;
   bankName?: string;
   paymentInstructions?: string;
   qrImageData?: string;
@@ -23,7 +24,13 @@ export function ConsultationPaymentPanel({
   doctorName,
   payment,
 }: ConsultationPaymentPanelProps) {
-  if (!payment?.consultationFee && !payment?.alias && !payment?.qrImageData) {
+  if (
+    !payment?.consultationFee &&
+    !payment?.alias &&
+    !payment?.cbu &&
+    !payment?.beneficiaryName &&
+    !payment?.qrImageData
+  ) {
     return null;
   }
 
@@ -53,8 +60,15 @@ export function ConsultationPaymentPanel({
           </p>
         )}
         {payment.cbu && (
-          <p className="text-xs text-slate-600">
-            <span className="text-slate-500">CBU:</span> {payment.cbu}
+          <p className="text-sm">
+            <span className="text-slate-500">CBU:</span>{" "}
+            <strong className="font-mono text-xs">{payment.cbu}</strong>
+          </p>
+        )}
+        {payment.beneficiaryName && (
+          <p className="text-sm">
+            <span className="text-slate-500">Titular:</span>{" "}
+            <strong>{payment.beneficiaryName}</strong>
           </p>
         )}
         {payment.paymentInstructions && (

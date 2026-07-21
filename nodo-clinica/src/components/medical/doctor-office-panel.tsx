@@ -500,6 +500,21 @@ export function DoctorOfficePanel({
                         loadGen.current += 1;
                         applyOfficeData(result.office);
                       }
+                      const nextPhoto =
+                        (typeof result.office?.profilePhotoData === "string" &&
+                          result.office.profilePhotoData) ||
+                        photoData;
+                      setProfilePhotoData(nextPhoto);
+                      window.dispatchEvent(
+                        new CustomEvent("nodo:profile-updated", {
+                          detail: {
+                            fullName:
+                              (result.office?.fullName as string | undefined) ??
+                              undefined,
+                            profilePhotoUrl: nextPhoto,
+                          },
+                        }),
+                      );
                       toast.success("Foto de perfil guardada");
                     } catch (err) {
                       toast.error(err instanceof Error ? err.message : "Error");
@@ -803,35 +818,6 @@ export function DoctorOfficePanel({
                 placeholder="Transferir antes o después de la consulta..."
                 className="mt-1 text-sm"
               />
-            </div>
-            <div>
-              <Label className="text-xs flex items-center gap-1">
-                <CreditCard className="h-3.5 w-3.5" />
-                QR de cobro (Mercado Pago, etc.)
-              </Label>
-              <Input
-                type="file"
-                accept="image/*"
-                className="mt-1 h-9 text-xs"
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  try {
-                    const data = await readImageFile(f, 500);
-                    setPayment((p) => ({ ...p, qrImageData: data }));
-                  } catch (err) {
-                    toast.error(err instanceof Error ? err.message : "Error");
-                  }
-                }}
-              />
-              {payment.qrImageData && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={payment.qrImageData}
-                  alt="QR pago"
-                  className="mt-2 max-h-40 mx-auto border rounded-lg"
-                />
-              )}
             </div>
 
             <div className="pt-2 border-t border-slate-100">

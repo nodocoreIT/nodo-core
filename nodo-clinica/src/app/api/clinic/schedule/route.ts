@@ -394,9 +394,12 @@ export async function PUT(request: NextRequest) {
               : tokenIncoming,
           };
         }
-        return doctor;
       });
-      return NextResponse.json({ ok: true, office: localDoctorOfficePayload(saved) });
+      const doctor = saved.doctors.find((d) => d.id === session.userId);
+      if (!doctor) {
+        return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+      }
+      return NextResponse.json({ ok: true, office: localDoctorOfficePayload(doctor) });
     } catch (err) {
       return NextResponse.json(
         { error: err instanceof Error ? err.message : "Error al guardar" },

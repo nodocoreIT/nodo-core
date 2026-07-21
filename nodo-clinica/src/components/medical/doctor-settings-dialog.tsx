@@ -315,11 +315,16 @@ export function DoctorSettingsDialog({
       if (result.office) {
         loadGen.current += 1;
         applyOfficeData(result.office);
+        const nextPhoto =
+          (typeof result.office.profilePhotoData === "string" &&
+            result.office.profilePhotoData) ||
+          profilePhotoData ||
+          undefined;
         window.dispatchEvent(
           new CustomEvent("nodo:profile-updated", {
             detail: {
-              fullName: result.office.fullName,
-              profilePhotoUrl: result.office.profilePhotoData,
+              fullName: (result.office.fullName as string | undefined) ?? fullName,
+              profilePhotoUrl: nextPhoto,
             },
           }),
         );
@@ -641,15 +646,22 @@ export function DoctorSettingsDialog({
                               if (result.office) {
                                 loadGen.current += 1;
                                 applyOfficeData(result.office);
-                                window.dispatchEvent(
-                                  new CustomEvent("nodo:profile-updated", {
-                                    detail: {
-                                      fullName: result.office.fullName,
-                                      profilePhotoUrl: result.office.profilePhotoData,
-                                    },
-                                  }),
-                                );
                               }
+                              const nextPhoto =
+                                (typeof result.office?.profilePhotoData === "string" &&
+                                  result.office.profilePhotoData) ||
+                                photoData;
+                              setProfilePhotoData(nextPhoto);
+                              window.dispatchEvent(
+                                new CustomEvent("nodo:profile-updated", {
+                                  detail: {
+                                    fullName:
+                                      (result.office?.fullName as string | undefined) ??
+                                      undefined,
+                                    profilePhotoUrl: nextPhoto,
+                                  },
+                                }),
+                              );
                               setSaveResult({ status: "success" });
                             } catch (err) {
                               setSaveResult({

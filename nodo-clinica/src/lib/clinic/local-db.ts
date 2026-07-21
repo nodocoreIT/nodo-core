@@ -655,6 +655,7 @@ function publicPaymentSettings(
     currency: payment.currency ?? "ARS",
     alias: payment.alias,
     cbu: payment.cbu,
+    beneficiaryName: payment.beneficiaryName,
     bankName: payment.bankName,
     paymentInstructions: payment.paymentInstructions,
     qrImageData: payment.qrImageData,
