@@ -278,7 +278,6 @@ export async function GET(request: NextRequest) {
         .select("*, patients(full_name), patient_documents(*)")
         .eq("doctor_id", doctorId)
         .eq("payment_status", "confirmed")
-        .eq("org_id", user.org_id ?? "")
         .not("payment_confirmed_at", "is", null)
         .order("payment_confirmed_at", { ascending: false })
         .limit(100);
@@ -322,7 +321,6 @@ export async function GET(request: NextRequest) {
         .from("appointments")
         .select("*, patients(full_name), patient_documents(*)")
         .eq("doctor_id", doctorId)
-        .eq("org_id", user.org_id ?? "")
         .neq("status", "cancelled")
         .order("scheduled_at", { ascending: false })
         .limit(50);
@@ -364,7 +362,6 @@ export async function GET(request: NextRequest) {
         .from("appointments")
         .select("*, patients(full_name), patient_documents(*)")
         .eq("doctor_id", doctorId)
-        .eq("org_id", user.org_id ?? "")
         .neq("status", "cancelled")
         .order("scheduled_at", { ascending: true });
 
@@ -494,7 +491,6 @@ export async function GET(request: NextRequest) {
       .from("appointments")
       .select("*, patients(id, full_name, email, phone, profile_photo_url), patient_documents(id)")
       .eq("doctor_id", doctorId)
-      .eq("org_id", user.org_id ?? "")
       .neq("status", "cancelled");
 
     if (scope === "today" || scope === "active") {
@@ -1020,7 +1016,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (action === "doctorConfirmPayment" && appointmentId) {
-    if (user.role !== "admin" && user.role !== "super_admin") {
+    if (user.role === "patient") {
       return NextResponse.json(
         { error: "Solo el médico puede confirmar" },
         { status: 403 },
@@ -1030,7 +1026,6 @@ export async function PATCH(request: NextRequest) {
       .from("appointments")
       .select("*")
       .eq("id", appointmentId)
-      .eq("org_id", user.org_id ?? "")
       .maybeSingle();
     if (!apt) {
       return NextResponse.json(
@@ -1043,7 +1038,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (action === "doctorRejectPayment" && appointmentId) {
-    if (user.role !== "admin" && user.role !== "super_admin") {
+    if (user.role === "patient") {
       return NextResponse.json(
         { error: "Solo el médico puede rechazar" },
         { status: 403 },
@@ -1053,7 +1048,6 @@ export async function PATCH(request: NextRequest) {
       .from("appointments")
       .select("*")
       .eq("id", appointmentId)
-      .eq("org_id", user.org_id ?? "")
       .maybeSingle();
     if (!apt) {
       return NextResponse.json(
@@ -1147,8 +1141,7 @@ export async function PATCH(request: NextRequest) {
       .from("appointments")
       .select("id")
       .eq("doctor_id", doctorId)
-      .eq("status", "in_consultation")
-      .eq("org_id", user.org_id ?? "");
+      .eq("status", "in_consultation");
 
     let cleared = 0;
     for (const a of stuck ?? []) {
@@ -1167,7 +1160,6 @@ export async function PATCH(request: NextRequest) {
         .from("appointments")
         .select("*")
         .eq("id", appointmentId)
-        .eq("org_id", user.org_id ?? "")
         .maybeSingle()
     : await getAppointmentByToken(supabase, accessToken);
 
