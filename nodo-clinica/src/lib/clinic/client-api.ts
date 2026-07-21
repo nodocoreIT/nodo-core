@@ -125,6 +125,12 @@ export const clinicApi = {
           let fullName: string =
             userMeta.full_name ?? userMeta.name ?? authUser.email ?? "";
           let profilePhotoUrl: string | undefined;
+          // For a doctor, the business id is professionals.id, not the Supabase
+          // Auth user id (authUser.id === professionals.user_id, a different
+          // column) — appointments.doctor_id and every doctor-scoped query
+          // expect professionals.id. /api/clinic/account/session resolves it
+          // server-side; keep authUser.id only as a last-resort fallback.
+          let resolvedId: string = authUser.id;
           try {
             const sessionRes = await fetch(`${BASE}/api/clinic/account/session`, {
               credentials: "include",
@@ -136,9 +142,12 @@ export const clinicApi = {
                 fullName = sessionData.user.fullName;
               }
               profilePhotoUrl = sessionData.user?.profilePhotoUrl;
+              if (sessionData.user?.id) {
+                resolvedId = sessionData.user.id;
+              }
             }
           } catch {
-            /* keep the user_metadata fallback */
+            /* keep the auth id / user_metadata fallback */
           }
           return {
             session: {
@@ -148,7 +157,7 @@ export const clinicApi = {
               org_id: appMeta.org_id ?? null,
             },
             user: {
-              id: authUser.id,
+              id: resolvedId,
               email: authUser.email,
               fullName,
               profilePhotoUrl,

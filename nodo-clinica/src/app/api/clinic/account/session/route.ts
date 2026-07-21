@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { isLocalMode } from "@/lib/clinic/config";
 import { getSession, clearSessionResponse } from "@/lib/clinic/session";
 
@@ -25,6 +25,24 @@ export async function GET(): Promise<NextResponse> {
       const sessionRole: "doctor" | "patient" =
         clinicSession?.userId === user.id ? clinicSession.role : appRole;
 
+      // clinicSession.userId is always resolved to professionals.id (the PK
+      // appointments.doctor_id points to) by validateSessionUser(), never the
+      // raw Supabase Auth user id — auth.getUser()'s id is professionals.user_id,
+      // a different column entirely. Falling back to it silently would hand
+      // callers the wrong id for any query keyed on the doctor. When there is
+      // no ClinicSession cookie at all (e.g. a doctor who only ever
+      // authenticated via the Supabase Auth SDK directly), resolve it here.
+      let resolvedId = clinicSession?.userId ?? user.id;
+      if (!clinicSession && sessionRole === "doctor") {
+        const svc = await createServiceClient();
+        const { data: professional } = await svc
+          .from("professionals")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (professional) resolvedId = professional.id;
+      }
+
       return NextResponse.json({
         session: {
           userId: user.id,
@@ -33,7 +51,7 @@ export async function GET(): Promise<NextResponse> {
           org_id: appMeta.org_id ?? null,
         },
         user: {
-          id: user.id,
+          id: resolvedId,
           email: user.email,
           fullName: clinicSession?.fullName ?? fullName,
           profilePhotoUrl: clinicSession?.profilePhotoUrl,
