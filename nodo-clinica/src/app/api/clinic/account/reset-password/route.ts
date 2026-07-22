@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isMailConfigured, sendPasswordResetEmail } from "@/lib/mail";
+import { resolveAppOrigin } from "@/lib/clinic/appointment-payment";
 import {
   buildPasswordRecoveryRedirect,
   canAccessAsRole,
@@ -20,10 +21,7 @@ export async function POST(request: NextRequest) {
     const intendedRole = parseClinicDbRole(body.role) ?? "paciente";
     const normalizedEmail = email.trim().toLowerCase();
 
-    const origin =
-      request.headers.get("origin") ??
-      process.env.NEXT_PUBLIC_BASE_URL ??
-      "";
+    const origin = resolveAppOrigin(request.headers.get("origin"));
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const serviceClient = (await createServiceClient()) as any;

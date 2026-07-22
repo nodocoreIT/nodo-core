@@ -157,6 +157,6 @@ export function buildPasswordRecoveryRedirect(
   origin: string,
   intendedRole: ClinicDbRole,
 ): string {
-  const next = `/actualizar-contrasena?role=${intendedRole}`;
-  return `${origin.replace(/\/$/, "")}/auth/callback?next=${encodeURIComponent(next)}`;
+  const base = origin.replace(/\/$/, "");
+  return `${base}/actualizar-contrasena?role=${intendedRole}`;
 }

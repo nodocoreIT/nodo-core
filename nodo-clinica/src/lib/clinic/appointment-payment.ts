@@ -8,10 +8,28 @@ import { es } from "date-fns/locale";
 export function appBaseUrl() {
   const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
   if (fromEnv) return fromEnv;
+  if (process.env.NEXT_PUBLIC_BASE_URL?.trim()) {
+    return process.env.NEXT_PUBLIC_BASE_URL.trim().replace(/\/$/, "");
+  }
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`.replace(/\/$/, "");
   }
   return "http://localhost:3002";
+}
+
+/** Public URL for emails / Supabase redirectTo (never localhost in prod emails). */
+export function resolveAppOrigin(headerOrigin?: string | null): string {
+  const raw = (headerOrigin ?? "").trim().replace(/\/$/, "");
+  const isLocal =
+    !raw ||
+    raw.includes("localhost") ||
+    raw.includes("0.0.0.0") ||
+    raw.includes("127.0.0.1");
+
+  if (isLocal) {
+    return appBaseUrl();
+  }
+  return raw;
 }
 
 /** Login entry for patients (opens "Soy Paciente" tab). */
