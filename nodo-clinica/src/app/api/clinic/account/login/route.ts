@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { jsonWithSession } from "@/lib/clinic/session";
+import {
+  canAccessAsRole,
+  lookupClinicMembershipByAuthUserId,
+  sessionRoleToDbRole,
+} from "@/lib/clinic/resolve-clinic-role";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,19 +23,34 @@ export async function POST(request: NextRequest) {
     }
 
     const appMeta = data.user.app_metadata ?? {};
-    const rawRole: string = appMeta.role ?? "patient";
-
-    // If the client explicitly requests the patient portal, honour it.
-    // For doctor portal requests, only privileged accounts get the doctor role.
-    const isPrivileged = ["super_admin", "admin", "medico", "agent"].includes(rawRole);
-    const sessionRole: "doctor" | "patient" =
-      requestedRole === "patient" ? "patient" : isPrivileged ? "doctor" : "patient";
-
-    // Prefer the canonical name from professionals/patients over
-    // user_metadata.full_name, which is only set once at provisioning time
-    // and can carry stale/wrong data (e.g. a name from a different account).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const serviceClient = (await createServiceClient()) as any;
+
+    const intendedDbRole = sessionRoleToDbRole(
+      requestedRole === "doctor" ? "doctor" : "patient",
+    );
+    const membership = await lookupClinicMembershipByAuthUserId(
+      serviceClient,
+      data.user.id,
+      data.user.email,
+    );
+
+    if (!canAccessAsRole(membership, intendedDbRole)) {
+      await supabase.auth.signOut();
+      return NextResponse.json(
+        {
+          error:
+            intendedDbRole === "medico"
+              ? "Esta cuenta no tiene acceso al portal médico."
+              : "Esta cuenta no está registrada como paciente.",
+        },
+        { status: 403 },
+      );
+    }
+
+    const sessionRole: "doctor" | "patient" =
+      requestedRole === "patient" ? "patient" : "doctor";
+
     let canonicalName: string | null = null;
     if (sessionRole === "doctor") {
       const { data: professional } = await serviceClient
@@ -38,14 +58,32 @@ export async function POST(request: NextRequest) {
         .select("full_name")
         .eq("user_id", data.user.id)
         .maybeSingle();
-      canonicalName = professional?.full_name ?? null;
+      if (!professional) {
+        const { data: byEmail } = await serviceClient
+          .from("professionals")
+          .select("full_name")
+          .eq("email", data.user.email?.toLowerCase() ?? "")
+          .maybeSingle();
+        canonicalName = byEmail?.full_name ?? null;
+      } else {
+        canonicalName = professional.full_name ?? null;
+      }
     } else {
       const { data: patient } = await serviceClient
         .from("patients")
         .select("full_name")
         .eq("profile_id", data.user.id)
         .maybeSingle();
-      canonicalName = patient?.full_name ?? null;
+      if (!patient && data.user.email) {
+        const { data: byEmail } = await serviceClient
+          .from("patients")
+          .select("full_name")
+          .eq("email", data.user.email.toLowerCase())
+          .maybeSingle();
+        canonicalName = byEmail?.full_name ?? null;
+      } else {
+        canonicalName = patient?.full_name ?? null;
+      }
     }
     const fullName: string =
       canonicalName ??

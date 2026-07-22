@@ -1,26 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/supabase/server";
 import { sendPasswordResetEmail } from "@/lib/mail";
+import {
+  buildPasswordRecoveryRedirect,
+  canAccessAsRole,
+  lookupClinicMembershipByEmail,
+  parseClinicDbRole,
+} from "@/lib/clinic/resolve-clinic-role";
 
 /**
  * POST /api/clinic/account/forgot-password
- *
- * Generates a recovery link via the admin SDK and sends a branded
- * password-reset email through Zoho SMTP — replaces the default
- * Supabase Auth template.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const body = await request.json().catch(() => ({}));
   const email = String(body.email ?? "").trim().toLowerCase();
+  const intendedRole = parseClinicDbRole(body.role) ?? "paciente";
 
   if (!email) {
     return NextResponse.json({ error: "email is required" }, { status: 400 });
   }
 
   const origin = request.headers.get("origin") ?? process.env.NEXT_PUBLIC_BASE_URL ?? "";
-  const redirectTo = `${origin}/auth/callback?next=/actualizar-contrasena`;
+  const service = await createServiceClient();
 
-  // Use the admin SDK to generate a recovery link without sending the
-  // default Supabase email.
+  const membership = await lookupClinicMembershipByEmail(service, email);
+  if (!canAccessAsRole(membership, intendedRole)) {
+    return NextResponse.json({ ok: true });
+  }
+
+  const redirectTo = buildPasswordRecoveryRedirect(origin, intendedRole);
+
   const { createClient } = await import("@supabase/supabase-js");
   const admin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,7 +45,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
   if (linkError || !linkData?.properties?.action_link) {
-    // Don't leak whether the email exists — always return ok.
     console.error("[forgot-password] generateLink error", linkError);
     return NextResponse.json({ ok: true });
   }

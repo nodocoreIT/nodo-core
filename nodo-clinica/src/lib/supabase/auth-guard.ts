@@ -4,15 +4,13 @@ import { getSession } from "@/lib/clinic/session";
 import { isLocalMode } from "@/lib/clinic/config";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
-
-/** app_metadata.role can be Spanish ("medico"/"paciente", set by the account/* flows) or
- *  English ("doctor"/"patient", set by the legacy ClinicSession flows). Callers of
- *  requireAuth should only ever have to check the English canonical values. */
-function normalizeRole(role: string): string {
-  if (role === "medico") return "doctor";
-  if (role === "paciente") return "patient";
-  return role;
-}
+import {
+  canAccessAsRole,
+  lookupClinicMembershipByAuthUserId,
+  resolveRoleForContext,
+  sessionRoleToDbRole,
+  toSessionRole,
+} from "@/lib/clinic/resolve-clinic-role";
 
 export interface AuthContext {
   user: {
@@ -117,17 +115,29 @@ export async function requireAuth(
 
     if (!error && user) {
       const appMeta = user.app_metadata ?? {};
-      const supabaseRole: string = appMeta.role ?? "patient";
 
-      // Check ClinicSession cookie in parallel — a privileged user (doctor/admin)
-      // may have explicitly chosen to act as "patient". If the ClinicSession is for
-      // the same auth user and carries role "patient", honour that choice (downgrade
-      // only — never allow escalation via this path).
+      const svc = await createServiceClient();
+      const membership = await lookupClinicMembershipByAuthUserId(
+        svc,
+        user.id,
+        user.email,
+      );
+      const defaultResolved = resolveRoleForContext(membership);
+      const dbRole = toSessionRole(defaultResolved.role);
+
       const clinicSession = await getSession();
       const effectiveRole =
-        clinicSession?.userId === user.id && clinicSession?.role === "patient"
+        clinicSession?.role === "patient" &&
+        canAccessAsRole(membership, "paciente")
           ? "patient"
-          : normalizeRole(supabaseRole);
+          : dbRole;
+
+      if (effectiveRole === "doctor" && !membership.professionalId) {
+        return NextResponse.json(
+          { error: "Unauthorized — not a professional account" },
+          { status: 401 },
+        );
+      }
 
       return {
         user: {
@@ -136,7 +146,7 @@ export async function requireAuth(
           role: effectiveRole,
           org_id: appMeta.org_id ?? null,
         },
-        _professionalId: null,
+        _professionalId: membership.professionalId,
         supabase,
       };
     }

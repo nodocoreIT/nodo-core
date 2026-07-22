@@ -106,31 +106,13 @@ export const clinicApi = {
         if (authUser) {
           const appMeta = authUser.app_metadata ?? {};
           const userMeta = authUser.user_metadata ?? {};
-          const sessionRole = mapSessionRole(appMeta.role);
+          let dbRole: "doctor" | "patient" = mapSessionRole(appMeta.role);
 
-          // A privileged user (doctor) can also log in as a patient.
-          // If they explicitly chose "patient" at login (stored in sessionStorage),
-          // honour that choice so the patient portal works correctly.
-          const stored = getClientSession();
-          const effectiveRole: "doctor" | "patient" =
-            stored?.userId === authUser.id &&
-            stored?.role === "patient" &&
-            sessionRole === "doctor"
-              ? "patient"
-              : sessionRole;
-
-          // user_metadata.full_name is set once at provisioning time and can
-          // go stale (e.g. carry a name from a different account). Prefer the
-          // canonical name resolved server-side from professionals/patients.
           let fullName: string =
             userMeta.full_name ?? userMeta.name ?? authUser.email ?? "";
           let profilePhotoUrl: string | undefined;
-          // For a doctor, the business id is professionals.id, not the Supabase
-          // Auth user id (authUser.id === professionals.user_id, a different
-          // column) — appointments.doctor_id and every doctor-scoped query
-          // expect professionals.id. /api/clinic/account/session resolves it
-          // server-side; keep authUser.id only as a last-resort fallback.
           let resolvedId: string = authUser.id;
+
           try {
             const sessionRes = await fetch(`${BASE}/api/clinic/account/session`, {
               credentials: "include",
@@ -138,6 +120,11 @@ export const clinicApi = {
             });
             if (sessionRes.ok) {
               const sessionData = await parseJsonResponse(sessionRes);
+              if (sessionData.session?.role === "doctor" || sessionData.session?.role === "patient") {
+                dbRole = sessionData.session.role;
+              } else if (sessionData.user?.role === "doctor" || sessionData.user?.role === "patient") {
+                dbRole = sessionData.user.role;
+              }
               if (sessionData.user?.fullName) {
                 fullName = sessionData.user.fullName;
               }
@@ -147,8 +134,16 @@ export const clinicApi = {
               }
             }
           } catch {
-            /* keep the auth id / user_metadata fallback */
+            /* keep metadata fallback */
           }
+
+          const stored = getClientSession();
+          const effectiveRole: "doctor" | "patient" =
+            stored?.userId === authUser.id &&
+            stored?.role === "patient" &&
+            dbRole === "doctor"
+              ? "patient"
+              : dbRole;
           return {
             session: {
               userId: authUser.id,
@@ -212,15 +207,50 @@ export const clinicApi = {
       }
       if (!data.user) throw new Error("Credenciales incorrectas");
 
+      const intendedDbRole = role === "patient" ? "paciente" : "medico";
+      const verifyRes = await fetch(`${BASE}/api/clinic/account/verify-portal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ role: intendedDbRole }),
+      });
+
+      if (!verifyRes.ok) {
+        await supabase.auth.signOut();
+        const verifyData = await verifyRes.json().catch(() => ({}));
+        throw new Error(
+          verifyData.error ??
+            (role === "doctor"
+              ? "Esta cuenta no tiene acceso al portal médico."
+              : "Esta cuenta no está registrada como paciente."),
+        );
+      }
+
       const appMeta = data.user.app_metadata ?? {};
-      const userMeta = data.user.user_metadata ?? {};
-      const fullName: string =
-        userMeta.full_name ?? data.user.email?.split("@")[0] ?? "";
-      const sessionRole = mapSessionRole(appMeta.role);
+      let fullName: string =
+        data.user.user_metadata?.full_name ?? data.user.email?.split("@")[0] ?? "";
+      let resolvedId = data.user.id;
+      let dbRole: "doctor" | "patient" = role === "patient" ? "patient" : "doctor";
 
-      const effectiveRole = role === "patient" ? "patient" : sessionRole;
+      try {
+        const sessionRes = await fetch(`${BASE}/api/clinic/account/session`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (sessionRes.ok) {
+          const sessionData = await parseJsonResponse(sessionRes);
+          if (sessionData.user?.fullName) fullName = sessionData.user.fullName;
+          if (sessionData.user?.id) resolvedId = sessionData.user.id;
+          if (sessionData.session?.role === "doctor" || sessionData.session?.role === "patient") {
+            dbRole = sessionData.session.role;
+          }
+        }
+      } catch {
+        /* keep defaults */
+      }
 
-      // Save to sessionStorage for client components that still use it
+      const effectiveRole = role === "patient" ? "patient" : dbRole;
+
       saveClientSession({
         userId: data.user.id,
         role: effectiveRole,
@@ -228,8 +258,6 @@ export const clinicApi = {
         fullName,
       });
 
-      // Persist role choice server-side via ClinicSession cookie so API routes
-      // (requireAuth) can honour a privileged user acting as "patient".
       await fetch(`${BASE}/api/clinic/auth/set-role`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -239,7 +267,7 @@ export const clinicApi = {
 
       return {
         user: {
-          id: data.user.id,
+          id: resolvedId,
           email: data.user.email,
           fullName,
           role: effectiveRole,

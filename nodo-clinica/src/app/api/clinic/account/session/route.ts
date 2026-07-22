@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { isLocalMode } from "@/lib/clinic/config";
 import { getSession, clearSessionResponse } from "@/lib/clinic/session";
+import {
+  canAccessAsRole,
+  lookupClinicMembershipByAuthUserId,
+  resolveRoleForContext,
+  sessionRoleToDbRole,
+} from "@/lib/clinic/resolve-clinic-role";
 
 export async function GET(): Promise<NextResponse> {
   // Resolve ClinicSession cookie once — used for role preference and as fallback.
@@ -17,30 +23,38 @@ export async function GET(): Promise<NextResponse> {
     if (!error && user) {
       const appMeta = user.app_metadata ?? {};
       const userMeta = user.user_metadata ?? {};
-      const rawRole: string = appMeta.role ?? "patient";
-      const isPrivileged = ["super_admin", "admin", "medico", "agent"].includes(rawRole);
-      const appRole: "doctor" | "patient" = isPrivileged ? "doctor" : "patient";
       const fullName: string = userMeta.full_name ?? userMeta.name ?? user.email ?? "";
 
-      const sessionRole: "doctor" | "patient" =
-        clinicSession?.userId === user.id ? clinicSession.role : appRole;
+      const svc = await createServiceClient();
+      const membership = await lookupClinicMembershipByAuthUserId(
+        svc,
+        user.id,
+        user.email,
+      );
+      const defaultResolved = resolveRoleForContext(membership);
+      const dbRole = defaultResolved.role;
 
-      // clinicSession.userId is always resolved to professionals.id (the PK
-      // appointments.doctor_id points to) by validateSessionUser(), never the
-      // raw Supabase Auth user id — auth.getUser()'s id is professionals.user_id,
-      // a different column entirely. Falling back to it silently would hand
-      // callers the wrong id for any query keyed on the doctor. When there is
-      // no ClinicSession cookie at all (e.g. a doctor who only ever
-      // authenticated via the Supabase Auth SDK directly), resolve it here.
+      const sessionRole: "doctor" | "patient" =
+        clinicSession?.role === "patient" &&
+        canAccessAsRole(membership, "paciente")
+          ? "patient"
+          : dbRole === "medico"
+            ? "doctor"
+            : "patient";
+
       let resolvedId = clinicSession?.userId ?? user.id;
-      if (!clinicSession && sessionRole === "doctor") {
-        const svc = await createServiceClient();
-        const { data: professional } = await svc
-          .from("professionals")
-          .select("id")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        if (professional) resolvedId = professional.id;
+      if (sessionRole === "doctor") {
+        resolvedId = membership.professionalId ?? resolvedId;
+        if (!membership.professionalId) {
+          const { data: professional } = await svc
+            .from("professionals")
+            .select("id")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (professional) resolvedId = professional.id;
+        }
+      } else if (membership.patientProfileId) {
+        resolvedId = membership.patientProfileId;
       }
 
       return NextResponse.json({

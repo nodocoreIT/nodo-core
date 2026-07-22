@@ -1,35 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isMailConfigured, sendPasswordResetEmail } from "@/lib/mail";
+import {
+  buildPasswordRecoveryRedirect,
+  canAccessAsRole,
+  lookupClinicMembershipByEmail,
+  parseClinicDbRole,
+} from "@/lib/clinic/resolve-clinic-role";
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email } = body as { email?: string };
+    const { email } = body as { email?: string; role?: string };
 
     if (!email?.trim()) {
       return NextResponse.json({ error: "Email requerido." }, { status: 400 });
     }
+
+    const intendedRole = parseClinicDbRole(body.role) ?? "paciente";
+    const normalizedEmail = email.trim().toLowerCase();
 
     const origin =
       request.headers.get("origin") ??
       process.env.NEXT_PUBLIC_BASE_URL ??
       "";
 
-    // Use admin client to generate the password reset link server-side.
-    // This lets us send it via our own SMTP instead of Supabase's default email.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const serviceClient = (await createServiceClient()) as any;
 
-    const redirectTo = `${origin}/actualizar-contrasena`;
+    const membership = await lookupClinicMembershipByEmail(
+      serviceClient,
+      normalizedEmail,
+    );
+
+    if (!canAccessAsRole(membership, intendedRole)) {
+      // Do not reveal whether the email exists.
+      return NextResponse.json({ ok: true });
+    }
+
+    const redirectTo = buildPasswordRecoveryRedirect(origin, intendedRole);
     const { data, error } = await serviceClient.auth.admin.generateLink({
       type: "recovery",
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       options: { redirectTo },
     });
 
     if (error) {
-      // Don't reveal whether the email exists — always return 200 to the client.
       console.error("[reset-password] generateLink error:", error.message);
       return NextResponse.json({ ok: true });
     }
@@ -51,7 +67,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[reset-password]", err);
-    // Always return 200 — never reveal account existence to the client.
     return NextResponse.json({ ok: true });
   }
 }

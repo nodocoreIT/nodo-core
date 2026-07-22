@@ -1,9 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { KeyRound, Loader2, MailCheck } from "lucide-react";
-export default function RecuperarContrasenaPage() {
+import { parseClinicDbRole } from "@/lib/clinic/resolve-clinic-role";
+
+function RecuperarContrasenaContent() {
+  const searchParams = useSearchParams();
+  const intendedRole = parseClinicDbRole(searchParams.get("role")) ?? "paciente";
+
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -18,7 +24,7 @@ export default function RecuperarContrasenaPage() {
       const res = await fetch("/api/clinic/account/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: email.trim(), role: intendedRole }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error al enviar el correo");
@@ -120,5 +126,19 @@ export default function RecuperarContrasenaPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function RecuperarContrasenaPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-paper flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-brand" />
+        </div>
+      }
+    >
+      <RecuperarContrasenaContent />
+    </Suspense>
   );
 }

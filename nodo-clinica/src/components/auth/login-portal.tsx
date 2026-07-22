@@ -294,7 +294,10 @@ export function LoginPortal() {
       const res = await fetch("/api/clinic/account/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: recoveryEmail.trim() }),
+        body: JSON.stringify({
+          email: recoveryEmail.trim(),
+          role: isDoctor ? "medico" : "paciente",
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

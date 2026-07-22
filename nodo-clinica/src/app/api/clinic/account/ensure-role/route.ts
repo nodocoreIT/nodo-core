@@ -1,49 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import {
+  canAccessAsRole,
+  lookupClinicMembershipByAuthUserId,
+  lookupClinicMembershipByEmail,
+  parseClinicDbRole,
+  resolveRoleForContext,
+  type ClinicDbRole,
+} from "@/lib/clinic/resolve-clinic-role";
 
 /**
  * POST /api/clinic/account/ensure-role
  *
- * Called during the password-setup activation flow BEFORE re-login.
- * Accepts { email } in body, looks up the user in professionals/patients,
- * and sets app_metadata.role via the service role key.
- *
- * Does NOT require an active session — the recovery session is consumed
- * by updateUser() before this runs.
+ * Password recovery: sets app_metadata.role and links patient/professional rows.
+ * Body: { email?, userId?, intendedRole: "medico" | "paciente" }
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const body = await request.json().catch(() => ({}));
   const email = String(body.email ?? "").trim().toLowerCase();
+  const userIdFromBody =
+    typeof body.userId === "string" && body.userId.trim()
+      ? body.userId.trim()
+      : null;
+  const intendedRole =
+    parseClinicDbRole(body.intendedRole) ??
+    parseClinicDbRole(body.role) ??
+    "paciente";
 
-  if (!email) {
-    return NextResponse.json({ error: "email is required" }, { status: 400 });
+  if (!email && !userIdFromBody) {
+    return NextResponse.json(
+      { error: "email or userId is required" },
+      { status: 400 },
+    );
   }
 
   const service = await createServiceClient();
 
-  // Determine role by checking which table the user belongs to
-  const { data: professional } = await service
-    .from("professionals")
-    .select("user_id")
-    .eq("email", email)
-    .maybeSingle();
+  const membership = email
+    ? await lookupClinicMembershipByEmail(service, email)
+    : await lookupClinicMembershipByAuthUserId(service, userIdFromBody!, email);
 
-  const role: "medico" | "paciente" = professional ? "medico" : "paciente";
-
-  // Resolve auth user ID: prefer user_id from professionals table,
-  // fall back to looking up patients, then listing auth users.
-  let authUserId: string | null = professional?.user_id ?? null;
-
-  if (!authUserId) {
-    const { data: patient } = await service
-      .from("patients")
-      .select("user_id")
-      .eq("email", email)
-      .maybeSingle();
-    authUserId = patient?.user_id ?? null;
+  if (!canAccessAsRole(membership, intendedRole)) {
+    const msg =
+      intendedRole === "medico"
+        ? "Esta cuenta no está registrada como profesional."
+        : "Esta cuenta no está registrada como paciente.";
+    return NextResponse.json({ error: msg }, { status: 403 });
   }
 
-  // Last resort: find by email in auth.users
+  const resolved = resolveRoleForContext(membership, intendedRole);
+  const role: ClinicDbRole = resolved.role;
+
   const { createClient: createSupabaseClient } = await import("@supabase/supabase-js");
   const adminClient = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -51,18 +58,40 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     { auth: { persistSession: false } },
   );
 
-  if (!authUserId) {
+  let authUserId = userIdFromBody;
+
+  if (!authUserId && email) {
     const { data: listData } = await adminClient.auth.admin.listUsers({
       page: 1,
       perPage: 1000,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const found = listData?.users?.find((u: any) => u.email === email);
+    const found = listData?.users?.find(
+      (u: any) => String(u.email ?? "").toLowerCase() === email,
+    );
     authUserId = found?.id ?? null;
   }
 
   if (!authUserId) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  if (resolved.patientId && !resolved.patientProfileId) {
+    await service
+      .from("patients")
+      .update({ profile_id: authUserId })
+      .eq("id", resolved.patientId);
+  }
+
+  if (
+    resolved.professionalId &&
+    resolved.professionalUserId !== authUserId
+  ) {
+    await service
+      .from("professionals")
+      .update({ user_id: authUserId })
+      .eq("id", resolved.professionalId)
+      .is("user_id", null);
   }
 
   const { data: existingAuthUser } = await adminClient.auth.admin.getUserById(authUserId);
@@ -74,8 +103,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       app_metadata: {
         ...currentAppMetadata,
         role,
-        // This route runs right after a successful password reset
-        // (actualizar-contrasena) — clear the forced-password flag here.
         must_set_password: false,
       },
     },
@@ -86,12 +113,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Failed to update role" }, { status: 500 });
   }
 
-  // Clean up the pending registration now that the user has been activated.
-  // This removes the entry from the admin panel's "Solicitudes pendientes".
-  await service
-    .from("pending_clinic_registrations")
-    .delete()
-    .eq("email", email);
+  if (email) {
+    await service
+      .from("pending_clinic_registrations")
+      .delete()
+      .eq("email", email);
+  }
 
   return NextResponse.json({ ok: true, role });
 }

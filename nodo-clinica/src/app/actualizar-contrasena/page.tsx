@@ -6,6 +6,7 @@ import Link from "next/link";
 import { KeyRound, Loader2, CheckCircle, Stethoscope, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { clinicApi } from "@/lib/clinic/client-api";
+import { parseClinicDbRole } from "@/lib/clinic/resolve-clinic-role";
 
 export default function ActualizarContrasenaPage() {
   const router = useRouter();
@@ -16,6 +17,8 @@ export default function ActualizarContrasenaPage() {
   const [error, setError] = useState("");
   const [sessionReady, setSessionReady] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [intendedRole, setIntendedRole] = useState<"medico" | "paciente">("paciente");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -24,6 +27,8 @@ export default function ActualizarContrasenaPage() {
 
     async function initSession() {
       const searchParams = new URLSearchParams(window.location.search);
+      const roleFromUrl = parseClinicDbRole(searchParams.get("role"));
+      if (roleFromUrl) setIntendedRole(roleFromUrl);
 
       // Link expired — callback route forwarded this error
       if (searchParams.get("error") === "link_expired") {
@@ -44,6 +49,7 @@ export default function ActualizarContrasenaPage() {
         });
         if (refreshed.session) {
           setUserEmail(refreshed.session.user?.email ?? null);
+          setAuthUserId(refreshed.session.user?.id ?? null);
           setSessionReady(true);
           return;
         }
@@ -60,8 +66,14 @@ export default function ActualizarContrasenaPage() {
           const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
           if (!error && data.session) {
             setUserEmail(data.session.user?.email ?? null);
+            setAuthUserId(data.session.user?.id ?? null);
             setSessionReady(true);
-            window.history.replaceState({}, "", window.location.pathname);
+            const roleParam = roleFromUrl ?? "paciente";
+            window.history.replaceState(
+              {},
+              "",
+              `${window.location.pathname}?role=${roleParam}`,
+            );
             return;
           }
         }
@@ -94,21 +106,29 @@ export default function ActualizarContrasenaPage() {
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) throw updateError;
 
-      // 1. Set app_metadata.role BEFORE re-login so the JWT includes the role claim.
-      //    This endpoint uses the service role key — no session required (recovery is
-      //    already consumed by updateUser above).
-      let redirectPath = "/medico/dashboard";
-      let loginRole: "doctor" | "patient" = "doctor";
-      if (userEmail) {
+      let redirectPath = intendedRole === "medico" ? "/medico/dashboard" : "/paciente";
+      let loginRole: "doctor" | "patient" =
+        intendedRole === "medico" ? "doctor" : "patient";
+      if (userEmail || authUserId) {
         const roleRes = await fetch("/api/clinic/account/ensure-role", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: userEmail }),
+          body: JSON.stringify({
+            email: userEmail ?? undefined,
+            userId: authUserId ?? undefined,
+            intendedRole,
+          }),
         });
         const roleData = await roleRes.json().catch(() => ({}));
-        if (roleData.role === "paciente") {
-          redirectPath = "/paciente";
-          loginRole = "patient";
+        if (!roleRes.ok || !roleData.role) {
+          throw new Error(
+            roleData.error ??
+              "No se pudo verificar el tipo de cuenta. Solicitá un nuevo enlace.",
+          );
+        }
+        if (roleData.role === "medico") {
+          redirectPath = "/medico/dashboard";
+          loginRole = "doctor";
         }
       }
 
