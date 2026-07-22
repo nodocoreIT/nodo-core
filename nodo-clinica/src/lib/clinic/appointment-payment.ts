@@ -14,6 +14,11 @@ export function appBaseUrl() {
   return "http://localhost:3002";
 }
 
+/** Login entry for patients (opens "Soy Paciente" tab). */
+export function patientLoginUrl(baseUrl: string = appBaseUrl()) {
+  return `${baseUrl.replace(/\/$/, "")}/login?role=paciente`;
+}
+
 export async function confirmAppointmentPaymentAndNotify(
   appointmentId: string,
   opts?: { mercadopagoPaymentId?: string },

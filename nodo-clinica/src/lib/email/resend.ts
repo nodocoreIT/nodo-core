@@ -1,36 +1,8 @@
-import { Resend } from "resend";
+import "server-only";
+import { CLINIC_REMINDER_LOGO_DATA_URI } from "@/lib/email/clinic-logo-data-uri";
+import { sendClinicEmail, type EmailSendResult } from "@/lib/mail";
 
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
-
-export type EmailSendResult = {
-  id: string;
-  mock?: boolean;
-};
-
-function fromAddress() {
-  return (
-    process.env.RESEND_FROM_EMAIL ||
-    "Nodo Salud <onboarding@resend.dev>"
-  );
-}
-
-async function dispatchEmail(payload: Parameters<Resend["emails"]["send"]>[0]) {
-  if (!resend) {
-    console.log("[Email Mock]", {
-      to: payload.to,
-      subject: payload.subject,
-    });
-    return { id: "mock-email-id", mock: true } satisfies EmailSendResult;
-  }
-
-  const { data, error } = await resend.emails.send(payload);
-  if (error) {
-    throw new Error(error.message || "Error al enviar email con Resend");
-  }
-  return { id: data?.id ?? "sent" } satisfies EmailSendResult;
-}
+export type { EmailSendResult };
 
 interface AppointmentEmailParams {
   patientEmail: string;
@@ -98,11 +70,20 @@ export async function sendAppointmentConfirmationEmail(
     </html>
   `;
 
-  return dispatchEmail({
-    from: fromAddress(),
+  return sendClinicEmail({
     to: patientEmail,
     subject: `Turno confirmado — Dr/a. ${doctorName}`,
     html,
+    text: [
+      `Hola ${patientName},`,
+      "",
+      `Tu consulta con Dr/a. ${doctorName} está confirmada para el ${scheduledAt}.`,
+      reminderNote ?? "",
+      "",
+      `Sala de espera: ${waitingRoomUrl}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
   });
 }
 
@@ -127,6 +108,11 @@ export async function sendAppointmentReminderEmail(
     <body style="font-family: 'Inter', Arial, sans-serif; background: #f8fafc; padding: 32px;">
       <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
         <div style="background: linear-gradient(135deg, #0f766e, #14b8a6); padding: 32px; text-align: center;">
+          <img
+            src="${CLINIC_REMINDER_LOGO_DATA_URI}"
+            alt="Nodo Clínica"
+            style="height:44px;width:auto;display:inline-block;margin:0 auto 16px;"
+          />
           <h1 style="color: white; margin: 0; font-size: 24px;">Recordatorio de turno</h1>
           <p style="color: #ccfbf1; margin: 8px 0 0;">Clínica Virtual</p>
         </div>
@@ -151,11 +137,17 @@ export async function sendAppointmentReminderEmail(
     </html>
   `;
 
-  return dispatchEmail({
-    from: fromAddress(),
+  return sendClinicEmail({
     to: patientEmail,
     subject: `Recordatorio: turno con Dr/a. ${doctorName}`,
     html,
+    text: [
+      `Hola ${patientName},`,
+      "",
+      `Te recordamos que tenés consulta con Dr/a. ${doctorName} el ${scheduledAt}.`,
+      "",
+      `Sala de espera: ${waitingRoomUrl}`,
+    ].join("\n"),
   });
 }
 
@@ -171,8 +163,7 @@ export async function sendPrescriptionEmail(
 ): Promise<EmailSendResult> {
   const { patientEmail, patientName, doctorName, pdfBase64 } = params;
 
-  return dispatchEmail({
-    from: fromAddress(),
+  return sendClinicEmail({
     to: patientEmail,
     subject: `Receta médica — Dr/a. ${doctorName}`,
     html: `
@@ -180,10 +171,18 @@ export async function sendPrescriptionEmail(
       <p>Adjuntamos tu receta médica emitida por Dr/a. ${doctorName}.</p>
       <p>Saludos,<br>Clínica Virtual</p>
     `,
+    text: [
+      `Hola ${patientName},`,
+      "",
+      `Adjuntamos tu receta médica emitida por Dr/a. ${doctorName}.`,
+      "",
+      "Saludos,",
+      "Clínica Virtual",
+    ].join("\n"),
     attachments: [
       {
         filename: "receta-medica.pdf",
-        content: pdfBase64,
+        content: Buffer.from(pdfBase64, "base64"),
       },
     ],
   });

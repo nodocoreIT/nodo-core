@@ -50,6 +50,11 @@ export {
   type PortalHeaderActionsProps,
 } from "./components/portal-header-actions";
 export {
+  SettingsDesktopNav,
+  SettingsMobileNav,
+  type SettingsSectionNavItem,
+} from "./components/settings-section-nav";
+export {
   NotificationBellButton,
   type NotificationBellButtonProps,
 } from "./components/notification-bell-button";

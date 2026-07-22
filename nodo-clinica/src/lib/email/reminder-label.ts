@@ -9,3 +9,12 @@ export function formatReminderLabel(minutesBefore: number): string {
   }
   return `${minutesBefore} minutos antes`;
 }
+
+export const REMINDER_ANTICIPATION_OPTIONS = [
+  { value: 30, label: "30 minutos antes" },
+  { value: 60, label: "1 hora antes" },
+  { value: 120, label: "2 horas antes" },
+  { value: 720, label: "12 horas antes" },
+  { value: 1440, label: "1 día antes" },
+  { value: 2880, label: "2 días antes" },
+] as const;

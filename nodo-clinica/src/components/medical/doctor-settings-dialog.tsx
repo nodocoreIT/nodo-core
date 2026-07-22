@@ -44,9 +44,15 @@ import {
 } from "@/lib/clinic/schedule";
 import type { DoctorPaymentSettings, DoctorReminderSettings } from "@/lib/clinic/local-db";
 import { parseGoogleCalendarSrc } from "@/lib/google-calendar";
+import { REMINDER_ANTICIPATION_OPTIONS } from "@/lib/email/reminder-label";
 import { format, addDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { ThemeSettingsPanel } from "@/components/settings/theme-settings-panel";
+import {
+  SettingsDesktopNav,
+  SettingsMobileNav,
+  type SettingsSectionNavItem,
+} from "@nodocore/shared-components";
 import {
   DEFAULT_THEME_SETTINGS,
   mergeThemeSettings,
@@ -74,6 +80,24 @@ const SECTIONS: { id: SectionId; label: string; icon: React.ElementType }[] = [
   { id: "libres", label: "Días libres", icon: CalendarOff },
   { id: "apariencia", label: "Apariencia", icon: Palette },
 ];
+
+const CLINICA_SETTINGS_NAV: SettingsSectionNavItem<SectionId>[] = SECTIONS.map(
+  ({ id, label, icon }) => ({
+    id,
+    label,
+    icon,
+    mobileLabel:
+      id === "suscripcion"
+        ? "Plan"
+        : id === "avisos"
+          ? "Avisos"
+          : id === "libres"
+            ? "Libres"
+            : id === "apariencia"
+              ? "Tema"
+              : label,
+  }),
+);
 
 interface DoctorSettingsDialogProps {
   open: boolean;
@@ -351,14 +375,9 @@ export function DoctorSettingsDialog({
   const handleTestReminder = async () => {
     setTestingReminder(true);
     try {
-      const result = await clinicApi.sendTestReminderEmail();
-      if (result.mock) {
-        toast.warning(result.message, { duration: 10_000 });
-      } else {
-        toast.success(result.message);
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo enviar el email");
+      await clinicApi.sendTestReminderEmail();
+    } catch {
+      // Sin snackbar por ahora
     } finally {
       setTestingReminder(false);
     }
@@ -367,32 +386,16 @@ export function DoctorSettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[800px] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden bg-white">
-        {/* Left sidebar nav */}
-        <nav
-          aria-label="Secciones de configuración"
-          className="hidden sm:flex sm:w-52 md:w-56 flex-shrink-0 flex-col border-r border-border bg-slate-50 overflow-y-auto"
-        >
-          {SECTIONS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setActiveSection(id)}
-              className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors border-l-2 flex items-center gap-2.5 ${
-                activeSection === id
-                  ? "border-[var(--color-primary,#2563eb)] bg-[var(--color-primary,#2563eb)]/5 text-[var(--color-primary,#2563eb)]"
-                  : "border-transparent text-slate-500 hover:bg-white hover:text-slate-800"
-              }`}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
+        <SettingsDesktopNav
+          items={CLINICA_SETTINGS_NAV}
+          activeId={activeSection}
+          onSelect={setActiveSection}
+        />
 
         {/* Right content area */}
         <div className="flex flex-1 min-h-0 flex-col min-w-0 bg-white">
           {/* Fixed header */}
-          <div className="bg-white px-6 py-4 flex-shrink-0 border-b border-border">
+          <div className="bg-white px-4 sm:px-6 py-4 flex-shrink-0 border-b border-border">
             <DialogHeader>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mr-6">
                 <DialogTitle className="text-xl">Configuración</DialogTitle>
@@ -416,19 +419,12 @@ export function DoctorSettingsDialog({
               </DialogDescription>
             </DialogHeader>
 
-            {/* Mobile section picker */}
-            <div className="sm:hidden mt-3">
-              <Select value={activeSection} onValueChange={(v) => setActiveSection(v as SectionId)}>
-                <SelectTrigger className="h-9 font-semibold text-slate-800">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SECTIONS.map(({ id, label }) => (
-                    <SelectItem key={id} value={id}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <SettingsMobileNav
+              items={CLINICA_SETTINGS_NAV}
+              activeId={activeSection}
+              onSelect={setActiveSection}
+              className="mt-4"
+            />
           </div>
 
           {/* Scrollable content */}
@@ -1127,25 +1123,14 @@ export function DoctorSettingsDialog({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="60">1 hora antes</SelectItem>
-                        <SelectItem value="120">2 horas antes</SelectItem>
-                        <SelectItem value="720">12 horas antes</SelectItem>
-                        <SelectItem value="1440">1 día antes</SelectItem>
-                        <SelectItem value="2880">2 días antes</SelectItem>
+                        {REMINDER_ANTICIPATION_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={String(option.value)}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-[11px] text-slate-500 mt-2">
-                      Al reservar un turno, el paciente recibe un email de confirmación con fecha,
-                      hora y enlace a la sala. Si activás el recordatorio, también se avisa antes
-                      del turno. Requiere{" "}
-                      <code className="text-[10px] bg-slate-100 px-1 rounded">RESEND_API_KEY</code>{" "}
-                      en Vercel.
-                    </p>
-                    <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-md p-2 mt-2">
-                      En plan Vercel Hobby el aviso automático se revisa 1 vez al día (~9:00 UTC).
-                      Para avisos de 1–2 horas antes, usá <strong>1 día antes</strong> o el botón
-                      de reenvío manual del paciente.
-                    </p>
+                    
                   </div>
                   <div className="flex justify-center">
                     <Button
@@ -1161,7 +1146,7 @@ export function DoctorSettingsDialog({
                       ) : (
                         <Bell className="h-3.5 w-3.5 mr-1" />
                       )}
-                      Enviar email de prueba a mi correo
+                      Enviar email de prueba del recordatorio
                     </Button>
                   </div>
                 </>

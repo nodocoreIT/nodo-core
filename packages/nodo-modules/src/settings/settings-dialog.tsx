@@ -1,7 +1,7 @@
 "use client";
 // @ts-nocheck
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Loader2, Mail, UserPlus, Image as ImageIcon, BrainCircuit, CheckCircle2, AlertTriangle, Eye, EyeOff, Pencil, Trash2, Lock } from "lucide-react";
+import { Loader2, Mail, UserPlus, Image as ImageIcon, BrainCircuit, CheckCircle2, AlertTriangle, Eye, EyeOff, Pencil, Trash2, Lock, User, Building2, Users, Palette, Bell, TrendingUp, Share2, Settings as SettingsIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,9 @@ import {
   FormLabel,
   FormMessage,
   FormSelect,
+  SettingsDesktopNav,
+  SettingsMobileNav,
+  type SettingsSectionNavItem,
 } from "@nodocore/shared-components";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -553,16 +556,16 @@ function AiProGate() {
   );
 }
 
-const ALL_SETTINGS_TABS: { id: SettingsTabId; label: string }[] = [
-  { id: "profile", label: "Mi Perfil" },
-  { id: "company", label: "Datos de Empresa" },
-  { id: "users", label: "Usuarios y Roles" },
-  { id: "customization", label: "Personalización" },
-  { id: "ai", label: "Integraciones / IA" },
-  { id: "alerts", label: "Alertas" },
-  { id: "ipc", label: "Índices" },
-  { id: "redes-sociales", label: "Redes Sociales" },
-  { id: "system-config", label: "Configuración del Sistema" },
+const ALL_SETTINGS_TABS: SettingsSectionNavItem<SettingsTabId>[] = [
+  { id: "profile", label: "Mi Perfil", icon: User, mobileLabel: "Perfil" },
+  { id: "company", label: "Datos de Empresa", icon: Building2, mobileLabel: "Empresa" },
+  { id: "users", label: "Usuarios y Roles", icon: Users, mobileLabel: "Equipo" },
+  { id: "customization", label: "Personalización", icon: Palette, mobileLabel: "Tema" },
+  { id: "ai", label: "Integraciones / IA", icon: BrainCircuit, mobileLabel: "IA" },
+  { id: "alerts", label: "Alertas", icon: Bell, mobileLabel: "Alertas" },
+  { id: "ipc", label: "Índices", icon: TrendingUp, mobileLabel: "Índices" },
+  { id: "redes-sociales", label: "Redes Sociales", icon: Share2, mobileLabel: "Redes" },
+  { id: "system-config", label: "Configuración del Sistema", icon: SettingsIcon, mobileLabel: "Sistema" },
 ];
 
 export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialogProps) {
@@ -677,6 +680,10 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
   };
   const { role: authRole, user: authUser, plan } = useAuth();
   const aiUnlocked = hasProPlan(plan);
+  const settingsNavItems: SettingsSectionNavItem<SettingsTabId>[] = settingsTabs.map((tab) => ({
+    ...tab,
+    locked: tab.id === "ai" && !aiUnlocked,
+  }));
   const effectiveRole = module.sessionRole ?? authRole;
   const isSuperAdmin = !!module.superAdminRole && effectiveRole === module.superAdminRole;
   const hasAdminAccess = effectiveRole === module.adminRole || isSuperAdmin;
@@ -903,32 +910,14 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
             </div>
           </div>
         )}
-          <nav
-            aria-label="Secciones de configuración"
-            className="hidden sm:flex sm:w-52 md:w-56 flex-shrink-0 flex-col border-r border-border bg-slate-50 overflow-y-auto"
-          >
-            {settingsTabs.map((tab) => {
-              const tabLocked = tab.id === "ai" && !aiUnlocked;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors border-l-2 flex items-center justify-between gap-2 ${
-                    activeTab === tab.id
-                      ? "border-brand bg-brand/5 text-brand"
-                      : "border-transparent text-slate2 hover:bg-white hover:text-navy"
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  {tabLocked && <Lock className="h-3 w-3 shrink-0 opacity-50" aria-hidden />}
-                </button>
-              );
-            })}
-          </nav>
+          <SettingsDesktopNav
+            items={settingsNavItems}
+            activeId={activeTab}
+            onSelect={setActiveTab}
+          />
 
         <div className="flex flex-1 min-h-0 flex-col min-w-0 bg-white">
-          <div className="bg-white p-6 pb-4 flex-shrink-0 border-b border-border">
+          <div className="bg-white px-4 sm:px-6 py-4 flex-shrink-0 border-b border-border">
             <DialogHeader>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mr-6">
                 <DialogTitle className="text-xl">
@@ -956,18 +945,12 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
                 los accesos de tu equipo.
               </DialogDescription>
             </DialogHeader>
-          </div>
 
-          <div className="sm:hidden border-b border-border px-4 py-3 flex-shrink-0">
-            <label htmlFor="settings-section" className="sr-only">
-              Sección de configuración
-            </label>
-            <FormSelect
-              id="settings-section"
-              value={activeTab}
-              onChange={(value) => setActiveTab(value as SettingsTabId)}
-              options={settingsTabs.map((tab) => ({ value: tab.id, label: tab.label }))}
-              triggerClassName="font-semibold text-navy"
+            <SettingsMobileNav
+              items={settingsNavItems}
+              activeId={activeTab}
+              onSelect={setActiveTab}
+              className="mt-4"
             />
           </div>
 

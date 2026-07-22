@@ -10,6 +10,11 @@ import FaqEditor from './FaqEditor'
 import MisDatosClient from './MisDatosClient'
 import DatosBancariosClient from './DatosBancariosClient'
 import ContactoClient from './ContactoClient'
+import {
+  SettingsDesktopNav,
+  SettingsMobileNav,
+  type SettingsSectionNavItem,
+} from './settings-section-nav'
 
 interface FaqItem {
   id: string
@@ -28,14 +33,14 @@ interface Props {
   defaultTab?: string
 }
 
-const TABS = [
-  { id: 'sitio',           label: 'Sitio',            icon: Settings   },
-  { id: 'dashboard',      label: 'Dashboard',         icon: Layout     },
-  { id: 'contacto',       label: 'Horarios & Dirección', icon: Phone      },
-  { id: 'nosotros',       label: 'Nosotros',          icon: Globe      },
-  { id: 'faq',            label: 'FAQ',               icon: HelpCircle },
-  { id: 'mis-datos',      label: 'Mis Datos',         icon: UserCircle },
-  { id: 'datos-bancarios',label: 'Datos Bancarios',   icon: Building2  },
+const TABS: SettingsSectionNavItem[] = [
+  { id: 'sitio', label: 'Sitio', icon: Settings, mobileLabel: 'Sitio' },
+  { id: 'dashboard', label: 'Dashboard', icon: Layout, mobileLabel: 'Panel' },
+  { id: 'contacto', label: 'Horarios & Dirección', icon: Phone, mobileLabel: 'Contacto' },
+  { id: 'nosotros', label: 'Nosotros', icon: Globe, mobileLabel: 'Nosotros' },
+  { id: 'faq', label: 'FAQ', icon: HelpCircle, mobileLabel: 'FAQ' },
+  { id: 'mis-datos', label: 'Mis Datos', icon: UserCircle, mobileLabel: 'Datos' },
+  { id: 'datos-bancarios', label: 'Datos Bancarios', icon: Building2, mobileLabel: 'Bancos' },
 ]
 
 export default function ConfiguracionShell({
@@ -51,42 +56,30 @@ export default function ConfiguracionShell({
   const [activeTab, setActiveTab] = useState(defaultTab)
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <p className="text-gold text-xs tracking-[0.3em] uppercase mb-1">Dashboard</p>
-        <h1 className="text-white text-2xl font-serif">Configuración</h1>
-        <p className="text-[#555555] text-sm mt-1">
-          Gestioná todas las opciones del sitio y del panel desde un solo lugar.
-        </p>
-      </div>
+    <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+      <SettingsDesktopNav
+        items={TABS}
+        activeId={activeTab}
+        onSelect={setActiveTab}
+      />
 
-      {/* Tab nav */}
-      <div className="border-b border-luxury-gray overflow-x-auto">
-        <nav className="flex gap-0 min-w-max">
-          {TABS.map(({ id, label, icon: Icon }) => {
-            const active = activeTab === id
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setActiveTab(id)}
-                className={`flex items-center gap-2 px-4 py-3 text-xs tracking-wider uppercase border-b-2 transition-all whitespace-nowrap ${
-                  active
-                    ? 'border-gold text-gold'
-                    : 'border-transparent text-[#555555] hover:text-luxury-gray-light hover:border-luxury-gray-mid'
-                }`}
-              >
-                <Icon size={13} />
-                {label}
-              </button>
-            )
-          })}
-        </nav>
-      </div>
+      <div className="min-w-0 flex-1 space-y-6">
+        <div>
+          <p className="text-gold text-xs tracking-[0.3em] uppercase mb-1">Dashboard</p>
+          <h1 className="text-white text-2xl font-serif">Configuración</h1>
+          <p className="text-[#555555] text-sm mt-1">
+            Gestioná todas las opciones del sitio y del panel desde un solo lugar.
+          </p>
+          <SettingsMobileNav
+            items={TABS}
+            activeId={activeTab}
+            onSelect={setActiveTab}
+            className="mt-4"
+            columns={4}
+          />
+        </div>
 
-      {/* Tab content */}
-      <div>
+        <div>
         {activeTab === 'sitio' && (
           <ConfiguracionSitioClient initialConfig={siteConfig} />
         )}
@@ -112,6 +105,7 @@ export default function ConfiguracionShell({
         {activeTab === 'datos-bancarios' && (
           <DatosBancariosClient config={datosBancariosConfig} />
         )}
+        </div>
       </div>
     </div>
   )

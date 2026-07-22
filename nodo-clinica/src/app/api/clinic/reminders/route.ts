@@ -5,7 +5,11 @@ import {
   sendAppointmentReminderEmail,
 } from "@/lib/email/resend";
 import { formatReminderLabel } from "@/lib/email/reminder-label";
-import { appBaseUrl as baseUrl } from "@/lib/clinic/appointment-payment";
+import {
+  getReminderTestEmail,
+  REMINDER_TEST_PATIENT_NAME,
+} from "@/lib/email/reminder-test-email";
+import { appBaseUrl as baseUrl, patientLoginUrl } from "@/lib/clinic/appointment-payment";
 import { isLocalMode } from "@/lib/clinic/config";
 import { readDb } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
@@ -20,12 +24,7 @@ const DOCTOR_ROLES = new Set([
   "agent",
 ]);
 
-function testReminderOverrideEmail(): string | undefined {
-  const raw = process.env.REMINDER_TEST_EMAIL?.trim();
-  return raw && raw.includes("@") ? raw : undefined;
-}
-
-/** Sends a test email to the doctor or resends a confirmation to a patient. */
+/** Sends a test reminder to REMINDER_TEST_EMAIL or resends a confirmation to a patient. */
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const { action, appointmentId, accessToken } = body as {
@@ -71,25 +70,34 @@ export async function POST(request: NextRequest) {
     const officeSettings = (professional as any).office_settings;
     const settings = officeSettings?.reminder_settings;
     const label = formatReminderLabel(settings?.minutesBefore ?? 1440);
-    const toEmail = testReminderOverrideEmail() || professional.email;
+    const toEmail = getReminderTestEmail();
+    if (!toEmail) {
+      return NextResponse.json(
+        {
+          error:
+            "Configurá REMINDER_TEST_EMAIL en nodo-clinica/.env.local para enviar la prueba.",
+        },
+        { status: 400 },
+      );
+    }
 
     const sendResult = await sendAppointmentReminderEmail({
       patientEmail: toEmail,
-      patientName: professional.full_name,
+      patientName: REMINDER_TEST_PATIENT_NAME,
       doctorName: professional.full_name,
       scheduledAt: format(
         new Date(Date.now() + (settings?.minutesBefore ?? 1440) * 60 * 1000),
         "EEEE d 'de' MMMM 'a las' HH:mm 'hs'",
         { locale: es },
       ),
-      waitingRoomUrl: `${baseUrl()}/medico/dashboard`,
+      waitingRoomUrl: patientLoginUrl(baseUrl()),
     });
 
     if (sendResult.mock) {
       return NextResponse.json({
         ok: true,
         mock: true,
-        message: `Modo demo: no hay RESEND_API_KEY. Configurá RESEND_API_KEY y RESEND_FROM_EMAIL para enviar a ${toEmail}.`,
+        message: `Modo demo: configurá ZOHO_SMTP_USER y ZOHO_SMTP_PASSWORD para enviar a ${toEmail}.`,
       });
     }
 
@@ -209,25 +217,34 @@ async function handleLocalReminders(
 
     const settings = doctor.reminderSettings;
     const label = formatReminderLabel(settings?.minutesBefore ?? 1440);
-    const toEmail = testReminderOverrideEmail() || doctor.email;
+    const toEmail = getReminderTestEmail();
+    if (!toEmail) {
+      return NextResponse.json(
+        {
+          error:
+            "Configurá REMINDER_TEST_EMAIL en nodo-clinica/.env.local para enviar la prueba.",
+        },
+        { status: 400 },
+      );
+    }
 
     const sendResult = await sendAppointmentReminderEmail({
       patientEmail: toEmail,
-      patientName: doctor.fullName,
+      patientName: REMINDER_TEST_PATIENT_NAME,
       doctorName: doctor.fullName,
       scheduledAt: format(
         new Date(Date.now() + (settings?.minutesBefore ?? 1440) * 60 * 1000),
         "EEEE d 'de' MMMM 'a las' HH:mm 'hs'",
         { locale: es },
       ),
-      waitingRoomUrl: `${baseUrl()}/medico/dashboard`,
+      waitingRoomUrl: patientLoginUrl(baseUrl()),
     });
 
     if (sendResult.mock) {
       return NextResponse.json({
         ok: true,
         mock: true,
-        message: `Modo demo: falta RESEND_API_KEY en .env.local. Sin eso no se envía a ${toEmail}.`,
+        message: `Modo demo: falta ZOHO_SMTP_USER / ZOHO_SMTP_PASSWORD en .env.local. Sin eso no se envía a ${toEmail}.`,
       });
     }
 
@@ -276,7 +293,7 @@ async function handleLocalReminders(
       )} del turno a ${patient.email}.`;
     }
 
-    const toEmail = testReminderOverrideEmail() || patient.email;
+    const toEmail = patient.email;
     const sendResult = await sendAppointmentConfirmationEmail({
       patientEmail: toEmail,
       patientName: patient.fullName,
@@ -290,7 +307,7 @@ async function handleLocalReminders(
       return NextResponse.json({
         ok: true,
         mock: true,
-        message: `Modo demo: falta RESEND_API_KEY. No se envió a ${toEmail}.`,
+        message: `Modo demo: falta ZOHO_SMTP_USER / ZOHO_SMTP_PASSWORD. No se envió a ${toEmail}.`,
       });
     }
 

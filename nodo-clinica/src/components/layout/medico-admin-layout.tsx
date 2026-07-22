@@ -19,6 +19,7 @@ import { BrandMark } from "@/components/nodo/brand-mark";
 import { NodoChatBell } from "@/components/nodo-chat/nodo-chat-bell";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { isProPlan } from "@/lib/nodo-chat/is-pro-plan";
+import { isBrowserSupabaseEnabled } from "@/lib/clinic/config";
 import { isPlatformMode } from "@/lib/clinic/platform-config";
 import { isProOnlyMedicoRoute } from "@/lib/clinic/pro-features";
 import { useConsultorioStore, useConsultorioTheme } from "@/hooks/use-consultorio-theme";
@@ -410,7 +411,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <header className="flex min-h-16 flex-shrink-0 items-center justify-between gap-4 border-b border-border bg-[#EEF3F8] px-4 py-3 shadow-sm sm:px-6">
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               <button
                 type="button"
                 className="block md:hidden text-[var(--color-navy)] hover:text-[var(--color-primary)]"
@@ -418,6 +419,14 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                 aria-label="Abrir menú"
               >
                 <Menu className="h-6 w-6" />
+              </button>
+              <button
+                type="button"
+                className="block md:hidden rounded-md p-1 text-[var(--color-navy)] hover:text-[var(--color-primary)]"
+                onClick={() => setSettingsOpen(true)}
+                aria-label="Configuración"
+              >
+                <Settings className="h-6 w-6" />
               </button>
               <div className="min-w-0">
                 <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate2">
@@ -443,7 +452,11 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                   </div>
                 }
                 metrics={<PlanBadge fallbackPlan={doctor.subscriptionPlan} />}
-                trailing={isPlatformMode() ? <NodoSwitcher product="clinica" /> : null}
+                trailing={
+                  isPlatformMode() && isBrowserSupabaseEnabled() ? (
+                    <NodoSwitcher product="clinica" />
+                  ) : null
+                }
               />
             )}
           </header>

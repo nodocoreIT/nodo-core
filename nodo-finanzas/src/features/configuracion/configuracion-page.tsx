@@ -25,6 +25,7 @@ import { RubroGestion } from '@/components/rubros/rubro-gestion';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { getFechaHoy } from '@/utils/formatters';
 import toast from 'react-hot-toast';
+import { SettingsMobileNav, type SettingsSectionNavItem } from '@nodocore/shared-components';
 import type {
   CuentaBancaria,
   Tarjeta,
@@ -79,6 +80,15 @@ type FormSueldo = z.infer<typeof schemaSueldo>;
 type FormMedio = z.infer<typeof schemaMedio>;
 
 type Seccion = 'rubros' | 'categorias' | 'cuentas' | 'tarjetas' | 'sueldos' | 'medios';
+
+const CONFIG_TABS: SettingsSectionNavItem<Seccion>[] = [
+  { id: 'rubros', label: 'Rubros', icon: Tag },
+  { id: 'categorias', label: 'Categorías', icon: Tag, mobileLabel: 'Cat.' },
+  { id: 'cuentas', label: 'Cuentas', icon: Building2 },
+  { id: 'tarjetas', label: 'Tarjetas', icon: CreditCard },
+  { id: 'sueldos', label: 'Sueldos', icon: Banknote },
+  { id: 'medios', label: 'Medios', icon: CreditCard },
+];
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
@@ -385,7 +395,14 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
       )}
 
       {/* Tabs */}
-      <div className="flex overflow-x-auto gap-1 bg-mist p-1 rounded-lg">
+      <SettingsMobileNav
+        items={CONFIG_TABS}
+        activeId={seccion}
+        onSelect={setSeccion}
+        columns={3}
+        hideFromClassName="md:hidden"
+      />
+      <div className="hidden md:flex overflow-x-auto gap-1 bg-mist p-1 rounded-lg">
         <TabBtn id="rubros" label="Rubros" icon={Tag} />
         <TabBtn id="categorias" label="Categorías" icon={Tag} />
         <TabBtn id="cuentas" label="Cuentas" icon={Building2} />

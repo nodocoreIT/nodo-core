@@ -10,6 +10,52 @@ export function isMailConfigured(): boolean {
   return Boolean(USER && PASS);
 }
 
+function createMailTransporter() {
+  return nodemailer.createTransport({
+    host: HOST,
+    port: PORT,
+    secure: PORT === 465,
+    auth: { user: USER!, pass: PASS! },
+  });
+}
+
+function clinicFromAddress() {
+  return `"Nodo Clínica" <${USER}>`;
+}
+
+export type EmailSendResult = {
+  id: string;
+  mock?: boolean;
+};
+
+export async function sendClinicEmail(params: {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+  attachments?: nodemailer.SendMailOptions["attachments"];
+}): Promise<EmailSendResult> {
+  if (!isMailConfigured()) {
+    console.log("[Email Mock]", {
+      to: params.to,
+      subject: params.subject,
+    });
+    return { id: "mock-email-id", mock: true };
+  }
+
+  const transporter = createMailTransporter();
+  const info = await transporter.sendMail({
+    from: clinicFromAddress(),
+    to: params.to,
+    subject: params.subject,
+    html: params.html,
+    text: params.text,
+    attachments: params.attachments,
+  });
+
+  return { id: info.messageId ?? "sent" };
+}
+
 /**
  * Resolve the public-facing origin for email links.
  * If the request origin looks like localhost/0.0.0.0, fall back to
@@ -44,15 +90,10 @@ export async function sendPasswordResetEmail(params: {
   const origin = resolveOrigin(params.origin);
   const logoUrl = `${origin}/logos/logo%20compuesto%20estrella%20az%20letra%20blancazzz.png`;
 
-  const transporter = nodemailer.createTransport({
-    host: HOST,
-    port: PORT,
-    secure: PORT === 465,
-    auth: { user: USER, pass: PASS },
-  });
+  const transporter = createMailTransporter();
 
   await transporter.sendMail({
-    from: `"Nodo Clínica" <${USER}>`,
+    from: clinicFromAddress(),
     to: email,
     subject: "Restablecé tu contraseña en NODO | Clínica Virtual",
     text: [
@@ -132,15 +173,10 @@ export async function sendClinicVerificationEmail(params: {
   const roleLabel = role === "medico" ? "médico" : "paciente";
   const logoUrl = `${origin}/logos/logo%20compuesto%20estrella%20az%20letra%20blancazzz.png`;
 
-  const transporter = nodemailer.createTransport({
-    host: HOST,
-    port: PORT,
-    secure: PORT === 465,
-    auth: { user: USER, pass: PASS },
-  });
+  const transporter = createMailTransporter();
 
   await transporter.sendMail({
-    from: `"Nodo Clínica" <${USER}>`,
+    from: clinicFromAddress(),
     to: email,
     subject: "Verificá tu cuenta en NODO | Clínica Virtual",
     text: [

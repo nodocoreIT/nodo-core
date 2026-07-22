@@ -4,7 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { SupabaseProvider, AuthProvider } from "@nodocore/shared-components";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-import { CLINICA_AUTH_CONFIG, isPlatformMode } from "@/lib/clinic/platform-config";
+import { isBrowserSupabaseEnabled } from "@/lib/clinic/config";
+import { CLINICA_AUTH_CONFIG } from "@/lib/clinic/platform-config";
 
 function PlatformAuthProvider({ children }: { children: ReactNode }) {
   const supabase = getSupabaseBrowserClient();
@@ -25,10 +26,12 @@ export function AppProviders({ children }: { children: ReactNode }) {
       }),
   );
 
-  if (!isPlatformMode()) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+  const shell = (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+
+  if (!isBrowserSupabaseEnabled()) {
+    return shell;
   }
 
   return (

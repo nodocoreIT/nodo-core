@@ -37,6 +37,7 @@ import {
 } from "@/lib/clinic/schedule";
 import type { DoctorPaymentSettings, DoctorReminderSettings } from "@/lib/clinic/types";
 import { parseGoogleCalendarSrc } from "@/lib/google-calendar";
+import { REMINDER_ANTICIPATION_OPTIONS } from "@/lib/email/reminder-label";
 import { format, addDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { ThemeSettingsPanel } from "@/components/settings/theme-settings-panel";
@@ -321,14 +322,9 @@ export function DoctorOfficePanel({
   const handleTestReminder = async () => {
     setTestingReminder(true);
     try {
-      const result = await clinicApi.sendTestReminderEmail();
-      if (result.mock) {
-        toast.warning(result.message, { duration: 10_000 });
-      } else {
-        toast.success(result.message);
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo enviar el email");
+      await clinicApi.sendTestReminderEmail();
+    } catch {
+      // Sin snackbar por ahora
     } finally {
       setTestingReminder(false);
     }
@@ -881,19 +877,25 @@ export function DoctorOfficePanel({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="60">1 hora antes</SelectItem>
-                  <SelectItem value="120">2 horas antes</SelectItem>
-                  <SelectItem value="720">12 horas antes</SelectItem>
-                  <SelectItem value="1440">1 día antes</SelectItem>
-                  <SelectItem value="2880">2 días antes</SelectItem>
+                  {REMINDER_ANTICIPATION_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-slate-500 mt-2">
                 Al reservar un turno, el paciente recibe un email de confirmación
                 con fecha, hora y enlace a la sala. Si activás el recordatorio,
                 también se avisa antes del turno. Requiere{" "}
-                <code className="text-[10px] bg-slate-100 px-1 rounded">RESEND_API_KEY</code>{" "}
-                en Vercel.
+                <code className="text-[10px] bg-slate-100 px-1 rounded">
+                  ZOHO_SMTP_USER
+                </code>{" "}
+                y{" "}
+                <code className="text-[10px] bg-slate-100 px-1 rounded">
+                  ZOHO_SMTP_PASSWORD
+                </code>{" "}
+                en el entorno.
               </p>
               <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-md p-2 mt-2">
                 En plan Vercel Hobby el aviso automático se revisa 1 vez al día
@@ -915,7 +917,7 @@ export function DoctorOfficePanel({
               ) : (
                 <Bell className="h-3.5 w-3.5 mr-1" />
               )}
-              Enviar email de prueba a mi correo
+              Enviar email de prueba del recordatorio
             </Button>
           </TabsContent>
 

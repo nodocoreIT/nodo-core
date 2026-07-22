@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isPaymentConfirmed } from "@/lib/clinic/payment";
 import { sendAppointmentReminderEmail } from "@/lib/email/resend";
-import { appBaseUrl } from "@/lib/clinic/appointment-payment";
+import { getReminderTestEmail } from "@/lib/email/reminder-test-email";
+import { appBaseUrl, patientLoginUrl } from "@/lib/clinic/appointment-payment";
 import { isLocalMode } from "@/lib/clinic/config";
 import { readDb, writeDb } from "@/lib/clinic/local-db";
 import { format } from "date-fns";
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
         patientName: patient.full_name,
         doctorName: professional.full_name,
         scheduledAt: scheduledLabel,
-        waitingRoomUrl: `${baseUrl}/paciente/sala/${apt.access_token}`,
+        waitingRoomUrl: patientLoginUrl(baseUrl),
       });
 
       await supabase
@@ -93,7 +94,7 @@ async function runLocalReminders() {
   const now = Date.now();
   const maxLatenessMs = 36 * 60 * 60 * 1000;
   const baseUrl = appBaseUrl();
-  const override = process.env.REMINDER_TEST_EMAIL?.trim();
+  const override = getReminderTestEmail();
   let sent = 0;
   const idsToMark: string[] = [];
 
@@ -127,7 +128,7 @@ async function runLocalReminders() {
         patientName: patient.fullName,
         doctorName: doctor.fullName,
         scheduledAt: scheduledLabel,
-        waitingRoomUrl: `${baseUrl}/paciente/sala/${apt.accessToken}`,
+        waitingRoomUrl: patientLoginUrl(baseUrl),
       });
       if (!result.mock) {
         idsToMark.push(apt.id);

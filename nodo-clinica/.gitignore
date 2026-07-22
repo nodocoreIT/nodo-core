@@ -37,3 +37,5 @@ next-env.d.ts
 
 # tesseract.js OCR language data cache (downloaded at runtime, not source)
 *.traineddata
+
+testsprite_tests/tmp/config.json
