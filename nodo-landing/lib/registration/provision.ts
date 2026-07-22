@@ -7,6 +7,10 @@ import {
   finanzasThemeAppMetadata,
   seedInmoOrgProfileTheme,
 } from "@/lib/registration/seed-node-theme";
+import {
+  clinicaPortalRoleFromPlan,
+  ensureClinicaPortalProfile,
+} from "@/lib/registration/clinica-provision";
 
 function planToTier(plan: string): "starter" | "pro" {
   return plan.toLowerCase().includes("pro") ? "pro" : "starter";
@@ -147,6 +151,10 @@ async function ensureInmoAccess(
     .maybeSingle();
   const orgRole = (memberRow?.role as string | undefined) ?? "super_admin";
 
+  const portalRole =
+    product === "clinica" ? clinicaPortalRoleFromPlan(plan) : null;
+  const jwtRole = portalRole ?? orgRole;
+
   const updatePayload: {
     password?: string;
     app_metadata: Record<string, unknown>;
@@ -154,8 +162,9 @@ async function ensureInmoAccess(
     app_metadata: {
       ...currentAppMetadata,
       org_id: membership.orgId,
-      role: orgRole,
+      role: jwtRole,
       plan: tier,
+      subscription_plan: plan,
       must_set_password: false,
     },
   };
@@ -168,6 +177,20 @@ async function ensureInmoAccess(
 
   if (authErr) {
     return { error: "Error al actualizar credenciales: " + authErr.message };
+  }
+
+  if (product === "clinica" && portalRole) {
+    const profileResult = await ensureClinicaPortalProfile({
+      userId,
+      email: params.email,
+      clientName: params.clientName,
+      orgId: membership.orgId,
+      plan,
+      portalRole,
+    });
+    if (!profileResult.ok) {
+      return { error: profileResult.error };
+    }
   }
 
   await seedInmoOrgProfileTheme(admin, membership.orgId, params.clientName, product);

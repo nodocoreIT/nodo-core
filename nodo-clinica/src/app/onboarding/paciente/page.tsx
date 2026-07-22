@@ -8,6 +8,7 @@ import { User, Loader2, CheckCircle, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { NeuralNodesBackground } from "@/components/ui/neural-nodes-background";
+import { PhoneVerificationField } from "@/components/onboarding/phone-verification-field";
 
 const PLANS = [
   {
@@ -89,6 +90,7 @@ function OnboardingPacienteContent() {
   });
   const [dniFront, setDniFront] = useState<File | null>(null);
   const [dniBack, setDniBack] = useState<File | null>(null);
+  const [phoneVerified, setPhoneVerified] = useState(false);
 
   if (!token) {
     return (
@@ -110,6 +112,7 @@ function OnboardingPacienteContent() {
     e.preventDefault();
     if (!form.fullName) { toast.error("El nombre completo es requerido."); return; }
     if (!form.dni.trim()) { toast.error("El número de DNI es requerido."); return; }
+    if (!phoneVerified) { toast.error("Verificá tu número de celular antes de continuar."); return; }
     setLoading(true);
     try {
       const formData = new FormData();
@@ -207,6 +210,12 @@ function OnboardingPacienteContent() {
               </div>
             </div>
 
+            <PhoneVerificationField
+              onboardingToken={token}
+              labelClass={labelClass}
+              onVerifiedChange={setPhoneVerified}
+            />
+
             {/* Row 3: DNI upload + Plan side by side */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* DNI upload */}
@@ -256,7 +265,7 @@ function OnboardingPacienteContent() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !phoneVerified}
               className="w-full rounded-lg py-3.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar y solicitar habilitación"}

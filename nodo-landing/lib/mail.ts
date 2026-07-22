@@ -95,8 +95,8 @@ export async function sendRegistrationVerificationEmail({
   await transporter.sendMail({
     from: `"NODO Core · Registro" <${USER}>`,
     to: email,
-    subject: `Verificá tu registro en NODO | Clínica Virtual`,
-    text: `Hola ${nombre},\n\nGracias por registrarte en NODO | Clínica Virtual (${plan.toUpperCase()}). Para completar tu registro, por favor verifica tu cuenta haciendo clic en el siguiente enlace:\n\n${verificationUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO Core`,
+    subject: `Verificá tu registro en NODO | Clínica`,
+    text: `Hola ${nombre},\n\nGracias por registrarte en NODO | Clínica (${plan.toUpperCase()}). Para completar tu registro, por favor verifica tu cuenta haciendo clic en el siguiente enlace:\n\n${verificationUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO Core`,
     attachments: registrationLogoAttachments(),
     html: `
       <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;background-color:#F5F8FC;">
@@ -106,7 +106,7 @@ export async function sendRegistrationVerificationEmail({
         <h2 style="color:#1B2A41;margin-top:0;font-size:20px;text-align:center;">Verificá tu registro</h2>
         <p style="color:#647890;font-size:15px;line-height:1.5;">
           Hola <strong>${nombre}</strong>,<br/><br/>
-          Completá tu solicitud de registro para el plan <strong>${plan.toUpperCase()}</strong> de <strong>NODO | Clínica Virtual</strong> haciendo clic en el botón de abajo:
+          Completá tu solicitud de registro para el plan <strong>${plan.toUpperCase()}</strong> de <strong>NODO | Clínica</strong> haciendo clic en el botón de abajo:
         </p>
         <div style="margin:24px 0;text-align:center;">
           <a href="${verificationUrl}" style="background-color:#DA5A0E;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;font-size:15px;">
@@ -209,8 +209,8 @@ export async function sendPatientVerificationEmail({
   await transporter.sendMail({
     from: `"NODO Clínica Virtual" <${USER}>`,
     to: email,
-    subject: `Activá tu cuenta en NODO | Clínica Virtual`,
-    text: `Hola ${nombre},\n\nGracias por registrarte como paciente en NODO | Clínica Virtual. Para activar tu cuenta y acceder a las videoconsultas y turnos, hacé clic en el siguiente enlace:\n\n${verificationUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO Clínica Virtual`,
+    subject: `Activá tu cuenta en NODO | Clínica`,
+    text: `Hola ${nombre},\n\nGracias por registrarte como paciente en NODO | Clínica. Para activar tu cuenta y acceder a las videoconsultas y turnos, hacé clic en el siguiente enlace:\n\n${verificationUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO Clínica Virtual`,
     attachments: [
       {
         filename: "logo_compuesto.png",
@@ -226,7 +226,7 @@ export async function sendPatientVerificationEmail({
         <h2 style="color:#DA5A0E;margin-top:0;font-size:20px;text-align:center;">Activá tu cuenta</h2>
         <p style="color:#647890;font-size:15px;line-height:1.5;">
           Hola <strong>${nombre}</strong>,<br/><br/>
-          Activá tu cuenta de paciente de <strong>NODO | Clínica Virtual</strong> haciendo clic en el botón de abajo:
+          Activá tu cuenta de paciente de <strong>NODO | Clínica</strong> haciendo clic en el botón de abajo:
         </p>
         <div style="margin:24px 0;text-align:center;">
           <a href="${verificationUrl}" style="background-color:#DA5A0E;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;font-size:15px;">

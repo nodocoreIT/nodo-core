@@ -527,8 +527,23 @@ export default function ClientesPage() {
   async function performDelete() {
     if (!confirmDelete) return;
     const ids = confirmDelete.ids;
-    const supabase = createClient();
-    await supabase.from("clients").delete().in("id", ids);
+    setSaving(true);
+    setError("");
+
+    const res = await fetch("/api/admin/delete-clients", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setSaving(false);
+
+    if (!res.ok || !json.ok) {
+      setError(json.error ?? "No se pudo eliminar el cliente.");
+      setConfirmDelete(null);
+      return;
+    }
+
     const idSet = new Set(ids);
     setClients((prev) => prev.filter((c) => !idSet.has(c.id)));
     setSelected((prev) => {
@@ -537,6 +552,7 @@ export default function ClientesPage() {
       return next;
     });
     setConfirmDelete(null);
+    loadAll();
   }
 
   function toggleSelect(id: string) {

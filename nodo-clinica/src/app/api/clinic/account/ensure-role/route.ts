@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
   canAccessAsRole,
-  lookupClinicMembershipByAuthUserId,
-  lookupClinicMembershipByEmail,
+  lookupClinicMembership,
   parseClinicDbRole,
   resolveRoleForContext,
   type ClinicDbRole,
@@ -22,10 +21,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     typeof body.userId === "string" && body.userId.trim()
       ? body.userId.trim()
       : null;
-  const intendedRole =
+  let intendedRole =
     parseClinicDbRole(body.intendedRole) ??
     parseClinicDbRole(body.role) ??
-    "paciente";
+    null;
 
   if (!email && !userIdFromBody) {
     return NextResponse.json(
@@ -33,23 +32,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 400 },
     );
   }
-
-  const service = await createServiceClient();
-
-  const membership = email
-    ? await lookupClinicMembershipByEmail(service, email)
-    : await lookupClinicMembershipByAuthUserId(service, userIdFromBody!, email);
-
-  if (!canAccessAsRole(membership, intendedRole)) {
-    const msg =
-      intendedRole === "medico"
-        ? "Esta cuenta no está registrada como profesional."
-        : "Esta cuenta no está registrada como paciente.";
-    return NextResponse.json({ error: msg }, { status: 403 });
-  }
-
-  const resolved = resolveRoleForContext(membership, intendedRole);
-  const role: ClinicDbRole = resolved.role;
 
   const { createClient: createSupabaseClient } = await import("@supabase/supabase-js");
   const adminClient = createSupabaseClient(
@@ -76,6 +58,52 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
+  const { data: existingAuthUser } = await adminClient.auth.admin.getUserById(authUserId);
+  const currentAppMetadata = existingAuthUser?.user?.app_metadata ?? {};
+
+  if (!intendedRole) {
+    intendedRole =
+      parseClinicDbRole(currentAppMetadata.role as string | undefined) ??
+      "paciente";
+  }
+
+  const service = await createServiceClient();
+
+  const membership = await lookupClinicMembership(service, {
+    email: email || null,
+    authUserId,
+  });
+
+  let effectiveRole = intendedRole;
+
+  if (!canAccessAsRole(membership, effectiveRole)) {
+    const metaRole = parseClinicDbRole(currentAppMetadata.role as string | undefined);
+    if (metaRole && canAccessAsRole(membership, metaRole)) {
+      effectiveRole = metaRole;
+    } else if (membership.professionalId && !membership.patientId) {
+      effectiveRole = "medico";
+    } else if (membership.patientId && !membership.professionalId) {
+      effectiveRole = "paciente";
+    } else if (!membership.professionalId && !membership.patientId) {
+      return NextResponse.json(
+        {
+          error:
+            "Tu perfil aún no está creado. Completá el onboarding desde el link de verificación de email antes de configurar la contraseña.",
+        },
+        { status: 403 },
+      );
+    } else {
+      const msg =
+        effectiveRole === "medico"
+          ? "Esta cuenta no está registrada como profesional."
+          : "Esta cuenta no está registrada como paciente.";
+      return NextResponse.json({ error: msg }, { status: 403 });
+    }
+  }
+
+  const resolved = resolveRoleForContext(membership, effectiveRole);
+  const role: ClinicDbRole = resolved.role;
+
   if (resolved.patientId && !resolved.patientProfileId) {
     await service
       .from("patients")
@@ -93,9 +121,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       .eq("id", resolved.professionalId)
       .is("user_id", null);
   }
-
-  const { data: existingAuthUser } = await adminClient.auth.admin.getUserById(authUserId);
-  const currentAppMetadata = existingAuthUser?.user?.app_metadata ?? {};
 
   const { error: updateError } = await adminClient.auth.admin.updateUserById(
     authUserId,

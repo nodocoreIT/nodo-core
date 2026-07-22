@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient, createSharedServiceClient } from "@/lib/supabase/server";
+import { assertOnboardingPhoneVerified } from "@/lib/clinic/phone-verification";
 
 const CLINIC_ORG_ID =
   process.env.CLINIC_ORG_ID ?? "843524dc-0c3b-4340-bc8e-e3ae5aa00fd2";
@@ -47,6 +48,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    let verifiedPhone: string;
+    try {
+      verifiedPhone = await assertOnboardingPhoneVerified(token);
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Celular no verificado." },
+        { status: 400 },
+      );
+    }
+
     const email = pending.email as string;
 
     // Find auth user by email (admin-only, one-time onboarding operation)
@@ -61,8 +72,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const authUser = listData.users.find((u: any) => u.email === email);
+    const authUser = listData.users.find(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (u: any) => String(u.email ?? "").toLowerCase() === email.toLowerCase(),
+    );
     if (!authUser) {
       return NextResponse.json(
         { error: "Usuario no encontrado. Reintentá el registro." },
@@ -101,6 +114,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         last_name: lastName,
         full_name: fullName,
         email: email.toLowerCase().trim(),
+        phone: verifiedPhone,
+        phone_verified_at: new Date().toISOString(),
         specialty,
         license_number: licenseNumber ?? null,
         subscription_status: "trial",

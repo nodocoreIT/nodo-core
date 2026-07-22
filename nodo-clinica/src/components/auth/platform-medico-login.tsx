@@ -76,6 +76,21 @@ export function PlatformMedicoLoginFields({
         return;
       }
 
+      const verifyRes = await fetch("/api/clinic/account/verify-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ role: "medico" }),
+      });
+      if (!verifyRes.ok) {
+        await supabase.auth.signOut({ scope: "local" });
+        const verifyData = await verifyRes.json().catch(() => ({}));
+        setGeneralError(
+          verifyData.error ?? "Esta cuenta no tiene acceso al portal médico.",
+        );
+        return;
+      }
+
       if (await fetchMustSetPassword(supabase)) {
         setNeedsNewPassword(true);
         return;

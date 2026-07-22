@@ -351,7 +351,7 @@ const NODE_MAIL_LABEL_BY_CODE: Record<string, string> = {
   Inmo: "NODO | Inmo",
   Finanzas: "NODO | Finanzas",
   Salud: "NODO | Salud",
-  Clínica: "NODO | Clínica Virtual",
+  Clínica: "NODO | Clínica",
 };
 
 export function getNodeMailLabelByCode(unitCode: string): string {
@@ -364,7 +364,7 @@ export function getNodeMailLabelByCode(unitCode: string): string {
 export function getNodeMailLabel(nodeSlug: string): string {
   const raw = nodeSlug.trim().toLowerCase();
   if (raw === "clinica-virtual" || raw === "nodo-clinica" || raw === "clinica") {
-    return "NODO | Clínica Virtual";
+    return "NODO | Clínica";
   }
   const slug = normalizeNodeSlug(nodeSlug);
   const node = getNodeBySlug(slug);

@@ -91,7 +91,7 @@ export async function sendClinicVerificationEmail(params: {
 
 - The verification URL must be: `${origin}/api/clinic/account/verify?token=${token}&role=${role}`
 - HTML template uses teal branding: CTA button color `#0D9488` (Tailwind `teal-600`)
-- Subject: `"Verificá tu cuenta en NODO | Clínica Virtual"`
+- Subject: `"Verificá tu cuenta en NODO | Clínica"`
 - No logo attachment needed (nodo-clinica has no `/public/logos/` directory unless confirmed)
 - If `!isMailConfigured()`, throw with message: `"SMTP not configured: set ZOHO_SMTP_USER and ZOHO_SMTP_PASSWORD"`
 - The function must be callable from server-only route handlers (the `"server-only"` import enforces this)

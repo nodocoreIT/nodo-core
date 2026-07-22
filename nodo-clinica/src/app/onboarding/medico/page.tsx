@@ -9,6 +9,7 @@ import { clinicApi } from "@/lib/clinic/client-api";
 import { SpecialtyCombobox } from "@/components/ui/specialty-combobox";
 import { NeuralNodesBackground } from "@/components/ui/neural-nodes-background";
 import { ONBOARDING_PLANS, formatPlanPrice } from "@/lib/clinic/subscription-plans";
+import { PhoneVerificationField } from "@/components/onboarding/phone-verification-field";
 
 const inputClass =
   "mt-1 w-full rounded-lg px-3 py-2.5 text-sm bg-white border border-slate-200 text-navy placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/25 focus:border-teal-500 transition-shadow";
@@ -26,6 +27,7 @@ function OnboardingMedicoContent() {
     specialty: "Medicina General",
     licenseNumber: "",
   });
+  const [phoneVerified, setPhoneVerified] = useState(false);
 
   if (!token) {
     return (
@@ -47,6 +49,10 @@ function OnboardingMedicoContent() {
     e.preventDefault();
     if (!form.fullName || !form.specialty) {
       toast.error("El nombre completo y la especialidad son requeridos.");
+      return;
+    }
+    if (!phoneVerified) {
+      toast.error("Verificá tu número de celular antes de continuar.");
       return;
     }
     setLoading(true);
@@ -129,6 +135,12 @@ function OnboardingMedicoContent() {
               </div>
             </div>
 
+            <PhoneVerificationField
+              onboardingToken={token}
+              labelClass={labelClass}
+              onVerifiedChange={setPhoneVerified}
+            />
+
             {/* Planes */}
             <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Plan de suscripción</p>
@@ -163,7 +175,7 @@ function OnboardingMedicoContent() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !phoneVerified}
               className="w-full rounded-lg py-3.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar y solicitar habilitación"}

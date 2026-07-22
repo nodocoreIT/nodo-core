@@ -50,6 +50,10 @@ export default function ActualizarContrasenaPage() {
         if (refreshed.session) {
           setUserEmail(refreshed.session.user?.email ?? null);
           setAuthUserId(refreshed.session.user?.id ?? null);
+          const metaRole = parseClinicDbRole(
+            refreshed.session.user?.app_metadata?.role as string | undefined,
+          );
+          if (metaRole && !roleFromUrl) setIntendedRole(metaRole);
           setSessionReady(true);
           return;
         }
@@ -67,8 +71,12 @@ export default function ActualizarContrasenaPage() {
           if (!error && data.session) {
             setUserEmail(data.session.user?.email ?? null);
             setAuthUserId(data.session.user?.id ?? null);
+            const metaRole = parseClinicDbRole(
+              data.session.user?.app_metadata?.role as string | undefined,
+            );
+            if (metaRole && !roleFromUrl) setIntendedRole(metaRole);
             setSessionReady(true);
-            const roleParam = roleFromUrl ?? "paciente";
+            const roleParam = roleFromUrl ?? metaRole ?? "paciente";
             window.history.replaceState(
               {},
               "",
@@ -104,7 +112,11 @@ export default function ActualizarContrasenaPage() {
     try {
       const supabase = createClient();
       const { error: updateError } = await supabase.auth.updateUser({ password });
-      if (updateError) throw updateError;
+      const passwordAlreadySet =
+        updateError?.message ===
+          "New password should be different from the old password." ||
+        (updateError as { code?: string } | null)?.code === "same_password";
+      if (updateError && !passwordAlreadySet) throw updateError;
 
       let redirectPath = intendedRole === "medico" ? "/medico/dashboard" : "/paciente";
       let loginRole: "doctor" | "patient" =
@@ -129,6 +141,9 @@ export default function ActualizarContrasenaPage() {
         if (roleData.role === "medico") {
           redirectPath = "/medico/dashboard";
           loginRole = "doctor";
+        } else {
+          redirectPath = "/paciente";
+          loginRole = "patient";
         }
       }
 

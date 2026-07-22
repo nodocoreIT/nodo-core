@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePanelTeamMember } from "@/lib/panel/panel-api-auth";
+import { revokeClientUnitAccess } from "@/lib/registration/revoke-client-access";
 
 type UnitPayload = {
   unit_code: string;
@@ -37,6 +38,33 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient();
+
+  const { data: existingUnits, error: fetchErr } = await admin
+    .from("client_units")
+    .select("id, unit_code, provision_user_id, access_user")
+    .eq("client_id", clientId);
+
+  if (fetchErr) {
+    return NextResponse.json({ error: fetchErr.message }, { status: 400 });
+  }
+
+  for (const prev of existingUnits ?? []) {
+    const next = units.find((u) => String(u.unit_code ?? "").trim() === prev.unit_code);
+    if (!next) {
+      await revokeClientUnitAccess(prev);
+      continue;
+    }
+    const nextEmail = String(next.access_user ?? "").trim().toLowerCase();
+    const prevEmail = String(prev.access_user ?? "").trim().toLowerCase();
+    if (
+      prevEmail &&
+      nextEmail &&
+      prevEmail !== nextEmail &&
+      (prev.provision_user_id || prev.access_user)
+    ) {
+      await revokeClientUnitAccess(prev);
+    }
+  }
 
   const { error: deleteErr } = await admin.from("client_units").delete().eq("client_id", clientId);
   if (deleteErr) {

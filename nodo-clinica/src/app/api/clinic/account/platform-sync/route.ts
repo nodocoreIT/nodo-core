@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { jsonWithSession, type ClinicSession } from "@/lib/clinic/session";
 import { isLocalMode } from "@/lib/clinic/config";
 import { forbidden, unauthorized } from "@/lib/clinic/access-control";
+import { parseClinicDbRole } from "@/lib/clinic/resolve-clinic-role";
 
 const ORG_DOCTOR_ROLES = new Set(["super_admin", "admin", "medico", "agent"]);
 
@@ -33,9 +34,17 @@ export async function POST(_request: NextRequest) {
   const meta = readJwtAppMetadata(session);
   const orgId = typeof meta.org_id === "string" ? meta.org_id : undefined;
   const jwtRole = typeof meta.role === "string" ? meta.role : "";
+  const portalRole = parseClinicDbRole(jwtRole);
   const plan = typeof meta.plan === "string" ? meta.plan : "starter";
 
-  if (!ORG_DOCTOR_ROLES.has(jwtRole)) {
+  if (portalRole === "paciente") {
+    return forbidden(
+      "Tu cuenta es de paciente. Ingresá desde la pestaña Paciente.",
+    );
+  }
+
+  const hasOrgDoctorRole = ORG_DOCTOR_ROLES.has(jwtRole);
+  if (portalRole !== "medico" && !hasOrgDoctorRole) {
     return forbidden(
       "Tu cuenta no tiene rol de médico en Nodo Clínica. Usá el portal de pacientes.",
     );
@@ -71,7 +80,13 @@ export async function POST(_request: NextRequest) {
   }
 
   if (!professional) {
-    // 3. First login — create professional row
+    if (portalRole !== "medico") {
+      return forbidden(
+        "Tu cuenta no tiene perfil médico. Contactá a NODO Core para habilitar el acceso.",
+      );
+    }
+
+    // First login with explicit medico portal role — create professional row
     const { data: inserted, error: insertError } = await supabase
       .from("professionals")
       .insert({

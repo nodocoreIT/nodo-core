@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
   // Redirect directly to the clinica app — no nodo-landing intermediary needed.
   // Supabase handles the token exchange and appends #access_token=...&type=recovery.
   const clinicaAppUrl = (process.env.NODO_CLINICA_APP_URL ?? "https://clinica.nodocore.com.ar").replace(/\/$/, "");
-  const redirectToUrl = `${clinicaAppUrl}/actualizar-contrasena`;
+  const redirectToUrl = `${clinicaAppUrl}/actualizar-contrasena?role=${reg.role}`;
 
   const nodoAdmin = createNodoAdminClient("clinica");
   if (!nodoAdmin) {

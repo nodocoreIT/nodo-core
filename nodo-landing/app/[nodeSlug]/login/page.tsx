@@ -1813,7 +1813,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
 
                         <p className="text-slate2 text-[12px] mt-4 text-center font-medium">
                           Al registrarte aceptas los Términos de Servicio y la
-                          Política de Privacidad de NODO | Clínica Virtual.
+                          Política de Privacidad de NODO | Clínica.
                         </p>
                       </div>
                     ) : (

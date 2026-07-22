@@ -95,11 +95,11 @@ export async function sendPasswordResetEmail(params: {
   await transporter.sendMail({
     from: clinicFromAddress(),
     to: email,
-    subject: "Restablecé tu contraseña en NODO | Clínica Virtual",
+    subject: "Restablecé tu contraseña en NODO | Clínica",
     text: [
       `Hola,`,
       ``,
-      `Recibimos una solicitud para restablecer tu contraseña en NODO | Clínica Virtual.`,
+      `Recibimos una solicitud para restablecer tu contraseña en NODO | Clínica.`,
       `Para crear una nueva contraseña, hacé clic en el siguiente enlace:`,
       ``,
       resetUrl,
@@ -126,7 +126,7 @@ export async function sendPasswordResetEmail(params: {
           </h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;">
             Recibimos una solicitud para restablecer tu contraseña en
-            <strong>NODO | Clínica Virtual</strong>.
+            <strong>NODO | Clínica</strong>.
             Hacé clic en el botón para crear una nueva:
           </p>
           <div style="margin:28px 0;text-align:center;">
@@ -178,11 +178,11 @@ export async function sendClinicVerificationEmail(params: {
   await transporter.sendMail({
     from: clinicFromAddress(),
     to: email,
-    subject: "Verificá tu cuenta en NODO | Clínica Virtual",
+    subject: "Verificá tu cuenta en NODO | Clínica",
     text: [
       `Hola,`,
       ``,
-      `Gracias por registrarte como ${roleLabel} en NODO | Clínica Virtual.`,
+      `Gracias por registrarte como ${roleLabel} en NODO | Clínica.`,
       `Para verificar tu cuenta, hacé clic en el siguiente enlace:`,
       ``,
       verificationUrl,
@@ -212,15 +212,15 @@ export async function sendClinicVerificationEmail(params: {
           </p>
           <p style="color:#374151;font-size:15px;line-height:1.6;">
             Gracias por registrarte como <strong>${roleLabel}</strong> en
-            <strong>NODO | Clínica Virtual</strong>.
-            Para activar tu cuenta hacé clic en el botón:
+            <strong>NODO | Clínica</strong>.
+            Para continuar con tu registro (datos personales y celular), hacé clic en el botón:
           </p>
           <div style="margin:28px 0;text-align:center;">
             <a
               href="${verificationUrl}"
               style="background-color:#0D9488;color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;font-size:15px;letter-spacing:0.02em;"
             >
-              Verificar mi cuenta
+              Verificar y continuar registro
             </a>
           </div>
           <p style="color:#6B7280;font-size:12px;line-height:1.5;">
