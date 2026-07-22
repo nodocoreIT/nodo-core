@@ -16,6 +16,7 @@ import type { PaymentReceiptAudit } from "@/lib/clinic/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ReceiptValidationCard } from "@/components/patient/receipt-validation-card";
+import { currencySymbol } from "@/lib/clinic/currency";
 import { toast } from "sonner";
 
 interface DoctorPaymentsLedgerProps {
@@ -117,6 +118,7 @@ export function DoctorPaymentsLedger({
     (sum, e) => sum + (e.audit?.amount ?? 0),
     0,
   );
+  const currency = currencySymbol(visibleEntries.find((e) => e.audit?.currency)?.audit?.currency);
 
   return (
     <div className="space-y-3">
@@ -133,7 +135,7 @@ export function DoctorPaymentsLedger({
           )}
           <span className="text-sm font-semibold text-emerald-800">
             {totalRead > 0
-              ? `ARS ${totalRead.toLocaleString("es-AR")} leídos`
+              ? `${currency} ${totalRead.toLocaleString("es-AR")} leídos`
               : `${visibleEntries.length} turno(s)`}
           </span>
         </div>

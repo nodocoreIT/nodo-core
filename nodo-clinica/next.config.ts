@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
   transpilePackages: ["@nodocore/shared-components", "@nodocore/nodo-modules", "@base-ui/react"],
+  serverExternalPackages: ["pdf-parse", "tesseract.js"],
   allowedDevOrigins: [
     "localhost",
     "127.0.0.1",

@@ -1,11 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
+import { createServiceClient } from "@/lib/supabase/server";
+import { appointmentNeedsDoctorPaymentReviewFromDbRow } from "@/lib/clinic/payment";
 import {
   countUnreadDoctorNotifications,
   listDoctorNotifications,
   markDoctorNotificationsRead,
   type DoctorNotificationType,
 } from "@/lib/clinic/doctor-notifications";
+
+/**
+ * The "cobros" badge used to count unread doctor_notifications rows, a
+ * separate inbox-style system that gets out of sync with the real state of
+ * each turno (approving/rejecting a payment doesn't mark its notification
+ * read, so a stale row kept the badge stuck). Count directly from
+ * appointments instead — the exact same source of truth the Cobros table
+ * uses for needsReview, so they can never disagree.
+ */
+async function countPendingCobros(professionalId: string): Promise<number> {
+  const svc = await createServiceClient();
+  const { data } = await svc
+    .from("appointments")
+    .select("status, payment_status, payment_provider, payment_receipt_audit, patient_documents(id)")
+    .eq("doctor_id", professionalId);
+
+  return (data ?? []).filter((apt) =>
+    appointmentNeedsDoctorPaymentReviewFromDbRow(apt as never, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      receiptDocumentCount: ((apt as any).patient_documents ?? []).length,
+    }),
+  ).length;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -31,10 +56,7 @@ export async function GET(request: NextRequest) {
 
   if (scope === "unread_count") {
     const count = await countUnreadDoctorNotifications(me.id, types);
-    const cobrosCount = await countUnreadDoctorNotifications(me.id, [
-      "mercadopago_payment",
-      "transfer_pending",
-    ]);
+    const cobrosCount = await countPendingCobros(me.id);
     return NextResponse.json({ count, cobrosCount });
   }
 
@@ -65,19 +87,6 @@ export async function PATCH(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const ids = Array.isArray(body.ids) ? (body.ids as string[]) : undefined;
-  const scope = body.scope as string | undefined;
-
-  if (scope === "cobros") {
-    const items = await listDoctorNotifications(me.id, { unreadOnly: true });
-    const cobrosIds = items
-      .filter(
-        (n) =>
-          n.type === "mercadopago_payment" || n.type === "transfer_pending",
-      )
-      .map((n) => n.id);
-    const marked = await markDoctorNotificationsRead(me.id, cobrosIds);
-    return NextResponse.json({ ok: true, marked });
-  }
 
   const marked = await markDoctorNotificationsRead(me.id, ids);
   return NextResponse.json({ ok: true, marked });

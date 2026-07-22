@@ -2,6 +2,7 @@
 
 import { CheckCircle2, XCircle, Loader2, Sparkles } from "lucide-react";
 import type { PaymentReceiptAudit } from "@/lib/clinic/types";
+import { currencySymbol } from "@/lib/clinic/currency";
 
 interface ReceiptValidationCardProps {
   audit: PaymentReceiptAudit | null;
@@ -25,7 +26,7 @@ export function ReceiptValidationCard({
 
   if (!audit) return null;
 
-  const currency = audit.currency ?? "ARS";
+  const currency = currencySymbol(audit.currency);
 
   return (
     <div
@@ -48,7 +49,6 @@ export function ReceiptValidationCard({
           }`}
         >
           {audit.valid ? "Aprobado" : "Revisar"}
-          {audit.confidence > 0 ? ` · ${audit.confidence}%` : ""}
         </span>
       </div>
 
@@ -56,9 +56,11 @@ export function ReceiptValidationCard({
         {audit.payerName && (
           <Row label="Origen / quien transfirió" value={audit.payerName} />
         )}
-        {audit.recipient && (
-          <Row label="Destinatario detectado" value={audit.recipient} />
+        {audit.holderName && (
+          <Row label="Titular detectado" value={audit.holderName} />
         )}
+        {audit.alias && <Row label="Alias detectado" value={audit.alias} />}
+        {audit.cbu && <Row label="CBU/CVU detectado" value={audit.cbu} />}
         {audit.amount != null && (
           <Row
             label="Importe leído"
@@ -87,7 +89,7 @@ export function ReceiptValidationCard({
           {Object.entries(audit.checks).map(([key, check]) => (
             <li
               key={key}
-              className={`flex items-start gap-1.5 ${check.pass ? "text-emerald-800" : "text-amber-900"}`}
+              className={`flex items-start gap-1.5 ${check.pass ? "text-emerald-800" : "text-red-700"}`}
             >
               {check.pass ? (
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0 mt-0.5" />

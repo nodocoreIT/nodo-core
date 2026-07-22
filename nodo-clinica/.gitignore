@@ -34,3 +34,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*
+
+# tesseract.js OCR language data cache (downloaded at runtime, not source)
+*.traineddata

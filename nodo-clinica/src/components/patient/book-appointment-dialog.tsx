@@ -19,8 +19,6 @@ import {
   Wallet,
   Upload,
   FileText,
-  CheckCircle2,
-  XCircle,
   MessageSquare,
   Mic,
   MicOff,
@@ -69,7 +67,7 @@ interface PaymentInfo {
   mercadopagoReady?: boolean;
 }
 
-async function fileToBase64(file: File): Promise<string> {
+async function fileToBase64(file: Blob): Promise<string> {
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
   let binary = "";
@@ -79,12 +77,53 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(binary);
 }
 
-type ReceiptChecks = {
-  amount: { pass: boolean; detail: string };
-  recipient: { pass: boolean; detail: string };
-  schedule: { pass: boolean; detail: string };
-  receiptType: { pass: boolean; detail: string };
-};
+/**
+ * Fotos de celular suelen pesar varios MB (mucho más que un PDF de texto),
+ * lo que puede superar el límite de tamaño de request del hosting y hacer
+ * que la validación falle en silencio para ese formato específico. Antes de
+ * mandar cualquier imagen (cualquier formato que el navegador pueda
+ * decodificar) la reescalamos y recomprimimos a JPEG liviano — de sobra para
+ * que la IA lea los datos del comprobante.
+ */
+async function prepareReceiptFile(
+  file: File,
+): Promise<{ mimeType: string; dataBase64: string }> {
+  if (!file.type.startsWith("image/")) {
+    return {
+      mimeType: file.type || "application/pdf",
+      dataBase64: await fileToBase64(file),
+    };
+  }
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxDim = 1600;
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const width = Math.round(bitmap.width * scale);
+    const height = Math.round(bitmap.height * scale);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("canvas-unavailable");
+    ctx.drawImage(bitmap, 0, 0, width, height);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.85),
+    );
+    if (!blob) throw new Error("compress-failed");
+
+    return { mimeType: "image/jpeg", dataBase64: await fileToBase64(blob) };
+  } catch {
+    // Si el navegador no puede decodificar el formato (ej. algunos casos de
+    // HEIC), mandamos el archivo original en vez de bloquear la subida.
+    return {
+      mimeType: file.type || "image/jpeg",
+      dataBase64: await fileToBase64(file),
+    };
+  }
+}
 
 const STEP_LABELS: Record<WizardStep, string> = {
   slot: "Fecha y hora",
@@ -160,9 +199,6 @@ export function BookAppointmentDialog({
   const [intakeReason, setIntakeReason] = useState("");
   const [listening, setListening] = useState(false);
   const [studyFiles, setStudyFiles] = useState<File[]>([]);
-  const [validationChecks, setValidationChecks] = useState<ReceiptChecks | null>(
-    null,
-  );
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const slotsSectionRef = useRef<HTMLDivElement | null>(null);
   const [resolvedPayment, setResolvedPayment] = useState<PaymentInfo | undefined>(
@@ -172,7 +208,6 @@ export function BookAppointmentDialog({
   const [paymentSettingsReady, setPaymentSettingsReady] = useState(false);
   const [receiptAudit, setReceiptAudit] = useState<PaymentReceiptAudit | null>(null);
   const [validatingReceipt, setValidatingReceipt] = useState(false);
-  const [receiptWarning, setReceiptWarning] = useState<string | null>(null);
 
   const showPaymentStep =
     patientShowsPaymentStep(resolvedPayment) || paymentRequiredOverride;
@@ -202,7 +237,6 @@ export function BookAppointmentDialog({
     setReceiptFile(null);
     setIntakeReason("");
     setStudyFiles([]);
-    setValidationChecks(null);
     setSelectedDate(null);
     setSelectedSlot(null);
     setListening(false);
@@ -376,27 +410,20 @@ export function BookAppointmentDialog({
     }
     setValidatingReceipt(true);
     setReceiptAudit(null);
-    setValidationChecks(null);
-    setReceiptWarning(null);
     try {
+      const prepared = await prepareReceiptFile(file);
       const result = await clinicApi.previewPaymentReceipt({
         doctorId,
         scheduledAt: selectedSlot,
         receipt: {
           fileName: file.name,
-          mimeType: file.type || "image/jpeg",
-          dataBase64: await fileToBase64(file),
+          mimeType: prepared.mimeType,
+          dataBase64: prepared.dataBase64,
         },
       });
       if (result.audit) setReceiptAudit(result.audit);
-      if (result.checks) setValidationChecks(result.checks as ReceiptChecks);
       if (result.valid) {
         toast.success("Comprobante validado — podés continuar");
-      } else {
-        const failed = result.checks
-          ? Object.values(result.checks).find((c) => !c.pass)?.detail
-          : result.reasons?.[0];
-        setReceiptWarning(failed ?? "Revisá los datos del comprobante");
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo analizar el comprobante");
@@ -439,16 +466,16 @@ export function BookAppointmentDialog({
     }
 
     setBooking(true);
-    setValidationChecks(null);
     try {
       let receipt:
         | { fileName: string; mimeType: string; dataBase64: string }
         | undefined;
       if (mode === "transfer" && receiptFile) {
+        const prepared = await prepareReceiptFile(receiptFile);
         receipt = {
           fileName: receiptFile.name,
-          mimeType: receiptFile.type || "image/jpeg",
-          dataBase64: await fileToBase64(receiptFile),
+          mimeType: prepared.mimeType,
+          dataBase64: prepared.dataBase64,
         };
       }
 
@@ -489,11 +516,10 @@ export function BookAppointmentDialog({
       }
     } catch (e) {
       const err = e as Error & {
-        checks?: ReceiptChecks;
+        checks?: unknown;
         requiresReceipt?: boolean;
       };
       if (err.requiresReceipt || err.checks) {
-        if (err.checks) setValidationChecks(err.checks);
         goToPaymentStep();
       }
       toast.error(err.message || "Error al confirmar el turno");
@@ -699,8 +725,6 @@ export function BookAppointmentDialog({
                     const file = e.target.files?.[0] ?? null;
                     setReceiptFile(file);
                     setReceiptAudit(null);
-                    setValidationChecks(null);
-                    setReceiptWarning(null);
                     if (file) await runReceiptPreview(file);
                   }}
                 />
@@ -715,20 +739,12 @@ export function BookAppointmentDialog({
                 audit={receiptAudit}
                 loading={validatingReceipt}
               />
-              {receiptWarning && (
-                <p className="text-[11px] text-red-800 bg-red-50 border border-red-200 rounded-md px-2 py-1.5">
-                  {receiptWarning}
-                </p>
-              )}
               {receiptAudit && !receiptAudit.valid && receiptFile && (
                 <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
                   La validación automática no fue concluyente. Podés continuar:
                   el médico revisará el comprobante manualmente.
                 </p>
               )}
-              <p className="text-[10px] text-slate-500">
-                Validamos monto, destinatario y fecha del turno al subir el archivo.
-              </p>
             </div>
 
             <NavButtons
@@ -843,9 +859,6 @@ export function BookAppointmentDialog({
                   {receiptFile.name}
                 </p>
               )}
-              {receiptAudit && (
-                <ReceiptValidationCard audit={receiptAudit} title="Verificación del Pago" />
-              )}
               {intakeReason.trim() && (
                 <p className="text-xs text-slate-600 line-clamp-2">
                   <span className="font-medium">Motivo:</span> {intakeReason}
@@ -896,16 +909,10 @@ export function BookAppointmentDialog({
               </div>
             )}
 
-            {needsPayment && receiptAudit && !receiptAudit.valid && receiptFile && (
-              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                El comprobante quedará en revisión manual del médico. Podés confirmar el turno igual.
-              </p>
-            )}
-
             {needsPayment && receiptFile && (
-              <p className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1.5">
-                <FileText className="h-3.5 w-3.5" />
-                Comprobante listo: {receiptFile.name}
+              <p className="flex items-center gap-2 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                Comprobante recibido — queda pendiente de aprobación por parte del profesional.
               </p>
             )}
 
@@ -921,24 +928,6 @@ export function BookAppointmentDialog({
                 para esta consulta.
               </span>
             </label>
-
-            {validationChecks && (
-              <ul className="text-xs space-y-1 rounded-lg border border-red-200 bg-red-50 p-3">
-                {Object.entries(validationChecks).map(([key, check]) => (
-                  <li
-                    key={key}
-                    className={`flex items-start gap-1.5 ${check.pass ? "text-emerald-800" : "text-red-800"}`}
-                  >
-                    {check.pass ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                    ) : (
-                      <XCircle className="h-3.5 w-3.5 shrink-0" />
-                    )}
-                    {check.detail}
-                  </li>
-                ))}
-              </ul>
-            )}
 
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={goBack} disabled={booking}>

@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CreditCard, QrCode } from "lucide-react";
+import { currencySymbol } from "@/lib/clinic/currency";
 
 interface PaymentInfo {
   consultationFee?: number;
@@ -35,7 +36,7 @@ export function ConsultationPaymentPanel({
   }
 
   const fee = payment.consultationFee
-    ? `${payment.currency ?? "ARS"} $${payment.consultationFee.toLocaleString("es-AR")}`
+    ? `${currencySymbol(payment.currency)} ${payment.consultationFee.toLocaleString("es-AR")}`
     : null;
 
   return (
@@ -61,7 +62,7 @@ export function ConsultationPaymentPanel({
         )}
         {payment.cbu && (
           <p className="text-sm">
-            <span className="text-slate-500">CBU:</span>{" "}
+            <span className="text-slate-500">CBU/CVU:</span>{" "}
             <strong className="font-mono text-xs">{payment.cbu}</strong>
           </p>
         )}

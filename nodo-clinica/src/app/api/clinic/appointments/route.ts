@@ -318,13 +318,16 @@ export async function GET(request: NextRequest) {
     }
 
     if (scope === "payment_ledger") {
+      // No .neq("status", "cancelled") here on purpose: a payment the doctor
+      // rejected cancels the appointment, but it still needs to show up in
+      // the ledger as "Rechazado" — the JS filter below already keeps only
+      // rows that have a receipt audit or a confirmed payment either way.
       const { data: ledger } = await supabase
         .from("appointments")
-        .select("*, patients(full_name), patient_documents(*)")
+        .select("*, patients(full_name, phone), patient_documents(*)")
         .eq("doctor_id", doctorId)
-        .neq("status", "cancelled")
         .order("scheduled_at", { ascending: false })
-        .limit(50);
+        .limit(500);
 
       const entries = (ledger ?? [])
         .filter((apt) =>
@@ -337,9 +340,13 @@ export async function GET(request: NextRequest) {
         )
         .map((apt) => ({
           id: apt.id,
+          status: apt.status,
           scheduledAt: apt.scheduled_at,
+          createdAt: apt.created_at,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           patientName: (apt as any).patients?.full_name ?? "Paciente",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          patientPhone: (apt as any).patients?.phone ?? undefined,
           paymentStatus: apt.payment_status,
           paymentProvider: apt.payment_provider,
           audit: apt.payment_receipt_audit,
@@ -771,6 +778,7 @@ export async function POST(request: NextRequest) {
       await attachDocumentToAppointment(
         apt.id,
         patientRow.id,
+        patientRow.org_id,
         validatedReceipt.fileName || "comprobante.jpg",
         validatedReceipt.mimeType || "image/jpeg",
         buffer,
@@ -792,6 +800,7 @@ export async function POST(request: NextRequest) {
       await attachDocumentToAppointment(
         apt.id,
         patientRow.id,
+        patientRow.org_id,
         study.fileName || "estudio.pdf",
         study.mimeType || "application/pdf",
         buffer,
@@ -860,6 +869,7 @@ export async function POST(request: NextRequest) {
   if (paymentPendingReview) {
     await notifyDoctorTransferPendingReview({
       doctorId: professional.id,
+      orgId: professional.org_id,
       appointmentId: apt.id,
       patientName: patientRow.full_name,
     });
@@ -1049,28 +1059,46 @@ export async function PATCH(request: NextRequest) {
         { status: 403 },
       );
     }
-    const { data: apt } = await supabase
+    const svc = await createServiceClient();
+    const { data: apt, error: fetchErr } = await svc
       .from("appointments")
       .select("*")
       .eq("id", appointmentId)
       .maybeSingle();
+    if (fetchErr) {
+      return NextResponse.json({ error: fetchErr.message }, { status: 400 });
+    }
     if (!apt) {
       return NextResponse.json(
         { error: "Turno no encontrado" },
         { status: 404 },
       );
     }
-    const { data: updated } = await supabase
+    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+    const { data: updated, error: updateErr } = await svc
       .from("appointments")
       .update({
         payment_status: "pending",
         status: "cancelled",
+        payment_receipt_audit: reason
+          ? {
+              ...((apt.payment_receipt_audit as Record<string, unknown>) ?? {}),
+              rejectionReason: reason,
+            }
+          : apt.payment_receipt_audit,
         updated_at: new Date().toISOString(),
       })
       .eq("id", apt.id)
       .select()
       .single();
-    return NextResponse.json(updated);
+    if (updateErr) {
+      return NextResponse.json({ error: updateErr.message }, { status: 400 });
+    }
+    return NextResponse.json({
+      ...updated,
+      requiresRefund: apt.payment_status === "confirmed",
+      paymentProvider: apt.payment_provider,
+    });
   }
 
   if (action === "doctorCancelAppointments" && Array.isArray(body.appointmentIds)) {
@@ -1117,6 +1145,48 @@ export async function PATCH(request: NextRequest) {
       );
     }
     return NextResponse.json({ results });
+  }
+
+  // Hard-delete a turno that is already cancelled — doctorCancelAppointments
+  // only touches turnos still active, so a row that was already rejected
+  // (status already "cancelled") needs this instead to actually disappear.
+  if (action === "doctorDeleteAppointment" && appointmentId) {
+    if (user.role === "patient") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+    const me = await resolveProfessional(authResult);
+    if (!me) {
+      return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+    }
+
+    const svc = await createServiceClient();
+    const { data: apt, error: fetchErr } = await svc
+      .from("appointments")
+      .select("id, status")
+      .eq("id", appointmentId)
+      .eq("doctor_id", me.id)
+      .maybeSingle();
+    if (fetchErr) {
+      return NextResponse.json({ error: fetchErr.message }, { status: 400 });
+    }
+    if (!apt) {
+      return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
+    }
+    if (apt.status !== "cancelled") {
+      return NextResponse.json(
+        { error: "Solo se pueden eliminar turnos cancelados" },
+        { status: 400 },
+      );
+    }
+
+    const { error: deleteError } = await svc
+      .from("appointments")
+      .delete()
+      .eq("id", appointmentId);
+    if (deleteError) {
+      return NextResponse.json({ error: deleteError.message }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true });
   }
 
   if (action === "refundAppointmentMercadoPago" && appointmentId) {

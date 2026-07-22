@@ -143,15 +143,6 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   }, [doctor, isPro]);
 
   useEffect(() => {
-    if (pathname === "/medico/cobros" && doctor) {
-      clinicApi.markCobrosNotificationsRead().then(() => {
-        setCobrosUnread(0);
-        window.dispatchEvent(new CustomEvent("cobros-notifications-read"));
-      }).catch(() => {});
-    }
-  }, [pathname, doctor]);
-
-  useEffect(() => {
     clinicApi.getSession().then(async ({ session, user }) => {
       if (!session || !["doctor", "admin", "super_admin"].includes(session.role)) {
         router.push("/login");

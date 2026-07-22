@@ -8,8 +8,10 @@ import {
 } from "@/lib/clinic/payment-validation";
 import {
   extractPdfVisibleText,
+  extractImageVisibleText,
   parseTransferReceiptText,
 } from "@/lib/clinic/receipt-text-parse";
+import { currencySymbol } from "@/lib/clinic/currency";
 
 export interface PaymentReceiptValidationInput {
   imageBase64: string;
@@ -34,7 +36,9 @@ export interface PaymentReceiptValidationResult {
   extracted?: {
     amount?: number;
     date?: string;
-    recipient?: string;
+    alias?: string;
+    holderName?: string;
+    cbu?: string;
     payerName?: string;
     payerNote?: string;
     operationId?: string;
@@ -42,25 +46,26 @@ export interface PaymentReceiptValidationResult {
   };
 }
 
+// La familia gemini-1.5-* fue dada de baja por Google (confirmado: 404 "not
+// found for API version v1beta"). Se usan modelos vigentes de la familia 2.x
+// como fallback, así una cuota agotada en uno cae en otro con cupo propio.
 const GEMINI_MODELS = [
   "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-1.5-flash-latest",
-  "gemini-1.5-pro",
+  "gemini-2.5-flash",
+  "gemini-2.0-flash-lite",
 ];
 
 type GeminiParse = {
   amount?: number | null;
   date?: string | null;
   time?: string | null;
-  recipient?: string | null;
+  alias?: string | null;
+  holderName?: string | null;
   cbu?: string | null;
   payerName?: string | null;
   doctorMentioned?: boolean;
   looksLikeTransferReceipt?: boolean;
   amountMatches?: boolean;
-  scheduleMatches?: boolean;
-  recipientMatches?: boolean;
   confidence?: number;
   notes?: string;
   operationId?: string | null;
@@ -73,34 +78,35 @@ Turno que el paciente quiere confirmar:
 - Fecha y hora del turno: ${slotLabel}
 - Médico: ${input.doctorName}
 - Alias esperado del destinatario: ${input.doctorAlias || "no indicado"}
-- CBU esperado: ${input.doctorCbu || "no indicado"}
+- CBU/CVU esperado: ${input.doctorCbu || "no indicado"}
 - Titular de la cuenta esperado: ${input.beneficiaryName || "no indicado"}
 - Monto esperado: ${input.currency} ${input.expectedAmount}
 
-Reglas estrictas (todas deben cumplirse para aprobar):
+Reglas de extracción — los campos pueden aparecer en cualquier orden dentro del
+comprobante y con cualquier combinación de mayúsculas/minúsculas, extraelos
+igual (no dependas de que coincidan con lo esperado arriba):
 - looksLikeTransferReceipt: true solo si es un comprobante bancario o de billetera real.
 - amountMatches: monto transferido = honorario (tolerancia 2% o $150 ARS).
-- recipientMatches: alias, CBU, titular de cuenta destino o nombre del destinatario coincide con los datos del médico.
-- scheduleMatches: la FECHA del comprobante es el mismo día del turno o hasta 30 días antes. La hora del pago NO tiene que coincidir con el horario del turno (el paciente paga por adelantado).
 - Extraé "time" en formato HH:mm si aparece en el comprobante.
-- Extraé "cbu" si aparece (22 dígitos).
+- Extraé "alias" del destinatario si aparece (ej. "juan.perez.mp"), distinto del CBU/CVU.
+- Extraé "holderName": nombre y apellido del TITULAR de la cuenta/alias destino (a quién se le pagó), no el nombre de quien envía el pago.
+- Extraé "cbu" si aparece (22 dígitos, puede figurar como "CBU" en cuentas bancarias o como "CVU" en billeteras virtuales como Mercado Pago — es el mismo formato, tratalos igual).
 - Extraé "operationId" si aparece (id Op, nº de operación, código de transacción).
-- confidence: 0-100 según claridad y coincidencia.
+- confidence: 0-100 según claridad de la imagen/PDF (no según si coincide con lo esperado — eso se evalúa aparte).
 
 Respondé ÚNICAMENTE JSON válido:
 {
   "amount": number o null,
   "date": "YYYY-MM-DD o null",
   "time": "HH:mm o null",
-  "recipient": "alias o destinatario detectado o null",
-  "cbu": "CBU destino 22 dígitos o null",
+  "alias": "alias del destinatario detectado o null",
+  "holderName": "nombre y apellido del titular de la cuenta/alias destino o null",
+  "cbu": "CBU/CVU destino 22 dígitos o null",
   "payerName": "nombre de quien transfirió o titular origen o null",
   "operationId": "número o código de operación o null",
   "doctorMentioned": boolean,
   "looksLikeTransferReceipt": boolean,
   "amountMatches": boolean,
-  "scheduleMatches": boolean,
-  "recipientMatches": boolean,
   "confidence": number,
   "notes": "breve explicación en español"
 }`;
@@ -120,24 +126,23 @@ function resultFromParsed(
       beneficiaryName: input.beneficiaryName,
       expectedAmount: input.expectedAmount,
       currency: input.currency,
-      appointmentDateIso: input.appointmentDateIso,
       mimeType: input.mimeType,
-      slotDurationMinutes: input.slotDurationMinutes,
     },
     { ...parsed, looksLikeTransferReceipt: parsed.looksLikeTransferReceipt ?? true },
   );
 
   const reasons = [
     checks.amount.detail,
-    checks.recipient.detail,
-    checks.schedule.detail,
+    checks.cbu.detail,
+    checks.alias.detail,
+    checks.holderName.detail,
     checks.receiptType.detail,
   ];
   if (parsed.notes) reasons.push(parsed.notes);
   if (sourceNote) reasons.push(sourceNote);
   if (!valid && strictMode) {
     reasons.push(
-      "Revisá monto, destinatario y fecha del comprobante antes de continuar.",
+      "Revisá monto, CBU/CVU y titular del comprobante antes de continuar.",
     );
   }
 
@@ -150,7 +155,9 @@ function resultFromParsed(
     extracted: {
       amount: parsed.amount ?? undefined,
       date: parsed.date ?? undefined,
-      recipient: parsed.recipient ?? undefined,
+      alias: parsed.alias ?? undefined,
+      holderName: parsed.holderName ?? undefined,
+      cbu: parsed.cbu ?? undefined,
       payerName: parsed.payerName ?? undefined,
       operationId: parsed.operationId ?? undefined,
       time: parsed.time ?? undefined,
@@ -158,17 +165,9 @@ function resultFromParsed(
   };
 }
 
-/** Google AI Studio keys look like AIza… — reject other tokens early. */
 function resolveGeminiApiKey(): string | null {
   const raw = process.env.GEMINI_API_KEY?.trim();
-  if (!raw) return null;
-  if (!raw.startsWith("AIza")) {
-    console.warn(
-      "[payment-receipt] GEMINI_API_KEY no parece una key de Google AI Studio (debe empezar con AIza…)",
-    );
-    return null;
-  }
-  return raw;
+  return raw || null;
 }
 
 function isMockPaymentReceiptEnabled(): boolean {
@@ -202,7 +201,7 @@ function resultFromReceiptText(
 ): PaymentReceiptValidationResult | null {
   if (text.length < 20) return null;
   const extracted = parseTransferReceiptText(text);
-  if (!extracted.amount && !extracted.recipient && !extracted.date && !extracted.cbu) {
+  if (!extracted.amount && !extracted.holderName && !extracted.date && !extracted.cbu) {
     return null;
   }
 
@@ -212,7 +211,8 @@ function resultFromReceiptText(
       amount: extracted.amount ?? null,
       date: extracted.date ?? null,
       time: extracted.time ?? null,
-      recipient: extracted.recipient ?? null,
+      alias: extracted.alias ?? null,
+      holderName: extracted.holderName ?? null,
       cbu: extracted.cbu ?? null,
       payerName: extracted.payerName ?? null,
       operationId: extracted.operationId ?? null,
@@ -259,22 +259,35 @@ async function tryGeminiParse(
   throw lastError ?? new Error("Ningún modelo de IA respondió");
 }
 
-function tryTextParseFallback(
+async function tryTextParseFallback(
   input: PaymentReceiptValidationInput,
   strictMode: boolean,
-): PaymentReceiptValidationResult | null {
+): Promise<PaymentReceiptValidationResult | null> {
   const isPdf =
     input.mimeType.toLowerCase() === "application/pdf" ||
     (input.fileName ?? "").toLowerCase().endsWith(".pdf");
-  if (!isPdf) return null;
 
-  const text = extractPdfVisibleText(input.imageBase64);
-  return resultFromReceiptText(
-    input,
-    text,
-    strictMode,
-    "Comprobante leído del PDF (sin IA)",
-  );
+  if (isPdf) {
+    const text = await extractPdfVisibleText(input.imageBase64);
+    return resultFromReceiptText(
+      input,
+      text,
+      strictMode,
+      "Comprobante leído del PDF (sin IA)",
+    );
+  }
+
+  if (input.mimeType.toLowerCase().startsWith("image/")) {
+    const text = await extractImageVisibleText(input.imageBase64);
+    return resultFromReceiptText(
+      input,
+      text,
+      strictMode,
+      "Comprobante leído por OCR local (sin IA)",
+    );
+  }
+
+  return null;
 }
 
 function tryMockReceiptFallback(
@@ -310,7 +323,7 @@ export async function validatePaymentReceipt(
   const apiKey = resolveGeminiApiKey();
 
   if (!apiKey) {
-    const textFallback = tryTextParseFallback(input, strictMode);
+    const textFallback = await tryTextParseFallback(input, strictMode);
     if (textFallback) return textFallback;
     const mockFallback = tryMockReceiptFallback(input, strictMode);
     if (mockFallback) return mockFallback;
@@ -330,18 +343,18 @@ export async function validatePaymentReceipt(
     return resultFromParsed(input, parsed, strictMode);
   } catch (err) {
     console.error("[payment-receipt] Gemini error", err);
-    const textFallback = tryTextParseFallback(input, strictMode);
+    const textFallback = await tryTextParseFallback(input, strictMode);
     if (textFallback) return textFallback;
     const mockFallback = tryMockReceiptFallback(input, strictMode);
     if (mockFallback) return mockFallback;
 
-    const fallback = validatePaymentReceiptHeuristic(input, strictMode);
+    const fallback = await validatePaymentReceiptHeuristic(input, strictMode);
     if (!strictMode || fallback.valid) return fallback;
 
     const geminiHint = /API_KEY_INVALID|API key not valid/i.test(
       err instanceof Error ? err.message : String(err),
     )
-      ? "GEMINI_API_KEY inválida: usá una key de Google AI Studio (empieza con AIza…)"
+      ? "GEMINI_API_KEY inválida: generá una nueva key en Google AI Studio"
       : "Verificá GEMINI_API_KEY o activá CLINIC_MOCK_PAYMENT_RECEIPT=true en local";
 
     return {
@@ -356,11 +369,11 @@ export async function validatePaymentReceipt(
   }
 }
 
-function validatePaymentReceiptHeuristic(
+async function validatePaymentReceiptHeuristic(
   input: PaymentReceiptValidationInput,
   strictMode: boolean,
-): PaymentReceiptValidationResult {
-  const textFallback = tryTextParseFallback(input, strictMode);
+): Promise<PaymentReceiptValidationResult> {
+  const textFallback = await tryTextParseFallback(input, strictMode);
   if (textFallback) return textFallback;
 
   const fileName = (input.fileName ?? "").toLowerCase();
@@ -397,7 +410,6 @@ function validatePaymentReceiptHeuristic(
   }
 
   if (!strictMode) {
-    const slotLabel = formatAppointmentSlotLabel(input.appointmentDateIso);
     return {
       valid: true,
       confidence: 80,
@@ -407,18 +419,24 @@ function validatePaymentReceiptHeuristic(
           pass: true,
           detail:
             input.expectedAmount > 0
-              ? `Monto esperado: ${input.currency} ${input.expectedAmount.toLocaleString("es-AR")} (demo)`
+              ? `Monto esperado: ${currencySymbol(input.currency)} ${input.expectedAmount.toLocaleString("es-AR")} (demo)`
               : "Sin honorario configurado",
         },
-        recipient: {
+        cbu: {
+          pass: true,
+          detail: input.doctorCbu
+            ? `CBU/CVU del médico: ${input.doctorCbu} (demo)`
+            : "El médico no tiene CBU/CVU configurado",
+        },
+        alias: {
           pass: true,
           detail: input.doctorAlias
             ? `Alias del médico: ${input.doctorAlias} (demo)`
-            : "Destinatario — validación relajada en demo",
+            : "El médico no tiene alias configurado",
         },
-        schedule: {
+        holderName: {
           pass: true,
-          detail: `Turno: ${slotLabel} (demo)`,
+          detail: "Titular — validación relajada en demo",
         },
         receiptType: {
           pass: true,
@@ -445,7 +463,7 @@ function validatePaymentReceiptHeuristic(
   }
   if (input.expectedAmount > 0) {
     reasons.push(
-      `Honorario esperado: ${input.currency} ${input.expectedAmount.toLocaleString("es-AR")}`,
+      `Honorario esperado: ${currencySymbol(input.currency)} ${input.expectedAmount.toLocaleString("es-AR")}`,
     );
   }
   reasons.push("Si el comprobante es correcto, el médico puede confirmarlo manualmente.");

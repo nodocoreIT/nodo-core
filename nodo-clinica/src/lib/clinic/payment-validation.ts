@@ -1,5 +1,6 @@
 import { isLocalMode } from "@/lib/clinic/config";
-import { localDateKeyFromIso, parseLocalDate } from "@/lib/clinic/schedule";
+import { parseLocalDate } from "@/lib/clinic/schedule";
+import { currencySymbol } from "@/lib/clinic/currency";
 
 /** Producción: OCR obligatorio; local: permisivo salvo override. */
 export function isStrictPaymentValidation(): boolean {
@@ -20,8 +21,9 @@ export interface PaymentCheckResult {
 
 export interface PaymentReceiptChecks {
   amount: PaymentCheckResult;
-  recipient: PaymentCheckResult;
-  schedule: PaymentCheckResult;
+  cbu: PaymentCheckResult;
+  alias: PaymentCheckResult;
+  holderName: PaymentCheckResult;
   receiptType: PaymentCheckResult;
 }
 
@@ -56,37 +58,56 @@ export function normalizeMatchText(value: string): string {
     .replace(/[^a-z0-9]/g, "");
 }
 
-export function recipientMatches(
-  hints: {
-    doctorName: string;
-    doctorAlias?: string;
-    doctorCbu?: string;
-    beneficiaryName?: string;
-  },
-  recipient: string | null | undefined,
-  extraText?: string | null,
+/** Compara CBUs ignorando espacios/guiones — 22 dígitos, sin tolerancia de mayúsc/minúsc (son números). */
+export function cbuMatches(
+  expected: string | null | undefined,
+  extracted: string | null | undefined,
 ): boolean {
-  const combined = [recipient, extraText].filter(Boolean).join(" ");
-  const target = normalizeMatchText(combined);
-  if (!target || target.length < 4) return false;
+  const e = (expected ?? "").replace(/\D/g, "");
+  const x = (extracted ?? "").replace(/\D/g, "");
+  if (!e || !x) return false;
+  return e === x;
+}
 
-  const candidates = [
-    hints.beneficiaryName,
-    hints.doctorAlias,
-    hints.doctorCbu,
-    hints.doctorName,
-    ...hints.doctorName.split(/\s+/).filter((p) => p.length >= 4),
-    ...(hints.beneficiaryName?.split(/\s+/).filter((p) => p.length >= 4) ?? []),
-  ]
-    .filter(Boolean)
-    .map((s) => normalizeMatchText(String(s)));
+/** Compara alias case-insensitive, ignorando puntos/espacios ("Juan.Perez" == "juan perez"). */
+export function aliasMatches(
+  expected: string | null | undefined,
+  extracted: string | null | undefined,
+): boolean {
+  const e = normalizeMatchText(expected ?? "");
+  const x = normalizeMatchText(extracted ?? "");
+  if (!e || !x) return false;
+  return e === x;
+}
 
-  return candidates.some((hint) => {
-    if (hint.length < 4) return false;
-    if (target.includes(hint) || hint.includes(target)) return true;
-    if (hint.length >= 6 && target.includes(hint.slice(0, 6))) return true;
-    return false;
-  });
+/**
+ * Compara nombre y apellido del titular sin importar mayúsculas, acentos, ni el
+ * orden de las palabras ("Juan Pérez" == "PEREZ, Juan Gabriel"). Requiere que
+ * todas las palabras significativas (≥3 letras) del nombre esperado aparezcan
+ * en el texto extraído — si el nombre esperado tiene una sola palabra, esa
+ * sola coincidencia no alcanza (evita falsos positivos con nombres comunes).
+ */
+export function holderNameMatches(
+  expected: string | null | undefined,
+  extracted: string | null | undefined,
+): boolean {
+  const expectedWords = (expected ?? "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((w) => w.length >= 3);
+  if (expectedWords.length === 0) return false;
+
+  const extractedText = (extracted ?? "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase();
+  if (!extractedText.trim()) return false;
+
+  const matchedWords = expectedWords.filter((w) => extractedText.includes(w));
+  const requiredMatches = expectedWords.length === 1 ? 1 : 2;
+  return matchedWords.length >= Math.min(requiredMatches, expectedWords.length);
 }
 
 const ES_MONTHS: Record<string, number> = {
@@ -136,44 +157,6 @@ export function parseReceiptDate(
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-export function parseReceiptTime(
-  timeStr: string | null | undefined,
-): number | null {
-  if (!timeStr?.trim()) return null;
-  const m = timeStr.match(/(\d{1,2})[:.](\d{2})/);
-  if (!m) return null;
-  const h = Number(m[1]);
-  const min = Number(m[2]);
-  if (h > 23 || min > 59) return null;
-  return h * 60 + min;
-}
-
-/** Fecha del pago compatible con el turno (pago por adelantado, mismo día u hasta 30 días antes). */
-export function scheduleMatchesAppointmentSlot(
-  appointmentIso: string,
-  receiptDate: Date | null,
-  _receiptTimeMinutes: number | null = null,
-  _slotDurationMinutes = 30,
-): boolean {
-  if (!receiptDate) return false;
-
-  const aptDayKey = localDateKeyFromIso(appointmentIso);
-  const payDayKey = [
-    receiptDate.getFullYear(),
-    String(receiptDate.getMonth() + 1).padStart(2, "0"),
-    String(receiptDate.getDate()).padStart(2, "0"),
-  ].join("-");
-
-  if (payDayKey > aptDayKey) return false;
-
-  const aptDay = parseLocalDate(aptDayKey);
-  const payDay = parseLocalDate(payDayKey);
-  const diffDays = (aptDay.getTime() - payDay.getTime()) / (24 * 60 * 60 * 1000);
-  if (diffDays > 30) return false;
-
-  return true;
-}
-
 export function formatAppointmentSlotLabel(appointmentIso: string): string {
   const d = new Date(appointmentIso);
   return d.toLocaleString("es-AR", {
@@ -190,13 +173,13 @@ export interface GeminiReceiptParse {
   amount?: number | null;
   date?: string | null;
   time?: string | null;
-  recipient?: string | null;
+  /** Alias del destinatario tal como aparece en el comprobante (ej. "juan.perez.mp"). */
+  alias?: string | null;
+  /** Nombre y apellido del titular de la cuenta/alias destino. */
+  holderName?: string | null;
   cbu?: string | null;
   doctorMentioned?: boolean;
   amountMatches?: boolean;
-  scheduleMatches?: boolean;
-  dateMatches?: boolean;
-  recipientMatches?: boolean;
   looksLikeTransferReceipt?: boolean;
   confidence?: number;
   notes?: string;
@@ -210,46 +193,28 @@ export function evaluatePaymentReceiptChecks(
     beneficiaryName?: string;
     expectedAmount: number;
     currency: string;
-    appointmentDateIso: string;
     mimeType: string;
-    slotDurationMinutes?: number;
   },
   parsed: GeminiReceiptParse,
 ): { checks: PaymentReceiptChecks; valid: boolean; confidence: number } {
-  const strict = isStrictPaymentValidation();
-
   const amountPass = amountWithinTolerance(input.expectedAmount, parsed.amount);
-  const recipientPass =
-    recipientMatches(
-      {
-        doctorName: input.doctorName,
-        doctorAlias: input.doctorAlias,
-        doctorCbu: input.doctorCbu,
-        beneficiaryName: input.beneficiaryName,
-      },
-      parsed.recipient,
-      parsed.cbu,
-    ) ||
-    !!parsed.recipientMatches ||
-    (!!parsed.doctorMentioned && strict === false);
 
-  const receiptDate = parseReceiptDate(parsed.date ?? undefined);
-  const receiptTime = parseReceiptTime(parsed.time ?? undefined);
-  const schedulePass =
-    scheduleMatchesAppointmentSlot(
-      input.appointmentDateIso,
-      receiptDate,
-      receiptTime,
-      input.slotDurationMinutes ?? 30,
-    ) ||
-    !!parsed.scheduleMatches ||
-    !!parsed.dateMatches;
+  // CBU: obligatorio solo si el médico tiene uno configurado — si no lo cargó,
+  // no hay nada contra qué comparar y no debe bloquear la reserva.
+  const cbuPass = !input.doctorCbu || cbuMatches(input.doctorCbu, parsed.cbu);
+
+  // Alias: siempre opcional, nunca bloquea `valid` — se informa igual.
+  const aliasPass =
+    !input.doctorAlias || !parsed.alias || aliasMatches(input.doctorAlias, parsed.alias);
+
+  // Nombre y apellido del titular: obligatorio. Se compara contra el titular
+  // configurado por el médico, o contra su propio nombre si no cargó uno.
+  const expectedHolderName = input.beneficiaryName || input.doctorName;
+  const holderNamePass = holderNameMatches(expectedHolderName, parsed.holderName);
 
   const receiptTypePass =
     parsed.looksLikeTransferReceipt !== false &&
     isAllowedReceiptMime(input.mimeType);
-
-  const slotLabel = formatAppointmentSlotLabel(input.appointmentDateIso);
 
   const checks: PaymentReceiptChecks = {
     amount: {
@@ -258,20 +223,32 @@ export function evaluatePaymentReceiptChecks(
         input.expectedAmount <= 0
           ? "Sin honorario configurado"
           : amountPass
-            ? `Monto coincide (${input.currency} ${parsed.amount ?? "—"})`
-            : `Monto esperado: ${input.currency} ${input.expectedAmount.toLocaleString("es-AR")}${parsed.amount != null ? ` · detectado: ${parsed.amount.toLocaleString("es-AR")}` : ""}`,
+            ? `Monto coincide (${currencySymbol(input.currency)} ${parsed.amount ?? "—"})`
+            : `Monto esperado: ${currencySymbol(input.currency)} ${input.expectedAmount.toLocaleString("es-AR")}${parsed.amount != null ? ` · detectado: ${parsed.amount.toLocaleString("es-AR")}` : ""}`,
     },
-    recipient: {
-      pass: recipientPass,
-      detail: recipientPass
-        ? "Destinatario coincide con el médico (alias/CBU/nombre)"
-        : `No coincide con alias/CBU/nombre${input.doctorAlias ? ` (${input.doctorAlias})` : ""}`,
+    cbu: {
+      pass: cbuPass,
+      detail: !input.doctorCbu
+        ? "El médico no tiene CBU/CVU configurado"
+        : cbuPass
+          ? "El CBU/CVU coincide con el del médico"
+          : `El CBU/CVU no coincide con el esperado (${input.doctorCbu})${parsed.cbu ? ` · detectado: ${parsed.cbu}` : " · no se detectó un CBU/CVU en el comprobante"}`,
     },
-    schedule: {
-      pass: schedulePass,
-      detail: schedulePass
-        ? `Fecha del pago compatible con el turno (${slotLabel})`
-        : `La fecha del comprobante no coincide con el turno (${slotLabel}). El pago puede ser el mismo día o hasta 30 días antes.`,
+    alias: {
+      pass: aliasPass,
+      detail: !input.doctorAlias
+        ? "El médico no tiene alias configurado"
+        : !parsed.alias
+          ? "No se detectó alias en el comprobante (opcional)"
+          : aliasPass
+            ? "El alias coincide con el del médico"
+            : `El alias no coincide (esperado: ${input.doctorAlias}, detectado: ${parsed.alias}) — opcional, no bloquea`,
+    },
+    holderName: {
+      pass: holderNamePass,
+      detail: holderNamePass
+        ? `El nombre del titular coincide (${expectedHolderName})`
+        : `El nombre y apellido del titular no coincide con "${expectedHolderName}"${parsed.holderName ? ` (detectado: ${parsed.holderName})` : " (no se detectó un nombre en el comprobante)"}`,
     },
     receiptType: {
       pass: receiptTypePass,
@@ -282,10 +259,13 @@ export function evaluatePaymentReceiptChecks(
   };
 
   const confidence = parsed.confidence ?? 0;
+  // El alias y la fecha son informativos y no participan del resultado final
+  // — CBU, monto y nombre del titular sí. La fecha puede fallar por husos
+  // horarios o comprobantes anticipados sin que eso implique un pago inválido.
   const valid =
     checks.amount.pass &&
-    checks.recipient.pass &&
-    checks.schedule.pass &&
+    checks.cbu.pass &&
+    checks.holderName.pass &&
     checks.receiptType.pass;
 
   return { checks, valid, confidence };

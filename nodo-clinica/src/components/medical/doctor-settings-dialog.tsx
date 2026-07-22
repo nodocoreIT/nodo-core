@@ -893,7 +893,7 @@ export function DoctorSettingsDialog({
                   </div>
 
                   <p className="text-[11px] text-slate-500">
-                    Transferencia manual: alias/CBU abajo. MP tiene prioridad si está activo y hay
+                    Transferencia manual: alias/CBU/CVU abajo. MP tiene prioridad si está activo y hay
                     honorario cargado.
                   </p>
                   <div className="grid grid-cols-[6.5rem_1fr] gap-3">
@@ -935,7 +935,7 @@ export function DoctorSettingsDialog({
                     </div>
                   </div>
                   <div>
-                    <Label className="text-xs">Alias / CBU transferencia</Label>
+                    <Label className="text-xs">Alias / CBU/CVU transferencia</Label>
                     <Input
                       value={payment.alias ?? ""}
                       onChange={(e) => setPayment((p) => ({ ...p, alias: e.target.value }))}
@@ -944,7 +944,7 @@ export function DoctorSettingsDialog({
                     />
                   </div>
                   <div>
-                    <Label className="text-xs">CBU (opcional)</Label>
+                    <Label className="text-xs">CBU/CVU (opcional)</Label>
                     <Input
                       value={payment.cbu ?? ""}
                       onChange={(e) => setPayment((p) => ({ ...p, cbu: e.target.value }))}

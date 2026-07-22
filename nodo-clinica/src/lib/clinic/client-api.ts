@@ -662,16 +662,19 @@ export const clinicApi = {
     return data;
   },
 
-  async doctorRejectPayment(appointmentId: string) {
+  async doctorRejectPayment(appointmentId: string, reason?: string) {
     const res = await fetch(`${BASE}/api/clinic/appointments`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ appointmentId, action: "doctorRejectPayment" }),
+      body: JSON.stringify({ appointmentId, action: "doctorRejectPayment", reason }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al rechazar pago");
-    return data;
+    return data as {
+      requiresRefund?: boolean;
+      paymentProvider?: string;
+    };
   },
 
   async getDoctorAppointmentsMonth(doctorId: string, monthKey: string) {
@@ -713,6 +716,19 @@ export const clinicApi = {
         error?: string;
       }>;
     };
+  },
+
+  /** Hard-deletes a turno that is already cancelled — use doctorCancelAppointments for active ones. */
+  async doctorDeleteAppointment(appointmentId: string) {
+    const res = await fetch(`${BASE}/api/clinic/appointments`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ appointmentId, action: "doctorDeleteAppointment" }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al eliminar el turno");
+    return data as { ok: true };
   },
 
   async refundAppointmentMercadoPago(appointmentId: string) {
@@ -1190,6 +1206,7 @@ export const clinicApi = {
         id: string;
         scheduledAt: string;
         patientName: string;
+        patientPhone?: string;
         paymentStatus?: string;
         paymentProvider?: string;
         audit?: import("@/lib/clinic/types").PaymentReceiptAudit;
@@ -1392,17 +1409,5 @@ export const clinicApi = {
       diagnoseUrl?: string;
       error?: string;
     };
-  },
-
-  async markCobrosNotificationsRead() {
-    const res = await fetch(`${BASE}/api/clinic/notifications`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ scope: "cobros" }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al marcar leídas");
-    return data as { ok: boolean; marked: number };
   },
 };

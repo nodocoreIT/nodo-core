@@ -70,7 +70,9 @@ export interface PaymentReceiptAudit {
   expectedAmount?: number;
   currency?: string;
   amount?: number;
-  recipient?: string;
+  alias?: string;
+  holderName?: string;
+  cbu?: string;
   payerName?: string;
   transferDate?: string;
   transferTime?: string;
@@ -79,8 +81,9 @@ export interface PaymentReceiptAudit {
   summary?: string;
   checks?: {
     amount: { pass: boolean; detail: string };
-    recipient: { pass: boolean; detail: string };
-    schedule: { pass: boolean; detail: string };
+    cbu: { pass: boolean; detail: string };
+    alias: { pass: boolean; detail: string };
+    holderName: { pass: boolean; detail: string };
     receiptType: { pass: boolean; detail: string };
   };
   reasons?: string[];

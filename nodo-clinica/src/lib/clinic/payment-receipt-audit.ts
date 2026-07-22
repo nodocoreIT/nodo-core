@@ -8,10 +8,10 @@ export function buildPaymentReceiptAudit(
 ): PaymentReceiptAudit {
   const amount = validation.extracted?.amount;
   const payer = validation.extracted?.payerName;
-  const recipient = validation.extracted?.recipient;
+  const holderName = validation.extracted?.holderName;
   const parts = [
     payer ? `De: ${payer}` : null,
-    recipient ? `Para: ${recipient}` : null,
+    holderName ? `Para: ${holderName}` : null,
     amount != null
       ? `Importe: ${(currency ?? "ARS")} ${amount.toLocaleString("es-AR")}`
       : null,
@@ -30,7 +30,9 @@ export function buildPaymentReceiptAudit(
     expectedAmount,
     currency,
     amount,
-    recipient,
+    alias: validation.extracted?.alias,
+    holderName,
+    cbu: validation.extracted?.cbu,
     payerName: payer,
     transferDate: validation.extracted?.date,
     transferTime: validation.extracted?.time,

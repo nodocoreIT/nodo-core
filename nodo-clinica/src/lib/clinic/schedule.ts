@@ -354,6 +354,22 @@ export function getCalendarDayStates(
 
     const dayBooked = bookedTimes.filter((t) => localDateKeyFromIso(t) === dateKey);
     const slots = generateSlotsForDate(dateKey, normalized, dayBooked);
+
+    // Hoy sin slots puede ser por dos motivos bien distintos: la ventana de
+    // atención ya terminó (el día operativamente ya cerró, como un día
+    // pasado) o quedó completo mientras todavía faltaba horario (eso sí es
+    // "full"). Solo el segundo caso debe verse en rojo.
+    if (slots.length === 0 && dateKey === todayKey) {
+      const dayBlocks = normalized.days.filter((d) => d.dayOfWeek === dow);
+      const windowEnded = dayBlocks.every(
+        (block) => !isAfter(new Date(argentinaDateTimeToIso(dateKey, block.endTime)), new Date()),
+      );
+      if (windowEnded) {
+        days.push({ date: dateKey, label: formatDateKeyShortLabel(dateKey), status: "closed" });
+        continue;
+      }
+    }
+
     days.push({
       date: dateKey,
       label: formatDateKeyShortLabel(dateKey),

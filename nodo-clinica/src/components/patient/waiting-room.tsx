@@ -95,7 +95,9 @@ export function WaitingRoom({
     reasons: string[];
     checks?: {
       amount: { pass: boolean; detail: string };
-      recipient: { pass: boolean; detail: string };
+      cbu: { pass: boolean; detail: string };
+      alias: { pass: boolean; detail: string };
+      holderName: { pass: boolean; detail: string };
       schedule: { pass: boolean; detail: string };
       receiptType: { pass: boolean; detail: string };
     };
@@ -662,8 +664,7 @@ export function WaitingRoom({
               </p>
               <Button
                 type="button"
-                variant="outline"
-                className="w-full border-red-200 text-red-700"
+                className="w-full bg-red-600 text-white hover:bg-red-700"
                 disabled={cancellingPending}
                 onClick={() => void handleCancelPending()}
               >
@@ -893,8 +894,7 @@ export function WaitingRoom({
 
               <Button
                 type="button"
-                variant="outline"
-                className="w-full border-red-200 text-red-700"
+                className="w-full bg-red-600 text-white hover:bg-red-700"
                 disabled={cancellingPending}
                 onClick={() => void handleCancelPending()}
               >
