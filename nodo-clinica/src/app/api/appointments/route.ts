@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { patientLoginUrl } from "@/lib/clinic/appointment-payment";
 import { sendAppointmentConfirmationEmail } from "@/lib/email/resend";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
       scheduledAt: format(new Date(scheduledAt), "dd 'de' MMMM 'yyyy' 'a las' HH:mm 'hs'", {
         locale: es,
       }),
-      waitingRoomUrl,
+      waitingRoomUrl: patientLoginUrl(baseUrl),
     });
 
     return NextResponse.json({

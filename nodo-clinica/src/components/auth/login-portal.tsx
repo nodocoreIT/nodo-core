@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Stethoscope, User, Eye, EyeOff, Loader2, KeyRound, MailCheck } from "lucide-react";
 import { clinicApi } from "@/lib/clinic/client-api";
+import { safePatientNextPath } from "@/lib/clinic/patient-login-redirect";
 import {
   CLINICA_REGISTRATION_URL,
   isOpenRegistrationAllowed,
@@ -203,6 +204,21 @@ export function LoginPortal() {
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [recoverySent, setRecoverySent] = useState(false);
 
+  const patientNext = safePatientNextPath(searchParams.get("next"));
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const { session } = await clinicApi.getSession();
+        if (session?.role === "patient") {
+          window.location.replace(patientNext ?? "/paciente");
+        }
+      } catch {
+        /* not logged in */
+      }
+    })();
+  }, [patientNext]);
+
   const isDoctor = role === "doctor";
   const platformDoctor = isDoctor && isPlatformMode();
   // Patients can always register; doctors follow open-registration + platform rules
@@ -231,7 +247,13 @@ export function LoginPortal() {
       await clinicApi.login(form.email.trim(), form.password, role);
       setShowTransition(true);
       setTimeout(() => {
-        window.location.replace(isDoctor ? "/medico/dashboard" : "/paciente");
+        window.location.replace(
+          !isDoctor && patientNext
+            ? patientNext
+            : isDoctor
+              ? "/medico/dashboard"
+              : "/paciente",
+        );
       }, 1500);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al ingresar";

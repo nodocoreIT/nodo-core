@@ -80,7 +80,7 @@ export async function getPatients(
 
   if (q) {
     query = query.or(
-      `full_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`,
+      `full_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,dni.ilike.%${q}%`,
     );
   }
 

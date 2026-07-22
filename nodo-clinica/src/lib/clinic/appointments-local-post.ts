@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { appBaseUrl } from "@/lib/clinic/appointment-payment";
+import { appBaseUrl, patientLoginUrl } from "@/lib/clinic/appointment-payment";
 import { attachDocumentToAppointment } from "@/lib/clinic/appointment-documents";
 import { buildPaymentReceiptAudit } from "@/lib/clinic/payment-receipt-audit";
 import { notifyDoctorTransferPendingReview } from "@/lib/clinic/doctor-notifications";
@@ -270,7 +270,7 @@ export async function handleAppointmentsPostLocal(request: NextRequest) {
     patientName: patient.fullName,
     doctorName: doctor.fullName,
     scheduledAt: scheduledLabel,
-    waitingRoomUrl: `${baseUrl}/paciente/sala/${apt.accessToken}`,
+    waitingRoomUrl: patientLoginUrl(baseUrl),
     reminderNote,
   }).catch((err) => console.error("[Email] confirmation failed", err));
 

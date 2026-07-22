@@ -433,6 +433,37 @@ export const clinicApi = {
     };
   },
 
+  async doctorAssignAppointments(payload: {
+    patientId: string;
+    patientEmail?: string;
+    scheduledAtList: string[];
+    intakeReason?: string;
+  }) {
+    const res = await fetch(`${BASE}/api/clinic/appointments/assign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    const data = await parseJsonResponse(res);
+    if (!res.ok) {
+      throw new Error(data.error || "Error al asignar turno");
+    }
+    return data as {
+      ok: boolean;
+      count: number;
+      patientEmail: string;
+      patientName: string;
+      appointments: Array<{
+        id: string;
+        scheduledAt: string;
+        accessToken: string;
+        paymentStatus: string;
+        requiresPayment: boolean;
+      }>;
+    };
+  },
+
   async getMercadoPagoCheckout(params: {
     accessToken?: string;
     appointmentId?: string;
@@ -590,6 +621,21 @@ export const clinicApi = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al cancelar turno");
+    return data;
+  },
+
+  async removePatientAppointment(accessToken: string) {
+    const res = await fetch(`${BASE}/api/clinic/appointments`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        accessToken,
+        action: "patientRemoveAppointment",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al eliminar turno");
     return data;
   },
 

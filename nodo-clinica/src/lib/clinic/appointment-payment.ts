@@ -15,8 +15,23 @@ export function appBaseUrl() {
 }
 
 /** Login entry for patients (opens "Soy Paciente" tab). */
-export function patientLoginUrl(baseUrl: string = appBaseUrl()) {
-  return `${baseUrl.replace(/\/$/, "")}/login?role=paciente`;
+export function patientLoginUrl(
+  baseUrl: string = appBaseUrl(),
+  opts?: { next?: string },
+) {
+  const url = new URL(`${baseUrl.replace(/\/$/, "")}/login`);
+  url.searchParams.set("role", "paciente");
+  if (opts?.next) url.searchParams.set("next", opts.next);
+  return url.toString();
+}
+
+/** Login → Mis turnos → auto-open payment modal for the given turno. */
+export function patientTurnosPaymentUrl(
+  accessToken: string,
+  baseUrl: string = appBaseUrl(),
+) {
+  const turnosPath = `/paciente/turnos?token=${encodeURIComponent(accessToken)}`;
+  return patientLoginUrl(baseUrl, { next: turnosPath });
 }
 
 export async function confirmAppointmentPaymentAndNotify(
@@ -105,7 +120,7 @@ export async function confirmAppointmentPaymentAndNotify(
     patientName: patient.full_name,
     doctorName: professional.full_name,
     scheduledAt: scheduledLabel,
-    waitingRoomUrl: `${appBaseUrl()}/paciente/sala/${apt.access_token}`,
+    waitingRoomUrl: patientLoginUrl(),
     reminderNote,
   }).catch((err) => console.error("[Email] confirmation after MP payment", err));
 

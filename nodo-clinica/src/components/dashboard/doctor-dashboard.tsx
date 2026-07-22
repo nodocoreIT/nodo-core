@@ -4,7 +4,7 @@ import { useEffect, useCallback, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Stethoscope, Pill, FlaskConical, Brain, LogOut, CheckCircle, Settings } from "lucide-react";
+import { Stethoscope, Pill, FlaskConical, Brain, LogOut, CheckCircle, Settings, CalendarPlus } from "lucide-react";
 import { PatientQueue } from "@/components/dashboard/patient-queue";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { JitsiMeet } from "@/components/consultation/jitsi-meet";
@@ -27,7 +27,8 @@ import { mapAppointmentStatusToLifecycle } from "@/types";
 import type { Appointment, ClinicalRecord, QueuePatient } from "@/types";
 import { toast } from "sonner";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { Button } from "@/components/ui/button";
+import { DoctorAssignAppointmentDialog } from "@/components/dashboard/doctor-assign-appointment-dialog";
+import type { DoctorAssignAppointmentPrefill } from "@/components/dashboard/doctor-assign-appointment-dialog";
 
 type DataSource = "local" | "supabase";
 
@@ -129,6 +130,9 @@ export function DoctorDashboard({
   const [activeHealthProfile, setActiveHealthProfile] =
     useState<PatientHealthProfile | null>(null);
   const [videoSessionKey, setVideoSessionKey] = useState(0);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignPrefillOverride, setAssignPrefillOverride] =
+    useState<DoctorAssignAppointmentPrefill | null>(null);
   const { queue } = useConsultationStore();
   const queueRef = useRef(queue);
   useEffect(() => { queueRef.current = queue; }, [queue]);
@@ -584,8 +588,28 @@ export function DoctorDashboard({
   };
 
   const patientProfile = activeAppointment?.patient as
-    | { profile?: { full_name: string; email: string } }
+    | { profile?: { full_name: string; email: string }; full_name?: string; email?: string }
     | undefined;
+
+  const assignPrefill: DoctorAssignAppointmentPrefill | null =
+    hasActiveSession() && activeAppointment
+      ? {
+          patientId: activeAppointment.patient_id,
+          patientName:
+            queue.find((q) => q.appointmentId === activeAppointment.id)?.patientName ??
+            patientProfile?.full_name ??
+            patientProfile?.profile?.full_name ??
+            "Paciente",
+          patientEmail:
+            queue.find((q) => q.appointmentId === activeAppointment.id)?.patientEmail ??
+            patientProfile?.email ??
+            patientProfile?.profile?.email,
+          patientPhoto:
+            queue.find((q) => q.appointmentId === activeAppointment.id)?.patientPhoto,
+        }
+      : null;
+
+  const dialogAssignPrefill = assignPrefillOverride ?? assignPrefill;
 
   return (
     <div className={embedded ? "bg-paper" : "min-h-screen bg-slate-50"}>
@@ -604,6 +628,17 @@ export function DoctorDashboard({
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {hasActiveSession() && activeAppointment && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-brand/30 text-brand hover:bg-brand/5"
+                onClick={() => setAssignOpen(true)}
+              >
+                <CalendarPlus className="h-4 w-4 mr-1" />
+                Asignar turno
+              </Button>
+            )}
             {hasActiveSession() && activeAppointment && (
               <Button
                 size="sm"
@@ -636,6 +671,10 @@ export function DoctorDashboard({
               <PatientSearchHeader
                 doctorId={doctorId}
                 onViewPatient={handleSelectSearchedPatient}
+                onAssignPatient={(patient) => {
+                  setAssignPrefillOverride(patient);
+                  setAssignOpen(true);
+                }}
               />
             )}
             <NotificationBell />
@@ -702,6 +741,17 @@ export function DoctorDashboard({
               <Button
                 size="sm"
                 variant="outline"
+                className="border-brand/30 text-brand hover:bg-brand/5"
+                onClick={() => setAssignOpen(true)}
+              >
+                <CalendarPlus className="h-4 w-4 mr-1" />
+                Asignar turno
+              </Button>
+            )}
+            {hasActiveSession() && activeAppointment && (
+              <Button
+                size="sm"
+                variant="outline"
                 className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                 onClick={() => finishConsultation(activeAppointment.id)}
               >
@@ -730,6 +780,10 @@ export function DoctorDashboard({
               <PatientSearchHeader
                 doctorId={doctorId}
                 onViewPatient={handleSelectSearchedPatient}
+                onAssignPatient={(patient) => {
+                  setAssignPrefillOverride(patient);
+                  setAssignOpen(true);
+                }}
               />
             )}
             <NotificationBell />
@@ -992,6 +1046,19 @@ export function DoctorDashboard({
           )}
         </div>
       </div>
+
+      <DoctorAssignAppointmentDialog
+        doctorId={doctorId}
+        doctorName={doctorName}
+        open={assignOpen}
+        onOpenChange={(open) => {
+          setAssignOpen(open);
+          if (!open) setAssignPrefillOverride(null);
+        }}
+        prefill={dialogAssignPrefill}
+        prefillMode={assignPrefillOverride ? "search" : assignPrefill ? "consultation" : undefined}
+        onAssigned={() => void loadQueue()}
+      />
     </div>
   );
 }

@@ -36,6 +36,7 @@ import { buildCheckoutForAppointment } from "@/lib/mercadopago/checkout";
 import {
   appBaseUrl,
   confirmAppointmentPaymentAndNotify,
+  patientLoginUrl,
 } from "@/lib/clinic/appointment-payment";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -235,28 +236,35 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      (appointments ?? []).map((apt) => ({
-        id: apt.id,
-        scheduledAt: apt.scheduled_at,
-        status: apt.status,
-        accessToken: apt.access_token,
+      (appointments ?? []).map((apt) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        paymentStatus: (apt as any).payment_status,
-        needsReview: appointmentNeedsDoctorPaymentReviewFromDbRow(apt as never, {
-          receiptDocumentCount:
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ((apt as any).patient_documents ?? []).length,
-        }),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        doctor: (apt as any).professionals
-          ? {
+        const audit = (apt as any).payment_receipt_audit as Record<string, unknown> | null;
+        return {
+          id: apt.id,
+          scheduledAt: apt.scheduled_at,
+          status: apt.status,
+          accessToken: apt.access_token,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          paymentStatus: (apt as any).payment_status,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          cancelledBy: (apt as any).cancelled_by ?? null,
+          paymentRejected: typeof audit?.rejectionReason === "string",
+          needsReview: appointmentNeedsDoctorPaymentReviewFromDbRow(apt as never, {
+            receiptDocumentCount:
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              fullName: (apt as any).professionals.full_name,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              specialty: (apt as any).professionals.specialty,
-            }
-          : undefined,
-      })),
+              ((apt as any).patient_documents ?? []).length,
+          }),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          doctor: (apt as any).professionals
+            ? {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                fullName: (apt as any).professionals.full_name,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                specialty: (apt as any).professionals.specialty,
+              }
+            : undefined,
+        };
+      }),
     );
   }
 
@@ -860,7 +868,7 @@ export async function POST(request: NextRequest) {
     patientName: patientRow.full_name,
     doctorName: professional.full_name,
     scheduledAt: scheduledLabel,
-    waitingRoomUrl: `${baseUrl}/paciente/sala/${apt.access_token}`,
+    waitingRoomUrl: patientLoginUrl(baseUrl),
     reminderNote,
   }).catch((err) => console.error("[Email] confirmation failed", err));
 
@@ -966,6 +974,34 @@ export async function PATCH(request: NextRequest) {
       .select()
       .single();
     return NextResponse.json(updated);
+  }
+
+  if (action === "patientRemoveAppointment" && accessToken) {
+    const { data: apt } = await getAppointmentByToken(supabase, accessToken);
+    if (!apt) {
+      return NextResponse.json(
+        { error: "Turno no encontrado" },
+        { status: 404 },
+      );
+    }
+    if (user.role === "patient") {
+      const { data: patientRow } = await supabase
+        .from("patients")
+        .select("id")
+        .eq("profile_id", user.id)
+        .maybeSingle();
+      if (patientRow && patientRow.id !== apt.patient_id) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+    }
+    if (["waiting", "in_consultation"].includes(apt.status)) {
+      return NextResponse.json(
+        { error: "No podés eliminar un turno en curso" },
+        { status: 400 },
+      );
+    }
+    await supabase.from("appointments").delete().eq("id", apt.id);
+    return NextResponse.json({ ok: true });
   }
 
   if (action === "patientDeleteCancelledAppointment" && accessToken) {
@@ -1080,12 +1116,12 @@ export async function PATCH(request: NextRequest) {
       .update({
         payment_status: "pending",
         status: "cancelled",
-        payment_receipt_audit: reason
-          ? {
-              ...((apt.payment_receipt_audit as Record<string, unknown>) ?? {}),
-              rejectionReason: reason,
-            }
-          : apt.payment_receipt_audit,
+        cancelled_by: "doctor",
+        cancelled_at: new Date().toISOString(),
+        payment_receipt_audit: {
+          ...((apt.payment_receipt_audit as Record<string, unknown>) ?? {}),
+          rejectionReason: reason || "Rechazado por el médico",
+        },
         updated_at: new Date().toISOString(),
       })
       .eq("id", apt.id)

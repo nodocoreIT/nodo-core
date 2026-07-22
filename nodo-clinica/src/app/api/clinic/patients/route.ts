@@ -128,6 +128,7 @@ export async function GET(request: NextRequest) {
         fullName: patient.full_name,
         email: patient.email,
         phone: patient.phone,
+        dni: patient.dni ?? null,
         profilePhotoUrl: patient.profile_photo_url,
         createdAt: patient.created_at,
         stats: {

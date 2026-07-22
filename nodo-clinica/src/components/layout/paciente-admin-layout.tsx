@@ -72,7 +72,12 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
       }
 
       if (!sessionUserId) {
-        router.replace("/login/paciente");
+        const returnTo =
+          window.location.pathname +
+          (window.location.search || "");
+        router.replace(
+          `/login/paciente?next=${encodeURIComponent(returnTo)}`,
+        );
         return;
       }
 

@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
       patientName: patient.full_name,
       doctorName: professional.full_name,
       scheduledAt: scheduledLabel,
-      waitingRoomUrl: `${baseUrl()}/paciente/sala/${apt.access_token}`,
+      waitingRoomUrl: patientLoginUrl(baseUrl()),
       reminderNote,
     });
 
@@ -299,7 +299,7 @@ async function handleLocalReminders(
       patientName: patient.fullName,
       doctorName: doctor.fullName,
       scheduledAt: scheduledLabel,
-      waitingRoomUrl: `${baseUrl()}/paciente/sala/${apt.accessToken}`,
+      waitingRoomUrl: patientLoginUrl(baseUrl()),
       reminderNote,
     });
 
