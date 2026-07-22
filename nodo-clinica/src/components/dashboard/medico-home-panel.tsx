@@ -22,9 +22,9 @@ function todayLabel(): string {
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
-function greetingName(fullName: string): string {
-  const first = fullName.trim().split(/\s+/)[0];
-  return first || "Doctor/a";
+function displayName(fullName: string): string {
+  const trimmed = fullName.trim();
+  return trimmed || "Doctor/a";
 }
 
 export function MedicoHomePanel({ doctorId, doctorName }: MedicoHomePanelProps) {
@@ -36,7 +36,7 @@ export function MedicoHomePanel({ doctorId, doctorName }: MedicoHomePanelProps) 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-display text-2xl font-bold uppercase tracking-wide text-navy">
-            Hola, {greetingName(doctorName)}
+            Hola, {displayName(doctorName)}
           </h2>
           <p className="mt-1 text-sm text-slate2">Hoy es {todayLabel()}</p>
         </div>

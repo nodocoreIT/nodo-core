@@ -33,6 +33,7 @@ import {
   type AdminCommandPaletteItem,
 } from "@nodocore/shared-components";
 import { NodoSwitcher } from "@nodocore/nodo-modules";
+import { MedicoDoctorProvider } from "@/contexts/medico-doctor-context";
 import { DoctorSettingsDialog, type SectionId } from "@/components/medical/doctor-settings-dialog";
 import { ClinicNotificationsBell } from "@/components/layout/clinic-notifications-bell";
 import { PlanBadge } from "@/components/plan/plan-badge";
@@ -261,7 +262,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
     [router],
   );
 
-  if (checking) {
+  if (checking || !doctor) {
     return (
       <div className="flex h-dvh items-center justify-center bg-paper">
         <div
@@ -274,6 +275,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    <MedicoDoctorProvider doctor={doctor}>
     <AdminCommandPaletteProvider
       items={commandItems}
       onSelectItem={handleCommandSelect}
@@ -462,5 +464,6 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
         )}
       </div>
     </AdminCommandPaletteProvider>
+    </MedicoDoctorProvider>
   );
 }
