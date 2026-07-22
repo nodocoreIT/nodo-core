@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
   const { data: existingUnits, error: fetchErr } = await admin
     .from("client_units")
-    .select("id, unit_code, provision_user_id, access_user")
+    .select("id, unit_code, provision_user_id, access_user, plan")
     .eq("client_id", clientId);
 
   if (fetchErr) {

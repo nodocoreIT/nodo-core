@@ -3,7 +3,8 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { jsonWithSession } from "@/lib/clinic/session";
 import {
   canAccessAsRole,
-  lookupClinicMembershipByAuthUserId,
+  linkClinicMembershipProfiles,
+  lookupClinicMembership,
   sessionRoleToDbRole,
 } from "@/lib/clinic/resolve-clinic-role";
 
@@ -29,10 +30,13 @@ export async function POST(request: NextRequest) {
     const intendedDbRole = sessionRoleToDbRole(
       requestedRole === "doctor" ? "doctor" : "patient",
     );
-    const membership = await lookupClinicMembershipByAuthUserId(
+    const membership = await linkClinicMembershipProfiles(
       serviceClient,
       data.user.id,
-      data.user.email,
+      await lookupClinicMembership(serviceClient, {
+        email: data.user.email,
+        authUserId: data.user.id,
+      }),
     );
 
     if (!canAccessAsRole(membership, intendedDbRole)) {

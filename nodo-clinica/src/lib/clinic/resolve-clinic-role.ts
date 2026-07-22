@@ -110,25 +110,23 @@ export async function lookupClinicMembershipByAuthUserId(
     .eq("profile_id", authUserId)
     .maybeSingle();
 
-  if (professional || patientByProfile) {
-    return {
-      professionalId: professional?.id ?? null,
-      professionalUserId: professional?.user_id ?? null,
-      patientId: patientByProfile?.id ?? null,
-      patientProfileId: patientByProfile?.profile_id ?? null,
-    };
-  }
-
-  if (email) {
-    return lookupClinicMembershipByEmail(service, email);
-  }
-
-  return {
-    professionalId: null,
-    professionalUserId: null,
-    patientId: null,
-    patientProfileId: null,
+  let membership: ClinicMembership = {
+    professionalId: professional?.id ?? null,
+    professionalUserId: professional?.user_id ?? null,
+    patientId: patientByProfile?.id ?? null,
+    patientProfileId: patientByProfile?.profile_id ?? null,
   };
+
+  // Always merge email lookup — a mistaken professionals row (e.g. platform-sync)
+  // must not hide a patients row matched only by email.
+  if (email?.trim()) {
+    membership = mergeClinicMembership(
+      membership,
+      await lookupClinicMembershipByEmail(service, email),
+    );
+  }
+
+  return membership;
 }
 
 export function canAccessAsRole(
@@ -159,6 +157,33 @@ export function resolveRoleForContext(
   }
 
   return { role, ...membership };
+}
+
+/** Link auth user to patient/professional rows found by email (dashboard provisioning). */
+export async function linkClinicMembershipProfiles(
+  service: ServiceClient,
+  authUserId: string,
+  membership: ClinicMembership,
+): Promise<ClinicMembership> {
+  let linked = { ...membership };
+
+  if (linked.patientId && linked.patientProfileId !== authUserId) {
+    await service
+      .from("patients")
+      .update({ profile_id: authUserId })
+      .eq("id", linked.patientId);
+    linked = { ...linked, patientProfileId: authUserId };
+  }
+
+  if (linked.professionalId && !linked.professionalUserId) {
+    await service
+      .from("professionals")
+      .update({ user_id: authUserId })
+      .eq("id", linked.professionalId);
+    linked = { ...linked, professionalUserId: authUserId };
+  }
+
+  return linked;
 }
 
 /** @deprecated Prefer lookupClinicMembershipByEmail + resolveRoleForContext */

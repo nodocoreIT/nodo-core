@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NODES } from "@/lib/nodes";
 import {
+  clinicaPortalRoleFromPlan,
   isClinicaUnitCode,
   revokeClinicaPortalAccess,
 } from "@/lib/registration/clinica-provision";
@@ -15,6 +16,7 @@ type ClientUnitRow = {
   unit_code: string;
   provision_user_id: string | null;
   access_user: string | null;
+  plan?: string | null;
 };
 
 /** Ban nodo auth user + remove clinica portal profile for one contracted unit. */
@@ -44,9 +46,13 @@ export async function revokeClientUnitAccess(
   }
 
   if (isClinicaUnitCode(unit.unit_code)) {
+    const portalRole = unit.plan
+      ? clinicaPortalRoleFromPlan(unit.plan)
+      : "both";
     const revoked = await revokeClinicaPortalAccess({
       email: unit.access_user,
       userId,
+      portalRole,
     });
     if (!revoked.ok) return revoked;
   }
@@ -70,7 +76,7 @@ export async function deleteClientsWithAccessRevoke(
 
   const { data: units, error: unitsError } = await admin
     .from("client_units")
-    .select("id, unit_code, provision_user_id, access_user, client_id")
+    .select("id, unit_code, provision_user_id, access_user, plan, client_id")
     .in("client_id", clientIds);
 
   if (unitsError) {

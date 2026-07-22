@@ -67,6 +67,18 @@ export async function ensureClinicaPortalProfile(params: {
   const { firstName, lastName, display } = splitName(params.clientName, email);
 
   if (params.portalRole === "paciente") {
+    // Drop mistaken professional row (platform-sync on medico tab for patient accounts)
+    const { error: delProf } = await db
+      .from("professionals")
+      .delete()
+      .eq("user_id", params.userId);
+    if (delProf?.code === "23503") {
+      await db
+        .from("professionals")
+        .update({ user_id: null })
+        .eq("user_id", params.userId);
+    }
+
     const { data: existing, error: fetchError } = await db
       .from("patients")
       .select("id, profile_id")
@@ -147,10 +159,11 @@ function isClinicaUnitCode(unitCode: string): boolean {
   return code === "clínica" || code === "clinica" || code === "salud";
 }
 
-/** Removes clinica portal rows so verify-portal / login cannot succeed after revoke. */
+/** Removes clinica portal rows for revoke (role-aware when possible). */
 export async function revokeClinicaPortalAccess(params: {
   email?: string | null;
   userId?: string | null;
+  portalRole?: "medico" | "paciente" | "both";
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const admin = createNodoAdminClient("clinica");
   if (!admin) return { ok: true };
@@ -158,8 +171,12 @@ export async function revokeClinicaPortalAccess(params: {
   const db = admin.schema("nodo_clinica");
   const email = params.email?.trim().toLowerCase() ?? null;
   const userId = params.userId ?? null;
+  const role = params.portalRole ?? "both";
+  const removePatients = role === "both" || role === "paciente";
+  const removeProfessionals = role === "both" || role === "medico";
 
   async function removePatientRows() {
+    if (!removePatients) return null;
     if (userId) {
       const { error } = await db.from("patients").delete().eq("profile_id", userId);
       if (error && error.code !== "23503") return error.message;
@@ -184,6 +201,7 @@ export async function revokeClinicaPortalAccess(params: {
   }
 
   async function removeProfessionalRows() {
+    if (!removeProfessionals) return null;
     if (userId) {
       const { error } = await db.from("professionals").delete().eq("user_id", userId);
       if (error && error.code !== "23503") return error.message;

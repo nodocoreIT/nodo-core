@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import {
   canAccessAsRole,
-  lookupClinicMembershipByAuthUserId,
+  linkClinicMembershipProfiles,
+  lookupClinicMembership,
   parseClinicDbRole,
   toSessionRole,
 } from "@/lib/clinic/resolve-clinic-role";
+import { repairDashboardPacienteProfile } from "@/lib/clinic/repair-dashboard-profile";
 
 /**
  * POST /api/clinic/account/verify-portal
@@ -31,11 +33,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const service = await createServiceClient();
-  const membership = await lookupClinicMembershipByAuthUserId(
-    service,
-    user.id,
-    user.email,
-  );
+  let membership = await lookupClinicMembership(service, {
+    email: user.email,
+    authUserId: user.id,
+  });
+  membership = await linkClinicMembershipProfiles(service, user.id, membership);
+
+  if (!canAccessAsRole(membership, intendedRole) && intendedRole === "paciente") {
+    const repaired = await repairDashboardPacienteProfile(service, user);
+    if (repaired) {
+      membership = await linkClinicMembershipProfiles(service, user.id, repaired);
+    }
+  }
 
   if (!canAccessAsRole(membership, intendedRole)) {
     return NextResponse.json(
