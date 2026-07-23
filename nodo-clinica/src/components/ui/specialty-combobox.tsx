@@ -1,8 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Combobox } from "@base-ui/react/combobox"
-import { Check, ChevronsUpDown, Plus, Loader2 } from "lucide-react"
+import { Check, ChevronsUpDown, Loader2, Search } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -16,168 +15,166 @@ interface SpecialtyComboboxProps {
   onChange: (value: string) => void
   disabled?: boolean
   placeholder?: string
+  className?: string
+}
+
+const triggerClassName = cn(
+  "flex h-auto w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-navy shadow-sm transition-colors outline-none",
+  "focus-visible:border-teal-500 focus-visible:ring-2 focus-visible:ring-teal-500/25",
+  "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+)
+
+async function fetchSpecialties(): Promise<Specialty[]> {
+  const res = await fetch("/api/clinic/specialties")
+  if (!res.ok) throw new Error("Error al cargar especialidades")
+  const data = await res.json()
+  return (data.specialties ?? []) as Specialty[]
 }
 
 export function SpecialtyCombobox({
   value,
   onChange,
   disabled = false,
-  placeholder = "Buscar especialidad...",
+  placeholder = "Seleccioná o buscá especialidad…",
+  className,
 }: SpecialtyComboboxProps) {
-  const [results, setResults] = React.useState<Specialty[]>([])
-  const [loading, setLoading] = React.useState(false)
-  const [adding, setAdding] = React.useState(false)
-  const [inputValue, setInputValue] = React.useState("")
-  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const rootRef = React.useRef<HTMLDivElement>(null)
+  const searchRef = React.useRef<HTMLInputElement>(null)
+  const [open, setOpen] = React.useState(false)
+  const [search, setSearch] = React.useState("")
+  const [specialties, setSpecialties] = React.useState<Specialty[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [loadError, setLoadError] = React.useState(false)
 
-  // Debounced fetch when input changes
   React.useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
+    let cancelled = false
+    setLoading(true)
+    setLoadError(false)
 
-    debounceRef.current = setTimeout(async () => {
-      setLoading(true)
-      try {
-        const params = inputValue ? `?q=${encodeURIComponent(inputValue)}` : ""
-        const res = await fetch(`/api/clinic/specialties${params}`)
-        if (!res.ok) throw new Error("Error al buscar especialidades")
-        const data = await res.json()
-        setResults(data.specialties ?? [])
-      } catch {
-        setResults([])
-      } finally {
-        setLoading(false)
-      }
-    }, 300)
+    fetchSpecialties()
+      .then((items) => {
+        if (!cancelled) setSpecialties(items)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSpecialties([])
+          setLoadError(true)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
 
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
+      cancelled = true
     }
-  }, [inputValue])
+  }, [])
 
-  async function handleAddNew() {
-    const newName = inputValue.trim()
-    if (!newName || adding) return
-    setAdding(true)
-    try {
-      const res = await fetch("/api/clinic/specialties", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName }),
-      })
-      if (!res.ok) throw new Error("Error al agregar especialidad")
-      const data = await res.json()
-      const savedName: string = data.specialty?.name ?? newName
-      onChange(savedName)
-      setInputValue("")
-    } catch {
-      // keep state so user can retry
-    } finally {
-      setAdding(false)
+  React.useEffect(() => {
+    if (!open) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false)
+        setSearch("")
+      }
     }
+
+    document.addEventListener("mousedown", handlePointerDown)
+    return () => document.removeEventListener("mousedown", handlePointerDown)
+  }, [open])
+
+  React.useEffect(() => {
+    if (open) {
+      window.setTimeout(() => searchRef.current?.focus(), 0)
+    }
+  }, [open])
+
+  const filtered = React.useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return specialties
+    return specialties.filter((item) => item.name.toLowerCase().includes(query))
+  }, [specialties, search])
+
+  function selectSpecialty(name: string) {
+    onChange(name)
+    setOpen(false)
+    setSearch("")
   }
 
-  const showAddOption =
-    inputValue.trim().length > 0 &&
-    !loading &&
-    results.length === 0
-
   return (
-    <Combobox.Root
-      value={value || null}
-      onValueChange={(val) => onChange(val ?? "")}
-      onInputValueChange={setInputValue}
-      disabled={disabled}
-      data-slot="specialty-combobox"
-    >
-      <Combobox.InputGroup className="relative">
-        <Combobox.Input
-          placeholder={placeholder}
-          className={cn(
-            "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 pr-8 text-sm transition-colors outline-none",
-            "placeholder:text-muted-foreground",
-            "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-            "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
-          )}
-        />
-        <Combobox.Icon className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
-          <ChevronsUpDown className="size-3.5" />
-        </Combobox.Icon>
-      </Combobox.InputGroup>
+    <div ref={rootRef} className={cn("relative", className)}>
+      <button
+        type="button"
+        disabled={disabled || loading}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        className={triggerClassName}
+      >
+        <span className={cn("truncate text-left", !value && "text-slate-400")}>
+          {loading ? "Cargando especialidades…" : value || placeholder}
+        </span>
+        {loading ? (
+          <Loader2 className="size-4 shrink-0 animate-spin text-slate-400" />
+        ) : (
+          <ChevronsUpDown className="size-4 shrink-0 text-slate-400" />
+        )}
+      </button>
 
-      <Combobox.Portal>
-        <Combobox.Positioner sideOffset={4} className="isolate z-50 outline-none">
-          <Combobox.Popup
-            className={cn(
-              "max-h-(--available-height) w-(--anchor-width) overflow-y-auto rounded-lg p-1",
-              "bg-white text-slate-800 shadow-md ring-1 ring-black/10",
-              "origin-(--transform-origin)",
-              "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95",
-              "data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-              "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
-            )}
-          >
-            {/* Loading state */}
-            {loading && (
-              <div className="flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" />
-                <span>Buscando...</span>
-              </div>
-            )}
+      {open && (
+        <div
+          className="absolute z-[120] mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
+          role="listbox"
+        >
+          <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
+            <Search className="size-4 shrink-0 text-slate-400" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar especialidad…"
+              className="w-full bg-transparent text-sm text-navy placeholder:text-slate-400 outline-none"
+            />
+          </div>
 
-            {/* Results */}
-            {!loading && results.map((specialty) => (
-              <Combobox.Item
-                key={specialty.id}
-                value={specialty.name}
-                className={cn(
-                  "relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none",
-                  "focus:bg-teal-50 focus:text-teal-800",
-                  "data-disabled:pointer-events-none data-disabled:opacity-50",
-                  "data-[highlighted]:bg-teal-50 data-[highlighted]:text-teal-800"
-                )}
-              >
-                <Combobox.ItemIndicator className="flex items-center">
-                  <Check className="size-3.5" />
-                </Combobox.ItemIndicator>
-                {specialty.name}
-              </Combobox.Item>
-            ))}
-
-            {/* Add new option */}
-            {showAddOption && (
-              <div
-                role="option"
-                aria-selected={false}
-                onClick={handleAddNew}
-                onKeyDown={(e) => e.key === "Enter" && handleAddNew()}
-                tabIndex={0}
-                className={cn(
-                  "flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-sm text-primary outline-hidden select-none",
-                  "hover:bg-accent hover:text-accent-foreground",
-                  "focus:bg-accent focus:text-accent-foreground",
-                  adding && "pointer-events-none opacity-50"
-                )}
-              >
-                {adding ? (
-                  <Loader2 className="size-3.5 shrink-0 animate-spin" />
-                ) : (
-                  <Plus className="size-3.5 shrink-0" />
-                )}
-                <span>
-                  Agregar: <span className="font-medium">{inputValue.trim()}</span>
-                </span>
-              </div>
+          <div className="max-h-56 overflow-y-auto p-1">
+            {loadError && (
+              <p className="px-3 py-2 text-sm text-red-600">
+                No se pudieron cargar las especialidades.
+              </p>
             )}
 
-            {/* Empty state */}
-            {!loading && !showAddOption && results.length === 0 && (
-              <Combobox.Empty className="px-2 py-1.5 text-sm text-muted-foreground">
-                Sin resultados
-              </Combobox.Empty>
+            {!loadError && filtered.length === 0 && (
+              <p className="px-3 py-2 text-sm text-slate-500">Sin resultados</p>
             )}
-          </Combobox.Popup>
-        </Combobox.Positioner>
-      </Combobox.Portal>
-    </Combobox.Root>
+
+            {!loadError &&
+              filtered.map((item) => {
+                const selected = value === item.name
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    onClick={() => selectSpecialty(item.name)}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-navy transition-colors",
+                      selected ? "bg-teal-50 text-teal-800" : "hover:bg-slate-50",
+                    )}
+                  >
+                    <Check
+                      className={cn("size-4 shrink-0", selected ? "opacity-100" : "opacity-0")}
+                    />
+                    <span>{item.name}</span>
+                  </button>
+                )
+              })}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

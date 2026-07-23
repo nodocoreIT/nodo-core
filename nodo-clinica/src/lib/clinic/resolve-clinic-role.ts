@@ -33,22 +33,60 @@ export async function lookupClinicMembershipByEmail(
   const [{ data: professional }, { data: patient }] = await Promise.all([
     service
       .from("professionals")
-      .select("id, user_id")
-      .eq("email", normalized)
+      .select("id, user_id, email")
+      .ilike("email", normalized)
       .maybeSingle(),
     service
       .from("patients")
-      .select("id, profile_id")
-      .eq("email", normalized)
+      .select("id, profile_id, email")
+      .ilike("email", normalized)
       .maybeSingle(),
   ]);
 
-  return {
+  let membership: ClinicMembership = {
     professionalId: professional?.id ?? null,
     professionalUserId: professional?.user_id ?? null,
     patientId: patient?.id ?? null,
     patientProfileId: patient?.profile_id ?? null,
   };
+
+  // Same auth account can hold both portals — link the sibling profile by user id.
+  const authUserId =
+    membership.professionalUserId ?? membership.patientProfileId ?? null;
+
+  if (authUserId) {
+    if (!membership.professionalId) {
+      const { data: profByUser } = await service
+        .from("professionals")
+        .select("id, user_id")
+        .eq("user_id", authUserId)
+        .maybeSingle();
+      if (profByUser?.id) {
+        membership = {
+          ...membership,
+          professionalId: profByUser.id,
+          professionalUserId: profByUser.user_id ?? authUserId,
+        };
+      }
+    }
+
+    if (!membership.patientId) {
+      const { data: patientByProfile } = await service
+        .from("patients")
+        .select("id, profile_id")
+        .eq("profile_id", authUserId)
+        .maybeSingle();
+      if (patientByProfile?.id) {
+        membership = {
+          ...membership,
+          patientId: patientByProfile.id,
+          patientProfileId: patientByProfile.profile_id ?? authUserId,
+        };
+      }
+    }
+  }
+
+  return membership;
 }
 
 function mergeClinicMembership(

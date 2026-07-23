@@ -53,6 +53,18 @@ function userKey(email: string, unitCode: string): string {
   return `${email.trim().toLowerCase()}::${normalizeUnitCode(unitCode)}`;
 }
 
+/** Clinic allows the same email as paciente and médico — dedupe per portal role. */
+function clinicProfileKey(email: string, unitCode: string, role: "paciente" | "medico"): string {
+  return `${userKey(email, unitCode)}::${role}`;
+}
+
+function nodoUserDedupeKey(row: NodoUserRecord): string {
+  if (row.id.startsWith("clinic-patient:") || row.id.startsWith("clinic-medico:")) {
+    return row.id;
+  }
+  return userKey(row.email, row.unitCode);
+}
+
 function inferAccessType(plan: string | null, unitCode: string): NodoUserAccessType {
   const code = normalizeUnitCode(unitCode);
   const p = (plan ?? "").trim().toLowerCase();
@@ -213,9 +225,11 @@ async function listFromClinicaProfiles(existingKeys: Set<string>): Promise<NodoU
   for (const p of patients ?? []) {
     const email = String(p.email ?? "").trim().toLowerCase();
     if (!email || email.includes("@deleted.local")) continue;
-    const key = userKey(email, unitCode);
-    if (existingKeys.has(key)) continue;
-    existingKeys.add(key);
+
+    const profileKey = clinicProfileKey(email, unitCode, "paciente");
+    const accessKey = userKey(email, unitCode);
+    if (existingKeys.has(profileKey) || existingKeys.has(accessKey)) continue;
+    existingKeys.add(profileKey);
 
     rows.push({
       id: `clinic-patient:${p.id}`,
@@ -240,9 +254,10 @@ async function listFromClinicaProfiles(existingKeys: Set<string>): Promise<NodoU
   for (const prof of professionals ?? []) {
     const email = String(prof.email ?? "").trim().toLowerCase();
     if (!email || email.includes("@deleted.local")) continue;
-    const key = userKey(email, unitCode);
-    if (existingKeys.has(key)) continue;
-    existingKeys.add(key);
+
+    const profileKey = clinicProfileKey(email, unitCode, "medico");
+    if (existingKeys.has(profileKey)) continue;
+    existingKeys.add(profileKey);
 
     rows.push({
       id: `clinic-medico:${prof.id}`,
@@ -361,7 +376,7 @@ export async function listNodoUsers(): Promise<NodoUserRecord[]> {
 
   const seen = new Set<string>();
   const combined = merged.filter((row) => {
-    const key = userKey(row.email, row.unitCode);
+    const key = nodoUserDedupeKey(row);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

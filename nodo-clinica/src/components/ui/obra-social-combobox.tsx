@@ -92,9 +92,10 @@ export function ObraSocialCombobox({
         <Combobox.Input
           placeholder={placeholder}
           className={cn(
-            "h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-1 pr-8 text-sm text-navy shadow-sm transition-colors outline-none",
+            "h-auto w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2.5 pr-8 text-sm text-navy shadow-sm transition-colors outline-none",
             "placeholder:text-slate-400",
             "focus-visible:border-teal-500 focus-visible:ring-2 focus-visible:ring-teal-500/25",
+            "[&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_#ffffff] [&:-webkit-autofill]:[-webkit-text-fill-color:#1e293b]",
             "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
           )}
         />

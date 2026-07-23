@@ -10,9 +10,10 @@ import { SpecialtyCombobox } from "@/components/ui/specialty-combobox";
 import { NeuralNodesBackground } from "@/components/ui/neural-nodes-background";
 import { ONBOARDING_PLANS, formatPlanPrice } from "@/lib/clinic/subscription-plans";
 import { PhoneVerificationField } from "@/components/onboarding/phone-verification-field";
+import { CLINIC_BRAND_LOGO_SRC } from "@/lib/clinic/brand";
 
 const inputClass =
-  "mt-1 w-full rounded-lg px-3 py-2.5 text-sm bg-white border border-slate-200 text-navy placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/25 focus:border-teal-500 transition-shadow";
+  "mt-1 w-full rounded-lg px-3 py-2.5 text-sm bg-white border border-slate-200 text-navy placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/25 focus:border-teal-500 transition-shadow [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_#ffffff] [&:-webkit-autofill]:[-webkit-text-fill-color:#1e293b]";
 const labelClass = "text-xs font-medium text-slate-300";
 
 function OnboardingMedicoContent() {
@@ -24,7 +25,7 @@ function OnboardingMedicoContent() {
   const [plan, setPlan] = useState("trial");
   const [form, setForm] = useState({
     fullName: "",
-    specialty: "Medicina General",
+    specialty: "",
     licenseNumber: "",
   });
   const [phoneVerified, setPhoneVerified] = useState(false);
@@ -85,12 +86,13 @@ function OnboardingMedicoContent() {
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-50 border border-teal-200 text-teal-600">
               <Stethoscope className="h-6 w-6" />
             </span>
-            <div className="flex items-center gap-[0.4em]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logos/nodo ver clinica.png" alt="NODO" style={{ height: "clamp(22px, 2.4vw, 28px)", width: "auto" }} className="inline-block shrink-0" />
-              <span className="font-light leading-none text-white/30" style={{ fontSize: "clamp(22px, 2.4vw, 28px)" }}>|</span>
-              <span className="font-display font-extrabold text-white" style={{ fontSize: "clamp(22px, 2.4vw, 28px)", lineHeight: 1.1 }}>Clínica</span>
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={CLINIC_BRAND_LOGO_SRC}
+              alt="NODO Clínica"
+              style={{ height: "clamp(28px, 3vw, 36px)", width: "auto" }}
+              className="inline-block shrink-0"
+            />
           </div>
           <h1 className="text-2xl font-semibold text-white">Completá tu registro</h1>
           <p className="text-sm mt-2 max-w-lg mx-auto" style={{ color: "rgba(234,240,247,.55)" }}>

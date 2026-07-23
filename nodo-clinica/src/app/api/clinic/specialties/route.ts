@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from("medical_specialties")
-    .select("*")
+    .select("id, name")
     .eq("status", "approved")
     .order("name", { ascending: true });
 

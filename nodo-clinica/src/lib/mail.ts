@@ -1,5 +1,6 @@
 import "server-only";
 import nodemailer from "nodemailer";
+import { CLINIC_BRAND_LOGO_SRC } from "@/lib/clinic/brand";
 
 const HOST = process.env.ZOHO_SMTP_HOST ?? "smtp.zoho.com";
 const PORT = Number(process.env.ZOHO_SMTP_PORT ?? 465);
@@ -88,7 +89,7 @@ export async function sendPasswordResetEmail(params: {
 
   const { email, resetUrl } = params;
   const origin = resolveOrigin(params.origin);
-  const logoUrl = `${origin}/logos/logo%20compuesto%20estrella%20az%20letra%20blancazzz.png`;
+  const logoUrl = `${origin}${CLINIC_BRAND_LOGO_SRC}`;
 
   const transporter = createMailTransporter();
 
@@ -171,7 +172,7 @@ export async function sendClinicVerificationEmail(params: {
   const origin = resolveOrigin(params.origin);
   const verificationUrl = `${origin}/api/clinic/account/verify?token=${token}&role=${role}`;
   const roleLabel = role === "medico" ? "médico" : "paciente";
-  const logoUrl = `${origin}/logos/logo%20compuesto%20estrella%20az%20letra%20blancazzz.png`;
+  const logoUrl = `${origin}${CLINIC_BRAND_LOGO_SRC}`;
 
   const transporter = createMailTransporter();
 

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { KeyRound, Loader2, CheckCircle, Stethoscope, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { clinicApi } from "@/lib/clinic/client-api";
+import { CLINIC_BRAND_LOGO_SRC } from "@/lib/clinic/brand";
 import { parseClinicDbRole } from "@/lib/clinic/resolve-clinic-role";
 
 export default function ActualizarContrasenaPage() {
@@ -185,7 +186,7 @@ export default function ActualizarContrasenaPage() {
       <div className="relative z-[1]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/logos/logo compuesto estrella az letra blancazzz.png"
+          src={CLINIC_BRAND_LOGO_SRC}
           alt="NODO Clínica"
           style={{ height: "30px", width: "auto" }}
         />
@@ -205,24 +206,11 @@ export default function ActualizarContrasenaPage() {
           <div className="flex items-center gap-[0.4em] flex-wrap">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logos/nodo ver clinica.png"
-              alt="NODO"
+              src={CLINIC_BRAND_LOGO_SRC}
+              alt="NODO Clínica"
               className="inline-block shrink-0"
               style={{ height: "clamp(30px,3vw,40px)", width: "auto" }}
             />
-            <span
-              aria-hidden
-              className="font-light leading-none text-white/30"
-              style={{ fontSize: "clamp(30px,3vw,40px)" }}
-            >
-              |
-            </span>
-            <span
-              className="font-display font-extrabold text-white"
-              style={{ fontSize: "clamp(30px,3vw,40px)", lineHeight: 1.1 }}
-            >
-              Clínica
-            </span>
           </div>
         </div>
       </div>

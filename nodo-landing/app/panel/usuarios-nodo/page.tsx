@@ -559,6 +559,11 @@ export default function UsuariosNodoPage() {
                         </td>
                         <td style={tdStyle}>
                           <NodePill unitCode={user.unitCode} label={user.unitLabel} />
+                          {user.role === "medico" || user.role === "paciente" ? (
+                            <div style={{ fontSize: 11, color: "var(--color-slate2)", marginTop: 6 }}>
+                              {user.role === "medico" ? "Médico" : "Paciente"}
+                            </div>
+                          ) : null}
                           {user.plan && (
                             <div style={{ fontSize: 11, color: "var(--color-slate2)", marginTop: 6 }}>{user.plan}</div>
                           )}

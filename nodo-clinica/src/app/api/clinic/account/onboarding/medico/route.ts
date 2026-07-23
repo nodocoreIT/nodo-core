@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient, createSharedServiceClient } from "@/lib/supabase/server";
 import { assertOnboardingPhoneVerified } from "@/lib/clinic/phone-verification";
 import { CLINIC_ORG_ID, syncClinicaAuthClaims } from "@/lib/clinic/clinic-org";
+import { upsertProfessionalOnboardingRecord } from "@/lib/clinic/db/professionals";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -101,30 +102,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Split fullName into first/last for the DB columns
-    const nameParts = fullName.trim().split(/\s+/);
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(" ") || firstName;
+    const profResult = await upsertProfessionalOnboardingRecord(serviceClient, {
+      userId,
+      orgId: CLINIC_ORG_ID,
+      fullName,
+      email,
+      specialty,
+      licenseNumber,
+      plan,
+      phone: verifiedPhone,
+      phoneVerifiedAt: verifiedPhone ? new Date().toISOString() : null,
+    });
 
-    // Insert into professionals (ignore duplicate — idempotent)
-    const { error: profError } = await serviceClient
-      .from("professionals")
-      .insert({
-        user_id: userId,
-        org_id: CLINIC_ORG_ID,
-        first_name: firstName,
-        last_name: lastName,
-        full_name: fullName,
-        email: email.toLowerCase().trim(),
-        phone: verifiedPhone,
-        phone_verified_at: verifiedPhone ? new Date().toISOString() : null,
-        specialty,
-        license_number: licenseNumber ?? null,
-        subscription_status: "trial",
-        subscription_plan: plan,
-      });
-
-    if (profError && profError.code !== "23505") {
-      console.error("[onboarding/medico] professionals insert error", profError);
+    if (!profResult.ok) {
+      console.error("[onboarding/medico] professionals upsert error", profResult);
       return NextResponse.json(
         { error: "Error al crear perfil profesional." },
         { status: 500 },

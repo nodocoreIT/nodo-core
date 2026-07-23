@@ -7,6 +7,7 @@ import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { EcosystemDiagram } from "@/components/nodo/ecosystem-diagram";
 import { clinicApi } from "@/lib/clinic/client-api";
+import { CLINIC_BRAND_LOGO_SRC } from "@/lib/clinic/brand";
 import { DEMO_CREDENTIALS } from "@/lib/clinic/config";
 
 interface LoginFormProps {
@@ -131,7 +132,7 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
 
           <div className="relative z-[1]">
             <Image
-              src="/logos/logo compuesto estrella az letra blancazzz.png"
+              src={CLINIC_BRAND_LOGO_SRC}
               alt="Nodo Core"
               height={30}
               width={140}

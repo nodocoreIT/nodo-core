@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle, Clock, FileImage, CreditCard, Trash2, MailCheck, AlertCircle, ChevronDown } from "lucide-react";
+import { CheckCircle, Clock, FileImage, CreditCard, Trash2, MailCheck, AlertCircle, ChevronDown, Stethoscope, User } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
 import { NODES } from "@/lib/nodes";
@@ -95,6 +95,16 @@ type ClinicRegistration = {
   created_at: string;
   stage: "pending_email" | "expired" | "pending_onboarding" | "pending_activation";
 };
+
+function clinicRoleBadge(role: ClinicRegistration["role"]) {
+  const isMedico = role === "medico";
+  return {
+    label: isMedico ? "Médico" : "Paciente",
+    Icon: isMedico ? Stethoscope : User,
+    background: isMedico ? "#DBEAFE" : "#EDE9FE",
+    color: isMedico ? "#1D4ED8" : "#6D28D9",
+  };
+}
 
 export default function SolicitudesPage() {
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
@@ -334,6 +344,9 @@ export default function SolicitudesPage() {
                       ? CheckCircle
                       : MailCheck;
 
+              const roleBadge = clinicRoleBadge(r.role);
+              const RoleIcon = roleBadge.Icon;
+
               return (
                 <article
                   key={r.id}
@@ -353,7 +366,6 @@ export default function SolicitudesPage() {
                     <div>
                       <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{r.email}</p>
                       <p style={{ fontSize: 12, color: "var(--color-slate2)", margin: "3px 0 0" }}>
-                        {r.role === "medico" ? "Médico" : "Paciente"} ·{" "}
                         {new Date(r.created_at).toLocaleDateString("es-AR", {
                           day: "numeric",
                           month: "short",
@@ -364,6 +376,22 @@ export default function SolicitudesPage() {
                         )}
                       </p>
                     </div>
+                    <span
+                      style={{
+                        background: roleBadge.background,
+                        color: roleBadge.color,
+                        padding: "3px 10px",
+                        borderRadius: 999,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                      }}
+                    >
+                      <RoleIcon size={11} />
+                      {roleBadge.label}
+                    </span>
                     <span style={{ background: "#E0F2F1", color: "#0D9488", padding: "2px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600 }}>
                       Nodo Clínica
                     </span>
