@@ -1,9 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Stethoscope, User, Eye, EyeOff, Loader2, KeyRound, MailCheck } from "lucide-react";
+import {
+  PasswordResetPanel,
+  mapAuthPasswordError,
+  isSamePasswordAuthError,
+  usePasswordRecoveryBootstrap,
+} from "@nodocore/shared-components";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { safePatientNextPath } from "@/lib/clinic/patient-login-redirect";
 import {
@@ -12,6 +18,8 @@ import {
   isPlatformMode,
 } from "@/lib/clinic/platform-config";
 import { PlatformMedicoLoginFields } from "@/components/auth/platform-medico-login";
+import { createClient } from "@/lib/supabase/client";
+import { parseClinicDbRole } from "@/lib/clinic/resolve-clinic-role";
 
 function NodeTransitionOverlay() {
   return (
@@ -187,15 +195,26 @@ function NodeTransitionOverlay() {
 }
 
 type Role = "doctor" | "patient";
-type AuthMode = "login" | "register" | "forgot";
+type AuthMode = "login" | "register" | "forgot" | "reset-password";
 
 export function LoginPortal() {
   const searchParams = useSearchParams();
-  const initialMode = searchParams.get("mode") === "register" ? "register" : "login";
-  const initialRole = searchParams.get("role") === "paciente" ? "patient" : "doctor";
+  const modeParam = searchParams.get("mode") || "login";
+  const roleParam = searchParams.get("role");
+  const initialRole: Role =
+    roleParam === "paciente" || roleParam === "patient" ? "patient" : "doctor";
+  const initialAuthMode: AuthMode =
+    modeParam === "register"
+      ? "register"
+      : modeParam === "forgot"
+        ? "forgot"
+        : modeParam === "reset-password"
+          ? "reset-password"
+          : "login";
+
+  const supabase = useMemo(() => createClient(), []);
 
   const [role, setRole] = useState<Role>(initialRole);
-  const [authMode, setAuthMode] = useState<AuthMode>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [generalError, setGeneralError] = useState("");
@@ -203,8 +222,30 @@ export function LoginPortal() {
   const [registerSuccess, setRegisterSuccess] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [recoverySent, setRecoverySent] = useState(false);
+  const [recoveryDebugUrl, setRecoveryDebugUrl] = useState<string | null>(null);
+  const [resetSuccess, setResetSuccess] = useState(false);
+
+  const {
+    authMode,
+    setAuthMode,
+    bootstrapping: recoveryBootstrapping,
+  } = usePasswordRecoveryBootstrap({
+    supabase,
+    modeParam,
+    searchParams,
+    initialMode: initialAuthMode,
+    onError: (message) => setGeneralError(message),
+  });
 
   const patientNext = safePatientNextPath(searchParams.get("next"));
+
+  useEffect(() => {
+    if (roleParam === "paciente" || roleParam === "patient") {
+      setRole("patient");
+    } else if (roleParam === "medico" || roleParam === "doctor") {
+      setRole("doctor");
+    }
+  }, [roleParam]);
 
   useEffect(() => {
     void (async () => {
@@ -290,6 +331,7 @@ export function LoginPortal() {
     setGeneralError("");
     if (!recoveryEmail.trim()) return;
     setLoading(true);
+    setRecoveryDebugUrl(null);
     try {
       const res = await fetch("/api/clinic/account/reset-password", {
         method: "POST",
@@ -308,11 +350,61 @@ export function LoginPortal() {
         );
       }
       setRecoverySent(true);
+      if (typeof data.resetUrl === "string") {
+        setRecoveryDebugUrl(data.resetUrl);
+      }
     } catch (err) {
       setGeneralError(err instanceof Error ? err.message : "Error al enviar el correo");
     } finally {
       setLoading(false);
     }
+  };
+
+  const recoveryRole =
+    parseClinicDbRole(roleParam) ?? (isDoctor ? "medico" : "paciente");
+
+  const handleResetPassword = async (newPassword: string): Promise<string | null> => {
+    const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+    const passwordAlreadySet =
+      isSamePasswordAuthError(error?.message ?? "") ||
+      (error as { code?: string } | null)?.code === "same_password";
+
+    if (error && !passwordAlreadySet) {
+      return mapAuthPasswordError(error.message);
+    }
+
+    const userEmail = data.user?.email ?? null;
+    const authUserId = data.user?.id ?? null;
+
+    if (userEmail || authUserId) {
+      const roleRes = await fetch("/api/clinic/account/ensure-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: userEmail ?? undefined,
+          userId: authUserId ?? undefined,
+          intendedRole: recoveryRole,
+        }),
+      });
+      const roleData = await roleRes.json().catch(() => ({}));
+      if (!roleRes.ok || !roleData.role) {
+        return (
+          roleData.error ??
+          "No se pudo verificar el tipo de cuenta. Solicitá un nuevo enlace."
+        );
+      }
+
+      const loginRole: "doctor" | "patient" =
+        roleData.role === "medico" ? "doctor" : "patient";
+      if (userEmail) {
+        await clinicApi.login(userEmail, newPassword, loginRole);
+      }
+    }
+
+    await supabase.auth.signOut({ scope: "local" });
+    setResetSuccess(true);
+    setAuthMode("login");
+    return null;
   };
 
   const inputBase =
@@ -448,7 +540,7 @@ export function LoginPortal() {
         <main className="flex items-center justify-center p-8 bg-paper min-h-screen">
           <div className="w-[min(420px,100%)]">
             {/* Tabs */}
-            {authMode !== "forgot" && <div className="flex border-b border-mist mb-6">
+            {(authMode === "login" || authMode === "register") && <div className="flex border-b border-mist mb-6">
               <button
                 type="button"
                 onClick={() => { setAuthMode("login"); setGeneralError(""); }}
@@ -488,7 +580,7 @@ export function LoginPortal() {
             </div>}
 
             {/* Branding inline (mobile / right panel header) */}
-            {authMode !== "forgot" && <div className="flex items-center gap-2.5 mb-5">
+            {(authMode === "login" || authMode === "register") && <div className="flex items-center gap-2.5 mb-5">
               <span
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
                 style={{
@@ -512,7 +604,7 @@ export function LoginPortal() {
               </div>
             </div>}
 
-            {authMode !== "forgot" && <>
+            {(authMode === "login" || authMode === "register") && <>
             <h1 className="font-display font-bold text-ink text-[26px] mb-1">
               {authMode === "login" ? "Iniciar sesión" : "Crear cuenta"}
             </h1>
@@ -556,8 +648,27 @@ export function LoginPortal() {
             {/* Form area — fixed min-height prevents layout jump between tabs */}
             <div className="min-h-[280px]">
 
+            {recoveryBootstrapping ? (
+              <div className="flex justify-center py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-brand" />
+              </div>
+            ) : null}
+
+            {resetSuccess && authMode === "login" && !recoveryBootstrapping && (
+              <p className="text-[13px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-3 py-2 mb-4 text-center">
+                Tu contraseña se restableció correctamente. Ya podés iniciar sesión.
+              </p>
+            )}
+
+            {authMode === "reset-password" && !recoveryBootstrapping && (
+              <PasswordResetPanel
+                nodeLabel="Nodo Clínica"
+                onResetPassword={handleResetPassword}
+              />
+            )}
+
             {/* Login form */}
-            {authMode === "login" && (
+            {authMode === "login" && !recoveryBootstrapping && (
               platformDoctor ? (
                 <PlatformMedicoLoginFields
                   email={form.email}
@@ -644,7 +755,7 @@ export function LoginPortal() {
             )}
 
             {/* Register form */}
-            {authMode === "register" && (showRegister || platformDoctor) && (
+            {authMode === "register" && !recoveryBootstrapping && (showRegister || platformDoctor) && (
               <form onSubmit={handleRegister} noValidate>
                 <div className="mb-3">
                   <label className="block text-[13px] font-semibold text-navy mb-1.5">Nombre completo</label>
@@ -685,7 +796,7 @@ export function LoginPortal() {
               </form>
             )}
 
-            {authMode === "register" && !showRegister && !platformDoctor && (
+            {authMode === "register" && !recoveryBootstrapping && !showRegister && !platformDoctor && (
               <div className="text-center py-8">
                 <h2 className="font-display font-bold text-ink text-[22px] mb-2">Registro vía NodoCore</h2>
                 <p className="text-slate2 text-[14px] mb-6">
@@ -705,7 +816,7 @@ export function LoginPortal() {
             )}
 
             {/* Forgot password panel */}
-            {authMode === "forgot" && (
+            {authMode === "forgot" && !recoveryBootstrapping && (
               recoverySent ? (
                 <div className="flex flex-col items-center gap-4 py-8 text-center">
                   <div className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-100">
@@ -716,9 +827,29 @@ export function LoginPortal() {
                     Te enviamos un enlace de recuperación a{" "}
                     <span className="font-semibold text-ink">{recoveryEmail}</span>.
                   </p>
+                  {recoveryDebugUrl && process.env.NODE_ENV === "development" && (
+                    <div className="text-left w-full max-w-sm rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                      <p className="font-semibold mb-1">Dev — link de recuperación</p>
+                      <a
+                        href={recoveryDebugUrl}
+                        className="break-all text-brand underline"
+                      >
+                        {recoveryDebugUrl}
+                      </a>
+                      <p className="mt-2 text-[10px] leading-snug">
+                        Si abre en <code>:3000</code>, agregá{" "}
+                        <code>http://localhost:3002/**</code> en Supabase → Auth → Redirect URLs.
+                      </p>
+                    </div>
+                  )}
                   <button
                     type="button"
-                    onClick={() => { setAuthMode("login"); setRecoverySent(false); setRecoveryEmail(""); }}
+                    onClick={() => {
+                      setAuthMode("login");
+                      setRecoverySent(false);
+                      setRecoveryEmail("");
+                      setRecoveryDebugUrl(null);
+                    }}
                     className="text-[13px] font-semibold text-brand hover:underline bg-transparent border-none cursor-pointer p-0 mt-2"
                   >
                     Volver al inicio de sesión

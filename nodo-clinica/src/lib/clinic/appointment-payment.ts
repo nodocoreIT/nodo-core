@@ -8,28 +8,96 @@ import { es } from "date-fns/locale";
 export function appBaseUrl() {
   const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
   if (fromEnv) return fromEnv;
+  if (process.env.CLINIC_APP_URL?.trim()) {
+    return process.env.CLINIC_APP_URL.trim().replace(/\/$/, "");
+  }
   if (process.env.NEXT_PUBLIC_BASE_URL?.trim()) {
     return process.env.NEXT_PUBLIC_BASE_URL.trim().replace(/\/$/, "");
+  }
+  const vercelProduction = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (vercelProduction) {
+    return `https://${vercelProduction.replace(/\/$/, "")}`;
   }
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`.replace(/\/$/, "");
   }
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+    return "https://clinica.nodocore.com.ar";
+  }
   return "http://localhost:3002";
+}
+
+const LOCAL_HOST = /localhost|127\.0\.0\.1|0\.0\.0\.0/i;
+
+function isLocalHost(hostname: string): boolean {
+  return LOCAL_HOST.test(hostname);
 }
 
 /** Public URL for emails / Supabase redirectTo (never localhost in prod emails). */
 export function resolveAppOrigin(headerOrigin?: string | null): string {
   const raw = (headerOrigin ?? "").trim().replace(/\/$/, "");
-  const isLocal =
-    !raw ||
-    raw.includes("localhost") ||
-    raw.includes("0.0.0.0") ||
-    raw.includes("127.0.0.1");
-
-  if (isLocal) {
+  if (!raw) {
     return appBaseUrl();
   }
+  try {
+    if (isLocalHost(new URL(raw).hostname)) {
+      return appBaseUrl();
+    }
+  } catch {
+    if (LOCAL_HOST.test(raw)) {
+      return appBaseUrl();
+    }
+  }
   return raw;
+}
+
+/** Prefer env + request host over client Origin (API routes). */
+export function resolveAppOriginFromRequest(request: {
+  headers: { get(name: string): string | null };
+}): string {
+  const forwardedHost =
+    request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const originHeader = request.headers.get("origin")?.trim().replace(/\/$/, "");
+
+  // Local dev: always use the Host you're hitting (e.g. localhost:3002 for nodo-clinica).
+  // NEXT_PUBLIC_APP_URL may point at nodocore.com.ar or :3000 and breaks recovery tests.
+  if (process.env.NODE_ENV === "development") {
+    if (forwardedHost) {
+      const proto =
+        originHeader?.startsWith("https://") ||
+        request.headers.get("x-forwarded-proto")?.includes("https")
+          ? "https"
+          : "http";
+      return `${proto}://${forwardedHost}`.replace(/\/$/, "");
+    }
+    if (originHeader) {
+      return originHeader;
+    }
+  }
+
+  const configured =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.CLINIC_APP_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, "");
+  }
+
+  const vercelProduction = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (vercelProduction) {
+    return `https://${vercelProduction.replace(/\/$/, "")}`;
+  }
+
+  const proto =
+    (request.headers.get("x-forwarded-proto") ?? "https").split(",")[0]?.trim() ??
+    "https";
+  if (forwardedHost) {
+    const hostname = forwardedHost.split(":")[0] ?? "";
+    if (hostname && !isLocalHost(hostname)) {
+      return `${proto}://${forwardedHost}`.replace(/\/$/, "");
+    }
+  }
+
+  return resolveAppOrigin(originHeader);
 }
 
 /** Login entry for patients (opens "Soy Paciente" tab). */

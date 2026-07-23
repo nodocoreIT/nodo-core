@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isMailConfigured, sendPasswordResetEmail } from "@/lib/mail";
-import { resolveAppOrigin } from "@/lib/clinic/appointment-payment";
+import { resolveAppOriginFromRequest } from "@/lib/clinic/appointment-payment";
 import {
   buildPasswordRecoveryRedirect,
   parseClinicDbRole,
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const intendedRole = parseClinicDbRole(body.role) ?? "paciente";
     const normalizedEmail = email.trim().toLowerCase();
 
-    const origin = resolveAppOrigin(request.headers.get("origin"));
+    const origin = resolveAppOriginFromRequest(request);
 
     const serviceClient = await createServiceClient();
 
@@ -34,6 +34,11 @@ export async function POST(request: NextRequest) {
     }
 
     const redirectTo = buildPasswordRecoveryRedirect(origin, intendedRole);
+
+    if (process.env.NODE_ENV === "development") {
+      console.info("[reset-password] redirectTo:", redirectTo);
+    }
+
     const { data, error } = await serviceClient.auth.admin.generateLink({
       type: "recovery",
       email: normalizedEmail,
@@ -60,15 +65,24 @@ export async function POST(request: NextRequest) {
 
     if (!isMailConfigured()) {
       console.warn("[reset-password] SMTP not configured — reset URL:", resetUrl);
-      return NextResponse.json(
-        { error: "El envío de correo no está configurado." },
-        { status: 503 },
-      );
+      return NextResponse.json({
+        ok: true,
+        redirectTo,
+        resetUrl,
+        mailConfigured: false,
+        hint:
+          "En local, agregá redirectTo en Supabase → Auth → URL Configuration. Si el link cae en :3000, la Site URL del proyecto apunta al landing.",
+      });
     }
 
     await sendPasswordResetEmail({ email: email.trim(), resetUrl, origin });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      ...(process.env.NODE_ENV === "development"
+        ? { redirectTo, resetUrl, mailConfigured: true }
+        : {}),
+    });
   } catch (err) {
     console.error("[reset-password]", err);
     return NextResponse.json(

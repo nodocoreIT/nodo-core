@@ -228,5 +228,5 @@ export function buildPasswordRecoveryRedirect(
   intendedRole: ClinicDbRole,
 ): string {
   const base = origin.replace(/\/$/, "");
-  return `${base}/actualizar-contrasena?role=${intendedRole}`;
+  return `${base}/login?mode=reset-password&role=${intendedRole}`;
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sendPasswordResetEmail } from "@/lib/mail";
-import { resolveAppOrigin } from "@/lib/clinic/appointment-payment";
+import { resolveAppOriginFromRequest } from "@/lib/clinic/appointment-payment";
 import {
   buildPasswordRecoveryRedirect,
   parseClinicDbRole,
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "email is required" }, { status: 400 });
   }
 
-  const origin = resolveAppOrigin(request.headers.get("origin"));
+  const origin = resolveAppOriginFromRequest(request);
   const service = await createServiceClient();
 
   const eligibility = await checkPortalLoginEligibility(
