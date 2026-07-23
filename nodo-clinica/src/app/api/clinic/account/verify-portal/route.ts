@@ -8,6 +8,7 @@ import {
   toSessionRole,
 } from "@/lib/clinic/resolve-clinic-role";
 import { repairDashboardPacienteProfile } from "@/lib/clinic/repair-dashboard-profile";
+import { portalNotRegisteredMessage } from "@/lib/clinic/portal-login-eligibility";
 import { resolveSupabaseAuthUser } from "@/lib/supabase/resolve-auth-user";
 
 /**
@@ -46,13 +47,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (!canAccessAsRole(membership, intendedRole)) {
     return NextResponse.json(
-      {
-        error:
-          intendedRole === "medico"
-            ? "Esta cuenta no tiene acceso al portal médico."
-            : "Esta cuenta no está registrada como paciente.",
-      },
-      { status: 403 },
+      { error: portalNotRegisteredMessage(intendedRole) },
+      { status: 404 },
     );
   }
 

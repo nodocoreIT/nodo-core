@@ -5,7 +5,6 @@ import { getSession, clearSessionResponse } from "@/lib/clinic/session";
 import {
   canAccessAsRole,
   lookupClinicMembershipByAuthUserId,
-  resolveRoleForContext,
 } from "@/lib/clinic/resolve-clinic-role";
 import { resolveSupabaseAuthUser } from "@/lib/supabase/resolve-auth-user";
 
@@ -30,28 +29,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         user.id,
         user.email,
       );
-      const defaultResolved = resolveRoleForContext(membership);
-      const dbRole = defaultResolved.role;
 
-      const sessionRole: "doctor" | "patient" =
-        clinicSession?.role === "patient" &&
-        canAccessAsRole(membership, "paciente")
-          ? "patient"
-          : dbRole === "medico"
-            ? "doctor"
-            : "patient";
+      const canDoctor = canAccessAsRole(membership, "medico");
+      const canPatient = canAccessAsRole(membership, "paciente");
+
+      if (!canDoctor && !canPatient) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      let sessionRole: "doctor" | "patient";
+      if (clinicSession?.role === "patient" && canPatient) {
+        sessionRole = "patient";
+      } else if (canDoctor) {
+        sessionRole = "doctor";
+      } else {
+        sessionRole = "patient";
+      }
 
       let resolvedId = clinicSession?.userId ?? user.id;
       if (sessionRole === "doctor") {
         resolvedId = membership.professionalId ?? resolvedId;
-        if (!membership.professionalId) {
-          const { data: professional } = await svc
-            .from("professionals")
-            .select("id")
-            .eq("user_id", user.id)
-            .maybeSingle();
-          if (professional) resolvedId = professional.id;
-        }
       } else if (membership.patientProfileId) {
         resolvedId = membership.patientProfileId;
       }

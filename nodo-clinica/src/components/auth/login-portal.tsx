@@ -285,6 +285,25 @@ export function LoginPortal() {
     }
     setLoading(true);
     try {
+      const eligibilityRes = await fetch("/api/clinic/account/portal-eligibility", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.email.trim(),
+          role: isDoctor ? "medico" : "paciente",
+        }),
+      });
+      if (!eligibilityRes.ok) {
+        const eligibilityData = await eligibilityRes.json().catch(() => ({}));
+        setGeneralError(
+          eligibilityData.error ??
+            (isDoctor
+              ? "No existe un médico registrado con ese correo."
+              : "No existe un paciente registrado con ese correo."),
+        );
+        return;
+      }
+
       await clinicApi.login(form.email.trim(), form.password, role);
       setShowTransition(true);
       setTimeout(() => {

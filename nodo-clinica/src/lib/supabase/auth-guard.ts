@@ -154,6 +154,13 @@ export async function requireAuth(
         );
       }
 
+      if (effectiveRole === "patient" && !membership.patientId) {
+        return NextResponse.json(
+          { error: "Unauthorized — not a patient account" },
+          { status: 401 },
+        );
+      }
+
       const supabase = await createAuthedClinicClient(accessToken);
 
       return {

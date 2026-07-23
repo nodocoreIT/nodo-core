@@ -99,7 +99,7 @@ export function PlatformMedicoLoginFields({
         await supabase.auth.signOut({ scope: "local" });
         const verifyData = await verifyRes.json().catch(() => ({}));
         setGeneralError(
-          verifyData.error ?? "Esta cuenta no tiene acceso al portal médico.",
+          verifyData.error ?? "No existe un médico registrado con ese correo.",
         );
         return;
       }

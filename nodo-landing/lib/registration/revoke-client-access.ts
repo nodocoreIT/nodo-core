@@ -1,7 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NODES } from "@/lib/nodes";
 import {
-  clinicaPortalRoleFromPlan,
   isClinicaUnitCode,
   revokeClinicaPortalAccess,
 } from "@/lib/registration/clinica-provision";
@@ -46,13 +45,20 @@ export async function revokeClientUnitAccess(
   }
 
   if (isClinicaUnitCode(unit.unit_code)) {
-    const portalRole = unit.plan
-      ? clinicaPortalRoleFromPlan(unit.plan)
-      : "both";
+    const normalizedEmail = unit.access_user?.trim().toLowerCase() ?? null;
+    if (normalizedEmail) {
+      const landingAdmin = createAdminClient();
+      await landingAdmin
+        .from("node_email_access")
+        .delete()
+        .eq("email", normalizedEmail)
+        .eq("unit_code", unit.unit_code);
+    }
+
     const revoked = await revokeClinicaPortalAccess({
       email: unit.access_user,
       userId,
-      portalRole,
+      portalRole: "both",
     });
     if (!revoked.ok) return revoked;
   }

@@ -82,15 +82,29 @@ export function MedicoHomePanel({ doctorId, doctorName }: MedicoHomePanelProps) 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_340px] gap-4 items-start">
         <MedicoHomeTasks
           loading={agenda.loading}
-          todayTasks={agenda.todayTasks}
+          dayTasks={agenda.dayTasks}
           calendarSrc={agenda.calendarSrc}
+          selectedDateKey={agenda.selectedDateKey}
+          selectedDateLabel={agenda.selectedDateLabel}
+          onSelectDate={agenda.setSelectedDateKey}
+          onSelectToday={agenda.selectToday}
+          onSelectTomorrow={agenda.selectTomorrow}
+          todayKey={agenda.todayKey}
+          tomorrowKey={agenda.tomorrowKey}
         />
         <MedicoHomeAgendaSidebar
           loading={agenda.loading}
-          todayAppts={agenda.todayAppts}
+          dayAppts={agenda.dayAppts}
           upcomingAppts={agenda.upcomingAppts}
-          todayBlocks={agenda.todayBlocks}
+          selectedBlocks={agenda.selectedBlocks}
           stats={agenda.stats}
+          selectedDateKey={agenda.selectedDateKey}
+          selectedDateLabel={agenda.selectedDateLabel}
+          onSelectDate={agenda.setSelectedDateKey}
+          onSelectToday={agenda.selectToday}
+          onSelectTomorrow={agenda.selectTomorrow}
+          todayKey={agenda.todayKey}
+          tomorrowKey={agenda.tomorrowKey}
         />
       </div>
 

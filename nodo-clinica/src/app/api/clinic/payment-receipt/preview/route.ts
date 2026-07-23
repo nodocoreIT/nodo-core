@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/supabase/auth-guard";
 import { validatePaymentReceipt } from "@/lib/ai/payment-receipt";
 import { buildPaymentReceiptAudit } from "@/lib/clinic/payment-receipt-audit";
+import { getBookableProfessional } from "@/lib/clinic/db/professionals";
 import { isLocalMode } from "@/lib/clinic/config";
 import { readDb } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
 
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
-  const { user, supabase } = auth;
+  const { user } = auth;
 
   if (user.role !== "patient") {
     return NextResponse.json(
@@ -73,22 +74,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: professional } = await supabase
-    .from("professionals")
-    .select("org_id, full_name")
-    .eq("id", doctorId)
-    .maybeSingle();
-
-  if (!professional) {
+  const bookable = await getBookableProfessional(doctorId);
+  if (!bookable) {
     return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
   }
 
-  const { data: officeSettings } = await supabase
-    .from("office_settings")
-    .select("payment, availability")
-    .eq("professional_id", doctorId)
-    .maybeSingle();
-
+  const { professional, officeSettings } = bookable;
   const payment = (officeSettings?.payment as Record<string, unknown>) ?? {};
   const availability =
     (officeSettings?.availability as { slotDurationMinutes?: number } | null) ??

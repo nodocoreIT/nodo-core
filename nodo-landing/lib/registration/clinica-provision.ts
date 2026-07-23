@@ -7,14 +7,19 @@ export function getDefaultClinicOrgId(): string {
   return process.env.CLINIC_ORG_ID ?? DEFAULT_CLINIC_ORG_ID;
 }
 
-/** Pacientes (portal libre / dashboard) comparten la org de plataforma — no una org por persona. */
-export async function ensureClinicaPacienteOrgMembership(
+/** Pacientes y médicos del portal comparten la org de plataforma — no una org por persona. */
+export async function ensureClinicaSharedOrgMembership(
   admin: SupabaseClient<any, any, any>,
-  params: { userId: string; clientName: string; email: string },
+  params: {
+    userId: string;
+    clientName: string;
+    email: string;
+    portalRole?: "medico" | "paciente";
+  },
 ): Promise<{ ok: true; orgId: string } | { ok: false; error: string }> {
   const orgId = getDefaultClinicOrgId();
   const fullName =
-    params.clientName.trim() || params.email.trim() || "Paciente";
+    params.clientName.trim() || params.email.trim() || "Usuario";
 
   const { error: profileError } = await admin
     .schema("shared")
@@ -25,8 +30,22 @@ export async function ensureClinicaPacienteOrgMembership(
     return { ok: false, error: profileError.message };
   }
 
+  if (params.portalRole === "medico") {
+    const { error: memberError } = await admin
+      .schema("shared")
+      .from("org_members")
+      .insert({ user_id: params.userId, org_id: orgId, role: "admin" });
+
+    if (memberError && memberError.code !== "23505") {
+      return { ok: false, error: memberError.message };
+    }
+  }
+
   return { ok: true, orgId };
 }
+
+/** @deprecated Use ensureClinicaSharedOrgMembership */
+export const ensureClinicaPacienteOrgMembership = ensureClinicaSharedOrgMembership;
 
 /** Maps panel plan codes (and legacy values) to the clinica portal role. */
 export function clinicaPortalRoleFromPlan(plan: string): "medico" | "paciente" {
@@ -37,7 +56,8 @@ export function clinicaPortalRoleFromPlan(plan: string): "medico" | "paciente" {
     p.includes("médico") ||
     p.includes("turnero") ||
     p.includes("institucional") ||
-    p === "profesional"
+    p === "profesional" ||
+    p === "pro"
   ) {
     return "medico";
   }
@@ -89,10 +109,7 @@ export async function ensureClinicaPortalProfile(params: {
 
   const db = admin.schema("nodo_clinica");
   const email = params.email.trim().toLowerCase();
-  const orgId =
-    params.portalRole === "paciente"
-      ? getDefaultClinicOrgId()
-      : params.orgId || getDefaultClinicOrgId();
+  const orgId = getDefaultClinicOrgId();
   const { firstName, lastName, display } = splitName(params.clientName, email);
 
   if (params.portalRole === "paciente") {
@@ -172,6 +189,7 @@ export async function ensureClinicaPortalProfile(params: {
     last_name: lastName,
     full_name: display,
     email,
+    specialty: "Sin Asignar",
     subscription_status: "active",
     subscription_plan: params.plan,
   });
@@ -195,62 +213,107 @@ export async function revokeClinicaPortalAccess(params: {
   portalRole?: "medico" | "paciente" | "both";
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const admin = createNodoAdminClient("clinica");
-  if (!admin) return { ok: true };
+  if (!admin) {
+    return { ok: false, error: "Nodo Clínica no configurado para revocar acceso." };
+  }
 
   const db = admin.schema("nodo_clinica");
-  const email = params.email?.trim().toLowerCase() ?? null;
-  const userId = params.userId ?? null;
+  let email = params.email?.trim().toLowerCase() ?? null;
+  let userId = params.userId ?? null;
   const role = params.portalRole ?? "both";
   const removePatients = role === "both" || role === "paciente";
   const removeProfessionals = role === "both" || role === "medico";
 
+  if (!userId && email) {
+    const { data: listData } = await admin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+    const found = listData?.users?.find(
+      (u) => String(u.email ?? "").toLowerCase() === email,
+    );
+    userId = found?.id ?? null;
+  }
+
+  async function softDeleteOrAnonymize(
+    table: "patients" | "professionals",
+    id: string,
+    anonymize: Record<string, unknown>,
+  ): Promise<string | null> {
+    const { error } = await db.from(table).delete().eq("id", id);
+    if (!error) return null;
+    if (error.code === "23503") {
+      await db.from(table).update(anonymize).eq("id", id);
+      return null;
+    }
+    return error.message;
+  }
+
   async function removePatientRows() {
     if (!removePatients) return null;
+    const ids = new Set<string>();
+
     if (userId) {
-      const { error } = await db.from("patients").delete().eq("profile_id", userId);
-      if (error && error.code !== "23503") return error.message;
-      if (error?.code === "23503") {
-        await db
-          .from("patients")
-          .update({ profile_id: null, email: `revoked+${userId.slice(0, 8)}@deleted.local` })
-          .eq("profile_id", userId);
-      }
+      const { data } = await db
+        .from("patients")
+        .select("id")
+        .eq("profile_id", userId);
+      for (const row of data ?? []) ids.add(row.id);
     }
     if (email) {
-      const { error } = await db.from("patients").delete().eq("email", email);
-      if (error && error.code !== "23503") return error.message;
-      if (error?.code === "23503") {
-        await db
-          .from("patients")
-          .update({ profile_id: null, email: `revoked+${Date.now()}@deleted.local` })
-          .eq("email", email);
-      }
+      const { data } = await db
+        .from("patients")
+        .select("id")
+        .ilike("email", email);
+      for (const row of data ?? []) ids.add(row.id);
+    }
+
+    for (const id of ids) {
+      const err = await softDeleteOrAnonymize("patients", id, {
+        profile_id: null,
+        email: `revoked+${id.slice(0, 8)}@deleted.local`,
+      });
+      if (err) return err;
     }
     return null;
   }
 
   async function removeProfessionalRows() {
     if (!removeProfessionals) return null;
+    const ids = new Set<string>();
+
     if (userId) {
-      const { error } = await db.from("professionals").delete().eq("user_id", userId);
-      if (error && error.code !== "23503") return error.message;
-      if (error?.code === "23503") {
-        await db
-          .from("professionals")
-          .update({ user_id: null, email: `revoked+${userId.slice(0, 8)}@deleted.local` })
-          .eq("user_id", userId);
-      }
+      const { data } = await db
+        .from("professionals")
+        .select("id")
+        .eq("user_id", userId);
+      for (const row of data ?? []) ids.add(row.id);
     }
     if (email) {
-      const { error } = await db.from("professionals").delete().eq("email", email);
-      if (error && error.code !== "23503") return error.message;
-      if (error?.code === "23503") {
-        await db
-          .from("professionals")
-          .update({ user_id: null, email: `revoked+${Date.now()}@deleted.local` })
-          .eq("email", email);
-      }
+      const { data } = await db
+        .from("professionals")
+        .select("id")
+        .ilike("email", email);
+      for (const row of data ?? []) ids.add(row.id);
     }
+
+    for (const id of ids) {
+      const err = await softDeleteOrAnonymize("professionals", id, {
+        user_id: null,
+        email: `revoked+${id.slice(0, 8)}@deleted.local`,
+      });
+      if (err) return err;
+    }
+
+    if (userId && removeProfessionals && admin) {
+      await admin
+        .schema("shared")
+        .from("org_members")
+        .delete()
+        .eq("user_id", userId)
+        .eq("org_id", getDefaultClinicOrgId());
+    }
+
     return null;
   }
 

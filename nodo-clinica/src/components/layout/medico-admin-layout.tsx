@@ -37,7 +37,9 @@ import {
 import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { MedicoDoctorProvider } from "@/contexts/medico-doctor-context";
 import { DoctorSettingsDialog, type SectionId } from "@/components/medical/doctor-settings-dialog";
+import { DoctorSpecialtySetupModal } from "@/components/medical/doctor-specialty-setup-modal";
 import { ClinicNotificationsBell } from "@/components/layout/clinic-notifications-bell";
+import { needsSpecialtyAssignment } from "@/lib/clinic/unassigned-specialty";
 import { PlanBadge } from "@/components/plan/plan-badge";
 import { toast } from "sonner";
 
@@ -108,6 +110,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SectionId | undefined>(undefined);
+  const [specialtySetupOpen, setSpecialtySetupOpen] = useState(false);
   const [cobrosUnread, setCobrosUnread] = useState(0);
   const mpCallbackHandled = useRef(false);
 
@@ -150,42 +153,72 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     clinicApi.getSession().then(async ({ session, user }) => {
       if (!session || session.role !== "doctor") {
-        router.push("/login");
+        setChecking(false);
+        router.push("/login?role=medico");
         return;
       }
-      setDoctor({
-        id: user.id,
-        fullName: user.fullName,
-        email: user.email ?? session.email,
-        subscriptionPlan: user.subscriptionPlan,
-        profilePhotoUrl: user.profilePhotoUrl,
-      });
+
       try {
-        const office = await clinicApi.getDoctorSchedule(user.id);
-        if (office.themeSettings) {
-          useConsultorioStore.getState().hydrateSettings(
-            mergeThemeSettings(office.themeSettings),
-          );
+        const verifyRes = await fetch("/api/clinic/account/verify-portal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ role: "medico" }),
+        });
+        if (!verifyRes.ok) {
+          await clinicApi.logout();
+          setChecking(false);
+          router.push("/login?role=medico");
+          return;
         }
-        const photo =
-          typeof office.profilePhotoData === "string" && office.profilePhotoData
-            ? office.profilePhotoData
-            : undefined;
-        if (photo || office.fullName) {
-          setDoctor((d) =>
-            d
-              ? {
-                  ...d,
-                  fullName: office.fullName || d.fullName,
-                  profilePhotoUrl: photo ?? d.profilePhotoUrl,
-                }
-              : d,
+        const verifyData = (await verifyRes.json()) as {
+          professionalId?: string;
+        };
+        const professionalId = verifyData.professionalId ?? user.id;
+
+        setDoctor({
+          id: professionalId,
+          fullName: user.fullName,
+          email: user.email ?? session.email,
+          subscriptionPlan: user.subscriptionPlan,
+          profilePhotoUrl: user.profilePhotoUrl,
+        });
+        try {
+          const office = await clinicApi.getDoctorSchedule(professionalId);
+          if (office.themeSettings) {
+            useConsultorioStore.getState().hydrateSettings(
+              mergeThemeSettings(office.themeSettings),
+            );
+          }
+          const officeSpecialties = Array.isArray(office.specialties)
+            ? (office.specialties as string[])
+            : [];
+          setSpecialtySetupOpen(
+            needsSpecialtyAssignment(officeSpecialties),
           );
+          const photo =
+            typeof office.profilePhotoData === "string" && office.profilePhotoData
+              ? office.profilePhotoData
+              : undefined;
+          if (photo || office.fullName) {
+            setDoctor((d) =>
+              d
+                ? {
+                    ...d,
+                    fullName: office.fullName || d.fullName,
+                    profilePhotoUrl: photo ?? d.profilePhotoUrl,
+                  }
+                : d,
+            );
+          }
+        } catch {
+          /* tema / foto local por defecto */
         }
+        setChecking(false);
       } catch {
-        /* tema / foto local por defecto */
+        setChecking(false);
+        router.push("/login?role=medico");
       }
-      setChecking(false);
     });
   }, [router]);
 
@@ -476,6 +509,12 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
             onOpenChange={(o) => { setSettingsOpen(o); if (!o) setSettingsSection(undefined); }}
             doctorId={doctor.id}
             initialSection={settingsSection}
+          />
+        )}
+        {doctor && (
+          <DoctorSpecialtySetupModal
+            open={specialtySetupOpen}
+            onComplete={() => setSpecialtySetupOpen(false)}
           />
         )}
       </div>

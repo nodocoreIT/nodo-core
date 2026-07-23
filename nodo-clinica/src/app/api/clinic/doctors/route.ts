@@ -4,6 +4,7 @@ import { readDb, publicDoctor, publicDoctorSummary } from "@/lib/clinic/local-db
 import { requireAuth } from "@/lib/supabase/auth-guard";
 import { createServiceClient } from "@/lib/supabase/server";
 import { professionalHasMercadoPagoConnection } from "@/lib/clinic/db/payments";
+import { isUnassignedSpecialty } from "@/lib/clinic/unassigned-specialty";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(publicDoctorSummary(doctor));
     }
 
-    const doctors = db.doctors.filter(isActiveDoctor).map(publicDoctor);
+    const doctors = db.doctors
+      .filter(isActiveDoctor)
+      .filter((d) => !isUnassignedSpecialty(d.specialty))
+      .map(publicDoctor);
     return NextResponse.json(doctors);
   }
 
@@ -91,12 +95,14 @@ export async function GET(request: NextRequest) {
     .select("id, full_name, specialty, license_number, profile_photo_url");
 
   return NextResponse.json(
-    (professionals ?? []).map((p) => ({
-      id: p.id,
-      fullName: p.full_name,
-      specialty: p.specialty,
-      licenseNumber: p.license_number,
-      profilePhotoUrl: p.profile_photo_url,
-    })),
+    (professionals ?? [])
+      .filter((p) => !isUnassignedSpecialty(p.specialty))
+      .map((p) => ({
+        id: p.id,
+        fullName: p.full_name,
+        specialty: p.specialty,
+        licenseNumber: p.license_number,
+        profilePhotoUrl: p.profile_photo_url,
+      })),
   );
 }

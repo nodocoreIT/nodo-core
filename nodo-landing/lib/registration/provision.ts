@@ -9,7 +9,7 @@ import {
 } from "@/lib/registration/seed-node-theme";
 import {
   clinicaPortalRoleFromPlan,
-  ensureClinicaPacienteOrgMembership,
+  ensureClinicaSharedOrgMembership,
   ensureClinicaPortalProfile,
 } from "@/lib/registration/clinica-provision";
 import { findAuthUserByEmail, authConfigForNodoCode } from "@/lib/registration/auth-user-lookup";
@@ -140,11 +140,12 @@ async function ensureInmoAccess(
     product === "clinica" ? clinicaPortalRoleFromPlan(plan) : null;
 
   let membership: { orgId: string } | { error: string };
-  if (product === "clinica" && portalRole === "paciente") {
-    const shared = await ensureClinicaPacienteOrgMembership(admin, {
+  if (product === "clinica") {
+    const shared = await ensureClinicaSharedOrgMembership(admin, {
       userId,
       clientName: params.clientName,
       email: params.email,
+      portalRole: portalRole ?? undefined,
     });
     if (!shared.ok) return { error: shared.error };
     membership = { orgId: shared.orgId };
@@ -199,7 +200,7 @@ async function ensureInmoAccess(
 
   const postUpdateTasks: Promise<{ ok: true } | { ok: false; error: string } | void>[] = [];
 
-  if (!(product === "clinica" && portalRole === "paciente")) {
+  if (product !== "clinica") {
     postUpdateTasks.push(
       seedInmoOrgProfileTheme(admin, membership.orgId, params.clientName, product),
     );

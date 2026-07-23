@@ -6,6 +6,8 @@ import { isLocalMode } from "@/lib/clinic/config";
 import { readDb, writeDb, type DoctorPaymentSettings, type DoctorReminderSettings } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
 import { professionalHasMercadoPagoConnection } from "@/lib/clinic/db/payments";
+import { createServiceClient } from "@/lib/supabase/server";
+import { isUnassignedSpecialty } from "@/lib/clinic/unassigned-specialty";
 
 const DOCTOR_ROLES = new Set(["admin", "super_admin", "medico", "agent", "doctor"]);
 import { mergeThemeSettings } from "@/lib/clinic/theme-settings";
@@ -242,14 +244,16 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Public endpoint — no auth required for reading schedule (patient booking)
+  // Patient booking — auth required, but read via service role (RLS org_id on
+  // professionals/office_settings blocks many patient JWTs even within the same clinic).
   const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
-  const { supabase } = authResult;
 
-  const { data: professional, error: professionalError } = await supabase
+  const serviceClient = await createServiceClient();
+
+  const { data: professional, error: professionalError } = await serviceClient
     .from("professionals")
-    .select("*, office_settings(*)")
+    .select("id, org_id, specialty, subscription_status")
     .eq("id", doctorId)
     .maybeSingle();
 
@@ -261,11 +265,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const officeSettings = (professional as any).office_settings;
+  if (isUnassignedSpecialty(professional.specialty)) {
+    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+  }
+
+  const { data: officeSettings } = await serviceClient
+    .from("office_settings")
+    .select("availability")
+    .eq("professional_id", doctorId)
+    .maybeSingle();
+
   const availability = getAvailability(officeSettings);
 
-  const { data: bookedApts } = await supabase
+  const { data: bookedApts } = await serviceClient
     .from("appointments")
     .select("scheduled_at")
     .eq("doctor_id", doctorId)
@@ -492,7 +504,13 @@ export async function PUT(request: NextRequest) {
     ).trim();
   }
   if (Array.isArray((body as { specialties?: string[] }).specialties)) {
-    professionalUpdate.specialties = (body as { specialties: string[] }).specialties;
+    const specialties = (body as { specialties: string[] }).specialties
+      .map((s) => String(s).trim())
+      .filter(Boolean);
+    professionalUpdate.specialties = specialties;
+    if (specialties[0]) {
+      professionalUpdate.specialty = specialties[0];
+    }
   }
   if (signatureText !== undefined) professionalUpdate.signature_text = signatureText;
   if (signatureImageData !== undefined) professionalUpdate.signature_image_url = signatureImageData;

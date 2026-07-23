@@ -48,6 +48,7 @@ import {
   resolveCobroReceiptFields,
 } from "@/lib/clinic/cobros-receipt";
 import { buildPaymentReceiptAudit } from "@/lib/clinic/payment-receipt-audit";
+import { getBookableProfessional } from "@/lib/clinic/db/professionals";
 import { attachDocumentToAppointment } from "@/lib/clinic/appointment-documents";
 import { appointmentNeedsDoctorPaymentReviewFromDbRow } from "@/lib/clinic/payment";
 import { isLocalMode } from "@/lib/clinic/config";
@@ -294,8 +295,16 @@ export async function GET(request: NextRequest) {
   if (doctorId) {
     const scope = searchParams.get("scope") ?? "upcoming";
 
+    const me = await resolveProfessional(authResult);
+    if (!me || me.id !== doctorId) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+
+    // Service client: doctor reads must not depend on JWT org_id / nested RLS joins.
+    const svc = await createServiceClient();
+
     if (scope === "cobros_received") {
-      const { data: professional } = await supabase
+      const { data: professional } = await svc
         .from("professionals")
         .select("*, office_settings(*)")
         .eq("id", doctorId)
@@ -305,7 +314,7 @@ export async function GET(request: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (professional?.office_settings as any)?.payment?.consultationFee ?? 0;
 
-      const { data: confirmed } = await supabase
+      const { data: confirmed } = await svc
         .from("appointments")
         .select("*, patients(full_name), patient_documents(*)")
         .eq("doctor_id", doctorId)
@@ -353,7 +362,7 @@ export async function GET(request: NextRequest) {
       // rejected cancels the appointment, but it still needs to show up in
       // the ledger as "Rechazado" — the JS filter below already keeps only
       // rows that have a receipt audit or a confirmed payment either way.
-      const { data: ledger } = await supabase
+      const { data: ledger } = await svc
         .from("appointments")
         .select("*, patients(full_name, phone), patient_documents(*)")
         .eq("doctor_id", doctorId)
@@ -397,7 +406,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (scope === "pending_payment") {
-      const { data: all } = await supabase
+      const { data: all } = await svc
         .from("appointments")
         .select("*, patients(full_name), patient_documents(*)")
         .eq("doctor_id", doctorId)
@@ -452,7 +461,7 @@ export async function GET(request: NextRequest) {
       const monthStart = `${monthKey}-01T00:00:00`;
       const monthEnd = `${monthKey}-${String(lastDay).padStart(2, "0")}T23:59:59`;
 
-      const { data: apts } = await supabase
+      const { data: apts } = await svc
         .from("appointments")
         .select("id, scheduled_at, patient_id")
         .eq("doctor_id", doctorId)
@@ -485,7 +494,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Falta el parámetro date" }, { status: 400 });
       }
 
-      const { data: apts } = await supabase
+      const { data: apts } = await svc
         .from("appointments")
         .select("*, patients(id, full_name, email, phone, profile_photo_url)")
         .eq("doctor_id", doctorId)
@@ -514,38 +523,44 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ appointments });
     }
 
-    // Default: upcoming / today / active
-    const { data: professional } = await supabase
-      .from("professionals")
-      .select("*, office_settings(*)")
-      .eq("id", doctorId)
-      .maybeSingle();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const availability = (professional?.office_settings as any)?.availability ?? DEFAULT_AVAILABILITY;
     const todayKey = localDateKeyFromDate(new Date());
     const horizonKey = addDaysToDateKey(todayKey, 60);
 
-    let dbQuery = supabase
+    let dbQuery = svc
       .from("appointments")
       .select("*, patients(id, full_name, email, phone, profile_photo_url), patient_documents(id)")
-      .eq("doctor_id", doctorId)
-      .neq("status", "cancelled");
+      .eq("doctor_id", doctorId);
 
-    if (scope === "today" || scope === "active") {
+    if (scope === "queue") {
       dbQuery = dbQuery
         .gte("scheduled_at", `${todayKey}T00:00:00`)
-        .lte("scheduled_at", `${todayKey}T23:59:59`);
-    } else if (scope === "upcoming") {
-      dbQuery = dbQuery
-        .gte("scheduled_at", `${todayKey}T00:00:00`)
-        .lte("scheduled_at", `${horizonKey}T23:59:59`);
+        .in("status", ["scheduled", "waiting", "in_consultation"]);
+    } else {
+      dbQuery = dbQuery.neq("status", "cancelled");
+      if (scope === "today" || scope === "active") {
+        dbQuery = dbQuery
+          .gte("scheduled_at", `${todayKey}T00:00:00`)
+          .lte("scheduled_at", `${todayKey}T23:59:59`);
+      } else if (scope === "upcoming") {
+        dbQuery = dbQuery
+          .gte("scheduled_at", `${todayKey}T00:00:00`)
+          .lte("scheduled_at", `${horizonKey}T23:59:59`);
+      }
     }
 
-    const { data: rawApts } = await dbQuery.order("scheduled_at", { ascending: true });
+    const orderBy =
+      scope === "queue"
+        ? { column: "queue_position" as const, ascending: true }
+        : { column: "scheduled_at" as const, ascending: true };
+
+    const { data: rawApts } = await dbQuery.order(orderBy.column, {
+      ascending: orderBy.ascending,
+    });
 
     const filtered = (rawApts ?? []).filter((a) => {
-      if (!appointmentMatchesScheduleGrid(a.scheduled_at, availability)) return false;
+      if (scope === "queue") {
+        return isPaymentConfirmed(a as never);
+      }
       if (scope === "active") {
         return (
           ["scheduled", "waiting", "in_consultation"].includes(a.status) &&
@@ -610,19 +625,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Médico requerido" }, { status: 400 });
   }
 
-  // Fetch doctor (professional) + office settings
-  const { data: professional } = await supabase
-    .from("professionals")
-    .select("*, office_settings(*)")
-    .eq("id", doctorId)
-    .maybeSingle();
-
-  if (!professional || professional.subscription_status === "expired") {
+  // Fetch doctor (professional) + office settings (service client — patient RLS cannot read professionals)
+  const bookable = await getBookableProfessional(doctorId);
+  if (!bookable) {
     return NextResponse.json(
       { error: "Médico no disponible" },
       { status: 404 },
     );
   }
+
+  const { professional, officeSettings } = bookable;
 
   // Find the patient row for this auth user
   const { data: patientRow } = await supabase
@@ -641,15 +653,13 @@ export async function POST(request: NextRequest) {
   }
 
   // Build doctor-like object for business logic helpers
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const officeSettings = (professional.office_settings as any) ?? {};
   const doctorForLogic = {
     id: professional.id,
     fullName: professional.full_name,
     email: professional.email,
-    payment: officeSettings.payment,
-    reminderSettings: officeSettings.reminder_settings,
-    availability: officeSettings.availability,
+    payment: officeSettings?.payment,
+    reminderSettings: officeSettings?.reminder_settings,
+    availability: officeSettings?.availability,
   };
 
   const requiresPayment = doctorRequiresPayment(doctorForLogic as never);
@@ -773,7 +783,7 @@ export async function POST(request: NextRequest) {
   const tokenExpires = new Date(when.getTime() + 24 * 60 * 60 * 1000);
 
   const { data: apt, error: insertError } = await createAppointment(supabase, {
-    org_id: patientRow.org_id,
+    org_id: professional.org_id ?? patientRow.org_id,
     doctor_id: doctorId,
     professional_id: doctorId,
     patient_id: patientRow.id,

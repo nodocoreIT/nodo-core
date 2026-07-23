@@ -152,10 +152,13 @@ async function parseJsonResponse(res: Response) {
 
 // ── Role helpers ──────────────────────────────────────────────────────────
 
-const PRIVILEGED_ROLES = ["super_admin", "admin", "medico", "agent"];
+const DOCTOR_JWT_ROLES = new Set(["super_admin", "admin", "medico", "doctor", "agent"]);
 
 function mapSessionRole(appMetadataRole: string | null | undefined): "doctor" | "patient" {
-  return PRIVILEGED_ROLES.includes(appMetadataRole ?? "") ? "doctor" : "patient";
+  const role = appMetadataRole ?? "";
+  if (role === "patient" || role === "paciente") return "patient";
+  if (DOCTOR_JWT_ROLES.has(role)) return "doctor";
+  return "patient";
 }
 
 async function fetchSessionUncached(): Promise<ClinicSessionResult> {
@@ -186,38 +189,26 @@ async function fetchSessionUncached(): Promise<ClinicSessionResult> {
             ...clinicFetchOpts(),
             cache: "no-store",
           });
-          if (sessionRes.ok) {
-            const sessionData = await parseJsonResponse(sessionRes);
-            if (sessionData.session?.role === "doctor" || sessionData.session?.role === "patient") {
-              dbRole = sessionData.session.role;
-            } else if (sessionData.user?.role === "doctor" || sessionData.user?.role === "patient") {
-              dbRole = sessionData.user.role;
-            }
-            if (sessionData.user?.fullName) {
-              fullName = sessionData.user.fullName;
-            }
-            profilePhotoUrl = sessionData.user?.profilePhotoUrl;
-            if (sessionData.user?.id) {
-              resolvedId = sessionData.user.id;
-            }
-          } else if (session?.access_token) {
-            const stored = getClientSession();
-            const bootstrapRole =
-              stored?.userId === authUser.id && stored.role === "patient"
-                ? "patient"
-                : dbRole;
-            await fetch(`${BASE}/api/clinic/auth/set-role`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${session.access_token}`,
-              },
-              credentials: "include",
-              body: JSON.stringify({ role: bootstrapRole }),
-            }).catch(() => undefined);
+          if (!sessionRes.ok) {
+            return { session: null, user: null };
+          }
+          const sessionData = await parseJsonResponse(sessionRes);
+          if (sessionData.session?.role === "doctor" || sessionData.session?.role === "patient") {
+            dbRole = sessionData.session.role;
+          } else if (sessionData.user?.role === "doctor" || sessionData.user?.role === "patient") {
+            dbRole = sessionData.user.role;
+          } else {
+            return { session: null, user: null };
+          }
+          if (sessionData.user?.fullName) {
+            fullName = sessionData.user.fullName;
+          }
+          profilePhotoUrl = sessionData.user?.profilePhotoUrl;
+          if (sessionData.user?.id) {
+            resolvedId = sessionData.user.id;
           }
         } catch {
-          /* keep metadata fallback */
+          return { session: null, user: null };
         }
 
         const stored = getClientSession();
@@ -830,7 +821,7 @@ export const clinicApi = {
 
   async getDoctorAppointments(
     doctorId: string,
-    scope: "today" | "upcoming" | "active" = "today",
+    scope: "today" | "upcoming" | "active" | "queue" = "today",
   ) {
     const res = await fetch(
       `${BASE}/api/clinic/appointments?doctorId=${doctorId}&scope=${scope}`,
@@ -842,7 +833,7 @@ export const clinicApi = {
   },
 
   async getDoctorQueue(doctorId: string) {
-    return this.getDoctorAppointments(doctorId, "upcoming");
+    return this.getDoctorAppointments(doctorId, "queue");
   },
 
   async getPendingPaymentAppointments(doctorId: string) {

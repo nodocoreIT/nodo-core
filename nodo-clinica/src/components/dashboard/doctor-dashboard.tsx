@@ -208,41 +208,59 @@ export function DoctorDashboard({
       return;
     }
 
-    const supabase = createClient();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const { data, error } = await supabase
-      .from("appointments")
-      .select(`
-        *,
-        patient:patients(id, full_name, email, phone, profile_photo_url)
-      `)
-      .eq("doctor_id", doctorId)
-      .gte("scheduled_at", today.toISOString())
-      .in("status", ["scheduled", "waiting", "in_consultation"])
-      .order("queue_position");
-
-    if (error) {
-      console.error("[doctor-dashboard] failed to load queue", error);
+    let rows: unknown;
+    try {
+      rows = await clinicApi.getDoctorQueue(doctorId);
+    } catch {
+      toast.error("No se pudo cargar la cola de pacientes");
+      return;
+    }
+    if (!Array.isArray(rows)) {
+      toast.error("Error al leer turnos del consultorio");
       return;
     }
 
-    if (data) {
-      const rows = data as unknown as AppointmentRow[];
-      const queue: QueuePatient[] = rows.map((apt) => ({
+    const queue: QueuePatient[] = rows.map(
+      (apt: {
+        id: string;
+        patient_id?: string;
+        patientId?: string;
+        queue_position?: number;
+        queuePosition?: number;
+        scheduled_at?: string;
+        scheduledAt?: string;
+        status: string;
+        documentCount?: number;
+        hasNewDocuments?: boolean;
+        intake_reason?: string;
+        intakeReason?: string;
+        patient?: {
+          id?: string;
+          full_name?: string;
+          fullName?: string;
+          email?: string;
+          phone?: string;
+          profile_photo_url?: string;
+          profilePhotoUrl?: string;
+        };
+      }) => ({
         appointmentId: apt.id,
-        patientId: apt.patient_id,
-        patientName: apt.patient?.full_name || "Paciente",
+        patientId: apt.patient_id ?? apt.patientId ?? "",
+        patientName:
+          apt.patient?.full_name ?? apt.patient?.fullName ?? "Paciente",
         patientEmail: apt.patient?.email,
         patientPhone: apt.patient?.phone,
-        patientPhoto: apt.patient?.profile_photo_url,
-        status: mapAppointmentStatusToLifecycle(apt.status),
-        queuePosition: apt.queue_position,
-        scheduledAt: apt.scheduled_at,
-      }));
-      setQueue(queue);
-    }
+        patientPhoto:
+          apt.patient?.profile_photo_url ?? apt.patient?.profilePhotoUrl,
+        status: mapAppointmentStatusToLifecycle(apt.status as Appointment["status"]),
+        queuePosition: apt.queue_position ?? apt.queuePosition ?? 0,
+        scheduledAt: apt.scheduled_at ?? apt.scheduledAt ?? "",
+        documentCount: apt.documentCount ?? 0,
+        hasNewDocuments: apt.hasNewDocuments ?? (apt.documentCount ?? 0) > 0,
+        intakeReason: apt.intake_reason ?? apt.intakeReason,
+      }),
+    );
+    setQueue(queue);
   }, [doctorId, setQueue, dataSource]);
 
   const loadClinicalHistory = useCallback(
@@ -537,7 +555,7 @@ export function DoctorDashboard({
         "postgres_changes",
         {
           event: "*",
-          schema: "public",
+          schema: "nodo_clinica",
           table: "appointments",
           filter: `doctor_id=eq.${doctorId}`,
         },

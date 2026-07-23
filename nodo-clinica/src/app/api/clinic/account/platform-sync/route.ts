@@ -5,6 +5,7 @@ import { jsonWithSession, type ClinicSession } from "@/lib/clinic/session";
 import { isLocalMode } from "@/lib/clinic/config";
 import { forbidden, unauthorized } from "@/lib/clinic/access-control";
 import { parseClinicDbRole } from "@/lib/clinic/resolve-clinic-role";
+import { portalNotRegisteredMessage } from "@/lib/clinic/portal-login-eligibility";
 
 const ORG_DOCTOR_ROLES = new Set(["super_admin", "admin", "medico", "agent"]);
 
@@ -80,54 +81,27 @@ export async function POST(_request: NextRequest) {
   }
 
   if (!professional) {
-    if (portalRole !== "medico") {
-      return forbidden(
-        "Tu cuenta no tiene perfil médico. Contactá a NODO Core para habilitar el acceso.",
-      );
-    }
-
-    // First login with explicit medico portal role — create professional row
-    const { data: inserted, error: insertError } = await supabase
-      .from("professionals")
-      .insert({
-        org_id: orgId,
-        user_id: session.user.id,
-        full_name: displayName,
-        email,
-        subscription_status: "active",
-        subscription_plan: plan,
-      })
-      .select()
-      .single();
-
-    if (insertError || !inserted) {
-      console.error("[platform-sync] insert error", insertError);
-      return NextResponse.json(
-        { error: "No se pudo crear el profesional" },
-        { status: 500 },
-      );
-    }
-    professional = inserted;
-  } else {
-    // 4. Returning user — keep data fresh
-    const updates: Record<string, unknown> = {
-      subscription_plan: plan,
-      subscription_status: "active",
-      user_id: session.user.id,
-    };
-    if (!professional.full_name || professional.full_name === "Médico") {
-      updates.full_name = displayName;
-    }
-
-    const { data: updated } = await supabase
-      .from("professionals")
-      .update(updates)
-      .eq("id", professional.id)
-      .select()
-      .single();
-
-    if (updated) professional = updated;
+    return forbidden(portalNotRegisteredMessage("medico"));
   }
+
+  // Returning user — keep data fresh
+  const updates: Record<string, unknown> = {
+    subscription_plan: plan,
+    subscription_status: "active",
+    user_id: session.user.id,
+  };
+  if (!professional.full_name || professional.full_name === "Médico") {
+    updates.full_name = displayName;
+  }
+
+  const { data: updated } = await supabase
+    .from("professionals")
+    .update(updates)
+    .eq("id", professional.id)
+    .select()
+    .single();
+
+  if (updated) professional = updated;
 
   const clinicSession: ClinicSession = {
     userId: professional.id,

@@ -14,7 +14,6 @@ import {
   DEFAULT_AVAILABILITY,
   localDateKeyFromDate,
   localDateKeyFromIso,
-  appointmentMatchesScheduleGrid,
   slotKeyFromIso,
   addDaysToDateKey,
 } from "@/lib/clinic/schedule";
@@ -287,8 +286,6 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
       return NextResponse.json(pending);
     }
 
-    const doctor = db.doctors.find((d) => d.id === doctorId);
-    const availability = doctor?.availability ?? DEFAULT_AVAILABILITY;
     const todayKey = localDateKeyFromDate(new Date());
     const horizonKey = addDaysToDateKey(todayKey, 60);
 
@@ -299,16 +296,20 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
 
     const filtered = db.appointments.filter((a) => {
       if (a.doctorId !== doctorId) return false;
+      if (scope === "queue") {
+        const dateKey = localDateKeyFromIso(a.scheduledAt);
+        if (dateKey < todayKey) return false;
+        if (!["scheduled", "waiting", "in_consultation"].includes(a.status)) {
+          return false;
+        }
+        return isPaymentConfirmed(a);
+      }
       if (a.status === "cancelled") return false;
       const dateKey = localDateKeyFromIso(a.scheduledAt);
       if (allowedDates) {
         if (!allowedDates.has(dateKey)) return false;
       } else if (scope === "upcoming") {
         if (dateKey < todayKey || dateKey > horizonKey) return false;
-      }
-      const avail = doctor?.availability ?? DEFAULT_AVAILABILITY;
-      if (!appointmentMatchesScheduleGrid(a.scheduledAt, avail)) {
-        return false;
       }
       if (scope === "active") {
         return (

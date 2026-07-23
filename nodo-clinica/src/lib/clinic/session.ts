@@ -90,20 +90,20 @@ async function validateSessionUser(
     };
   }
 
-  // Patients: the JWT is signed by our server, so we trust it without a DB round-trip.
-  // Users who have a nodo_clinica.patients row get enriched data; others fall back to the JWT.
   const patientClient = await createServiceClient();
   const { data: patient } = await patientClient
     .from("patients")
     .select("profile_id, email, full_name")
-    .eq("profile_id", session.userId)
+    .or(`profile_id.eq.${session.userId},email.eq.${session.email.toLowerCase()}`)
     .maybeSingle();
 
+  if (!patient) return null;
+
   return {
-    userId: patient?.profile_id ?? session.userId,
+    userId: patient.profile_id ?? session.userId,
     role: "patient",
-    email: patient?.email ?? session.email,
-    fullName: patient?.full_name ?? session.fullName,
+    email: patient.email ?? session.email,
+    fullName: patient.full_name ?? session.fullName,
   };
 }
 
