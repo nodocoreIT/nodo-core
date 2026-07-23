@@ -4,9 +4,9 @@ import { Suspense, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ObraSocialCombobox } from "@/components/ui/obra-social-combobox";
-import { User, Loader2, CheckCircle, ImagePlus } from "lucide-react";
+import { User, Loader2, CheckCircle, ImagePlus, AlertCircle, X } from "lucide-react";
 import { toast } from "sonner";
-import { clinicApi } from "@/lib/clinic/client-api";
+import { clinicApi, OnboardingSubmitError } from "@/lib/clinic/client-api";
 import { NeuralNodesBackground } from "@/components/ui/neural-nodes-background";
 import { PhoneVerificationField } from "@/components/onboarding/phone-verification-field";
 
@@ -92,6 +92,7 @@ function OnboardingPacienteContent() {
   const [dniBack, setDniBack] = useState<File | null>(null);
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [phoneSkipped, setPhoneSkipped] = useState(false);
+  const [dniConflictOpen, setDniConflictOpen] = useState(false);
   const canSubmitPhone = phoneVerified || phoneSkipped;
 
   if (!token) {
@@ -130,7 +131,11 @@ function OnboardingPacienteContent() {
       await clinicApi.completeOnboardingPaciente(formData);
       setSubmitted(true);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al completar el registro");
+      if (err instanceof OnboardingSubmitError && err.code === "dni_already_registered") {
+        setDniConflictOpen(true);
+      } else {
+        toast.error(err instanceof Error ? err.message : "Error al completar el registro");
+      }
       setLoading(false);
     }
   };
@@ -183,7 +188,7 @@ function OnboardingPacienteContent() {
                   required
                   value={form.dni}
                   onChange={(e) => setForm({ ...form, dni: e.target.value })}
-                  placeholder="28660386"
+                  placeholder="Ingresa tu DNI"
                   className={inputClass}
                 />
               </div>
@@ -281,6 +286,50 @@ function OnboardingPacienteContent() {
           <a className="underline hover:text-white" href="/">Volver al inicio</a>
         </p>
       </div>
+
+      {dniConflictOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => setDniConflictOpen(false)}
+        >
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setDniConflictOpen(false)}
+              className="absolute right-4 top-4 rounded-md p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              aria-label="Cerrar"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 mx-auto">
+              <AlertCircle className="h-8 w-8 text-amber-600" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-800 mt-5">DNI ya registrado</h2>
+            <p className="text-slate-600 text-sm leading-relaxed mt-3">
+              Este DNI ya se encuentra registrado con otro correo. Verificá si ya tenés una cuenta
+              con otro email o contactanos para resolver el inconveniente.
+            </p>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+              <a
+                href="/login"
+                className="inline-flex items-center justify-center rounded-md border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Ir a iniciar sesión
+              </a>
+              <button
+                type="button"
+                onClick={() => setDniConflictOpen(false)}
+                className="inline-flex items-center justify-center rounded-md bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors"
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {submitted && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">

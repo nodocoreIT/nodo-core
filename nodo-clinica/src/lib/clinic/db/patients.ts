@@ -148,3 +148,191 @@ export async function upsertHealthProfile(
     .select()
     .single();
 }
+
+export interface PatientOnboardingInput {
+  userId: string;
+  orgId: string;
+  email: string;
+  fullName: string;
+  firstName: string;
+  lastName: string;
+  dni: string;
+  address: string | null;
+  obraSocial: string | null;
+  plan: string;
+  phone: string | null;
+  phoneVerifiedAt: string | null;
+  dniFrontPath: string | null;
+  dniBackPath: string | null;
+}
+
+export const DNI_ALREADY_REGISTERED_MESSAGE =
+  "Este DNI ya se encuentra registrado con otro correo. Verificá si ya tenés una cuenta con otro email o contactanos para resolver el inconveniente.";
+
+export const DNI_ALREADY_REGISTERED_CODE = "dni_already_registered";
+
+function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === "42703" || error.code === "PGRST204") return true;
+  const msg = error.message ?? "";
+  return (
+    /column .* does not exist/i.test(msg) ||
+    /could not find the .* column of .* in the schema cache/i.test(msg)
+  );
+}
+
+/** Creates or updates the patient row during self-service onboarding (idempotent). */
+export async function upsertPatientOnboardingRecord(
+  supabase: AnyClient,
+  input: PatientOnboardingInput,
+): Promise<{ ok: true; patientId: string } | { ok: false; error: string; code?: string }> {
+  const email = input.email.trim().toLowerCase();
+  const dni = input.dni.trim();
+  const basePayload = {
+    profile_id: input.userId,
+    org_id: input.orgId,
+    first_name: input.firstName,
+    last_name: input.lastName,
+    full_name: input.fullName,
+    dni,
+    email,
+    address: input.address,
+    obra_social: input.obraSocial,
+    subscription_plan: input.plan,
+    dni_front_path: input.dniFrontPath,
+    dni_back_path: input.dniBackPath,
+  };
+
+  async function findExistingPatientId(): Promise<string | undefined> {
+    const { data: byProfile } = await supabase
+      .from("patients")
+      .select("id")
+      .eq("profile_id", input.userId)
+      .maybeSingle();
+
+    if (byProfile?.id) return byProfile.id as string;
+
+    const { data: byEmail } = await supabase
+      .from("patients")
+      .select("id")
+      .ilike("email", email)
+      .maybeSingle();
+
+    if (byEmail?.id) return byEmail.id as string;
+
+    if (dni) {
+      const { data: byDni } = await supabase
+        .from("patients")
+        .select("id, profile_id, email")
+        .eq("dni", dni)
+        .maybeSingle();
+
+      if (byDni?.id) {
+        const linkedProfile = byDni.profile_id as string | null;
+        if (!linkedProfile || linkedProfile === input.userId) {
+          return byDni.id as string;
+        }
+      }
+    }
+
+    return undefined;
+  }
+
+  async function resolveDuplicatePatientId(): Promise<string | undefined> {
+    const { data: byEmail } = await supabase
+      .from("patients")
+      .select("id")
+      .ilike("email", email)
+      .maybeSingle();
+    if (byEmail?.id) return byEmail.id as string;
+
+    if (dni) {
+      const { data: byDni } = await supabase
+        .from("patients")
+        .select("id, profile_id")
+        .eq("dni", dni)
+        .maybeSingle();
+      if (byDni?.id) {
+        const linkedProfile = byDni.profile_id as string | null;
+        if (!linkedProfile || linkedProfile === input.userId) {
+          return byDni.id as string;
+        }
+      }
+    }
+
+    return undefined;
+  }
+
+  async function writePayload(
+    payload: Record<string, unknown>,
+  ): Promise<{ ok: true; patientId: string } | { ok: false; error: string; code?: string }> {
+    const existingId = await findExistingPatientId();
+
+    if (existingId) {
+      const { error } = await supabase.from("patients").update(payload).eq("id", existingId);
+      if (error) return { ok: false, error: error.message, code: error.code };
+      return { ok: true, patientId: existingId };
+    }
+
+    const { data: inserted, error: insertError } = await supabase
+      .from("patients")
+      .insert(payload)
+      .select("id")
+      .single();
+
+    if (!insertError && inserted?.id) {
+      return { ok: true, patientId: inserted.id as string };
+    }
+
+    if (insertError?.code === "23505") {
+      const duplicateId = await resolveDuplicatePatientId();
+      if (duplicateId) {
+        const { error: updateError } = await supabase
+          .from("patients")
+          .update(payload)
+          .eq("id", duplicateId);
+        if (updateError) {
+          return { ok: false, error: updateError.message, code: updateError.code };
+        }
+        return { ok: true, patientId: duplicateId };
+      }
+      if (insertError.message.includes("patients_dni_key")) {
+        return {
+          ok: false,
+          error: DNI_ALREADY_REGISTERED_MESSAGE,
+          code: DNI_ALREADY_REGISTERED_CODE,
+        };
+      }
+    }
+
+    if (insertError) {
+      return { ok: false, error: insertError.message, code: insertError.code };
+    }
+
+    return { ok: false, error: "No se pudo crear el perfil de paciente." };
+  }
+
+  // Omit phone columns unless verified — avoids PostgREST errors when columns are missing.
+  const payloadVariants: Record<string, unknown>[] = input.phone
+    ? [
+        { ...basePayload, phone: input.phone, phone_verified_at: input.phoneVerifiedAt },
+        { ...basePayload, phone: input.phone },
+        basePayload,
+      ]
+    : [basePayload];
+
+  let lastResult: { ok: true; patientId: string } | { ok: false; error: string; code?: string } = {
+    ok: false,
+    error: "No se pudo crear el perfil de paciente.",
+  };
+
+  for (const payload of payloadVariants) {
+    lastResult = await writePayload(payload);
+    if (lastResult.ok) return lastResult;
+    if (!isMissingColumnError({ code: lastResult.code, message: lastResult.error })) {
+      return lastResult;
+    }
+  }
+
+  return lastResult;
+}

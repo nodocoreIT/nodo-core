@@ -92,13 +92,13 @@ export function ObraSocialCombobox({
         <Combobox.Input
           placeholder={placeholder}
           className={cn(
-            "h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 pr-8 text-sm transition-colors outline-none",
-            "placeholder:text-muted-foreground",
-            "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+            "h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-1 pr-8 text-sm text-navy shadow-sm transition-colors outline-none",
+            "placeholder:text-slate-400",
+            "focus-visible:border-teal-500 focus-visible:ring-2 focus-visible:ring-teal-500/25",
             "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
           )}
         />
-        <Combobox.Icon className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+        <Combobox.Icon className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400">
           <ChevronsUpDown className="size-3.5" />
         </Combobox.Icon>
       </Combobox.InputGroup>

@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NODES } from "@/lib/nodes";
 import {
   isClinicaUnitCode,
-  revokeClinicaPortalAccess,
+  softRevokeClinicaPortalAccess,
 } from "@/lib/registration/clinica-provision";
 import {
   setNodoAuthSuspended,
@@ -55,7 +55,7 @@ export async function revokeClientUnitAccess(
         .eq("unit_code", unit.unit_code);
     }
 
-    const revoked = await revokeClinicaPortalAccess({
+    const revoked = await softRevokeClinicaPortalAccess({
       email: unit.access_user,
       userId,
       portalRole: "both",

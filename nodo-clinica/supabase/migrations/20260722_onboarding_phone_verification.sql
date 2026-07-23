@@ -9,6 +9,7 @@ ALTER TABLE nodo_clinica.professionals
   ADD COLUMN IF NOT EXISTS phone_verified_at timestamptz;
 
 ALTER TABLE nodo_clinica.patients
+  ADD COLUMN IF NOT EXISTS phone text,
   ADD COLUMN IF NOT EXISTS phone_verified_at timestamptz;
 
 CREATE TABLE IF NOT EXISTS nodo_clinica.phone_verification_challenges (

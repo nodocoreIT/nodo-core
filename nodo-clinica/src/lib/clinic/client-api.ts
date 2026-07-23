@@ -150,6 +150,16 @@ async function parseJsonResponse(res: Response) {
   }
 }
 
+export class OnboardingSubmitError extends Error {
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = "OnboardingSubmitError";
+    this.code = code;
+  }
+}
+
 // ── Role helpers ──────────────────────────────────────────────────────────
 
 const DOCTOR_JWT_ROLES = new Set(["super_admin", "admin", "medico", "doctor", "agent"]);
@@ -453,7 +463,12 @@ export const clinicApi = {
       body: formData,
     });
     const resData = await parseJsonResponse(res);
-    if (!res.ok) throw new Error(resData.error || "Error en onboarding");
+    if (!res.ok) {
+      throw new OnboardingSubmitError(
+        resData.error || "Error en onboarding",
+        typeof resData.code === "string" ? resData.code : undefined,
+      );
+    }
     return resData as { ok: boolean };
   },
 

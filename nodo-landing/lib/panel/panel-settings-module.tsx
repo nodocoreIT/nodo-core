@@ -28,6 +28,7 @@ const PANEL_MANAGED_NAV = [
   { to: "/panel/ideas", label: "Ideas" },
   { to: "/panel/tareas", label: "Tareas" },
   { to: "/panel/clientes", label: "Clientes" },
+  { to: "/panel/usuarios-nodo", label: "Usuarios de Nodo" },
   { to: "/panel/caja", label: "Caja" },
   { to: "/panel/equipo", label: "Equipo" },
   { to: "/panel/passwords", label: "Bóveda de contraseñas" },

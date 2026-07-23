@@ -206,6 +206,194 @@ function isClinicaUnitCode(unitCode: string): boolean {
   return code === "clínica" || code === "clinica" || code === "salud";
 }
 
+type ClinicaPortalRole = "medico" | "paciente" | "both";
+
+function parseClinicaRowId(
+  clinicRowId: string | null | undefined,
+): { table: "patients" | "professionals"; id: string } | null {
+  if (!clinicRowId) return null;
+  if (clinicRowId.startsWith("clinic-patient:")) {
+    return { table: "patients", id: clinicRowId.replace("clinic-patient:", "") };
+  }
+  if (clinicRowId.startsWith("clinic-medico:")) {
+    return { table: "professionals", id: clinicRowId.replace("clinic-medico:", "") };
+  }
+  return null;
+}
+
+function isAnonymizedClinicaEmail(email: string | null | undefined): boolean {
+  return String(email ?? "").toLowerCase().includes("@deleted.local");
+}
+
+/**
+ * Unlinks auth from portal rows without deleting or anonymizing email.
+ * Reversible via reactivateClinicaPortalAccess (used by panel pause/revoke).
+ */
+export async function softRevokeClinicaPortalAccess(params: {
+  email?: string | null;
+  userId?: string | null;
+  portalRole?: ClinicaPortalRole;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const admin = createNodoAdminClient("clinica");
+  if (!admin) {
+    return { ok: false, error: "Nodo Clínica no configurado para revocar acceso." };
+  }
+
+  const db = admin.schema("nodo_clinica");
+  const email = params.email?.trim().toLowerCase() ?? null;
+  let userId = params.userId ?? null;
+  const role = params.portalRole ?? "both";
+  const unlinkPatients = role === "both" || role === "paciente";
+  const unlinkProfessionals = role === "both" || role === "medico";
+
+  if (!userId && email) {
+    const { data: listData } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const found = listData?.users?.find((u) => String(u.email ?? "").toLowerCase() === email);
+    userId = found?.id ?? null;
+  }
+
+  if (unlinkPatients) {
+    const ids = new Set<string>();
+    if (userId) {
+      const { data } = await db.from("patients").select("id").eq("profile_id", userId);
+      for (const row of data ?? []) ids.add(row.id as string);
+    }
+    if (email) {
+      const { data } = await db.from("patients").select("id").ilike("email", email);
+      for (const row of data ?? []) ids.add(row.id as string);
+    }
+    for (const id of ids) {
+      const { error } = await db.from("patients").update({ profile_id: null }).eq("id", id);
+      if (error) return { ok: false, error: error.message };
+    }
+  }
+
+  if (unlinkProfessionals) {
+    const ids = new Set<string>();
+    if (userId) {
+      const { data } = await db.from("professionals").select("id").eq("user_id", userId);
+      for (const row of data ?? []) ids.add(row.id as string);
+    }
+    if (email) {
+      const { data } = await db.from("professionals").select("id").ilike("email", email);
+      for (const row of data ?? []) ids.add(row.id as string);
+    }
+    for (const id of ids) {
+      const { error } = await db.from("professionals").update({ user_id: null }).eq("id", id);
+      if (error) return { ok: false, error: error.message };
+    }
+  }
+
+  return { ok: true };
+}
+
+/** Restores portal profile link after auth reactivation (panel reactivate / unban). */
+export async function reactivateClinicaPortalAccess(params: {
+  email: string;
+  userId: string;
+  portalRole?: ClinicaPortalRole;
+  clinicRowId?: string | null;
+  plan?: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const admin = createNodoAdminClient("clinica");
+  if (!admin) {
+    return { ok: false, error: "Nodo Clínica no configurado." };
+  }
+
+  const db = admin.schema("nodo_clinica");
+  let email = params.email.trim().toLowerCase();
+  const userId = params.userId;
+  const role = params.portalRole ?? "both";
+  const orgId = getDefaultClinicOrgId();
+
+  if (isAnonymizedClinicaEmail(email)) {
+    const { data: authRow } = await admin
+      .schema("auth")
+      .from("users")
+      .select("email")
+      .eq("id", userId)
+      .maybeSingle();
+    const authEmail = String(authRow?.email ?? "").trim().toLowerCase();
+    if (authEmail) email = authEmail;
+  }
+
+  const parsedRow = parseClinicaRowId(params.clinicRowId);
+  if (parsedRow) {
+    const { data: row } = await db
+      .from(parsedRow.table)
+      .select("id, email, profile_id, user_id")
+      .eq("id", parsedRow.id)
+      .maybeSingle();
+
+    if (row) {
+      const patch: Record<string, unknown> = { org_id: orgId };
+      if (parsedRow.table === "patients") {
+        patch.profile_id = userId;
+        if (isAnonymizedClinicaEmail(row.email as string)) patch.email = email;
+      } else {
+        patch.user_id = userId;
+        if (isAnonymizedClinicaEmail(row.email as string)) patch.email = email;
+      }
+      const { error } = await db.from(parsedRow.table).update(patch).eq("id", parsedRow.id);
+      if (error) return { ok: false, error: error.message };
+    }
+  }
+
+  if (role === "both" || role === "paciente") {
+    const { data: patient } = await db
+      .from("patients")
+      .select("id, email, profile_id")
+      .ilike("email", email)
+      .maybeSingle();
+
+    if (patient) {
+      const patch: Record<string, unknown> = { profile_id: userId, org_id: orgId };
+      if (isAnonymizedClinicaEmail(patient.email as string)) patch.email = email;
+      if (patient.profile_id !== userId) {
+        const { error } = await db.from("patients").update(patch).eq("id", patient.id);
+        if (error) return { ok: false, error: error.message };
+      }
+    } else if (parsedRow?.table !== "patients") {
+      // Row may still carry a revoked+ email after a destructive revoke — recover by id prefix.
+      const { data: revokedRows } = await db
+        .from("patients")
+        .select("id, email")
+        .ilike("email", "revoked+%@deleted.local")
+        .is("profile_id", null);
+
+      for (const row of revokedRows ?? []) {
+        const token = String(row.email ?? "").match(/^revoked\+([a-f0-9]{8})@deleted\.local$/i)?.[1];
+        if (!token || !String(row.id).toLowerCase().startsWith(token.toLowerCase())) continue;
+        const { error } = await db
+          .from("patients")
+          .update({ email, profile_id: userId, org_id: orgId })
+          .eq("id", row.id);
+        if (error) return { ok: false, error: error.message };
+        break;
+      }
+    }
+  }
+
+  if (role === "both" || role === "medico") {
+    const { data: professional } = await db
+      .from("professionals")
+      .select("id, email, user_id")
+      .ilike("email", email)
+      .maybeSingle();
+
+    if (professional) {
+      const patch: Record<string, unknown> = { user_id: userId, org_id: orgId };
+      if (isAnonymizedClinicaEmail(professional.email as string)) patch.email = email;
+      if (professional.user_id !== userId) {
+        const { error } = await db.from("professionals").update(patch).eq("id", professional.id);
+        if (error) return { ok: false, error: error.message };
+      }
+    }
+  }
+
+  return { ok: true };
+}
+
 /** Removes clinica portal rows for revoke (role-aware when possible). */
 export async function revokeClinicaPortalAccess(params: {
   email?: string | null;

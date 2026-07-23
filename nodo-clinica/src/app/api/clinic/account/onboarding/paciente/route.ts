@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { assertOnboardingPhoneVerified } from "@/lib/clinic/phone-verification";
 import { CLINIC_ORG_ID, syncClinicaAuthClaims } from "@/lib/clinic/clinic-org";
+import {
+  upsertHealthProfile,
+  upsertPatientOnboardingRecord,
+  DNI_ALREADY_REGISTERED_CODE,
+} from "@/lib/clinic/db/patients";
 
 function getExtension(filename: string): string {
   const parts = filename.split(".");
@@ -150,32 +155,44 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const firstName = nameParts[0] ?? "";
     const lastName = nameParts.slice(1).join(" ") || firstName;
 
-    // Insert patient record (ignore duplicate — idempotent)
-    const { error: patientError } = await serviceClient
-      .from("patients")
-      .insert({
-        profile_id: userId,
-        org_id: CLINIC_ORG_ID,
-        first_name: firstName,
-        last_name: lastName,
-        full_name: fullName,
-        dni: dni.trim(),
-        email: email.toLowerCase().trim(),
-        phone: verifiedPhone,
-        phone_verified_at: verifiedPhone ? new Date().toISOString() : null,
-        address: address ?? null,
-        obra_social: obraSocial ?? null,
-        subscription_plan: plan,
-        dni_front_path: dniFrontPath,
-        dni_back_path: dniBackPath,
-      });
+    // Create or update patient record (idempotent — supports retry / re-onboarding)
+    const patientResult = await upsertPatientOnboardingRecord(serviceClient, {
+      userId,
+      orgId: CLINIC_ORG_ID,
+      email,
+      fullName,
+      firstName,
+      lastName,
+      dni: dni.trim(),
+      address: address ?? null,
+      obraSocial: obraSocial?.trim() || null,
+      plan,
+      phone: verifiedPhone,
+      phoneVerifiedAt: verifiedPhone ? new Date().toISOString() : null,
+      dniFrontPath,
+      dniBackPath,
+    });
 
-    if (patientError && patientError.code !== "23505") {
-      console.error("[onboarding/paciente] patients insert error", patientError);
+    if (!patientResult.ok) {
+      console.error("[onboarding/paciente] patients upsert error", patientResult);
+      const isDniConflict = patientResult.code === DNI_ALREADY_REGISTERED_CODE;
       return NextResponse.json(
-        { error: "Error al crear perfil de paciente." },
-        { status: 500 },
+        {
+          error: patientResult.error || "Error al crear perfil de paciente.",
+          code: isDniConflict ? DNI_ALREADY_REGISTERED_CODE : undefined,
+        },
+        { status: isDniConflict ? 409 : patientResult.code === "23505" ? 409 : 500 },
       );
+    }
+
+    if (obraSocial?.trim()) {
+      const { error: hpError } = await upsertHealthProfile(serviceClient, {
+        patient_id: patientResult.patientId,
+        insurance_provider: obraSocial.trim().toUpperCase(),
+      });
+      if (hpError) {
+        console.error("[onboarding/paciente] health profile upsert error", hpError);
+      }
     }
 
     await syncClinicaAuthClaims(serviceClient, userId, "paciente");
