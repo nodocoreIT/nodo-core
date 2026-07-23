@@ -20,6 +20,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const plan = formData.get("plan") as string | null;
     const dniFront = formData.get("dniFront") as File | null;
     const dniBack = formData.get("dniBack") as File | null;
+    const skipPhoneVerification =
+      formData.get("skipPhoneVerification") === "1" ||
+      formData.get("skipPhoneVerification") === "true";
 
     if (!token) {
       return NextResponse.json(
@@ -53,14 +56,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    let verifiedPhone: string;
-    try {
-      verifiedPhone = await assertOnboardingPhoneVerified(token);
-    } catch (e) {
-      return NextResponse.json(
-        { error: e instanceof Error ? e.message : "Celular no verificado." },
-        { status: 400 },
-      );
+    let verifiedPhone: string | null = null;
+    if (!skipPhoneVerification) {
+      try {
+        verifiedPhone = await assertOnboardingPhoneVerified(token);
+      } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "Celular no verificado." },
+          { status: 400 },
+        );
+      }
     }
 
     const email = pending.email as string;
@@ -157,7 +162,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         dni: dni.trim(),
         email: email.toLowerCase().trim(),
         phone: verifiedPhone,
-        phone_verified_at: new Date().toISOString(),
+        phone_verified_at: verifiedPhone ? new Date().toISOString() : null,
         address: address ?? null,
         obra_social: obraSocial ?? null,
         subscription_plan: plan,

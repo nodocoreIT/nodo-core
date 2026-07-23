@@ -28,6 +28,8 @@ function OnboardingMedicoContent() {
     licenseNumber: "",
   });
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phoneSkipped, setPhoneSkipped] = useState(false);
+  const canSubmitPhone = phoneVerified || phoneSkipped;
 
   if (!token) {
     return (
@@ -51,8 +53,8 @@ function OnboardingMedicoContent() {
       toast.error("El nombre completo y la especialidad son requeridos.");
       return;
     }
-    if (!phoneVerified) {
-      toast.error("Verificá tu número de celular antes de continuar.");
+    if (!canSubmitPhone) {
+      toast.error("Verificá tu celular o marcá omitir este campo para continuar.");
       return;
     }
     setLoading(true);
@@ -63,6 +65,7 @@ function OnboardingMedicoContent() {
         licenseNumber: form.licenseNumber,
         plan,
         token,
+        skipPhoneVerification: phoneSkipped,
       });
       setSubmitted(true);
     } catch (err) {
@@ -139,6 +142,7 @@ function OnboardingMedicoContent() {
               onboardingToken={token}
               labelClass={labelClass}
               onVerifiedChange={setPhoneVerified}
+              onSkipChange={setPhoneSkipped}
             />
 
             {/* Planes */}
@@ -175,7 +179,7 @@ function OnboardingMedicoContent() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading || !phoneVerified}
+              disabled={loading || !canSubmitPhone}
               className="w-full rounded-lg py-3.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar y solicitar habilitación"}

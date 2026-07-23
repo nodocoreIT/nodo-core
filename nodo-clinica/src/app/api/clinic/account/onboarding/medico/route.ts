@@ -6,12 +6,13 @@ import { CLINIC_ORG_ID, syncClinicaAuthClaims } from "@/lib/clinic/clinic-org";
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
-    const { fullName, specialty, licenseNumber, plan, token } = body as {
+    const { fullName, specialty, licenseNumber, plan, token, skipPhoneVerification } = body as {
       fullName?: string;
       specialty?: string;
       licenseNumber?: string;
       plan?: string;
       token?: string;
+      skipPhoneVerification?: boolean;
     };
 
     if (!token) {
@@ -46,14 +47,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    let verifiedPhone: string;
-    try {
-      verifiedPhone = await assertOnboardingPhoneVerified(token);
-    } catch (e) {
-      return NextResponse.json(
-        { error: e instanceof Error ? e.message : "Celular no verificado." },
-        { status: 400 },
-      );
+    let verifiedPhone: string | null = null;
+    if (!skipPhoneVerification) {
+      try {
+        verifiedPhone = await assertOnboardingPhoneVerified(token);
+      } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "Celular no verificado." },
+          { status: 400 },
+        );
+      }
     }
 
     const email = pending.email as string;
@@ -113,7 +116,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         full_name: fullName,
         email: email.toLowerCase().trim(),
         phone: verifiedPhone,
-        phone_verified_at: new Date().toISOString(),
+        phone_verified_at: verifiedPhone ? new Date().toISOString() : null,
         specialty,
         license_number: licenseNumber ?? null,
         subscription_status: "trial",

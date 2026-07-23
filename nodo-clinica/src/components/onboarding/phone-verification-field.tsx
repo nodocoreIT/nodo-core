@@ -12,16 +12,19 @@ interface PhoneVerificationFieldProps {
   onboardingToken: string;
   labelClass?: string;
   onVerifiedChange?: (verified: boolean) => void;
+  onSkipChange?: (skipped: boolean) => void;
 }
 
 export function PhoneVerificationField({
   onboardingToken,
   labelClass = "text-xs font-medium text-slate-300",
   onVerifiedChange,
+  onSkipChange,
 }: PhoneVerificationFieldProps) {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [verified, setVerified] = useState(false);
+  const [skipped, setSkipped] = useState(false);
   const [verifiedPhone, setVerifiedPhone] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -85,6 +88,32 @@ export function PhoneVerificationField({
           <p className="text-sm font-semibold text-teal-300">Número verificado</p>
           <p className="text-xs text-slate-300 mt-0.5">{verifiedPhone ?? phone}</p>
         </div>
+      </div>
+    );
+  }
+
+  if (skipped) {
+    return (
+      <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-3">
+        <p className="text-xs text-slate-300">
+          Verificación de celular omitida. Podés completar el registro y cargar el número más adelante.
+        </p>
+        <label className="flex items-start gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={skipped}
+            onChange={(e) => {
+              const next = e.target.checked;
+              setSkipped(next);
+              onSkipChange?.(next);
+              if (!next) onVerifiedChange?.(false);
+            }}
+            className="mt-0.5 h-4 w-4 rounded border-white/30 accent-teal-500"
+          />
+          <span className="text-xs text-slate-300">
+            Omitir este campo por ahora (sin verificación SMS)
+          </span>
+        </label>
       </div>
     );
   }
@@ -160,6 +189,26 @@ export function PhoneVerificationField({
           </div>
         </div>
       )}
+
+      <label className="flex items-start gap-2 cursor-pointer pt-1 border-t border-white/10">
+        <input
+          type="checkbox"
+          checked={skipped}
+          onChange={(e) => {
+            const next = e.target.checked;
+            setSkipped(next);
+            onSkipChange?.(next);
+            if (next) {
+              setCodeSent(false);
+              onVerifiedChange?.(false);
+            }
+          }}
+          className="mt-0.5 h-4 w-4 rounded border-white/30 accent-teal-500"
+        />
+        <span className="text-xs text-slate-300">
+          Omitir este campo por ahora (continuar sin verificar el celular)
+        </span>
+      </label>
     </div>
   );
 }

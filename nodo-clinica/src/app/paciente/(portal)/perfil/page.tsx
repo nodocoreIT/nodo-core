@@ -126,8 +126,9 @@ function TabPerfil({ initialData }: { initialData: ProfileData }) {
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [passwordSectionOpen, setPasswordSectionOpen] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -233,12 +234,14 @@ function TabPerfil({ initialData }: { initialData: ProfileData }) {
 
         {/* Email — read-only */}
         <div className="space-y-1.5">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="patient-profile-email">Email</Label>
           <Input
-            id="email"
+            id="patient-profile-email"
+            name="patient-profile-email"
             value={email}
             readOnly
             disabled
+            autoComplete="username"
             className="bg-muted text-muted-foreground cursor-not-allowed"
           />
           <p className="text-xs text-slate-400">
@@ -291,18 +294,25 @@ function TabPerfil({ initialData }: { initialData: ProfileData }) {
           </Button>
         </div>
 
-        {/* Password — toggled section */}
+        {/* Password — toggled section (separate from visibility toggles) */}
         <div className="border-t border-border pt-5">
-          {!showPassword && !showConfirm && password === "" && confirmPassword === "" ? (
+          {!passwordSectionOpen && password === "" && confirmPassword === "" ? (
             <button
               type="button"
-              onClick={() => setShowPassword(true)}
+              onClick={() => setPasswordSectionOpen(true)}
               className="text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:underline"
             >
               Cambiar contraseña
             </button>
           ) : (
-            <div className="space-y-4">
+            <form
+              className="space-y-4"
+              autoComplete="off"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSave();
+              }}
+            >
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Cambiar contraseña
@@ -312,8 +322,9 @@ function TabPerfil({ initialData }: { initialData: ProfileData }) {
                   onClick={() => {
                     setPassword("");
                     setConfirmPassword("");
-                    setShowPassword(false);
-                    setShowConfirm(false);
+                    setPasswordSectionOpen(false);
+                    setShowNewPassword(false);
+                    setShowConfirmPassword(false);
                   }}
                   className="text-xs text-slate-400 hover:text-slate-600"
                 >
@@ -322,51 +333,57 @@ function TabPerfil({ initialData }: { initialData: ProfileData }) {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="password">Nueva contraseña</Label>
+                <Label htmlFor="patient-new-password">Nueva contraseña</Label>
                 <div className="relative">
                   <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
+                    id="patient-new-password"
+                    name="new-password"
+                    type={showNewPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     className="pr-10"
+                    autoComplete="new-password"
                     autoFocus
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword((v) => !v)}
+                    onClick={() => setShowNewPassword((v) => !v)}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    aria-label={showNewPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
+                <Label htmlFor="patient-confirm-password">Confirmar contraseña</Label>
                 <div className="relative">
                   <Input
-                    id="confirmPassword"
-                    type={showConfirm ? "text" : "password"}
+                    id="patient-confirm-password"
+                    name="confirm-new-password"
+                    type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
                     className="pr-10"
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowConfirm((v) => !v)}
+                    onClick={() => setShowConfirmPassword((v) => !v)}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    aria-label={showConfirmPassword ? "Ocultar confirmación" : "Mostrar confirmación"}
                   >
-                    {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
 
               <div className="flex justify-end">
                 <Button
-                  onClick={handleSave}
+                  type="submit"
                   disabled={saving}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
@@ -374,7 +391,7 @@ function TabPerfil({ initialData }: { initialData: ProfileData }) {
                   Guardar contraseña
                 </Button>
               </div>
-            </div>
+            </form>
           )}
         </div>
       </CardContent>

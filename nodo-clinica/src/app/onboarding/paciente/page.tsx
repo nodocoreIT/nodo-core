@@ -91,6 +91,8 @@ function OnboardingPacienteContent() {
   const [dniFront, setDniFront] = useState<File | null>(null);
   const [dniBack, setDniBack] = useState<File | null>(null);
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phoneSkipped, setPhoneSkipped] = useState(false);
+  const canSubmitPhone = phoneVerified || phoneSkipped;
 
   if (!token) {
     return (
@@ -112,7 +114,7 @@ function OnboardingPacienteContent() {
     e.preventDefault();
     if (!form.fullName) { toast.error("El nombre completo es requerido."); return; }
     if (!form.dni.trim()) { toast.error("El número de DNI es requerido."); return; }
-    if (!phoneVerified) { toast.error("Verificá tu número de celular antes de continuar."); return; }
+    if (!canSubmitPhone) { toast.error("Verificá tu celular o marcá omitir este campo para continuar."); return; }
     setLoading(true);
     try {
       const formData = new FormData();
@@ -124,6 +126,7 @@ function OnboardingPacienteContent() {
       formData.append("plan", plan);
       if (dniFront) formData.append("dniFront", dniFront);
       if (dniBack) formData.append("dniBack", dniBack);
+      if (phoneSkipped) formData.append("skipPhoneVerification", "1");
       await clinicApi.completeOnboardingPaciente(formData);
       setSubmitted(true);
     } catch (err) {
@@ -214,6 +217,7 @@ function OnboardingPacienteContent() {
               onboardingToken={token}
               labelClass={labelClass}
               onVerifiedChange={setPhoneVerified}
+              onSkipChange={setPhoneSkipped}
             />
 
             {/* Row 3: DNI upload + Plan side by side */}
@@ -265,7 +269,7 @@ function OnboardingPacienteContent() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading || !phoneVerified}
+              disabled={loading || !canSubmitPhone}
               className="w-full rounded-lg py-3.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar y solicitar habilitación"}

@@ -430,6 +430,7 @@ export const clinicApi = {
     licenseNumber: string;
     plan: string;
     token: string;
+    skipPhoneVerification?: boolean;
   }): Promise<{ ok: boolean }> {
     const res = await fetch(`${BASE}/api/clinic/account/onboarding/medico`, {
       method: "POST",
