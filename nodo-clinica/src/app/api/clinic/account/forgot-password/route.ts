@@ -4,10 +4,9 @@ import { sendPasswordResetEmail } from "@/lib/mail";
 import { resolveAppOrigin } from "@/lib/clinic/appointment-payment";
 import {
   buildPasswordRecoveryRedirect,
-  canAccessAsRole,
-  lookupClinicMembershipByEmail,
   parseClinicDbRole,
 } from "@/lib/clinic/resolve-clinic-role";
+import { checkPortalLoginEligibility } from "@/lib/clinic/portal-login-eligibility";
 
 /**
  * POST /api/clinic/account/forgot-password
@@ -24,9 +23,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const origin = resolveAppOrigin(request.headers.get("origin"));
   const service = await createServiceClient();
 
-  const membership = await lookupClinicMembershipByEmail(service, email);
-  if (!canAccessAsRole(membership, intendedRole)) {
-    return NextResponse.json({ ok: true });
+  const eligibility = await checkPortalLoginEligibility(
+    service,
+    email,
+    intendedRole,
+  );
+  if (!eligibility.eligible) {
+    return NextResponse.json({ error: eligibility.message }, { status: 404 });
   }
 
   const redirectTo = buildPasswordRecoveryRedirect(origin, intendedRole);
@@ -47,7 +50,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (linkError || !linkData?.properties?.action_link) {
     console.error("[forgot-password] generateLink error", linkError);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(
+      { error: "No se pudo generar el enlace de recuperación." },
+      { status: 500 },
+    );
   }
 
   try {

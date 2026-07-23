@@ -299,9 +299,13 @@ export function LoginPortal() {
           role: isDoctor ? "medico" : "paciente",
         }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Error al enviar el correo");
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "Error al enviar el correo",
+        );
       }
       setRecoverySent(true);
     } catch (err) {

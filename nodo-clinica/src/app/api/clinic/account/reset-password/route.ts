@@ -4,10 +4,9 @@ import { isMailConfigured, sendPasswordResetEmail } from "@/lib/mail";
 import { resolveAppOrigin } from "@/lib/clinic/appointment-payment";
 import {
   buildPasswordRecoveryRedirect,
-  canAccessAsRole,
-  lookupClinicMembershipByEmail,
   parseClinicDbRole,
 } from "@/lib/clinic/resolve-clinic-role";
+import { checkPortalLoginEligibility } from "@/lib/clinic/portal-login-eligibility";
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,17 +22,15 @@ export async function POST(request: NextRequest) {
 
     const origin = resolveAppOrigin(request.headers.get("origin"));
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const serviceClient = (await createServiceClient()) as any;
+    const serviceClient = await createServiceClient();
 
-    const membership = await lookupClinicMembershipByEmail(
+    const eligibility = await checkPortalLoginEligibility(
       serviceClient,
       normalizedEmail,
+      intendedRole,
     );
-
-    if (!canAccessAsRole(membership, intendedRole)) {
-      // Do not reveal whether the email exists.
-      return NextResponse.json({ ok: true });
+    if (!eligibility.eligible) {
+      return NextResponse.json({ error: eligibility.message }, { status: 404 });
     }
 
     const redirectTo = buildPasswordRecoveryRedirect(origin, intendedRole);
@@ -45,19 +42,28 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("[reset-password] generateLink error:", error.message);
-      return NextResponse.json({ ok: true });
+      return NextResponse.json(
+        { error: "No se pudo generar el enlace de recuperación." },
+        { status: 500 },
+      );
     }
 
     const resetUrl: string = data?.properties?.action_link ?? "";
 
     if (!resetUrl) {
       console.error("[reset-password] no action_link in response");
-      return NextResponse.json({ ok: true });
+      return NextResponse.json(
+        { error: "No se pudo generar el enlace de recuperación." },
+        { status: 500 },
+      );
     }
 
     if (!isMailConfigured()) {
       console.warn("[reset-password] SMTP not configured — reset URL:", resetUrl);
-      return NextResponse.json({ ok: true });
+      return NextResponse.json(
+        { error: "El envío de correo no está configurado." },
+        { status: 503 },
+      );
     }
 
     await sendPasswordResetEmail({ email: email.trim(), resetUrl, origin });
@@ -65,6 +71,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[reset-password]", err);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(
+      { error: "Error al enviar el correo de recuperación." },
+      { status: 500 },
+    );
   }
 }
