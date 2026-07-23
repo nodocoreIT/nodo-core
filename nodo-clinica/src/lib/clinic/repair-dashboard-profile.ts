@@ -4,9 +4,9 @@ import {
   parseClinicDbRole,
   type ClinicMembership,
 } from "@/lib/clinic/resolve-clinic-role";
+import { CLINIC_ORG_ID } from "@/lib/clinic/clinic-org";
 
-const DEFAULT_CLINIC_ORG_ID =
-  process.env.CLINIC_ORG_ID ?? "843524dc-0c3b-4340-bc8e-e3ae5aa00fd2";
+const DEFAULT_CLINIC_ORG_ID = CLINIC_ORG_ID;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ServiceClient = SupabaseClient<any>;
@@ -23,17 +23,36 @@ export async function repairDashboardPacienteProfile(
     app_metadata?: Record<string, unknown>;
     user_metadata?: Record<string, unknown>;
   },
+  options?: { force?: boolean },
 ): Promise<ClinicMembership | null> {
-  const metaRole = parseClinicDbRole(user.app_metadata?.role as string | undefined);
-  if (metaRole !== "paciente" || !user.email?.trim()) {
+  if (!user.email?.trim()) {
     return null;
   }
 
   const email = user.email.trim().toLowerCase();
-  const orgId =
-    typeof user.app_metadata?.org_id === "string"
-      ? user.app_metadata.org_id
-      : DEFAULT_CLINIC_ORG_ID;
+  const metaRole = parseClinicDbRole(user.app_metadata?.role as string | undefined);
+
+  const { data: patientByEmail } = await service
+    .from("patients")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+
+  const shouldRepair =
+    options?.force === true ||
+    metaRole === "paciente" ||
+    !!patientByEmail;
+
+  if (!shouldRepair) {
+    return null;
+  }
+
+  // Do not repair accounts that are clearly medico-only (no patient row).
+  if (metaRole === "medico" && !patientByEmail && options?.force !== true) {
+    return null;
+  }
+
+  const orgId = DEFAULT_CLINIC_ORG_ID;
   const rawName =
     (typeof user.user_metadata?.full_name === "string" &&
       user.user_metadata.full_name.trim()) ||
@@ -45,16 +64,16 @@ export async function repairDashboardPacienteProfile(
 
   const { data: existing } = await service
     .from("patients")
-    .select("id, profile_id")
+    .select("id, profile_id, org_id")
     .eq("email", email)
     .maybeSingle();
 
   if (existing) {
-    if (existing.profile_id !== user.id) {
-      await service
-        .from("patients")
-        .update({ profile_id: user.id })
-        .eq("id", existing.id);
+    const patch: Record<string, unknown> = {};
+    if (existing.profile_id !== user.id) patch.profile_id = user.id;
+    if (existing.org_id !== orgId) patch.org_id = orgId;
+    if (Object.keys(patch).length > 0) {
+      await service.from("patients").update(patch).eq("id", existing.id);
     }
   } else {
     const { error: insertError } = await service.from("patients").insert({

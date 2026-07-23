@@ -433,7 +433,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
               </button>
               <div className="min-w-0">
                 <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate2">
-                  Nodo Clínica · Gestión
+                  Nodo Clínica · Profesionales
                 </p>
                 <h1 className="truncate text-base sm:text-xl font-bold text-navy font-display">
                   {title}

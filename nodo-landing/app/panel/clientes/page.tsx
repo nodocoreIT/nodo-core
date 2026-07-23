@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, Fragment, type CSSProperties } from "react";
 import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, RotateCcw, Database, AlertTriangle, Loader2 } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
-import { NODES, unitHasClientAccessCredentials, type NodeDef } from "@/lib/nodes";
+import { NODES, getPanelAssignableNodes, unitHasClientAccessCredentials, type NodeDef } from "@/lib/nodes";
 import {
   defaultPlanCodeForUnit,
   getPlanSelectOptions,
@@ -87,9 +87,78 @@ function formatDate(dateStr: string): string {
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+type NodePillTheme = { bg: string; color: string };
+
+const NODE_PILL_COLORS: Record<string, NodePillTheme> = {
+  autos: { bg: "#B62635", color: "#ffffff" },
+  finanzas: { bg: "#05805C", color: "#ffffff" },
+  ecommerce: { bg: "#DCD500", color: "#000000" },
+  clinica: { bg: "#0D7C73", color: "#ffffff" },
+  salud: { bg: "#ff0077", color: "#ffffff" },
+  inmo: { bg: "#CA460D", color: "#ffffff" },
+  legales: { bg: "#530403", color: "#ffffff" },
+};
+
+function normalizeUnitCodeForPill(unitCode: string): string {
+  return unitCode.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function getNodePillTheme(unitCode: string): NodePillTheme | null {
+  const normalized = normalizeUnitCodeForPill(unitCode);
+  if (!normalized) return null;
+  return NODE_PILL_COLORS[normalized] ?? { bg: "var(--color-mist-200)", color: "var(--color-navy)" };
+}
+
+function getFormUnitPillLabel(unitCode: string, matchedNodeDef?: NodeDef): string {
+  if (!unitCode.trim()) return "Esperando nodo";
+  return matchedNodeDef?.label ?? unitCode;
+}
+
+function getFormUnitPillStyle(unitCode: string, active: boolean): CSSProperties {
+  const theme = getNodePillTheme(unitCode);
+  const base: CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    padding: "8px 12px",
+    fontSize: 12.5,
+    fontWeight: 700,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    fontFamily: "var(--font-sans)",
+  };
+
+  if (!theme) {
+    return {
+      ...base,
+      border: active ? "1px dashed var(--color-slate2)" : "1px dashed var(--color-mist)",
+      background: active ? "var(--color-mist-200)" : "white",
+      color: "var(--color-slate2)",
+      fontStyle: "italic",
+    };
+  }
+
+  if (active) {
+    return {
+      ...base,
+      border: `1px solid ${theme.bg}`,
+      background: theme.bg,
+      color: theme.color,
+    };
+  }
+
+  return {
+    ...base,
+    border: `1px solid ${theme.bg}`,
+    background: "white",
+    color: theme.bg,
+  };
+}
+
 function getAssignableNodes(usedCodes: string[]): NodeDef[] {
-  const used = new Set(usedCodes);
-  return NODES.filter((node) => !used.has(node.code));
+  const used = new Set(usedCodes.filter(Boolean));
+  return getPanelAssignableNodes().filter((node) => !used.has(node.code));
 }
 
 function createFormUnit(unitCode: string, planes: NodePlan[]): FormUnit {
@@ -217,7 +286,7 @@ export default function ClientesPage() {
     setFormEmail("");
     setFormPhone("");
     setFormSince(today);
-    const firstUnit = createFormUnit(NODES[0]?.code ?? "", planes);
+    const firstUnit = createFormUnit("", planes);
     setFormUnits([firstUnit]);
     setActiveUnitKey(firstUnit.key);
     setError("");
@@ -245,7 +314,7 @@ export default function ClientesPage() {
             provisioned_at: u.provisioned_at ?? null,
             provision_user_id: u.provision_user_id ?? null,
           }))
-        : [createFormUnit(NODES[0]?.code ?? "", planes)];
+        : [createFormUnit("", planes)];
     setFormUnits(mappedUnits);
     setActiveUnitKey(mappedUnits[0]?.key ?? "");
     setError("");
@@ -289,6 +358,13 @@ export default function ClientesPage() {
     if (!formName.trim()) {
       setError("El nombre es obligatorio.");
       return;
+    }
+
+    for (const u of formUnits) {
+      if (!u.unit_code.trim()) {
+        setError("Seleccioná un módulo para cada nodo contratado.");
+        return;
+      }
     }
 
     for (const u of formUnits) {
@@ -360,7 +436,12 @@ export default function ClientesPage() {
     const unitsRes = await fetch("/api/admin/save-client-units", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ client_id: clientId, units: unitRows }),
+      body: JSON.stringify({
+        client_id: clientId,
+        client_name: formName.trim(),
+        provision: true,
+        units: unitRows,
+      }),
     });
     const unitsJson = await unitsRes.json();
     if (!unitsRes.ok || !unitsJson.ok) {
@@ -375,69 +456,43 @@ export default function ClientesPage() {
       if (u.provision_user_id) provisionedUserIds.set(u.unit_code, u.provision_user_id);
     }
 
-    // Provision admin users for onboarding/activo nodos with new or changed credentials.
     const provisionErrors: string[] = [];
     const freshlyProvisioned = new Set<string>();
-    for (const u of formUnits) {
-      const nodeDef = NODES.find((n) => n.code === u.unit_code);
-      if (!nodeDef?.provisionable) continue;
-      if (!u.access_user.trim() || !u.access_password.trim()) continue;
-      if (u.status === "pausado") continue;
+    const provisionFailedUnits = new Set<string>();
 
-      const prev = prevUnits.find((p) => p.unit_code === u.unit_code);
-      // Skip only when already provisioned AND user_id is already stored.
-      // If user_id is missing (column was added after provisioning), re-call
-      // provision so the route recovers and returns the existing user_id.
-      const alreadyProvisioned =
-        !!prev?.provisioned_at &&
-        prev.access_user === u.access_user.trim() &&
-        !!prev.provision_user_id;
-      if (alreadyProvisioned) continue;
+    const provisionResults = Array.isArray(unitsJson.provision)
+      ? (unitsJson.provision as Array<{
+          unit_code: string;
+          ok: boolean;
+          user_id?: string;
+          error?: string;
+        }>)
+      : [];
 
-      const res = await fetch("/api/nodo-provision", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nodo_code: u.unit_code,
-          client_name: formName.trim(),
-          email: u.access_user.trim(),
-          password: u.access_password.trim(),
-          plan: u.plan.trim(),
-        }),
-      });
-      const json = await res.json();
-      if (json.ok) {
-        const userId = json.user_id as string | undefined;
-        if (userId) provisionedUserIds.set(u.unit_code, userId);
-        freshlyProvisioned.add(u.unit_code);
-        await supabase
-          .from("client_units")
-          .update({ provisioned_at: new Date().toISOString(), provision_user_id: userId ?? null })
-          .eq("client_id", clientId)
-          .eq("unit_code", u.unit_code);
-      } else {
-        provisionErrors.push(`${nodeDef.label}: ${json.error ?? "error desconocido"}`);
+    for (const row of provisionResults) {
+      const nodeDef = NODES.find((n) => n.code === row.unit_code);
+      if (row.ok && row.user_id) {
+        provisionedUserIds.set(row.unit_code, row.user_id);
+        freshlyProvisioned.add(row.unit_code);
+      } else if (!row.ok) {
+        provisionErrors.push(`${nodeDef?.label ?? row.unit_code}: ${row.error ?? "error desconocido"}`);
+        provisionFailedUnits.add(row.unit_code);
       }
     }
 
-    // Register access_user in node_email_access (login guard for nodos).
-    const syncAccessRes = await fetch("/api/admin/sync-client-unit-access", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ client_id: clientId }),
-    });
-    const syncAccessJson = await syncAccessRes.json();
-    if (!syncAccessRes.ok || !syncAccessJson.ok) {
-      provisionErrors.push(
-        `Acceso al nodo: ${syncAccessJson.error ?? "no se pudo sincronizar el email de acceso"}`,
-      );
-    }
+    // Register access_user in node_email_access (done inside save-client-units).
 
-    // Sync password + Auth claims on every save (idempotent repair for dashboard clients).
+    // Sync password + Auth claims only when credentials changed (skip after fresh provision).
     for (const u of formUnits) {
+      if (freshlyProvisioned.has(u.unit_code)) continue;
+      if (provisionFailedUnits.has(u.unit_code)) continue;
       if (!unitHasClientAccessCredentials(u.access_user)) continue;
       const newPassword = u.access_password.trim();
       if (!newPassword || u.status === "pausado") continue;
+
+      const prev = prevUnits.find((p) => p.unit_code === u.unit_code);
+      const prevPwd = prev?.access_password?.trim() ?? "";
+      if (prevPwd && prevPwd === newPassword && prev?.provision_user_id) continue;
 
       const nodeDef = NODES.find((n) => n.code === u.unit_code);
       const res = await fetch("/api/admin/client-unit-password-update", {
@@ -460,46 +515,68 @@ export default function ClientesPage() {
     }
 
     // Sync ban status: pausado → ban, onboarding/activo → unban.
-    for (const u of formUnits) {
-      const nodeDef = NODES.find((n) => n.code === u.unit_code);
-      if (!nodeDef?.provisionable) continue;
-      const userId = provisionedUserIds.get(u.unit_code);
-      if (!userId) continue;
-      await fetch("/api/nodo-suspend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nodo_code: u.unit_code,
-          user_id: userId,
-          action: u.status === "pausado" ? "suspend" : "reactivate",
-        }),
-      });
-    }
+    const suspendTasks = formUnits
+      .map((u) => {
+        const nodeDef = NODES.find((n) => n.code === u.unit_code);
+        if (!nodeDef?.provisionable) return null;
+        const userId = provisionedUserIds.get(u.unit_code);
+        if (!userId) return null;
+        if (freshlyProvisioned.has(u.unit_code) && u.status !== "pausado") {
+          // Fresh provision should unban via ensureInmoAccess; reactivate as safety net.
+          return fetch("/api/nodo-suspend", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              nodo_code: u.unit_code,
+              user_id: userId,
+              action: "reactivate",
+            }),
+          });
+        }
 
-    // Sync plan tier in nodo app_metadata when the plan changed or was set.
-    for (const u of formUnits) {
-      const nodeDef = NODES.find((n) => n.code === u.unit_code);
-      if (!nodeDef?.provisionable) continue;
+        return fetch("/api/nodo-suspend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nodo_code: u.unit_code,
+            user_id: userId,
+            action: u.status === "pausado" ? "suspend" : "reactivate",
+          }),
+        });
+      })
+      .filter(Boolean) as Promise<Response>[];
 
-      const userId = provisionedUserIds.get(u.unit_code) ?? u.provision_user_id;
-      const nextPlan = u.plan.trim();
-      if (!userId || !nextPlan) continue;
+    await Promise.all(suspendTasks);
 
-      const prev = prevUnits.find((p) => p.unit_code === u.unit_code);
-      const prevPlan = normalizePlanCode(planes, u.unit_code, prev?.plan ?? "");
-      const normalizedNextPlan = normalizePlanCode(planes, u.unit_code, nextPlan);
-      if (prevPlan === normalizedNextPlan && prev?.provision_user_id) continue;
+    // Sync plan tier when it changed (skip right after provision — already applied there).
+    const planTasks = formUnits
+      .map((u) => {
+        const nodeDef = NODES.find((n) => n.code === u.unit_code);
+        if (!nodeDef?.provisionable) return null;
+        if (freshlyProvisioned.has(u.unit_code)) return null;
 
-      await fetch("/api/nodo-plan-update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nodo_code: u.unit_code,
-          user_id: userId,
-          plan: normalizedNextPlan,
-        }),
-      });
-    }
+        const userId = provisionedUserIds.get(u.unit_code) ?? u.provision_user_id;
+        const nextPlan = u.plan.trim();
+        if (!userId || !nextPlan) return null;
+
+        const prev = prevUnits.find((p) => p.unit_code === u.unit_code);
+        const prevPlan = normalizePlanCode(planes, u.unit_code, prev?.plan ?? "");
+        const normalizedNextPlan = normalizePlanCode(planes, u.unit_code, nextPlan);
+        if (prevPlan === normalizedNextPlan && prev?.provision_user_id) return null;
+
+        return fetch("/api/nodo-plan-update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nodo_code: u.unit_code,
+            user_id: userId,
+            plan: normalizedNextPlan,
+          }),
+        });
+      })
+      .filter(Boolean) as Promise<Response>[];
+
+    await Promise.all(planTasks);
 
     setSaving(false);
     if (provisionErrors.length > 0) {
@@ -512,12 +589,14 @@ export default function ClientesPage() {
   }
 
   function requestDelete(id: string, name: string) {
+    setError("");
     setConfirmDelete({ ids: [id], label: name });
   }
 
   function requestBulkDelete() {
     const ids = [...selected];
     if (ids.length === 0) return;
+    setError("");
     const label = ids.length === 1
       ? clients.find((c) => c.id === ids[0])?.name ?? "1 cliente"
       : `${ids.length} clientes`;
@@ -540,7 +619,6 @@ export default function ClientesPage() {
 
     if (!res.ok || !json.ok) {
       setError(json.error ?? "No se pudo eliminar el cliente.");
-      setConfirmDelete(null);
       return;
     }
 
@@ -945,21 +1023,11 @@ export default function ClientesPage() {
                             >
                               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                 {cu.map((u) => {
-                                  const st = statusStyle(u.status);
-                                  const NODE_PILL_COLORS: Record<string, { bg: string; color: string }> = {
-                                    autos:     { bg: "#B62635", color: "#ffffff" },
-                                    finanzas:  { bg: "#05805C", color: "#ffffff" },
-                                    ecommerce: { bg: "#DCD500", color: "#000000" },
-                                    clinica:   { bg: "#0D7C73", color: "#ffffff" },
-                                    salud:     { bg: "#ff0077", color: "#ffffff" },
-                                    inmo:      { bg: "#CA460D", color: "#ffffff" },
-                                    legales:   { bg: "#530403", color: "#ffffff" }
-                                  };
-                                  const normalizedCode = (u.unit_code ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                                  const pillTheme = NODE_PILL_COLORS[normalizedCode] ?? { bg: "var(--color-mist-200)", color: "var(--color-navy)" };
+                                  const pillTheme = getNodePillTheme(u.unit_code ?? "");
+                                  const normalizedCode = normalizeUnitCodeForPill(u.unit_code ?? "");
                                   return (
-                                    <span key={u.id} style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 11.5, background: pillTheme.bg, borderRadius: 6, padding: "3px 8px", color: pillTheme.color, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                                      nodo | {u.unit_code}
+                                    <span key={u.id} style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 11.5, background: pillTheme?.bg ?? "var(--color-mist-200)", borderRadius: 6, padding: "3px 8px", color: pillTheme?.color ?? "var(--color-navy)", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                      nodo | {normalizedCode || u.unit_code}
                                     </span>
                                   );
                                 })}
@@ -1044,14 +1112,39 @@ export default function ClientesPage() {
         {/* Delete confirmation modal */}
         {confirmDelete && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(18,30,47,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 110, padding: 16 }}>
-            <div style={{ background: "white", borderRadius: 12, width: "min(380px, 96vw)", boxShadow: "0 12px 40px rgba(18,30,47,.18)", padding: 24 }}>
+            <div style={{ background: "white", borderRadius: 12, width: "min(380px, 96vw)", boxShadow: "0 12px 40px rgba(18,30,47,.18)", padding: 24, position: "relative" }}>
+              {saving && (
+                <div style={{ position: "absolute", inset: 0, background: "#ffffff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, zIndex: 2, borderRadius: 12 }}>
+                  <Loader2 size={28} color="#C0392B" style={{ animation: "spin 1s linear infinite" }} />
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#991B1B" }}>Eliminando cliente...</p>
+                  <p style={{ margin: 0, fontSize: 12.5, color: "var(--color-slate2)" }}>No cierres esta ventana.</p>
+                </div>
+              )}
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-navy)", fontFamily: "var(--font-display)" }}>Eliminar</h3>
               <p style={{ margin: "10px 0 0", fontSize: 14, color: "var(--color-slate2)", lineHeight: 1.5 }}>
                 ¿Seguro que querés eliminar <strong style={{ color: "var(--color-ink)" }}>{confirmDelete.label}</strong>? Se borran también sus nodos y accesos. Esta acción no se puede deshacer.
               </p>
+              {error && !saving && (
+                <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "#C0392B", lineHeight: 1.45 }}>{error}</p>
+              )}
               <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                <button onClick={performDelete} style={{ flex: 1, background: "#C0392B", color: "white", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}>Eliminar</button>
-                <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, background: "transparent", color: "var(--color-slate2)", border: "1px solid var(--color-mist)", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}>Cancelar</button>
+                <button
+                  onClick={performDelete}
+                  disabled={saving}
+                  style={{ flex: 1, background: "#C0392B", color: "white", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", opacity: saving ? 0.7 : 1 }}
+                >
+                  {saving ? "Eliminando..." : "Eliminar"}
+                </button>
+                <button
+                  onClick={() => {
+                    setConfirmDelete(null);
+                    setError("");
+                  }}
+                  disabled={saving}
+                  style={{ flex: 1, background: "transparent", color: "var(--color-slate2)", border: "1px solid var(--color-mist)", borderRadius: 8, padding: "10px 16px", fontSize: 13.5, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", opacity: saving ? 0.7 : 1 }}
+                >
+                  Cancelar
+                </button>
               </div>
             </div>
           </div>
@@ -1311,34 +1404,29 @@ export default function ClientesPage() {
                   </div>
 
                   <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 12 }}>
-                    {formUnits.map((u, idx) => {
+                    {formUnits.map((u) => {
                       const active = activeFormUnit?.key === u.key;
                       const st = statusStyle(u.status);
                       const matchedNodeDef = NODES.find((n) => n.code.toLowerCase() === u.unit_code?.toLowerCase()) ?? NODES.find((n) => n.slug.toLowerCase() === u.unit_code?.toLowerCase());
-                      const nodeLabel = matchedNodeDef?.label ?? u.unit_code ?? `Nodo ${idx + 1}`;
+                      const nodeLabel = getFormUnitPillLabel(u.unit_code, matchedNodeDef);
+                      const pendingNode = !u.unit_code.trim();
                       return (
                         <button
                           key={u.key}
                           type="button"
                           onClick={() => setActiveUnitKey(u.key)}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            border: active ? "1px solid var(--color-brand)" : "1px solid var(--color-mist)",
-                            background: active ? "rgba(218,90,14,.08)" : "white",
-                            color: active ? "var(--color-brand)" : "var(--color-ink)",
-                            borderRadius: 999,
-                            padding: "8px 12px",
-                            fontSize: 12.5,
-                            fontWeight: 700,
-                            cursor: "pointer",
-                            whiteSpace: "nowrap",
-                            fontFamily: "var(--font-sans)",
-                          }}
+                          style={getFormUnitPillStyle(u.unit_code, active)}
                         >
                           <span>{nodeLabel}</span>
-                          <span style={{ width: 7, height: 7, borderRadius: "50%", background: st.color }} />
+                          <span
+                            style={{
+                              width: 7,
+                              height: 7,
+                              borderRadius: "50%",
+                              background: pendingNode ? "var(--color-slate2)" : st.color,
+                              opacity: pendingNode ? 0.45 : 1,
+                            }}
+                          />
                         </button>
                       );
                     })}
@@ -1349,7 +1437,7 @@ export default function ClientesPage() {
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
                         <div>
                           <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "var(--color-navy)", fontFamily: "var(--font-display)" }}>
-                            {NODES.find((n) => n.code === activeFormUnit.unit_code)?.label ?? "Nodo"}
+                            {getFormUnitPillLabel(activeFormUnit.unit_code, NODES.find((n) => n.code === activeFormUnit.unit_code))}
                           </p>
                           <p style={{ margin: "3px 0 0", fontSize: 12.5, color: "var(--color-slate2)" }}>
                             Configuración comercial, estado operativo y acceso del cliente.
@@ -1379,9 +1467,12 @@ export default function ClientesPage() {
                                   plan: defaultPlanCodeForUnit(planes, newCode),
                                 });
                               }}
-                              options={NODES.map((node) => ({
+                              allowEmpty
+                              placeholder="Seleccioná un módulo..."
+                              emptyLabel="Seleccioná un módulo..."
+                              options={getPanelAssignableNodes().map((node) => ({
                                 value: node.code,
-                                label: node.inDevelopment ? `${node.label} (en desarrollo)` : node.label,
+                                label: node.label,
                                 disabled: formUnits.some(
                                   (unit) => unit.key !== activeFormUnit.key && unit.unit_code === node.code,
                                 ),
@@ -1391,6 +1482,17 @@ export default function ClientesPage() {
                           <div>
                             <label style={labelStyle}>Plan</label>
                             {(() => {
+                              if (!activeFormUnit.unit_code.trim()) {
+                                return (
+                                  <input
+                                    type="text"
+                                    value=""
+                                    disabled
+                                    style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed" }}
+                                    placeholder="Elegí un módulo primero"
+                                  />
+                                );
+                              }
                               const planOptions = getPlanSelectOptions(planes, activeFormUnit.unit_code);
                               if (planOptions.length > 0) {
                                 return (

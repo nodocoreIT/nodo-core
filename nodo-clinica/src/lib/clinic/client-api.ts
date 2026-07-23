@@ -4,6 +4,7 @@ import type { MedicationSearchResponse } from "@/lib/clinic/medication-catalog";
 
 const BASE = "";
 const SESSION_KEY = "clinica_local_session";
+const AUTH_TOKEN_CACHE = "clinica_access_token";
 
 // ── Browser Supabase client (lazy-loaded, client-only) ────────────────────
 
@@ -45,13 +46,91 @@ export function getClientSession(): ClinicSession | null {
 export function clearClientSession() {
   if (typeof window === "undefined") return;
   sessionStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(AUTH_TOKEN_CACHE);
+  invalidateClinicApiCache();
 }
 
-// ── Fetch helpers ─────────────────────────────────────────────────────────
+type ClinicSessionResult = {
+  session: {
+    userId: string;
+    email?: string;
+    role: "doctor" | "patient";
+    org_id?: string | null;
+  } | null;
+  user: {
+    id: string;
+    email?: string;
+    fullName?: string;
+    profilePhotoUrl?: string;
+    role?: "doctor" | "patient";
+    subscriptionPlan?: string;
+    org_id?: string | null;
+  } | null;
+};
+
+const SESSION_CACHE_MS = 30_000;
+const APPOINTMENTS_CACHE_MS = 15_000;
+
+let sessionInflight: Promise<ClinicSessionResult> | null = null;
+let sessionCache: { at: number; value: ClinicSessionResult } | null = null;
+const appointmentsInflight = new Map<string, Promise<unknown>>();
+const appointmentsCache = new Map<string, { at: number; value: unknown }>();
+
+export function invalidateClinicApiCache(
+  scope: "session" | "appointments" | "all" = "all",
+) {
+  if (scope === "session" || scope === "all") {
+    sessionCache = null;
+    sessionInflight = null;
+  }
+  if (scope === "appointments" || scope === "all") {
+    appointmentsCache.clear();
+    appointmentsInflight.clear();
+  }
+}
+
+async function fetchClinicJson(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<unknown> {
+  const res = await fetch(input, init);
+  return parseJsonResponse(res);
+}
+
+async function syncAuthTokenCache(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  const client = getBrowserSupabase();
+  if (!client) {
+    sessionStorage.removeItem(AUTH_TOKEN_CACHE);
+    return null;
+  }
+  try {
+    const supabase = await client;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const token = session?.access_token ?? null;
+    if (token) {
+      sessionStorage.setItem(AUTH_TOKEN_CACHE, token);
+    } else {
+      sessionStorage.removeItem(AUTH_TOKEN_CACHE);
+    }
+    return token;
+  } catch {
+    sessionStorage.removeItem(AUTH_TOKEN_CACHE);
+    return null;
+  }
+}
 
 function clinicFetchOpts(): RequestInit {
+  const headers: Record<string, string> = {};
+  if (typeof window !== "undefined") {
+    const token = sessionStorage.getItem(AUTH_TOKEN_CACHE);
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
   return {
     credentials: "include",
+    headers,
   };
 }
 
@@ -79,6 +158,134 @@ function mapSessionRole(appMetadataRole: string | null | undefined): "doctor" | 
   return PRIVILEGED_ROLES.includes(appMetadataRole ?? "") ? "doctor" : "patient";
 }
 
+async function fetchSessionUncached(): Promise<ClinicSessionResult> {
+  await syncAuthTokenCache();
+
+  const client = getBrowserSupabase();
+  if (client) {
+    try {
+      const supabase = await client;
+      const { data: { session } } = await supabase.auth.getSession();
+      let authUser = session?.user;
+      if (!authUser) {
+        const { data: { user: freshUser } } = await supabase.auth.getUser();
+        authUser = freshUser ?? undefined;
+      }
+      if (authUser) {
+        const appMeta = authUser.app_metadata ?? {};
+        const userMeta = authUser.user_metadata ?? {};
+        let dbRole: "doctor" | "patient" = mapSessionRole(appMeta.role);
+
+        let fullName: string =
+          userMeta.full_name ?? userMeta.name ?? authUser.email ?? "";
+        let profilePhotoUrl: string | undefined;
+        let resolvedId: string = authUser.id;
+
+        try {
+          const sessionRes = await fetch(`${BASE}/api/clinic/account/session`, {
+            ...clinicFetchOpts(),
+            cache: "no-store",
+          });
+          if (sessionRes.ok) {
+            const sessionData = await parseJsonResponse(sessionRes);
+            if (sessionData.session?.role === "doctor" || sessionData.session?.role === "patient") {
+              dbRole = sessionData.session.role;
+            } else if (sessionData.user?.role === "doctor" || sessionData.user?.role === "patient") {
+              dbRole = sessionData.user.role;
+            }
+            if (sessionData.user?.fullName) {
+              fullName = sessionData.user.fullName;
+            }
+            profilePhotoUrl = sessionData.user?.profilePhotoUrl;
+            if (sessionData.user?.id) {
+              resolvedId = sessionData.user.id;
+            }
+          } else if (session?.access_token) {
+            const stored = getClientSession();
+            const bootstrapRole =
+              stored?.userId === authUser.id && stored.role === "patient"
+                ? "patient"
+                : dbRole;
+            await fetch(`${BASE}/api/clinic/auth/set-role`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              credentials: "include",
+              body: JSON.stringify({ role: bootstrapRole }),
+            }).catch(() => undefined);
+          }
+        } catch {
+          /* keep metadata fallback */
+        }
+
+        const stored = getClientSession();
+        const effectiveRole: "doctor" | "patient" =
+          stored?.userId === authUser.id &&
+          stored?.role === "patient" &&
+          dbRole === "doctor"
+            ? "patient"
+            : dbRole;
+        return {
+          session: {
+            userId: authUser.id,
+            email: authUser.email,
+            role: effectiveRole,
+            org_id: appMeta.org_id ?? null,
+          },
+          user: {
+            id: resolvedId,
+            email: authUser.email,
+            fullName,
+            profilePhotoUrl,
+            role: effectiveRole,
+            subscriptionPlan: appMeta.plan ?? appMeta.subscription_plan ?? undefined,
+            org_id: appMeta.org_id ?? null,
+          },
+        };
+      }
+    } catch {
+      /* fall through to HTTP */
+    }
+  }
+
+  const stored = getClientSession();
+  if (stored) {
+    return {
+      session: {
+        userId: stored.userId,
+        email: stored.email,
+        role: stored.role,
+        org_id: null,
+      },
+      user: {
+        id: stored.userId,
+        email: stored.email,
+        fullName: stored.fullName,
+        role: stored.role,
+        org_id: null,
+      },
+    };
+  }
+
+  if (!useBrowserSupabaseAuth()) {
+    const res = await fetch(`${BASE}/api/clinic/auth/session`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    const data = await parseJsonResponse(res);
+    return { session: data.session ?? null, user: data.user ?? null };
+  }
+
+  const res = await fetch(`${BASE}/api/clinic/account/session`, clinicFetchOpts());
+  const data = await parseJsonResponse(res);
+  if (!res.ok) {
+    return { session: null, user: null };
+  }
+  return data as ClinicSessionResult;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────
 
 export const clinicApi = {
@@ -89,99 +296,23 @@ export const clinicApi = {
    *          pattern as nodo-inmo / nodo-autos / nodo-finanzas).
    * Fallback: HTTP API (clinica_session JWT cookie for platform-sync logins).
    */
-  async getSession() {
-    // 1. Try browser Supabase client (fast, no round-trip)
-    const client = getBrowserSupabase();
-    if (client) {
-      try {
-        const supabase = await client;
-        const { data: { session } } = await supabase.auth.getSession();
-        // getUser() is more reliable when getSession() returns null — it verifies
-        // the token server-side (handles split-cookie edge cases and stale state).
-        let authUser = session?.user;
-        if (!authUser) {
-          const { data: { user: freshUser } } = await supabase.auth.getUser();
-          authUser = freshUser ?? undefined;
-        }
-        if (authUser) {
-          const appMeta = authUser.app_metadata ?? {};
-          const userMeta = authUser.user_metadata ?? {};
-          let dbRole: "doctor" | "patient" = mapSessionRole(appMeta.role);
-
-          let fullName: string =
-            userMeta.full_name ?? userMeta.name ?? authUser.email ?? "";
-          let profilePhotoUrl: string | undefined;
-          let resolvedId: string = authUser.id;
-
-          try {
-            const sessionRes = await fetch(`${BASE}/api/clinic/account/session`, {
-              credentials: "include",
-              cache: "no-store",
-            });
-            if (sessionRes.ok) {
-              const sessionData = await parseJsonResponse(sessionRes);
-              if (sessionData.session?.role === "doctor" || sessionData.session?.role === "patient") {
-                dbRole = sessionData.session.role;
-              } else if (sessionData.user?.role === "doctor" || sessionData.user?.role === "patient") {
-                dbRole = sessionData.user.role;
-              }
-              if (sessionData.user?.fullName) {
-                fullName = sessionData.user.fullName;
-              }
-              profilePhotoUrl = sessionData.user?.profilePhotoUrl;
-              if (sessionData.user?.id) {
-                resolvedId = sessionData.user.id;
-              }
-            }
-          } catch {
-            /* keep metadata fallback */
-          }
-
-          const stored = getClientSession();
-          const effectiveRole: "doctor" | "patient" =
-            stored?.userId === authUser.id &&
-            stored?.role === "patient" &&
-            dbRole === "doctor"
-              ? "patient"
-              : dbRole;
-          return {
-            session: {
-              userId: authUser.id,
-              email: authUser.email,
-              role: effectiveRole,
-              org_id: appMeta.org_id ?? null,
-            },
-            user: {
-              id: resolvedId,
-              email: authUser.email,
-              fullName,
-              profilePhotoUrl,
-              role: effectiveRole,
-              subscriptionPlan: appMeta.plan ?? appMeta.subscription_plan ?? undefined,
-              org_id: appMeta.org_id ?? null,
-            },
-          };
-        }
-      } catch {
-        /* fall through to HTTP */
-      }
+  async getSession(): Promise<ClinicSessionResult> {
+    const now = Date.now();
+    if (sessionCache && now - sessionCache.at < SESSION_CACHE_MS) {
+      return sessionCache.value;
     }
+    if (sessionInflight) return sessionInflight;
 
-    // 2. Local mode: clinic_session cookie + JSON DB
-    if (!useBrowserSupabaseAuth()) {
-      const res = await fetch(`${BASE}/api/clinic/auth/session`, {
-        credentials: "include",
-        cache: "no-store",
+    sessionInflight = fetchSessionUncached()
+      .then((value) => {
+        sessionCache = { at: Date.now(), value };
+        return value;
+      })
+      .finally(() => {
+        sessionInflight = null;
       });
-      const data = await parseJsonResponse(res);
-      return { session: data.session ?? null, user: data.user ?? null };
-    }
 
-    // 3. Supabase: HTTP session API
-    const res = await fetch(`${BASE}/api/clinic/account/session`, {
-      credentials: "include",
-    });
-    return parseJsonResponse(res);
+    return sessionInflight;
   },
 
   /**
@@ -191,89 +322,48 @@ export const clinicApi = {
    * This matches how nodo-inmo / nodo-autos / nodo-finanzas handle login.
    */
   async login(email: string, password: string, role: "doctor" | "patient") {
-    const client = getBrowserSupabase();
-    if (client) {
-      const supabase = await client;
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) {
-        const msg = (error.message ?? "").toLowerCase();
-        if (msg.includes("invalid login") || msg.includes("invalid_credentials")) {
-          throw new Error("Credenciales incorrectas. Verificá tu email y contraseña.");
-        }
-        throw new Error(error.message || "Credenciales incorrectas");
-      }
-      if (!data.user) throw new Error("Credenciales incorrectas");
-
-      const intendedDbRole = role === "patient" ? "paciente" : "medico";
-      const verifyRes = await fetch(`${BASE}/api/clinic/account/verify-portal`, {
+    if (useBrowserSupabaseAuth()) {
+      const res = await fetch(`${BASE}/api/clinic/account/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ role: intendedDbRole }),
+        body: JSON.stringify({ email, password, role }),
       });
+      const respData = await parseJsonResponse(res);
+      if (!res.ok) throw new Error(respData.error || "Error de login");
 
-      if (!verifyRes.ok) {
-        await supabase.auth.signOut();
-        const verifyData = await verifyRes.json().catch(() => ({}));
-        throw new Error(
-          verifyData.error ??
-            (role === "doctor"
-              ? "Esta cuenta no tiene acceso al portal médico."
-              : "Esta cuenta no está registrada como paciente."),
-        );
+      const client = getBrowserSupabase();
+      if (client && respData.supabaseSession?.access_token) {
+        try {
+          const supabase = await client;
+          await supabase.auth.setSession({
+            access_token: respData.supabaseSession.access_token,
+            refresh_token: respData.supabaseSession.refresh_token,
+          });
+          await syncAuthTokenCache();
+        } catch {
+          /* server cookies + clinica_session are enough for API routes */
+        }
       }
 
-      const appMeta = data.user.app_metadata ?? {};
-      let fullName: string =
-        data.user.user_metadata?.full_name ?? data.user.email?.split("@")[0] ?? "";
-      let resolvedId = data.user.id;
-      let dbRole: "doctor" | "patient" = role === "patient" ? "patient" : "doctor";
+      const sessionRole: "doctor" | "patient" =
+        respData.role === "doctor" || respData.role === "patient"
+          ? respData.role
+          : role;
 
-      try {
-        const sessionRes = await fetch(`${BASE}/api/clinic/account/session`, {
-          credentials: "include",
-          cache: "no-store",
+      if (respData.user?.id) {
+        saveClientSession({
+          userId: respData.user.id,
+          role: sessionRole,
+          email: respData.user.email ?? email,
+          fullName: respData.user.fullName ?? email.split("@")[0],
         });
-        if (sessionRes.ok) {
-          const sessionData = await parseJsonResponse(sessionRes);
-          if (sessionData.user?.fullName) fullName = sessionData.user.fullName;
-          if (sessionData.user?.id) resolvedId = sessionData.user.id;
-          if (sessionData.session?.role === "doctor" || sessionData.session?.role === "patient") {
-            dbRole = sessionData.session.role;
-          }
-        }
-      } catch {
-        /* keep defaults */
       }
 
-      const effectiveRole = role === "patient" ? "patient" : dbRole;
-
-      saveClientSession({
-        userId: data.user.id,
-        role: effectiveRole,
-        email: data.user.email ?? "",
-        fullName,
-      });
-
-      await fetch(`${BASE}/api/clinic/auth/set-role`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ role: effectiveRole }),
-      });
-
+      invalidateClinicApiCache();
       return {
-        user: {
-          id: resolvedId,
-          email: data.user.email,
-          fullName,
-          role: effectiveRole,
-          org_id: appMeta.org_id ?? null,
-        },
-        role: effectiveRole,
+        user: respData.user,
+        role: sessionRole,
       };
     }
 
@@ -686,7 +776,7 @@ export const clinicApi = {
   async removePatientAppointment(accessToken: string) {
     const res = await fetch(`${BASE}/api/clinic/appointments`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...clinicFetchOpts().headers },
       credentials: "include",
       body: JSON.stringify({
         accessToken,
@@ -695,13 +785,14 @@ export const clinicApi = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al eliminar turno");
+    invalidateClinicApiCache("appointments");
     return data;
   },
 
   async deleteCancelledAppointment(accessToken: string) {
     const res = await fetch(`${BASE}/api/clinic/appointments`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...clinicFetchOpts().headers },
       credentials: "include",
       body: JSON.stringify({
         accessToken,
@@ -714,11 +805,27 @@ export const clinicApi = {
   },
 
   async getPatientAppointments(patientId: string) {
-    const res = await fetch(
-      `${BASE}/api/clinic/appointments?patientId=${patientId}`,
+    const now = Date.now();
+    const cached = appointmentsCache.get(patientId);
+    if (cached && now - cached.at < APPOINTMENTS_CACHE_MS) {
+      return cached.value;
+    }
+
+    const inflight = appointmentsInflight.get(patientId);
+    if (inflight) return inflight;
+
+    const promise = fetchClinicJson(
+      `${BASE}/api/clinic/appointments?patientId=${encodeURIComponent(patientId)}`,
       clinicFetchOpts(),
-    );
-    return parseJsonResponse(res);
+    ).then((value) => {
+      appointmentsCache.set(patientId, { at: Date.now(), value });
+      return value;
+    }).finally(() => {
+      appointmentsInflight.delete(patientId);
+    });
+
+    appointmentsInflight.set(patientId, promise);
+    return promise;
   },
 
   async getDoctorAppointments(

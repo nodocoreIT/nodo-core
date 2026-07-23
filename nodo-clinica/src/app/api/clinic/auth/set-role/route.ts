@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { setSession } from "@/lib/clinic/session";
 import type { ClinicSession } from "@/lib/clinic/session";
+import { resolveSupabaseAuthUser } from "@/lib/supabase/resolve-auth-user";
 
 /**
  * POST /api/clinic/auth/set-role
@@ -20,10 +20,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const resolved = await resolveSupabaseAuthUser(request);
+  const user = resolved?.user;
 
-  if (error || !user) {
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

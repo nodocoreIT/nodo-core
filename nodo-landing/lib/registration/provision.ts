@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getNodeDefaultTheme, isEmptyThemeSettings } from "@nodocore/shared-components/lib/node-default-theme";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
+import { createNodoAdminClient, getLandingAuthConfig } from "@/lib/supabase/nodo-admin";
 import { syncNodeEmailAccessForClient } from "@/lib/registration/client-unit-auth";
 import {
   finanzasThemeAppMetadata,
@@ -9,8 +9,10 @@ import {
 } from "@/lib/registration/seed-node-theme";
 import {
   clinicaPortalRoleFromPlan,
+  ensureClinicaPacienteOrgMembership,
   ensureClinicaPortalProfile,
 } from "@/lib/registration/clinica-provision";
+import { findAuthUserByEmail, authConfigForNodoCode } from "@/lib/registration/auth-user-lookup";
 
 function planToTier(plan: string): "starter" | "pro" {
   return plan.toLowerCase().includes("pro") ? "pro" : "starter";
@@ -134,31 +136,47 @@ async function ensureInmoAccess(
   const { userId, password, plan, product } = params;
   const tier = planToTier(plan);
 
-  const membership = await ensureInmoMembership(admin, params);
-  if ("error" in membership) return membership;
-
-  const { data: userData } = await admin.auth.admin.getUserById(userId);
-  const currentAppMetadata = userData.user?.app_metadata ?? {};
-
-  // Determine the caller's role from org_members so the JWT reflects the
-  // correct role (super_admin for the org creator, admin for re-provisioned users).
-  const { data: memberRow } = await admin
-    .schema("shared")
-    .from("org_members")
-    .select("role")
-    .eq("org_id", membership.orgId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  const orgRole = (memberRow?.role as string | undefined) ?? "super_admin";
-
   const portalRole =
     product === "clinica" ? clinicaPortalRoleFromPlan(plan) : null;
+
+  let membership: { orgId: string } | { error: string };
+  if (product === "clinica" && portalRole === "paciente") {
+    const shared = await ensureClinicaPacienteOrgMembership(admin, {
+      userId,
+      clientName: params.clientName,
+      email: params.email,
+    });
+    if (!shared.ok) return { error: shared.error };
+    membership = { orgId: shared.orgId };
+  } else {
+    membership = await ensureInmoMembership(admin, params);
+  }
+  if ("error" in membership) return membership;
+
+  const [{ data: userData }, memberRowResult] = await Promise.all([
+    admin.auth.admin.getUserById(userId),
+    portalRole === "paciente"
+      ? Promise.resolve({ data: null })
+      : admin
+          .schema("shared")
+          .from("org_members")
+          .select("role")
+          .eq("org_id", membership.orgId)
+          .eq("user_id", userId)
+          .maybeSingle(),
+  ]);
+
+  const currentAppMetadata = userData.user?.app_metadata ?? {};
+  const memberRow = memberRowResult.data;
+  const orgRole = (memberRow?.role as string | undefined) ?? "super_admin";
   const jwtRole = portalRole ?? orgRole;
 
   const updatePayload: {
     password?: string;
+    ban_duration: string;
     app_metadata: Record<string, unknown>;
   } = {
+    ban_duration: "none",
     app_metadata: {
       ...currentAppMetadata,
       org_id: membership.orgId,
@@ -179,21 +197,33 @@ async function ensureInmoAccess(
     return { error: "Error al actualizar credenciales: " + authErr.message };
   }
 
-  if (product === "clinica" && portalRole) {
-    const profileResult = await ensureClinicaPortalProfile({
-      userId,
-      email: params.email,
-      clientName: params.clientName,
-      orgId: membership.orgId,
-      plan,
-      portalRole,
-    });
-    if (!profileResult.ok) {
-      return { error: profileResult.error };
-    }
+  const postUpdateTasks: Promise<{ ok: true } | { ok: false; error: string } | void>[] = [];
+
+  if (!(product === "clinica" && portalRole === "paciente")) {
+    postUpdateTasks.push(
+      seedInmoOrgProfileTheme(admin, membership.orgId, params.clientName, product),
+    );
   }
 
-  await seedInmoOrgProfileTheme(admin, membership.orgId, params.clientName, product);
+  if (product === "clinica" && portalRole) {
+    postUpdateTasks.unshift(
+      ensureClinicaPortalProfile({
+        userId,
+        email: params.email,
+        clientName: params.clientName,
+        orgId: membership.orgId,
+        plan,
+        portalRole,
+      }),
+    );
+  }
+
+  const postResults = await Promise.all(postUpdateTasks);
+  for (const result of postResults) {
+    if (result && "ok" in result && !result.ok) {
+      return { error: result.error };
+    }
+  }
 
   return { orgId: membership.orgId };
 }
@@ -272,13 +302,13 @@ export async function provisionNodoAccess(params: {
   if (createErr) {
     const msg = createErr.message ?? "";
     if (msg.toLowerCase().includes("already")) {
-      const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      const found = list?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+      const authConfig = authConfigForNodoCode(nodoCode);
+      const found = authConfig ? await findAuthUserByEmail(authConfig, email, admin) : null;
       if (!found) return { ok: false, error: msg };
-      userId = found.id;
+      userId = found.userId;
 
       if (code === "finanzas") {
-        const currentMeta = found.app_metadata ?? {};
+        const currentMeta = found.appMetadata ?? {};
         const themePatch = isEmptyThemeSettings(currentMeta.theme_settings)
           ? finanzasThemeAppMetadata()
           : {};
@@ -459,14 +489,14 @@ export async function createLandingAuthPendingPassword(
   if (!authErr && newUser?.user) return newUser.user.id;
 
   if (authErr?.message?.toLowerCase().includes("already")) {
-    const { data: listData } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const matched = listData?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    const authConfig = getLandingAuthConfig();
+    const matched = authConfig ? await findAuthUserByEmail(authConfig, email, admin) : null;
     if (matched) {
-      await admin.auth.admin.updateUserById(matched.id, {
+      await admin.auth.admin.updateUserById(matched.userId, {
         app_metadata: { role, must_set_password: true },
         user_metadata: { full_name: fullName },
       });
-      return matched.id;
+      return matched.userId;
     }
   }
 
@@ -493,15 +523,15 @@ export async function ensureLandingAuthUser(
   if (!authErr && newUser?.user) return newUser.user.id;
 
   if (authErr?.message?.toLowerCase().includes("already")) {
-    const { data: listData } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const matched = listData?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    const authConfig = getLandingAuthConfig();
+    const matched = authConfig ? await findAuthUserByEmail(authConfig, email, admin) : null;
     if (matched) {
-      await admin.auth.admin.updateUserById(matched.id, {
+      await admin.auth.admin.updateUserById(matched.userId, {
         password,
         app_metadata: { role },
         user_metadata: { full_name: fullName },
       });
-      return matched.id;
+      return matched.userId;
     }
   }
 

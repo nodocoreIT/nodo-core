@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { ResendButton } from "@/components/patient/resend-button";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 const STATUS_LABEL: Record<string, string> = {
   scheduled: "Programado",
@@ -28,7 +29,7 @@ export function PacienteTurnosClient() {
       status: string;
       accessToken: string;
       paymentStatus?: string;
-      doctor?: { fullName: string; specialty: string };
+      doctor?: { fullName: string; specialty?: string; profilePhotoUrl?: string };
     }>
   >([]);
 
@@ -59,7 +60,7 @@ type Appointment = {
   scheduledAt: string;
   status: string;
   accessToken: string;
-  doctor?: { fullName: string; specialty: string };
+  doctor?: { fullName: string; specialty?: string; profilePhotoUrl?: string };
 };
 
 export function TurnosList({ appointments }: { appointments: Appointment[] }) {
@@ -76,14 +77,28 @@ export function TurnosList({ appointments }: { appointments: Appointment[] }) {
       {appointments.map((apt) => (
         <Card key={apt.id} className="border-slate-100">
           <CardContent className="py-3 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-sm font-medium">Dr/a. {apt.doctor?.fullName}</p>
-              <p className="text-xs text-slate-400">{apt.doctor?.specialty}</p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {format(new Date(apt.scheduledAt), "dd MMM yyyy · HH:mm 'hs'", {
-                  locale: es,
-                })}
-              </p>
+            <div className="flex items-start gap-3 min-w-0">
+              <UserAvatar
+                name={apt.doctor?.fullName ?? "Profesional"}
+                photoUrl={apt.doctor?.profilePhotoUrl}
+                size="default"
+                className="shrink-0"
+              />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-800">
+                  {apt.doctor?.fullName
+                    ? `Dr/a. ${apt.doctor.fullName}`
+                    : "Profesional"}
+                </p>
+                {apt.doctor?.specialty ? (
+                  <p className="text-xs text-slate-500">{apt.doctor.specialty}</p>
+                ) : null}
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {format(new Date(apt.scheduledAt), "dd MMM yyyy · HH:mm 'hs'", {
+                    locale: es,
+                  })}
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs">

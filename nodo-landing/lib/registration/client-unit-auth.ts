@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
+import { createNodoAdminClient, getLandingAuthConfig } from "@/lib/supabase/nodo-admin";
 import { NODES } from "@/lib/nodes";
+import { findAuthUserByEmail, authConfigForUnitCode } from "@/lib/registration/auth-user-lookup";
 import { provisionNodoAccess, syncInmoUserClaims } from "@/lib/registration/provision";
 
 export const MIN_ACCESS_PASSWORD_LENGTH = 8;
@@ -23,31 +24,29 @@ export async function syncNodeEmailAccessForClient(
 
   if (error || !units?.length) return;
 
-  for (const unit of units) {
-    const email = unit.access_user?.trim().toLowerCase();
-    if (!email) continue;
+  const rows = units
+    .map((unit) => {
+      const email = unit.access_user?.trim().toLowerCase();
+      if (!email) return null;
+      return {
+        email,
+        unit_code: unit.unit_code,
+        client_id: clientId,
+        client_unit_id: unit.id,
+        status: unit.status,
+      };
+    })
+    .filter(Boolean) as Array<{
+    email: string;
+    unit_code: string;
+    client_id: string;
+    client_unit_id: string;
+    status: string;
+  }>;
 
-    const accessRow = {
-      email,
-      unit_code: unit.unit_code,
-      client_id: clientId,
-      client_unit_id: unit.id,
-      status: unit.status,
-    };
+  if (rows.length === 0) return;
 
-    const { data: existing } = await admin
-      .from("node_email_access")
-      .select("id")
-      .eq("email", email)
-      .eq("unit_code", unit.unit_code)
-      .maybeSingle();
-
-    if (existing) {
-      await admin.from("node_email_access").update(accessRow).eq("id", existing.id);
-    } else {
-      await admin.from("node_email_access").insert(accessRow);
-    }
-  }
+  await admin.from("node_email_access").upsert(rows, { onConflict: "email,unit_code" });
 }
 
 export function authAdminForUnitCode(unitCode: string) {
@@ -78,7 +77,7 @@ export async function ensureAuthUserForUnit(
     plan?: string;
   },
 ): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
-  const existing = await resolveAuthUserForUnit(authAdmin, params.unit);
+  const existing = await resolveAuthUserForUnit(authAdmin, params.unit, params.unitCode);
   if (existing) {
     const inmoCode = params.unitCode.toLowerCase();
     const email = params.unit.access_user?.trim();
@@ -148,7 +147,11 @@ export async function ensureAuthUserForUnit(
   }
 
   if (createErr?.message?.toLowerCase().includes("already")) {
-    const resolved = await resolveAuthUserForUnit(authAdmin, { access_user: email, provision_user_id: null });
+    const resolved = await resolveAuthUserForUnit(
+      authAdmin,
+      { access_user: email, provision_user_id: null },
+      params.unitCode,
+    );
     if (resolved) {
       const updated = await setAuthUserPassword(authAdmin, resolved.userId, params.password, {
         mustSetPassword: params.mustSetPassword,
@@ -168,6 +171,7 @@ export async function resolveAuthUserForUnit(
     access_user: string | null;
     provision_user_id: string | null;
   },
+  unitCode?: string,
 ): Promise<{ userId: string; appMetadata: Record<string, unknown> } | null> {
   if (unit.provision_user_id) {
     const { data } = await authAdmin.auth.admin.getUserById(unit.provision_user_id);
@@ -181,15 +185,15 @@ export async function resolveAuthUserForUnit(
 
   if (!unit.access_user) return null;
 
-  const { data } = await authAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  const matched = data.users.find(
-    (user) => user.email?.toLowerCase() === unit.access_user!.toLowerCase(),
-  );
+  const config = unitCode ? authConfigForUnitCode(unitCode) : getLandingAuthConfig();
+  if (!config) return null;
+
+  const matched = await findAuthUserByEmail(config, unit.access_user, authAdmin);
   if (!matched) return null;
 
   return {
-    userId: matched.id,
-    appMetadata: matched.app_metadata ?? {},
+    userId: matched.userId,
+    appMetadata: matched.appMetadata,
   };
 }
 

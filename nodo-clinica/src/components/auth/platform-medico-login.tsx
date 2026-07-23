@@ -60,6 +60,19 @@ export function PlatformMedicoLoginFields({
 
     setLoading(true);
     try {
+      const eligibilityRes = await fetch("/api/clinic/account/portal-eligibility", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), role: "medico" }),
+      });
+      if (!eligibilityRes.ok) {
+        const eligibilityData = await eligibilityRes.json().catch(() => ({}));
+        setGeneralError(
+          eligibilityData.error ?? "No existe un médico registrado con ese correo.",
+        );
+        return;
+      }
+
       const { error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,

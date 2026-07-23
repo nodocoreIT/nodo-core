@@ -1,6 +1,32 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
 
-const DEFAULT_CLINIC_ORG_ID = "843524dc-0c3b-4340-bc8e-e3ae5aa00fd2";
+export const DEFAULT_CLINIC_ORG_ID = "843524dc-0c3b-4340-bc8e-e3ae5aa00fd2";
+
+export function getDefaultClinicOrgId(): string {
+  return process.env.CLINIC_ORG_ID ?? DEFAULT_CLINIC_ORG_ID;
+}
+
+/** Pacientes (portal libre / dashboard) comparten la org de plataforma — no una org por persona. */
+export async function ensureClinicaPacienteOrgMembership(
+  admin: SupabaseClient<any, any, any>,
+  params: { userId: string; clientName: string; email: string },
+): Promise<{ ok: true; orgId: string } | { ok: false; error: string }> {
+  const orgId = getDefaultClinicOrgId();
+  const fullName =
+    params.clientName.trim() || params.email.trim() || "Paciente";
+
+  const { error: profileError } = await admin
+    .schema("shared")
+    .from("user_profiles")
+    .upsert({ id: params.userId, full_name: fullName }, { onConflict: "id" });
+
+  if (profileError) {
+    return { ok: false, error: profileError.message };
+  }
+
+  return { ok: true, orgId };
+}
 
 /** Maps panel plan codes (and legacy values) to the clinica portal role. */
 export function clinicaPortalRoleFromPlan(plan: string): "medico" | "paciente" {
@@ -63,7 +89,10 @@ export async function ensureClinicaPortalProfile(params: {
 
   const db = admin.schema("nodo_clinica");
   const email = params.email.trim().toLowerCase();
-  const orgId = params.orgId || process.env.CLINIC_ORG_ID || DEFAULT_CLINIC_ORG_ID;
+  const orgId =
+    params.portalRole === "paciente"
+      ? getDefaultClinicOrgId()
+      : params.orgId || getDefaultClinicOrgId();
   const { firstName, lastName, display } = splitName(params.clientName, email);
 
   if (params.portalRole === "paciente") {
@@ -81,7 +110,7 @@ export async function ensureClinicaPortalProfile(params: {
 
     const { data: existing, error: fetchError } = await db
       .from("patients")
-      .select("id, profile_id")
+      .select("id, profile_id, org_id")
       .eq("email", email)
       .maybeSingle();
 
@@ -90,11 +119,11 @@ export async function ensureClinicaPortalProfile(params: {
     }
 
     if (existing) {
-      if (!existing.profile_id) {
-        await db
-          .from("patients")
-          .update({ profile_id: params.userId })
-          .eq("id", existing.id);
+      const patch: Record<string, unknown> = {};
+      if (!existing.profile_id) patch.profile_id = params.userId;
+      if (existing.org_id !== orgId) patch.org_id = orgId;
+      if (Object.keys(patch).length > 0) {
+        await db.from("patients").update(patch).eq("id", existing.id);
       }
       return { ok: true };
     }
@@ -118,7 +147,7 @@ export async function ensureClinicaPortalProfile(params: {
 
   const { data: existing, error: fetchError } = await db
     .from("professionals")
-    .select("id, user_id")
+    .select("id, user_id, org_id")
     .eq("email", email)
     .maybeSingle();
 
@@ -127,11 +156,11 @@ export async function ensureClinicaPortalProfile(params: {
   }
 
   if (existing) {
-    if (!existing.user_id) {
-      await db
-        .from("professionals")
-        .update({ user_id: params.userId })
-        .eq("id", existing.id);
+    const patch: Record<string, unknown> = {};
+    if (!existing.user_id) patch.user_id = params.userId;
+    if (existing.org_id !== orgId) patch.org_id = orgId;
+    if (Object.keys(patch).length > 0) {
+      await db.from("professionals").update(patch).eq("id", existing.id);
     }
     return { ok: true };
   }

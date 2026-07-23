@@ -30,17 +30,18 @@ export async function lookupClinicMembershipByEmail(
 ): Promise<ClinicMembership> {
   const normalized = email.trim().toLowerCase();
 
-  const { data: professional } = await service
-    .from("professionals")
-    .select("id, user_id")
-    .eq("email", normalized)
-    .maybeSingle();
-
-  const { data: patient } = await service
-    .from("patients")
-    .select("id, profile_id")
-    .eq("email", normalized)
-    .maybeSingle();
+  const [{ data: professional }, { data: patient }] = await Promise.all([
+    service
+      .from("professionals")
+      .select("id, user_id")
+      .eq("email", normalized)
+      .maybeSingle(),
+    service
+      .from("patients")
+      .select("id, profile_id")
+      .eq("email", normalized)
+      .maybeSingle(),
+  ]);
 
   return {
     professionalId: professional?.id ?? null,
@@ -98,17 +99,18 @@ export async function lookupClinicMembershipByAuthUserId(
   authUserId: string,
   email?: string | null,
 ): Promise<ClinicMembership> {
-  const { data: professional } = await service
-    .from("professionals")
-    .select("id, user_id")
-    .eq("user_id", authUserId)
-    .maybeSingle();
-
-  const { data: patientByProfile } = await service
-    .from("patients")
-    .select("id, profile_id")
-    .eq("profile_id", authUserId)
-    .maybeSingle();
+  const [{ data: professional }, { data: patientByProfile }] = await Promise.all([
+    service
+      .from("professionals")
+      .select("id, user_id")
+      .eq("user_id", authUserId)
+      .maybeSingle(),
+    service
+      .from("patients")
+      .select("id, profile_id")
+      .eq("profile_id", authUserId)
+      .maybeSingle(),
+  ]);
 
   let membership: ClinicMembership = {
     professionalId: professional?.id ?? null,

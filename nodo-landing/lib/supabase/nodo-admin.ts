@@ -38,6 +38,17 @@ function getNodoConfig(nodoCode: string): NodoConfig | null {
   }
 }
 
+export function getNodoAuthConfig(nodoCode: string): NodoConfig | null {
+  return getNodoConfig(nodoCode);
+}
+
+export function getLandingAuthConfig(): NodoConfig | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (url && serviceRoleKey) return { url, serviceRoleKey };
+  return null;
+}
+
 export function createNodoAdminClient(nodoCode: string) {
   const config = getNodoConfig(nodoCode);
   if (!config) return null;

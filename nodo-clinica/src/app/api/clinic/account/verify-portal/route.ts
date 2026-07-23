@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 import {
   canAccessAsRole,
   linkClinicMembershipProfiles,
@@ -8,6 +8,7 @@ import {
   toSessionRole,
 } from "@/lib/clinic/resolve-clinic-role";
 import { repairDashboardPacienteProfile } from "@/lib/clinic/repair-dashboard-profile";
+import { resolveSupabaseAuthUser } from "@/lib/supabase/resolve-auth-user";
 
 /**
  * POST /api/clinic/account/verify-portal
@@ -22,13 +23,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const resolved = await resolveSupabaseAuthUser(request);
+  const user = resolved?.user;
 
-  if (error || !user) {
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -40,7 +38,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   membership = await linkClinicMembershipProfiles(service, user.id, membership);
 
   if (!canAccessAsRole(membership, intendedRole) && intendedRole === "paciente") {
-    const repaired = await repairDashboardPacienteProfile(service, user);
+    const repaired = await repairDashboardPacienteProfile(service, user, { force: true });
     if (repaired) {
       membership = await linkClinicMembershipProfiles(service, user.id, repaired);
     }

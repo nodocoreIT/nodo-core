@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient, createSharedServiceClient } from "@/lib/supabase/server";
 import { assertOnboardingPhoneVerified } from "@/lib/clinic/phone-verification";
-
-const CLINIC_ORG_ID =
-  process.env.CLINIC_ORG_ID ?? "843524dc-0c3b-4340-bc8e-e3ae5aa00fd2";
+import { CLINIC_ORG_ID, syncClinicaAuthClaims } from "@/lib/clinic/clinic-org";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -129,6 +127,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         { status: 500 },
       );
     }
+
+    await syncClinicaAuthClaims(serviceClient, userId, "medico");
 
     return NextResponse.json({ ok: true });
   } catch (err) {

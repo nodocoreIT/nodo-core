@@ -1,5 +1,6 @@
 import "server-only";
 import { CLINIC_REMINDER_LOGO_DATA_URI } from "@/lib/email/clinic-logo-data-uri";
+import { currencySymbol } from "@/lib/clinic/currency";
 import { sendClinicEmail, type EmailSendResult } from "@/lib/mail";
 
 export type { EmailSendResult };
@@ -122,10 +123,11 @@ export async function sendDoctorAssignedAppointmentEmail(
     currency = "ARS",
   } = params;
 
+  const feeLabel = currencySymbol(currency);
   const feeBlock =
     consultationFee && consultationFee > 0
       ? `<p style="color: #64748b; line-height: 1.6;">
-           Honorario de consulta: <strong>${currency} ${consultationFee.toLocaleString("es-AR")}</strong>
+           Honorario de consulta: <strong>${feeLabel} ${consultationFee.toLocaleString("es-AR")}</strong>
          </p>`
       : "";
 
@@ -168,7 +170,7 @@ export async function sendDoctorAssignedAppointmentEmail(
       "",
       `${doctorName} te asignó un turno para el ${scheduledAt}.`,
       consultationFee && consultationFee > 0
-        ? `Honorario: ${currency} ${consultationFee}`
+        ? `Honorario: ${feeLabel} ${consultationFee.toLocaleString("es-AR")}`
         : "",
       "",
       `Ingresá como paciente: ${loginUrl}`,

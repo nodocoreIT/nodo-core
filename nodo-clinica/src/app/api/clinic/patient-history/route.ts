@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isLocalMode } from "@/lib/clinic/config";
 import { handlePatientHistoryGetLocal } from "@/lib/clinic/patient-history-local-get";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
+import { createServiceClient } from "@/lib/supabase/server";
 import { buildPatientTimeline } from "@/lib/clinic/patient-timeline";
 
 export async function GET(request: NextRequest) {
@@ -10,9 +11,9 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const patientId = searchParams.get("patientId");
+  const patientIdParam = searchParams.get("patientId");
 
-  if (!patientId) {
+  if (!patientIdParam) {
     return NextResponse.json(
       { error: "patientId requerido" },
       { status: 400 },
@@ -21,49 +22,106 @@ export async function GET(request: NextRequest) {
 
   const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
-  const { user, supabase } = authResult;
+  const { user } = authResult;
 
-  // Patients can only access their own history
+  const svc = await createServiceClient();
+
+  let patientRow: { id: string; org_id: string } | null = null;
+
   if (user.role === "patient") {
-    const { data: patientRow } = await supabase
+    const { data: ownRow } = await svc
       .from("patients")
-      .select("id")
+      .select("id, org_id, profile_id")
       .eq("profile_id", user.id)
       .maybeSingle();
-    if (!patientRow || patientRow.id !== patientId) {
+
+    if (!ownRow) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+
+    const paramMatches =
+      patientIdParam === ownRow.id || patientIdParam === ownRow.profile_id;
+    if (!paramMatches) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+
+    patientRow = { id: ownRow.id, org_id: ownRow.org_id };
+  } else {
+    const { data: byPk } = await svc
+      .from("patients")
+      .select("id, org_id")
+      .eq("id", patientIdParam)
+      .maybeSingle();
+
+    patientRow = byPk;
+
+    if (!patientRow) {
+      return NextResponse.json({ error: "Paciente no encontrado" }, { status: 404 });
+    }
+
+    if (user.org_id && patientRow.org_id !== user.org_id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
   }
+
+  const patientId = patientRow.id;
+  const orgId = patientRow.org_id;
 
   const [
     { data: rawAppointments },
     { data: clinicalRecords },
     { data: patient },
   ] = await Promise.all([
-    supabase
+    svc
       .from("appointments")
-      .select(
-        "id, scheduled_at, status, doctor_id, professionals!appointments_doctor_id_fkey(full_name, specialty), patient_documents(*), clinical_notes(*)",
-      )
+      .select("id, scheduled_at, status, doctor_id, patient_documents(*), clinical_notes(*)")
       .eq("patient_id", patientId)
-      .eq("org_id", user.org_id ?? "")
+      .eq("org_id", orgId)
       .order("scheduled_at", { ascending: false }),
-    supabase
+    svc
       .from("clinical_records")
-      .select("*, professionals(full_name)")
+      .select("*")
       .eq("patient_id", patientId)
-      .eq("org_id", user.org_id ?? "")
+      .eq("org_id", orgId)
       .order("created_at", { ascending: false }),
-    supabase
+    svc
       .from("patients")
       .select("*, patient_health_profiles(*)")
       .eq("id", patientId)
       .maybeSingle(),
   ]);
 
+  const doctorIds = [
+    ...new Set((rawAppointments ?? []).map((apt) => apt.doctor_id).filter(Boolean)),
+  ];
+  const { data: professionals } =
+    doctorIds.length > 0
+      ? await svc
+          .from("professionals")
+          .select("id, full_name, specialty")
+          .in("id", doctorIds)
+      : { data: [] };
+
+  const professionalById = new Map(
+    (professionals ?? []).map((p) => [p.id, p]),
+  );
+
+  const recordDoctorIds = [
+    ...new Set((clinicalRecords ?? []).map((r) => r.doctor_id).filter(Boolean)),
+  ];
+  const missingDoctorIds = recordDoctorIds.filter((id) => !professionalById.has(id));
+  if (missingDoctorIds.length > 0) {
+    const { data: extraPros } = await svc
+      .from("professionals")
+      .select("id, full_name, specialty")
+      .in("id", missingDoctorIds);
+    for (const p of extraPros ?? []) {
+      professionalById.set(p.id, p);
+    }
+  }
+
   const appointments = (rawAppointments ?? []).map((apt) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const doctor = (apt as any).professionals;
+    const doctor = professionalById.get(apt.doctor_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const docs = (apt as any).patient_documents ?? [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -93,8 +151,7 @@ export async function GET(request: NextRequest) {
     recordType: r.record_type,
     createdAt: r.created_at,
     appointmentId: r.appointment_id,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    doctorName: (r as any).professionals?.full_name,
+    doctorName: professionalById.get(r.doctor_id)?.full_name,
   }));
 
   const timeline = buildPatientTimeline(appointments, records);
@@ -104,10 +161,11 @@ export async function GET(request: NextRequest) {
   if (user.role === "patient") {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     healthProfile = (patient as any)?.patient_health_profiles ?? null;
-  } else if (user.role === "admin" || user.role === "super_admin") {
-    const doctorId = searchParams.get("doctorId");
+  } else if (user.role === "doctor") {
+    const professional = await resolveProfessional(authResult);
+    const doctorId = searchParams.get("doctorId") ?? professional?.id;
     if (doctorId) {
-      const { data: consentedApt } = await supabase
+      const { data: consentedApt } = await svc
         .from("appointments")
         .select("id")
         .eq("patient_id", patientId)

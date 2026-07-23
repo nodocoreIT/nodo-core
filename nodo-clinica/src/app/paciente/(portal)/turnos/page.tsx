@@ -5,12 +5,13 @@ import { useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { clinicApi } from "@/lib/clinic/client-api";
+import { clinicApi, getClientSession } from "@/lib/clinic/client-api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ChevronRight, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { WaitingRoomModal } from "@/components/patient/waiting-room-modal";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 const ACTIVE_STATUSES = ["scheduled", "waiting", "in_consultation"];
 
@@ -23,7 +24,7 @@ type PatientAppointment = {
   cancelledBy?: "patient" | "doctor" | null;
   paymentRejected?: boolean;
   needsReview?: boolean;
-  doctor?: { fullName: string; specialty: string };
+  doctor?: { fullName: string; specialty?: string; profilePhotoUrl?: string };
 };
 
 function appointmentBadgeLabel(apt: PatientAppointment): string {
@@ -70,9 +71,31 @@ function PacienteTurnosContent() {
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
 
   const load = useCallback(async () => {
-    const { user } = await clinicApi.getSession();
-    if (!user?.id) return;
-    const apts = await clinicApi.getPatientAppointments(user.id);
+    const stored = getClientSession();
+    const storedPatientId =
+      stored?.role === "patient" ? stored.userId : null;
+
+    const sessionPromise = clinicApi.getSession();
+    const appointmentsPromise = storedPatientId
+      ? clinicApi.getPatientAppointments(storedPatientId)
+      : null;
+
+    const { user, session } = await sessionPromise;
+    const patientAuthId =
+      (session?.role === "patient" || stored?.role === "patient") &&
+      (user?.id ?? stored?.userId)
+        ? (user?.id ?? stored!.userId)
+        : null;
+
+    if (!patientAuthId) {
+      setLoading(false);
+      return;
+    }
+
+    const apts =
+      appointmentsPromise && storedPatientId === patientAuthId
+        ? await appointmentsPromise
+        : await clinicApi.getPatientAppointments(patientAuthId);
     setAppointments(Array.isArray(apts) ? (apts as PatientAppointment[]) : []);
     setLoading(false);
   }, []);
@@ -94,12 +117,12 @@ function PacienteTurnosContent() {
 
   const handleRemove = async (accessToken: string) => {
     setRemovingToken(accessToken);
-    setAppointments((prev) => prev.filter((a) => a.accessToken !== accessToken));
     try {
       await clinicApi.removePatientAppointment(accessToken);
+      setAppointments((prev) => prev.filter((a) => a.accessToken !== accessToken));
+      toast.success("Turno eliminado");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo eliminar");
-      void load();
     } finally {
       setRemovingToken(null);
     }
@@ -132,14 +155,28 @@ function PacienteTurnosContent() {
                   <Badge className={appointmentBadgeClass(apt)}>
                     {appointmentBadgeLabel(apt)}
                   </Badge>
-                  <div>
-                    <p className="text-sm font-medium">Dr/a. {apt.doctor?.fullName}</p>
-                    <p className="text-xs text-slate-400">{apt.doctor?.specialty}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {format(new Date(apt.scheduledAt), "dd MMM yyyy · HH:mm 'hs'", {
-                        locale: es,
-                      })}
-                    </p>
+                  <div className="flex items-start gap-3">
+                    <UserAvatar
+                      name={apt.doctor?.fullName ?? "Profesional"}
+                      photoUrl={apt.doctor?.profilePhotoUrl}
+                      size="lg"
+                      className="shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-800">
+                        {apt.doctor?.fullName
+                          ? `Dr/a. ${apt.doctor.fullName}`
+                          : "Profesional"}
+                      </p>
+                      {apt.doctor?.specialty ? (
+                        <p className="text-xs text-slate-500">{apt.doctor.specialty}</p>
+                      ) : null}
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {format(new Date(apt.scheduledAt), "dd MMM yyyy · HH:mm 'hs'", {
+                          locale: es,
+                        })}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 pt-1">
                     {isActive && isPendingReview ? (

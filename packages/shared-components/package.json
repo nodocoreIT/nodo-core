@@ -10,6 +10,7 @@
     "./lib/node-default-theme": "./src/lib/node-default-theme.ts",
     "./lib/create-nodo-auth-client": "./src/lib/create-nodo-auth-client.ts",
     "./lib/auth-password-errors": "./src/lib/auth-password-errors.ts",
+    "./lib/verify-node-access": "./src/lib/verify-node-access.ts",
     "./styles/base.css": "./src/styles/base.css",
     "./styles/interactive.css": "./src/styles/interactive.css"
   },

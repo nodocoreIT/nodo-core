@@ -7,6 +7,7 @@ import {
   resolveRoleForContext,
   type ClinicDbRole,
 } from "@/lib/clinic/resolve-clinic-role";
+import { CLINIC_ORG_ID } from "@/lib/clinic/clinic-org";
 
 /**
  * POST /api/clinic/account/ensure-role
@@ -107,8 +108,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (resolved.patientId && !resolved.patientProfileId) {
     await service
       .from("patients")
-      .update({ profile_id: authUserId })
+      .update({ profile_id: authUserId, org_id: CLINIC_ORG_ID })
       .eq("id", resolved.patientId);
+  } else if (resolved.patientId) {
+    await service
+      .from("patients")
+      .update({ org_id: CLINIC_ORG_ID })
+      .eq("id", resolved.patientId)
+      .neq("org_id", CLINIC_ORG_ID);
   }
 
   if (
@@ -117,9 +124,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   ) {
     await service
       .from("professionals")
-      .update({ user_id: authUserId })
+      .update({ user_id: authUserId, org_id: CLINIC_ORG_ID })
       .eq("id", resolved.professionalId)
       .is("user_id", null);
+  } else if (resolved.professionalId) {
+    await service
+      .from("professionals")
+      .update({ org_id: CLINIC_ORG_ID })
+      .eq("id", resolved.professionalId)
+      .neq("org_id", CLINIC_ORG_ID);
   }
 
   const { error: updateError } = await adminClient.auth.admin.updateUserById(
@@ -128,6 +141,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       app_metadata: {
         ...currentAppMetadata,
         role,
+        org_id: CLINIC_ORG_ID,
         must_set_password: false,
       },
     },

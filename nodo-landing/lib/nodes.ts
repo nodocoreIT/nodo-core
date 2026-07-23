@@ -380,3 +380,25 @@ export function getNodeLoginPath(nodeSlug: string): string {
   const slug = normalizeNodeSlug(nodeSlug);
   return `/nodo-${slug}/login`;
 }
+
+/** Productos que el panel de clientes puede asignar hoy (sin nodos en desarrollo). */
+export const PANEL_ASSIGNABLE_NODE_CODES = [
+  "Clínica",
+  "Autos",
+  "Inmo",
+  "Ecommerce",
+  "Finanzas",
+] as const;
+
+export type PanelAssignableNodeCode = (typeof PANEL_ASSIGNABLE_NODE_CODES)[number];
+
+export function getPanelAssignableNodes(): NodeDef[] {
+  const allowed = new Set<string>(PANEL_ASSIGNABLE_NODE_CODES);
+  return NODES.filter((node) => allowed.has(node.code));
+}
+
+export function isPanelAssignableNodeCode(unitCode: string): boolean {
+  return PANEL_ASSIGNABLE_NODE_CODES.some(
+    (code) => code.toLowerCase() === unitCode.trim().toLowerCase(),
+  );
+}

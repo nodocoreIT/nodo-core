@@ -206,24 +206,46 @@ export async function GET(request: NextRequest) {
   }
 
   if (patientId) {
-    // patientId here is the auth/profile id (as sent by the client session),
-    // not the patients-table row id that appointments.patient_id stores.
-    const { data: patientRow, error: patientRowError } = await supabase
+    const svc = await createServiceClient();
+    const profileId = user.role === "patient" ? user.id : patientId;
+
+    const { data: patientRow, error: patientRowError } = await svc
       .from("patients")
       .select("id, org_id")
-      .eq("profile_id", patientId)
+      .eq("profile_id", profileId)
       .maybeSingle();
 
+    if (user.role === "patient" && !patientRow) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+
     const { data: appointments, error: appointmentsError } = patientRow
-      ? await supabase
+      ? await svc
           .from("appointments")
-          .select(
-            "*, professionals!appointments_doctor_id_fkey(full_name, specialty), patient_documents(*)",
-          )
+          .select("*, patient_documents(*)")
           .eq("patient_id", patientRow.id)
           .eq("org_id", patientRow.org_id)
           .order("scheduled_at", { ascending: false })
       : { data: [], error: null };
+
+    const doctorIds = [
+      ...new Set((appointments ?? []).map((apt) => apt.doctor_id).filter(Boolean)),
+    ];
+    const { data: professionals } =
+      doctorIds.length > 0
+        ? await svc
+            .from("professionals")
+            .select("id, full_name, specialty, profile_photo_url")
+            .in("id", doctorIds)
+        : { data: [] as Array<{
+            id: string;
+            full_name: string;
+            specialty: string | null;
+            profile_photo_url: string | null;
+          }> };
+    const professionalById = new Map(
+      (professionals ?? []).map((p) => [p.id, p]),
+    );
 
     if (searchParams.get("debug") === "1") {
       return NextResponse.json({
@@ -232,6 +254,8 @@ export async function GET(request: NextRequest) {
         patientRowError,
         appointmentsCount: appointments?.length ?? 0,
         appointmentsError,
+        doctorIds,
+        professionalsFound: professionals?.length ?? 0,
       });
     }
 
@@ -239,6 +263,7 @@ export async function GET(request: NextRequest) {
       (appointments ?? []).map((apt) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const audit = (apt as any).payment_receipt_audit as Record<string, unknown> | null;
+        const professional = professionalById.get(apt.doctor_id);
         return {
           id: apt.id,
           scheduledAt: apt.scheduled_at,
@@ -254,13 +279,11 @@ export async function GET(request: NextRequest) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ((apt as any).patient_documents ?? []).length,
           }),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          doctor: (apt as any).professionals
+          doctor: professional
             ? {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                fullName: (apt as any).professionals.full_name,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                specialty: (apt as any).professionals.specialty,
+                fullName: professional.full_name,
+                specialty: professional.specialty ?? undefined,
+                profilePhotoUrl: professional.profile_photo_url ?? undefined,
               }
             : undefined,
         };
@@ -895,6 +918,29 @@ export async function POST(request: NextRequest) {
 
 // ── PATCH ─────────────────────────────────────────────────────────────────────
 
+async function deleteAppointmentForPatient(
+  aptId: string,
+): Promise<{ ok: true } | { error: string; status: number }> {
+  const svc = await createServiceClient();
+  const { data: deleted, error } = await svc
+    .from("appointments")
+    .delete()
+    .eq("id", aptId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { error: error.message, status: 400 };
+  }
+  if (!deleted) {
+    return {
+      error: "No se pudo eliminar el turno",
+      status: 500,
+    };
+  }
+  return { ok: true };
+}
+
 export async function PATCH(request: NextRequest) {
   if (isLocalMode()) {
     return handleAppointmentsPatchLocal(request);
@@ -1000,7 +1046,10 @@ export async function PATCH(request: NextRequest) {
         { status: 400 },
       );
     }
-    await supabase.from("appointments").delete().eq("id", apt.id);
+    const result = await deleteAppointmentForPatient(apt.id);
+    if ("error" in result) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
     return NextResponse.json({ ok: true });
   }
 
@@ -1028,7 +1077,10 @@ export async function PATCH(request: NextRequest) {
         { status: 400 },
       );
     }
-    await supabase.from("appointments").delete().eq("id", apt.id);
+    const result = await deleteAppointmentForPatient(apt.id);
+    if ("error" in result) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
     return NextResponse.json({ ok: true });
   }
 

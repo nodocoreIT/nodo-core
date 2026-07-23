@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { isLocalMode } from "@/lib/clinic/config";
 import { getSession, clearSessionResponse } from "@/lib/clinic/session";
@@ -6,21 +6,20 @@ import {
   canAccessAsRole,
   lookupClinicMembershipByAuthUserId,
   resolveRoleForContext,
-  sessionRoleToDbRole,
 } from "@/lib/clinic/resolve-clinic-role";
+import { resolveSupabaseAuthUser } from "@/lib/supabase/resolve-auth-user";
 
-export async function GET(): Promise<NextResponse> {
-  // Resolve ClinicSession cookie once — used for role preference and as fallback.
-  const clinicSession = await getSession();
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const [clinicSession, resolved] = await Promise.all([
+    getSession(),
+    !isLocalMode()
+      ? resolveSupabaseAuthUser(request)
+      : Promise.resolve(null as Awaited<ReturnType<typeof resolveSupabaseAuthUser>>),
+  ]);
 
   if (!isLocalMode()) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-
-    if (!error && user) {
+    if (resolved) {
+      const { user } = resolved;
       const appMeta = user.app_metadata ?? {};
       const userMeta = user.user_metadata ?? {};
       const fullName: string = userMeta.full_name ?? userMeta.name ?? user.email ?? "";

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { CLINIC_ORG_ID } from "@/lib/clinic/clinic-org";
 
 interface PendingRow {
   id: string;
@@ -70,10 +71,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(new URL(`/login?error=role_mismatch`, request.url));
   }
 
+  const dbRole = role === "medico" ? "medico" : "paciente";
+
   // Create auth user (ignore if already exists — user may have been created from nodo-landing)
   const { error: createError } = await serviceClient.auth.admin.createUser({
     email: pendingRow.email,
     email_confirm: true,
+    app_metadata: { role: dbRole, org_id: CLINIC_ORG_ID },
   });
 
   if (createError) {
@@ -89,6 +93,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (!alreadyExists) {
       console.error("[verify] createUser error", { message: createError.message, code, status: (createError as { status?: number }).status });
       return NextResponse.redirect(new URL(`/login?error=session_error`, request.url));
+    }
+
+    const { data: listData } = await serviceClient.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+    const existing = listData?.users?.find(
+      (u: { email?: string | null; id: string }) =>
+        String(u.email ?? "").toLowerCase() === pendingRow.email.toLowerCase(),
+    );
+    if (existing) {
+      const { data: userData } = await serviceClient.auth.admin.getUserById(existing.id);
+      const current = userData.user?.app_metadata ?? {};
+      await serviceClient.auth.admin.updateUserById(existing.id, {
+        app_metadata: {
+          ...current,
+          role: dbRole,
+          org_id: CLINIC_ORG_ID,
+        },
+      });
     }
   }
 

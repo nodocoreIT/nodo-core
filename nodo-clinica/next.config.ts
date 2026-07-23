@@ -21,6 +21,10 @@ const nextConfig: NextConfig = {
     // app code and @nodocore/nodo-modules (NodoSwitcher).
     config.resolve.alias = {
       ...config.resolve.alias,
+      "@nodocore/shared-components/lib/verify-node-access": path.resolve(
+        monorepoRoot,
+        "packages/shared-components/src/lib/verify-node-access.ts",
+      ),
       "@nodocore/shared-components": path.resolve(
         monorepoRoot,
         "packages/shared-components/src/index.ts",

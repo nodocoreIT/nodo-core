@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mapAuthLoginError } from "@nodocore/shared-components/lib/verify-node-access";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { jsonWithSession } from "@/lib/clinic/session";
 import {
@@ -7,6 +8,7 @@ import {
   lookupClinicMembership,
   sessionRoleToDbRole,
 } from "@/lib/clinic/resolve-clinic-role";
+import { checkPortalLoginEligibility, portalNotRegisteredMessage } from "@/lib/clinic/portal-login-eligibility";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,20 +18,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email y contraseña requeridos" }, { status: 400 });
     }
 
+    const intendedDbRole = sessionRoleToDbRole(
+      requestedRole === "doctor" ? "doctor" : "patient",
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const serviceClient = (await createServiceClient()) as any;
+
+    const eligibility = await checkPortalLoginEligibility(
+      serviceClient,
+      email,
+      intendedDbRole,
+    );
+    if (!eligibility.eligible) {
+      return NextResponse.json({ error: eligibility.message }, { status: 404 });
+    }
+
     const supabase = await createClient();
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error || !data.user) {
-      return NextResponse.json({ error: "Credenciales incorrectas" }, { status: 401 });
+      return NextResponse.json(
+        { error: mapAuthLoginError(error?.message) },
+        { status: 401 },
+      );
     }
-
-    const appMeta = data.user.app_metadata ?? {};
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const serviceClient = (await createServiceClient()) as any;
-
-    const intendedDbRole = sessionRoleToDbRole(
-      requestedRole === "doctor" ? "doctor" : "patient",
-    );
     const membership = await linkClinicMembershipProfiles(
       serviceClient,
       data.user.id,
@@ -42,15 +54,12 @@ export async function POST(request: NextRequest) {
     if (!canAccessAsRole(membership, intendedDbRole)) {
       await supabase.auth.signOut();
       return NextResponse.json(
-        {
-          error:
-            intendedDbRole === "medico"
-              ? "Esta cuenta no tiene acceso al portal médico."
-              : "Esta cuenta no está registrada como paciente.",
-        },
-        { status: 403 },
+        { error: portalNotRegisteredMessage(intendedDbRole) },
+        { status: 404 },
       );
     }
+
+    const appMeta = data.user.app_metadata ?? {};
 
     const sessionRole: "doctor" | "patient" =
       requestedRole === "patient" ? "patient" : "doctor";
@@ -108,6 +117,12 @@ export async function POST(request: NextRequest) {
           org_id: appMeta.org_id ?? null,
         },
         role: sessionRole,
+        supabaseSession: data.session
+          ? {
+              access_token: data.session.access_token,
+              refresh_token: data.session.refresh_token,
+            }
+          : null,
       },
       {
         userId: data.user.id,

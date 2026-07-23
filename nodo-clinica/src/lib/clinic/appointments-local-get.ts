@@ -114,10 +114,31 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
         (a, b) =>
           new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime(),
       )
-      .map((apt) => ({
-        ...apt,
-        doctor: db.doctors.find((d) => d.id === apt.doctorId),
-      }));
+      .map((apt) => {
+        const doctor = db.doctors.find((d) => d.id === apt.doctorId);
+        return {
+          id: apt.id,
+          scheduledAt: apt.scheduledAt,
+          status: apt.status,
+          accessToken: apt.accessToken,
+          paymentStatus: apt.paymentStatus,
+          cancelledBy: apt.cancelledBy ?? null,
+          paymentRejected:
+            typeof apt.paymentReceiptAudit?.rejectionReason === "string",
+          needsReview: appointmentNeedsDoctorPaymentReview(apt, {
+            receiptDocumentCount: db.documents.filter(
+              (d) => d.appointmentId === apt.id,
+            ).length,
+          }),
+          doctor: doctor
+            ? {
+                fullName: doctor.fullName,
+                specialty: doctor.specialty,
+                profilePhotoUrl: doctor.profilePhotoData,
+              }
+            : undefined,
+        };
+      });
     return NextResponse.json(appointments);
   }
 

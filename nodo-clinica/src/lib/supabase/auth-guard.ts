@@ -8,9 +8,27 @@ import {
   canAccessAsRole,
   lookupClinicMembershipByAuthUserId,
   resolveRoleForContext,
-  sessionRoleToDbRole,
   toSessionRole,
 } from "@/lib/clinic/resolve-clinic-role";
+import { resolveSupabaseAuthUser } from "@/lib/supabase/resolve-auth-user";
+
+async function createAuthedClinicClient(accessToken?: string) {
+  if (accessToken) {
+    const { createClient: createSupabaseClient } = await import(
+      "@supabase/supabase-js"
+    );
+    return createSupabaseClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: { headers: { Authorization: `Bearer ${accessToken}` } },
+        auth: { persistSession: false },
+        db: { schema: "nodo_clinica" },
+      },
+    );
+  }
+  return createClient();
+}
 
 export interface AuthContext {
   user: {
@@ -106,26 +124,23 @@ export async function resolveProfessional(
  * or a NextResponse with status 401 if neither auth method succeeds.
  */
 export async function requireAuth(
-  _request?: NextRequest,
+  request?: NextRequest,
 ): Promise<AuthContext | NextResponse> {
   // 1. Try Supabase auth first — works in production and any env with Supabase configured.
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    const supabase = await createClient();
-    const { data: { user }, error } = await supabase.auth.getUser();
+    const resolved = await resolveSupabaseAuthUser(request);
 
-    if (!error && user) {
+    if (resolved) {
+      const { user, accessToken } = resolved;
       const appMeta = user.app_metadata ?? {};
 
       const svc = await createServiceClient();
-      const membership = await lookupClinicMembershipByAuthUserId(
-        svc,
-        user.id,
-        user.email,
-      );
+      const [membership, clinicSession] = await Promise.all([
+        lookupClinicMembershipByAuthUserId(svc, user.id, user.email),
+        getSession(),
+      ]);
       const defaultResolved = resolveRoleForContext(membership);
       const dbRole = toSessionRole(defaultResolved.role);
-
-      const clinicSession = await getSession();
       const effectiveRole =
         clinicSession?.role === "patient" &&
         canAccessAsRole(membership, "paciente")
@@ -138,6 +153,8 @@ export async function requireAuth(
           { status: 401 },
         );
       }
+
+      const supabase = await createAuthedClinicClient(accessToken);
 
       return {
         user: {
@@ -155,6 +172,7 @@ export async function requireAuth(
     const clinicSession = await getSession();
     if (clinicSession) {
       const sessionRole = clinicSession.role === "doctor" ? "doctor" : "patient";
+      const supabase = await createClient();
       return {
         user: {
           id: clinicSession.userId,

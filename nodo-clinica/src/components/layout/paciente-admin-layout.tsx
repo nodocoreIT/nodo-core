@@ -59,9 +59,13 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
         const { session, user } = await clinicApi.getSession();
         if (session?.role === "patient" && user?.id) {
           sessionUserId = user.id;
-          sessionEmail = user.email ?? session.email;
-          sessionFullName = user.fullName;
-          sessionPhoto = user.profilePhotoData;
+          sessionEmail = user.email ?? session.email ?? "";
+          sessionFullName = user.fullName ?? "";
+          sessionPhoto = user.profilePhotoUrl;
+        } else if (user?.id && stored?.role === "patient" && stored.userId === user.id) {
+          sessionUserId = user.id;
+          sessionEmail = user.email ?? stored.email;
+          sessionFullName = user.fullName ?? stored.fullName;
         }
       } catch { /* ignore */ }
 
@@ -72,6 +76,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
       }
 
       if (!sessionUserId) {
+        setChecking(false);
         const returnTo =
           window.location.pathname +
           (window.location.search || "");
@@ -216,7 +221,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex min-h-16 items-center justify-between gap-4 border-b border-border bg-[#EEF8F3] px-4 sm:px-6 py-3 shadow-sm shrink-0">
+        <header className="flex min-h-16 items-center justify-between gap-4 border-b border-border bg-[#EEF3F8] px-4 sm:px-6 py-3 shadow-sm shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
@@ -228,7 +233,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
             </button>
             <div className="min-w-0">
               <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Nodo Salud · Pacientes
+                Nodo Clínica · Pacientes
               </p>
               <h1 className="truncate text-base sm:text-xl font-bold text-navy font-display">
                 {title}
