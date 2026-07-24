@@ -456,7 +456,7 @@ export function WaitingRoom({
         "postgres_changes",
         {
           event: "UPDATE",
-          schema: "public",
+          schema: "nodo_clinica",
           table: "appointments",
           filter: `access_token=eq.${accessToken}`,
         },
