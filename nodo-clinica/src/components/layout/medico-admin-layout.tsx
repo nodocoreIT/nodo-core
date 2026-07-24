@@ -327,7 +327,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
 
         <aside
           className={cn(
-            "fixed bottom-0 top-0 left-0 z-50 flex h-dvh max-h-dvh w-60 flex-shrink-0 flex-col bg-[var(--color-sidebar-bg)] transition-transform duration-300 ease-in-out border-r border-[var(--color-sidebar-border)] md:static md:z-auto md:translate-x-0 md:flex",
+            "fixed bottom-0 top-0 left-0 z-50 flex h-svh max-h-svh w-60 flex-shrink-0 flex-col bg-[var(--color-sidebar-bg)] transition-transform duration-300 ease-in-out border-r border-[var(--color-sidebar-border)] md:static md:z-auto md:translate-x-0 md:flex",
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
           )}
         >
@@ -343,8 +343,54 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
+          <div className="md:hidden flex-shrink-0 border-b border-[var(--color-sidebar-border)] px-4 pb-3">
+            <div className="flex items-center gap-3 py-1">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--sidebar-primary)] text-xs font-bold text-[var(--sidebar-primary-foreground)]">
+                {doctor?.profilePhotoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={doctor.profilePhotoUrl}
+                    alt={displayName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  initials(displayName)
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-white">
+                  {displayName}
+                </p>
+                {doctor?.email && (
+                  <p className="truncate text-xs text-[var(--color-sidebar-text)]">
+                    {doctor.email}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                aria-label="Configuración"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setSettingsOpen(true);
+                }}
+                className="flex-shrink-0 rounded-md p-1.5 transition-colors text-[var(--color-sidebar-text)] hover:text-[var(--sidebar-accent-foreground)]"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Cerrar sesión"
+                onClick={handleLogout}
+                className="flex-shrink-0 rounded-md p-1.5 transition-colors text-[var(--color-sidebar-text)] hover:text-[var(--sidebar-accent-foreground)]"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
           <nav
-            className="flex-1 min-h-0 overflow-y-auto px-3 py-4"
+            className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
             aria-label="Navegación principal"
           >
             <SidebarNavAccordionProvider itemCount={NAV_ITEMS.length}>
@@ -397,7 +443,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
             <SidebarCommandPaletteHint />
           </nav>
 
-          <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] space-y-2">
+          <div className="hidden md:block flex-shrink-0 border-t border-[var(--color-sidebar-border)] px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] space-y-2">
             <div className="flex items-center gap-3 px-1 py-1">
               <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--sidebar-primary)] text-xs font-bold text-[var(--sidebar-primary-foreground)]">
                 {doctor?.profilePhotoUrl ? (

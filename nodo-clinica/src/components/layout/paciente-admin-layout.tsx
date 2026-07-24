@@ -132,7 +132,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
 
       <aside
         className={cn(
-          "fixed bottom-0 top-0 left-0 z-50 flex h-screen w-60 flex-shrink-0 flex-col bg-[var(--color-sidebar-bg)] border-r border-[var(--color-sidebar-border)] transition-transform duration-300 md:static md:translate-x-0",
+          "fixed bottom-0 top-0 left-0 z-50 flex h-svh w-60 flex-shrink-0 flex-col bg-[var(--color-sidebar-bg)] border-r border-[var(--color-sidebar-border)] transition-transform duration-300 md:static md:translate-x-0",
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -148,7 +148,54 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
           </button>
         </div>
 
-        <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-4" aria-label="Paciente">
+        <div className="md:hidden flex-shrink-0 border-b border-[var(--color-sidebar-border)] px-4 pb-3">
+          <div className="flex items-center gap-3 py-1">
+            <UserAvatar
+              name={patient?.fullName ?? "Paciente"}
+              photoUrl={patient?.profilePhotoData}
+              size="sm"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-white">
+                {patient?.fullName}
+              </p>
+              {patient?.email && (
+                <p className="truncate text-xs text-[var(--color-sidebar-text)]">
+                  {patient.email}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              aria-label="Mi perfil"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                router.push("/paciente/perfil");
+              }}
+              className={cn(
+                "flex-shrink-0 rounded-md p-1.5 transition-colors",
+                pathname === "/paciente/perfil"
+                  ? "text-emerald-400"
+                  : "text-[var(--color-sidebar-text)] hover:text-emerald-400",
+              )}
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Cerrar sesión"
+              onClick={handleLogout}
+              className="flex-shrink-0 rounded-md p-1.5 transition-colors text-[var(--color-sidebar-text)] hover:text-emerald-400"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <nav
+          className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+          aria-label="Paciente"
+        >
           <div className="flex flex-col gap-1">
             {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
               const isActive =
@@ -175,7 +222,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
           </div>
         </nav>
 
-        <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+        <div className="hidden md:block flex-shrink-0 border-t border-[var(--color-sidebar-border)] px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <div className="flex items-center gap-3 px-1 py-1">
             <UserAvatar
               name={patient?.fullName ?? "Paciente"}
