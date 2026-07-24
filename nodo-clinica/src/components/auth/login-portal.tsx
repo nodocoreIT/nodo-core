@@ -19,7 +19,32 @@ import {
 } from "@/lib/clinic/platform-config";
 import { PlatformMedicoLoginFields } from "@/components/auth/platform-medico-login";
 import { createClient } from "@/lib/supabase/client";
+import { isBrowserSupabaseEnabled } from "@/lib/clinic/config";
 import { parseClinicDbRole } from "@/lib/clinic/resolve-clinic-role";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+/** Recovery bootstrap needs a client; in local mode auth is cookie/JSON, not Supabase. */
+function localNoopSupabase(): SupabaseClient {
+  return {
+    auth: {
+      onAuthStateChange: () => ({
+        data: { subscription: { unsubscribe() {} } },
+      }),
+      verifyOtp: async () => ({ data: { user: null, session: null }, error: null }),
+      exchangeCodeForSession: async () => ({
+        data: { user: null, session: null },
+        error: null,
+      }),
+      setSession: async () => ({ data: { user: null, session: null }, error: null }),
+      getUser: async () => ({ data: { user: null }, error: null }),
+      updateUser: async () => ({
+        data: { user: null },
+        error: { message: "No disponible en modo local" },
+      }),
+      signOut: async () => ({ error: null }),
+    },
+  } as unknown as SupabaseClient;
+}
 
 function NodeTransitionOverlay() {
   return (
@@ -212,7 +237,10 @@ export function LoginPortal() {
           ? "reset-password"
           : "login";
 
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(
+    () => (isBrowserSupabaseEnabled() ? createClient() : localNoopSupabase()),
+    [],
+  );
 
   const [role, setRole] = useState<Role>(initialRole);
   const [showPassword, setShowPassword] = useState(false);
@@ -370,6 +398,9 @@ export function LoginPortal() {
     parseClinicDbRole(roleParam) ?? (isDoctor ? "medico" : "paciente");
 
   const handleResetPassword = async (newPassword: string): Promise<string | null> => {
+    if (!isBrowserSupabaseEnabled()) {
+      return "Recuperación de contraseña no disponible en modo local.";
+    }
     const { data, error } = await supabase.auth.updateUser({ password: newPassword });
     const passwordAlreadySet =
       isSamePasswordAuthError(error?.message ?? "") ||

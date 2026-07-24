@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   Clock,
   XCircle,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -77,6 +78,7 @@ export function WaitingRoom({
     { id?: string; name: string; uploadedAt: string; downloadUrl?: string }[]
   >([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [meta, setMeta] = useState<WaitingMeta | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string | undefined>();
@@ -352,6 +354,19 @@ export function WaitingRoom({
     }
 
     setIsUploading(false);
+  };
+
+  const handleDeleteDocument = async (documentId: string, fileName: string) => {
+    setDeletingDocId(documentId);
+    try {
+      await clinicApi.deleteDocument(documentId, accessToken);
+      setUploadedFiles((prev) => prev.filter((f) => f.id !== documentId));
+      toast.success(`${fileName} eliminado`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo eliminar");
+    } finally {
+      setDeletingDocId(null);
+    }
   };
 
   useEffect(() => {
@@ -653,6 +668,21 @@ export function WaitingRoom({
                         >
                           Ver
                         </a>
+                      )}
+                      {file.id && (
+                        <button
+                          type="button"
+                          className="text-red-600 hover:text-red-700 shrink-0 p-0.5 disabled:opacity-50"
+                          disabled={deletingDocId === file.id}
+                          aria-label={`Eliminar ${file.name}`}
+                          onClick={() => void handleDeleteDocument(file.id!, file.name)}
+                        >
+                          {deletingDocId === file.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                        </button>
                       )}
                     </div>
                   ))}
@@ -1150,6 +1180,21 @@ export function WaitingRoom({
                       </a>
                     ) : (
                       <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                    )}
+                    {file.id && (
+                      <button
+                        type="button"
+                        className="text-red-600 hover:text-red-700 shrink-0 p-0.5 disabled:opacity-50"
+                        disabled={deletingDocId === file.id || isUploading}
+                        aria-label={`Eliminar ${file.name}`}
+                        onClick={() => void handleDeleteDocument(file.id!, file.name)}
+                      >
+                        {deletingDocId === file.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                      </button>
                     )}
                   </div>
                 ))}

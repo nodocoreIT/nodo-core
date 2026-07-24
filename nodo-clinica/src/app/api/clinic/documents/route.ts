@@ -4,6 +4,12 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { ALLOWED_MIME, MAX_FILE_BYTES } from "@/lib/clinic/storage";
 import { markTransferReceiptPendingReview } from "@/lib/clinic/transfer-receipt-pending";
 import { createPatientDocument } from "@/lib/clinic/db/clinical-records";
+import { isLocalMode } from "@/lib/clinic/config";
+import {
+  handleDocumentsDeleteLocal,
+  handleDocumentsGetLocal,
+  handleDocumentsPostLocal,
+} from "@/lib/clinic/documents-local";
 
 const STORAGE_BUCKET = "patient-documents";
 
@@ -32,6 +38,10 @@ function mapDocument(doc: {
 // ── GET ───────────────────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
+  if (isLocalMode()) {
+    return handleDocumentsGetLocal(request);
+  }
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   const download = searchParams.get("download") === "1";
@@ -153,6 +163,10 @@ export async function GET(request: NextRequest) {
 // ── POST (upload) ─────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  if (isLocalMode()) {
+    return handleDocumentsPostLocal(request);
+  }
+
   const formData = await request.formData();
   const file = formData.get("file");
   const accessToken = formData.get("accessToken")?.toString();
@@ -302,4 +316,67 @@ export async function POST(request: NextRequest) {
       file_path: doc.file_path,
     }),
   );
+}
+
+// ── DELETE ────────────────────────────────────────────────────────────────────
+
+export async function DELETE(request: NextRequest) {
+  if (isLocalMode()) {
+    return handleDocumentsDeleteLocal(request);
+  }
+
+  const authResult = await requireAuth(request);
+  if (authResult instanceof NextResponse) return authResult;
+  const { user, supabase } = authResult;
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "id requerido" }, { status: 400 });
+  }
+
+  const { data: doc } = await supabase
+    .from("patient_documents")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!doc) {
+    return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
+  }
+
+  if (user.role === "patient") {
+    const { data: patientRow } = await supabase
+      .from("patients")
+      .select("id")
+      .eq("profile_id", user.id)
+      .maybeSingle();
+    if (!patientRow || patientRow.id !== doc.patient_id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+  } else if (user.role === "admin" || user.role === "super_admin" || user.role === "doctor") {
+    const { data: apt } = await supabase
+      .from("appointments")
+      .select("doctor_id")
+      .eq("id", doc.appointment_id)
+      .maybeSingle();
+    const { data: professional } = await supabase
+      .from("professionals")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!apt || !professional || apt.doctor_id !== professional.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+  } else {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
+  const serviceClient = await createServiceClient();
+  if (doc.file_path) {
+    await serviceClient.storage.from(STORAGE_BUCKET).remove([doc.file_path]);
+  }
+  await supabase.from("patient_documents").delete().eq("id", id);
+
+  return NextResponse.json({ ok: true });
 }

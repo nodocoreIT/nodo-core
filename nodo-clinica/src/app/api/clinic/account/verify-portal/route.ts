@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isLocalMode } from "@/lib/clinic/config";
+import { getSessionFromRequest } from "@/lib/clinic/session";
 import {
   canAccessAsRole,
   linkClinicMembershipProfiles,
@@ -22,6 +24,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const intendedRole = parseClinicDbRole(body.role);
   if (!intendedRole) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+  }
+
+  if (isLocalMode()) {
+    const session = await getSessionFromRequest(request);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const intendedSessionRole = toSessionRole(intendedRole);
+    if (session.role !== intendedSessionRole) {
+      return NextResponse.json(
+        { error: portalNotRegisteredMessage(intendedRole) },
+        { status: 404 },
+      );
+    }
+    return NextResponse.json({
+      ok: true,
+      role: session.role,
+      professionalId: session.role === "doctor" ? session.userId : undefined,
+      patientId: session.role === "patient" ? session.userId : undefined,
+    });
   }
 
   const resolved = await resolveSupabaseAuthUser(request);

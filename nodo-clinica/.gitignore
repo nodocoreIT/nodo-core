@@ -41,3 +41,6 @@ next-env.d.ts
 *.traineddata
 
 testsprite_tests/tmp/config.json
+
+jaasauth.key
+jaasauth.key.pub
