@@ -116,6 +116,7 @@ export async function sendRecoveryEmail(params: {
         email: email.trim(),
         recoveryUrl,
         nodeLabel,
+        nodeSlug,
       });
     } else {
       console.warn("Mail not configured. Recovery link:", recoveryUrl);

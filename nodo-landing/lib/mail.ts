@@ -293,8 +293,8 @@ export async function sendPasswordResetEmail({
   await transporter.sendMail({
     from: `"${nodeLabel}" <${USER}>`,
     to: email,
-    subject: `Recuperá tu contraseña en ${nodeLabel}`,
-    text: `Hola,\n\nRecibimos una solicitud para restablecer la contraseña de tu cuenta en ${nodeLabel}. Hacé clic en el siguiente enlace para crear una nueva contraseña:\n\n${recoveryUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO Core`,
+    subject: `Restablecé tu cuenta en ${nodeLabel}`,
+    text: `Hola,\n\nRecibimos una solicitud para restablecer tu cuenta en ${nodeLabel}. Hacé clic en el siguiente enlace para configurar tu contraseña e ingresar:\n\n${recoveryUrl}\n\nSi no realizaste esta solicitud, podés ignorar este correo.\n\nSaludos,\nEl equipo de NODO Core`,
     attachments,
     html: `
       <div style="font-family:sans-serif;max-width:520px;margin:0 auto;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
@@ -310,22 +310,22 @@ export async function sendPasswordResetEmail({
         <!-- Body -->
         <div style="background:#ffffff;padding:32px;">
           <h2 style="color:#0a0a0a;margin:0 0 8px;font-size:22px;font-weight:800;text-align:center;">
-            Recuperá tu contraseña
+            Restablecé tu cuenta
           </h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;text-align:center;margin:0 0 8px;">
             en <strong>${nodeLabel}</strong>
           </p>
           <hr style="border:none;border-top:1px solid #f3f4f6;margin:20px 0;"/>
           <p style="color:#4b5563;font-size:15px;line-height:1.6;margin:0 0 24px;">
-            Recibimos una solicitud para restablecer la contraseña de tu cuenta.<br/>
-            Hacé clic en el botón de abajo para crear una nueva contraseña:
+            Recibimos una solicitud para restablecer el acceso a tu cuenta.<br/>
+            Hacé clic en el botón de abajo para configurar tu contraseña e ingresar:
           </p>
 
           <!-- CTA -->
           <div style="text-align:center;margin:0 0 28px;">
             <a href="${recoveryUrl}"
                style="background-color:${brandColor};color:${buttonText};padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:800;display:inline-block;font-size:15px;letter-spacing:.01em;">
-              Restablecer contraseña
+              Restablecer cuenta
             </a>
           </div>
 
@@ -716,14 +716,12 @@ export async function sendAccountEnabledEmail({
   const theme      = brandMap[slug] ?? { brand: "#DA5A0E", light: false };
   const brandColor = theme.brand;
   const buttonText = theme.light ? "#000000" : "#ffffff";
-  const badgeBg    = theme.light ? "#000000" : "rgba(0,0,0,0.20)";
-  const badgeText  = theme.light ? brandColor : "#ffffff";
   const linkColor  = theme.light ? "#857f00" : brandColor;
 
   // Use a public URL for the white logo — avoids CID attachment delays in mail clients.
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://www.nodocore.com.ar").replace(/\/$/, "");
   const logoUrl = `${appUrl}/logos/logo%20compuesto%20estrella%20az%20letra%20blanca_50.png`;
-  const logoHtml = `<img src="${logoUrl}" alt="NODO Core" style="height:44px;width:auto;display:inline-block;margin-bottom:16px;"/><br/>`;
+  const logoHtml = `<img src="${logoUrl}" alt="NODO Core" style="height:44px;width:auto;display:inline-block;"/>`;
 
   await transporter.sendMail({
     from: `"NODO Core · Activación" <${USER}>`,
@@ -736,9 +734,6 @@ export async function sendAccountEnabledEmail({
         <!-- Header brandado -->
         <div style="background-color:${brandColor};padding:36px 48px 28px;text-align:center;">
           ${logoHtml}
-          <span style="display:inline-block;background:${badgeBg};color:${badgeText};font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 12px;border-radius:100px;">
-            ◎ ${nodeLabel}
-          </span>
         </div>
 
         <!-- Body -->
