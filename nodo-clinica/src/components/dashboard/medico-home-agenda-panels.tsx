@@ -26,12 +26,14 @@ import { addDaysToDateKey, parseLocalDate } from "@/lib/clinic/schedule";
 import type { AppointmentRow, TodayTask } from "@/hooks/use-medico-home-agenda";
 
 const STATUS_LABELS: Record<PatientLifecycleStatus, string> = {
+  programado: "Programado",
   en_espera: "En espera",
   en_consulta: "En consulta",
   finalizada: "Finalizada",
 };
 
 const STATUS_STYLES: Record<PatientLifecycleStatus, string> = {
+  programado: "bg-mist text-slate2 border-mist",
   en_espera: "bg-amber-50 text-amber-800 border-amber-200",
   en_consulta: "bg-brand/10 text-brand border-brand/30",
   finalizada: "bg-mist text-slate2 border-mist",
@@ -70,12 +72,14 @@ function PatientRow({
           {showDate ? `${dateLabel} · ${time}` : time}
         </div>
       </div>
-      <Badge
-        variant="outline"
-        className={cn("text-[9px] shrink-0 px-1.5 py-0", STATUS_STYLES[lifecycle])}
-      >
-        {STATUS_LABELS[lifecycle]}
-      </Badge>
+      {lifecycle !== "programado" && (
+        <Badge
+          variant="outline"
+          className={cn("text-[9px] shrink-0 px-1.5 py-0", STATUS_STYLES[lifecycle])}
+        >
+          {STATUS_LABELS[lifecycle]}
+        </Badge>
+      )}
     </Link>
   );
 }
@@ -413,7 +417,7 @@ export function MedicoHomeTasks({
                 <span className={cn("flex-1 min-w-0", task.done && "line-through")}>
                   {task.label}
                 </span>
-                {task.status && !task.done && (
+                {task.status && task.status !== "programado" && !task.done && (
                   <Badge
                     variant="outline"
                     className={cn(

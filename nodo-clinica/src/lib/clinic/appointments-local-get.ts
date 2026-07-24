@@ -70,16 +70,21 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
 
     const patient = db.patients.find((p) => p.id === apt.patientId);
     const doctor = db.doctors.find((d) => d.id === apt.doctorId);
-    const waiting = db.appointments.filter(
-      (a) =>
-        a.doctorId === apt.doctorId &&
-        ["waiting", "in_consultation"].includes(a.status),
-    ).length;
-    const ahead = db.appointments.filter(
+    // Queue order follows appointment time (same day as this turno), not
+    // booking order — a patient booked later for an earlier slot still goes first.
+    const aptDateKey = localDateKeyFromIso(apt.scheduledAt);
+    const sameDayQueue = db.appointments.filter(
       (a) =>
         a.doctorId === apt.doctorId &&
         ["waiting", "in_consultation"].includes(a.status) &&
-        a.queuePosition < apt.queuePosition,
+        localDateKeyFromIso(a.scheduledAt) === aptDateKey,
+    );
+    const waiting = sameDayQueue.length;
+    const ahead = sameDayQueue.filter(
+      (a) =>
+        a.id !== apt.id &&
+        (a.status === "in_consultation" ||
+          new Date(a.scheduledAt).getTime() < new Date(apt.scheduledAt).getTime()),
     ).length;
 
     return NextResponse.json({

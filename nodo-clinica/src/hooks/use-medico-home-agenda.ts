@@ -27,7 +27,7 @@ export interface TodayTask {
   label: string;
   time?: string;
   done: boolean;
-  status?: "en_espera" | "en_consulta" | "finalizada";
+  status?: "programado" | "en_espera" | "en_consulta" | "finalizada";
 }
 
 export function useMedicoHomeAgenda(doctorId: string) {

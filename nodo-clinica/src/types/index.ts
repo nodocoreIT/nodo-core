@@ -7,7 +7,11 @@ export type AppointmentStatus =
   | "completed"
   | "cancelled";
 
-export type PatientLifecycleStatus = "en_espera" | "en_consulta" | "finalizada";
+export type PatientLifecycleStatus =
+  | "programado"
+  | "en_espera"
+  | "en_consulta"
+  | "finalizada";
 
 export interface Profile {
   id: string;
@@ -150,8 +154,9 @@ export function mapAppointmentStatusToLifecycle(
   status: AppointmentStatus
 ): PatientLifecycleStatus {
   switch (status) {
-    case "waiting":
     case "scheduled":
+      return "programado";
+    case "waiting":
       return "en_espera";
     case "in_consultation":
       return "en_consulta";
@@ -159,7 +164,7 @@ export function mapAppointmentStatusToLifecycle(
     case "cancelled":
       return "finalizada";
     default:
-      return "en_espera";
+      return "programado";
   }
 }
 
@@ -167,6 +172,8 @@ export function mapLifecycleToAppointmentStatus(
   lifecycle: PatientLifecycleStatus
 ): AppointmentStatus {
   switch (lifecycle) {
+    case "programado":
+      return "scheduled";
     case "en_espera":
       return "waiting";
     case "en_consulta":

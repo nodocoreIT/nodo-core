@@ -216,14 +216,16 @@ function PatientQueueItem({
               {patient.hasNewDocuments && (
                 <FileUp className="h-3.5 w-3.5 text-amber-500 shrink-0" />
               )}
-              <Badge
-                variant="outline"
-                className={`text-[9px] h-4 px-1 shrink-0 ${LIFECYCLE_COLORS[patient.status]}`}
-              >
-                {LIFECYCLE_LABELS[patient.status]}
-              </Badge>
+              {patient.status !== "programado" && (
+                <Badge
+                  variant="outline"
+                  className={`text-[9px] h-4 px-1 shrink-0 ${LIFECYCLE_COLORS[patient.status]}`}
+                >
+                  {LIFECYCLE_LABELS[patient.status]}
+                </Badge>
+              )}
             </div>
-            <p className="text-[10px] text-slate-400 mt-0.5">
+            <p className="text-xs font-semibold text-slate-600 mt-0.5">
               {format(new Date(patient.scheduledAt), "EEE d MMM yyyy", {
                 locale: es,
               })}
@@ -259,7 +261,7 @@ function PatientQueueItem({
             Ver ficha
           </Button>
         )}
-        {patient.status === "en_espera" && (
+        {(patient.status === "en_espera" || patient.status === "programado") && (
           <Button
             size="sm"
             onClick={onStart}

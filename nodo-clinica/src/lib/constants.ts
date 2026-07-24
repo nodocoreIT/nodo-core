@@ -70,12 +70,14 @@ export const MEDICAL_EXAMS = [
 ] as const;
 
 export const LIFECYCLE_LABELS = {
+  programado: "Programado",
   en_espera: "En espera",
   en_consulta: "En consulta",
   finalizada: "Finalizada",
 } as const;
 
 export const LIFECYCLE_COLORS = {
+  programado: "bg-slate-100 text-slate-500 border-slate-200",
   en_espera: "bg-amber-100 text-amber-800 border-amber-200",
   en_consulta: "bg-emerald-100 text-emerald-800 border-emerald-200",
   finalizada: "bg-slate-100 text-slate-600 border-slate-200",

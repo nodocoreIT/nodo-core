@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   User,
   FileText,
@@ -15,6 +16,7 @@ import {
   Sparkles,
   MessageSquare,
   Play,
+  Download,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -29,6 +31,14 @@ interface PatientPreviewPanelProps {
   doctorId?: string;
   onStartConsultation?: (appointmentId: string) => void;
   onGenerateReport?: (patient: QueuePatient) => void;
+}
+
+function isPdfFile(fileName: string): boolean {
+  return /\.pdf$/i.test(fileName);
+}
+
+function isImageFile(fileName: string): boolean {
+  return /\.(png|jpe?g|gif|webp|bmp)$/i.test(fileName);
 }
 
 export function PatientPreviewPanel({
@@ -55,6 +65,10 @@ export function PatientPreviewPanel({
       doctorName?: string;
     }>;
     healthProfile?: import("@/lib/clinic/types").PatientHealthProfile | null;
+  } | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{
+    fileName: string;
+    downloadUrl: string;
   } | null>(null);
 
   useEffect(() => {
@@ -114,6 +128,7 @@ export function PatientPreviewPanel({
   const todayDocs = currentAppointment?.documents ?? [];
 
   return (
+    <>
     <Card className="border-slate-200 h-full shadow-sm">
       <CardHeader className="py-3 px-4 border-b bg-gradient-to-r from-slate-50 to-blue-50">
         <div className="flex items-start gap-3">
@@ -189,7 +204,7 @@ export function PatientPreviewPanel({
           </div>
         )}
         <div className="flex flex-wrap gap-2 mb-3">
-          {patient.status === "en_espera" &&
+          {(patient.status === "en_espera" || patient.status === "programado") &&
             onStartConsultation &&
             patient.appointmentId && (
             <Button
@@ -245,18 +260,17 @@ export function PatientPreviewPanel({
                   <ScrollArea className="h-49 pr-2">
                     <div className="space-y-2">
                       {todayDocs.map((doc) => (
-                        <a
+                        <button
                           key={doc.id}
-                          href={doc.downloadUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2 hover:bg-amber-50"
+                          type="button"
+                          onClick={() => setPreviewDoc(doc)}
+                          className="flex w-full items-center gap-2 rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2 text-left hover:bg-amber-50"
                         >
                           <Paperclip className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                           <span className="text-xs text-slate-700 truncate">
                             {doc.fileName}
                           </span>
-                        </a>
+                        </button>
                       ))}
                     </div>
                   </ScrollArea>
@@ -302,12 +316,11 @@ export function PatientPreviewPanel({
                 <ScrollArea className="h-[220px] pr-2">
                   <div className="space-y-2">
                     {todayDocs.map((doc) => (
-                      <a
+                      <button
                         key={doc.id}
-                        href={doc.downloadUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 hover:bg-slate-50"
+                        type="button"
+                        onClick={() => setPreviewDoc(doc)}
+                        className="flex w-full items-center gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 text-left hover:bg-slate-50"
                       >
                         <FileText className="h-3.5 w-3.5 text-blue-600 shrink-0" />
                         <div className="min-w-0">
@@ -318,7 +331,7 @@ export function PatientPreviewPanel({
                             Turno actual
                           </p>
                         </div>
-                      </a>
+                      </button>
                     ))}
                   </div>
                 </ScrollArea>
@@ -328,5 +341,44 @@ export function PatientPreviewPanel({
         )}
       </CardContent>
     </Card>
+
+    <Dialog open={!!previewDoc} onOpenChange={(open) => !open && setPreviewDoc(null)}>
+      <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col overflow-hidden">
+        <DialogTitle className="truncate pr-6">{previewDoc?.fileName}</DialogTitle>
+        <div className="min-h-0 flex-1 overflow-auto rounded-md border border-slate-100 bg-slate-50">
+          {previewDoc && isPdfFile(previewDoc.fileName) ? (
+            <iframe
+              src={previewDoc.downloadUrl}
+              title={previewDoc.fileName}
+              className="h-[75vh] w-full"
+            />
+          ) : previewDoc && isImageFile(previewDoc.fileName) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={previewDoc.downloadUrl}
+              alt={previewDoc.fileName}
+              className="mx-auto max-w-full"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <FileText className="h-10 w-10 text-slate-300" />
+              <p className="text-sm text-slate-500">
+                No se puede previsualizar este tipo de archivo.
+              </p>
+            </div>
+          )}
+        </div>
+        <a
+          href={previewDoc?.downloadUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 self-start text-xs font-medium text-blue-700 hover:underline"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Descargar / abrir en pestaña nueva
+        </a>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

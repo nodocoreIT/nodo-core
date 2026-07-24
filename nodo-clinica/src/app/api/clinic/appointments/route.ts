@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const [{ data: patient }, { data: professional }, { count: waitingCount }, { data: docs }] =
+    const [{ data: patient }, { data: professional }, { data: doctorQueueApts }, { data: docs }] =
       await Promise.all([
         supabase.from("patients").select("*").eq("id", apt.patient_id).maybeSingle(),
         supabase
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
           .maybeSingle(),
         supabase
           .from("appointments")
-          .select("*", { count: "exact", head: true })
+          .select("id, scheduled_at, status")
           .eq("doctor_id", apt.doctor_id)
           .in("status", ["waiting", "in_consultation"]),
         supabase
@@ -129,12 +129,19 @@ export async function GET(request: NextRequest) {
           .eq("appointment_id", apt.id),
       ]);
 
-    const { count: aheadCount } = await supabase
-      .from("appointments")
-      .select("*", { count: "exact", head: true })
-      .eq("doctor_id", apt.doctor_id)
-      .in("status", ["waiting", "in_consultation"])
-      .lt("queue_position", apt.queue_position);
+    // Queue order follows appointment time (same day as this turno), not
+    // booking order — a patient booked later for an earlier slot still goes first.
+    const aptDateKey = localDateKeyFromIso(apt.scheduled_at);
+    const sameDayQueue = (doctorQueueApts ?? []).filter(
+      (a) => localDateKeyFromIso(a.scheduled_at) === aptDateKey,
+    );
+    const aheadCount = sameDayQueue.filter(
+      (a) =>
+        a.id !== apt.id &&
+        (a.status === "in_consultation" ||
+          new Date(a.scheduled_at).getTime() < new Date(apt.scheduled_at).getTime()),
+    ).length;
+    const waitingCount = sameDayQueue.length;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const officeSettingsPayment = ((professional as any)?.office_settings?.payment ?? {}) as Record<
@@ -193,8 +200,8 @@ export async function GET(request: NextRequest) {
             payment: doctorPayment,
           }
         : undefined,
-      queuePosition: (aheadCount ?? 0) + 1,
-      totalWaiting: waitingCount ?? 0,
+      queuePosition: aheadCount + 1,
+      totalWaiting: waitingCount,
       strictPaymentValidation: isStrictPaymentValidation(),
       documents: (docs ?? []).map((d) => ({
         id: d.id,

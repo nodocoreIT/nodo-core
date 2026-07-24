@@ -193,7 +193,7 @@ function PacienteTurnosContent() {
                         }`}
                         onClick={() => setOpenToken(apt.accessToken)}
                       >
-                        {isPending ? "Completar pago" : "Ver turno"}
+                        {isPending ? "Completar pago" : "Entrar a sala de espera"}
                         <ChevronRight className="h-3 w-3 ml-0.5" />
                       </Button>
                     ) : (
