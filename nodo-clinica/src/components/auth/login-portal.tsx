@@ -247,19 +247,6 @@ export function LoginPortal() {
     }
   }, [roleParam]);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const { session } = await clinicApi.getSession();
-        if (session?.role === "patient") {
-          window.location.replace(patientNext ?? "/paciente");
-        }
-      } catch {
-        /* not logged in */
-      }
-    })();
-  }, [patientNext]);
-
   const isDoctor = role === "doctor";
   const platformDoctor = isDoctor && isPlatformMode();
   // Patients can always register; doctors follow open-registration + platform rules
