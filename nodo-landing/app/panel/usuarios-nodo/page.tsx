@@ -12,7 +12,6 @@ import {
   Mail,
   Pause,
   Play,
-  ShieldOff,
   Trash2,
   UserRound,
 } from "lucide-react";
@@ -379,10 +378,6 @@ export default function UsuariosNodoPage() {
     );
   }
 
-  async function handleRevoke(user: NodoUserRecord) {
-    await openImpactModal(user, "revoke");
-  }
-
   async function handleDelete(user: NodoUserRecord) {
     await openImpactModal(user, "delete");
   }
@@ -620,14 +615,6 @@ export default function UsuariosNodoPage() {
                               }}
                             >
                               <KeyRound className="h-3.5 w-3.5" />
-                            </ActionButton>
-                            <ActionButton
-                              title="Revocar acceso"
-                              disabled={busy}
-                              danger
-                              onClick={() => void handleRevoke(user)}
-                            >
-                              <ShieldOff className="h-3.5 w-3.5" />
                             </ActionButton>
                             <ActionButton
                               title="Eliminar usuario"
