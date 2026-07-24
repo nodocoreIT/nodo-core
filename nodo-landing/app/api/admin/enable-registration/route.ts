@@ -8,6 +8,7 @@ import {
   createLandingAuthPendingPassword,
 } from "@/lib/registration/provision";
 import { sendAccountEnabledEmail, isMailConfigured } from "@/lib/mail";
+import { resolvePublicOriginFromRequest } from "@/lib/auth/public-origin";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -128,7 +129,10 @@ export async function POST(request: Request) {
     .update({ status: "activo" })
     .eq("client_unit_id", clientUnitId);
 
-  const origin = new URL(request.url).origin;
+  // Prefer the canonical public URL over the incoming request's origin —
+  // otherwise a link generated while an admin is on localhost gets mailed
+  // to the end user pointing at localhost.
+  const origin = await resolvePublicOriginFromRequest(new URL(request.url).origin);
   // Use nodo-{slug} prefix so multi-zone proxy paths (e.g. /ecommerce/*) are not hit.
   const loginPathSlug = cfg ? `nodo-${cfg.slug}` : "login";
   let loginUrl = `${origin}/${loginPathSlug}/login?mode=first-access`;
@@ -138,6 +142,13 @@ export async function POST(request: Request) {
   if (cfg?.provisionable && provisionUserId) {
     const nodoAdmin = createNodoAdminClient(unit.unit_code);
     if (nodoAdmin) {
+      // Lift any prior suspension ban — otherwise Supabase rejects the
+      // recovery link verification with user_banned before the user ever
+      // reaches the app, even though access was just re-enabled.
+      await nodoAdmin.auth.admin.updateUserById(provisionUserId, {
+        ban_duration: "none",
+      });
+
       const project = nodoAuthProjectParam(unit.unit_code);
       const next = `/${loginPathSlug}/login?mode=first-access`;
       const confirmQuery = project
