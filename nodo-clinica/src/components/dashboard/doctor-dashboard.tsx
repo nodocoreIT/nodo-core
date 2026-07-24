@@ -977,7 +977,7 @@ export function DoctorDashboard({
                 }
               />
             </>
-          ) : dataSource === "local" ? (
+          ) : (
             inlineReport ? (
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 min-h-[500px]">
                 <MedicalReportPanel
@@ -1020,16 +1020,6 @@ export function DoctorDashboard({
                 }
               />
             )
-          ) : (
-            <div className="flex flex-col items-center justify-center h-[500px] bg-white rounded-xl border border-slate-200 border-dashed">
-              <Stethoscope className="h-12 w-12 text-slate-200 mb-4" />
-              <p className="text-slate-500 font-medium">
-                Seleccione un paciente para iniciar la consulta
-              </p>
-              <p className="text-sm text-slate-400 mt-1">
-                El video y las herramientas se cargarán automáticamente
-              </p>
-            </div>
           )}
         </div>
 

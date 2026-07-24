@@ -148,7 +148,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Paciente">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-4" aria-label="Paciente">
           <div className="flex flex-col gap-1">
             {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
               const isActive =
@@ -175,7 +175,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
           </div>
         </nav>
 
-        <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] p-3">
+        <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <div className="flex items-center gap-3 px-1 py-1">
             <UserAvatar
               name={patient?.fullName ?? "Paciente"}

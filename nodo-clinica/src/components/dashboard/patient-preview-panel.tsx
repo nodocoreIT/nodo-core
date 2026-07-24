@@ -237,24 +237,30 @@ export function PatientPreviewPanel({
                   Sin estudios subidos para este turno todavía
                 </p>
               ) : (
-                <ScrollArea className="h-[220px] pr-2">
-                  <div className="space-y-2">
-                    {todayDocs.map((doc) => (
-                      <a
-                        key={doc.id}
-                        href={doc.downloadUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2 hover:bg-amber-50"
-                      >
-                        <Paperclip className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-                        <span className="text-xs text-slate-700 truncate">
-                          {doc.fileName}
-                        </span>
-                      </a>
-                    ))}
-                  </div>
-                </ScrollArea>
+                <>
+                  <p className="text-[10px] font-medium text-amber-700 flex items-center gap-1 mb-2">
+                    <Paperclip className="h-3 w-3" />
+                    Estudios adjuntados
+                  </p>
+                  <ScrollArea className="h-49 pr-2">
+                    <div className="space-y-2">
+                      {todayDocs.map((doc) => (
+                        <a
+                          key={doc.id}
+                          href={doc.downloadUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2 hover:bg-amber-50"
+                        >
+                          <Paperclip className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                          <span className="text-xs text-slate-700 truncate">
+                            {doc.fileName}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </>
               )}
             </TabsContent>
             <TabsContent value="records" className="mt-3">

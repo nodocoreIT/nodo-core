@@ -344,7 +344,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav
-            className="flex-1 overflow-y-auto px-3 py-4"
+            className="flex-1 min-h-0 overflow-y-auto px-3 py-4"
             aria-label="Navegación principal"
           >
             <SidebarNavAccordionProvider itemCount={NAV_ITEMS.length}>
@@ -397,7 +397,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
             <SidebarCommandPaletteHint />
           </nav>
 
-          <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] p-3 space-y-2">
+          <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] space-y-2">
             <div className="flex items-center gap-3 px-1 py-1">
               <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--sidebar-primary)] text-xs font-bold text-[var(--sidebar-primary-foreground)]">
                 {doctor?.profilePhotoUrl ? (
