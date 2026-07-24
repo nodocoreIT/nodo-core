@@ -4,7 +4,8 @@ export function normalizeArMobilePhone(input: string): string | null {
   if (!digits) return null;
 
   if (digits.startsWith("54")) {
-    return `+${digits}`;
+    const rest = digits.slice(2);
+    return `+54${rest.startsWith("9") ? rest : `9${rest}`}`;
   }
 
   if (digits.startsWith("0")) {

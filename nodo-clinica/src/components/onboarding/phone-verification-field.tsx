@@ -137,7 +137,7 @@ export function PhoneVerificationField({
             type="tel"
             inputMode="tel"
             autoComplete="tel"
-            placeholder="11 1234-5678"
+            placeholder="+5492954223344"
             value={phone}
             onChange={(e) => {
               setPhone(e.target.value);
