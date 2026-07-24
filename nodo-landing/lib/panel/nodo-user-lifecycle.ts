@@ -464,10 +464,12 @@ export async function deleteNodoUser(user: NodoUserRecord): Promise<{ ok: true }
     const clinicDb = createAdminClient("nodo_clinica");
     await clinicDb.from("pending_clinic_registrations").delete().ilike("email", email);
 
+    // When the auth account is shared with another nodo/role, the preview
+    // above already told the admin it would be preserved untouched — banning
+    // it here would silently break that other access, contradicting the
+    // warning shown before confirming.
     if (preview.willDeleteAuthUser && authUserId && authAdmin) {
       await authAdmin.auth.admin.deleteUser(authUserId);
-    } else if (authUserId && authAdmin) {
-      await setNodoAuthSuspended(user.unitCode, authUserId, "suspend");
     }
 
     return { ok: true };
