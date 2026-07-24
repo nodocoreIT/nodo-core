@@ -151,8 +151,6 @@ export function DoctorSettingsDialog({
   const [newBlockDate, setNewBlockDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [saveResult, setSaveResult] = useState<{ status: "success" | "error"; message?: string } | null>(null);
-  const saveResultTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [testingReminder, setTestingReminder] = useState(false);
   const [mpOAuthConfigured, setMpOAuthConfigured] = useState<boolean | null>(null);
   const [testingMpConnection, setTestingMpConnection] = useState(false);
@@ -165,12 +163,6 @@ export function DoctorSettingsDialog({
   const [choosingPlan, setChoosingPlan] = useState(false);
   const [startingPlanId, setStartingPlanId] = useState<string | null>(null);
   const loadGen = useRef(0);
-
-  useEffect(() => {
-    return () => {
-      if (saveResultTimeout.current) clearTimeout(saveResultTimeout.current);
-    };
-  }, []);
 
   useEffect(() => {
     void clinicApi.getMercadoPagoOAuthConfig().then((cfg) => {
@@ -318,8 +310,6 @@ export function DoctorSettingsDialog({
 
   const handleSave = async () => {
     setSaving(true);
-    if (saveResultTimeout.current) clearTimeout(saveResultTimeout.current);
-    setSaveResult(null);
     try {
       const result = await clinicApi.saveDoctorOffice({
         fullName,
@@ -354,15 +344,11 @@ export function DoctorSettingsDialog({
         );
       }
       hydrateSettings(themeSettings);
-      setSaveResult({ status: "success" });
+      toast.success("Guardado exitoso");
     } catch (e) {
-      setSaveResult({
-        status: "error",
-        message: e instanceof Error ? e.message : "Error al guardar",
-      });
+      toast.error(e instanceof Error ? e.message : "Error al guardar");
     } finally {
       setSaving(false);
-      saveResultTimeout.current = setTimeout(() => setSaveResult(null), 3000);
     }
   };
 
@@ -633,8 +619,6 @@ export function DoctorSettingsDialog({
                             const f = e.target.files?.[0];
                             if (!f) return;
                             setUploadingPhoto(true);
-                            if (saveResultTimeout.current) clearTimeout(saveResultTimeout.current);
-                            setSaveResult(null);
                             try {
                               const photoData = await readImageFile(f);
                               setProfilePhotoData(photoData);
@@ -658,15 +642,11 @@ export function DoctorSettingsDialog({
                                   },
                                 }),
                               );
-                              setSaveResult({ status: "success" });
+                              toast.success("Guardado exitoso");
                             } catch (err) {
-                              setSaveResult({
-                                status: "error",
-                                message: err instanceof Error ? err.message : "Error al guardar la foto",
-                              });
+                              toast.error(err instanceof Error ? err.message : "Error al guardar la foto");
                             } finally {
                               setUploadingPhoto(false);
-                              saveResultTimeout.current = setTimeout(() => setSaveResult(null), 3000);
                             }
                           }}
                         />
@@ -1254,27 +1234,14 @@ export function DoctorSettingsDialog({
             <p className="text-[10px] text-slate-400 hidden sm:block">
               Un solo guardado para agenda, perfil, cobros, recordatorios y apariencia.
             </p>
-            <div className="ml-auto flex flex-col items-end gap-1">
-              <Button onClick={handleSave} disabled={saving} className="gap-2">
-                {saving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                {saving ? "Guardando..." : "Guardar cambios"}
-              </Button>
-              {saveResult && (
-                <p
-                  className={`text-[11px] ${
-                    saveResult.status === "success" ? "text-emerald-600" : "text-red-600"
-                  }`}
-                >
-                  {saveResult.status === "success"
-                    ? "Guardado exitoso"
-                    : (saveResult.message ?? "Error al guardar")}
-                </p>
+            <Button onClick={handleSave} disabled={saving} className="ml-auto gap-2">
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
               )}
-            </div>
+              {saving ? "Guardando..." : "Guardar cambios"}
+            </Button>
           </div>
         </div>
       </DialogContent>
