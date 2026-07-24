@@ -36,6 +36,15 @@ function dateKey(iso: string) {
   return format(new Date(iso), "yyyy-MM-dd");
 }
 
+const DAY_COLORS = [
+  "bg-blue-50 text-blue-700 border-blue-200",
+  "bg-violet-50 text-violet-700 border-violet-200",
+  "bg-amber-50 text-amber-700 border-amber-200",
+  "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "bg-rose-50 text-rose-700 border-rose-200",
+  "bg-cyan-50 text-cyan-700 border-cyan-200",
+];
+
 function dayHeading(key: string) {
   const todayKey = format(new Date(), "yyyy-MM-dd");
   const d = parseISO(`${key}T12:00:00`);
@@ -110,20 +119,28 @@ export function PatientQueue({
               No hay turnos en los próximos días laborables
             </p>
           ) : (
-            dayKeys.map((key, dayIndex) => (
+            dayKeys.map((key, dayIndex) => {
+              const dayColor = DAY_COLORS[dayIndex % DAY_COLORS.length];
+              return (
               <div key={key}>
                 {dayIndex > 0 ? (
                   <div className="flex items-center gap-2 py-3 px-1">
                     <div className="flex-1 border-t border-slate-200" />
-                    <span className="text-[11px] font-semibold text-slate-500 capitalize shrink-0 px-1">
+                    <span
+                      className={`text-sm font-bold capitalize shrink-0 px-3 py-1 rounded-full border ${dayColor}`}
+                    >
                       {dayHeading(key)}
                     </span>
                     <div className="flex-1 border-t border-slate-200" />
                   </div>
                 ) : (
-                  <p className="text-[11px] font-semibold text-slate-500 capitalize px-2 pt-1 pb-2">
-                    {dayHeading(key)}
-                  </p>
+                  <div className="px-2 pt-1 pb-3">
+                    <span
+                      className={`text-sm font-bold capitalize inline-block px-3 py-1 rounded-full border ${dayColor}`}
+                    >
+                      {dayHeading(key)}
+                    </span>
+                  </div>
                 )}
                 <div className="space-y-0">
                   {grouped[key].map((patient) => (
@@ -151,7 +168,8 @@ export function PatientQueue({
                   ))}
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </ScrollArea>

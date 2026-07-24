@@ -118,6 +118,7 @@ export function DoctorDashboard({
   const [previewPatient, setPreviewPatient] = useState<QueuePatient | null>(
     null
   );
+  const [previewRefreshTick, setPreviewRefreshTick] = useState(0);
   const [inlineReport, setInlineReport] = useState<{
     appointmentId?: string;
     patientId: string;
@@ -136,6 +137,8 @@ export function DoctorDashboard({
   const { queue } = useConsultationStore();
   const queueRef = useRef(queue);
   useEffect(() => { queueRef.current = queue; }, [queue]);
+  const previewPatientRef = useRef(previewPatient);
+  useEffect(() => { previewPatientRef.current = previewPatient; }, [previewPatient]);
 
   useEffect(() => {
     if (dataSource !== "local") return;
@@ -569,7 +572,7 @@ export function DoctorDashboard({
         "postgres_changes",
         {
           event: "INSERT",
-          schema: "public",
+          schema: "nodo_clinica",
           table: "patient_documents",
         },
         async (payload) => {
@@ -588,6 +591,9 @@ export function DoctorDashboard({
             description: doc.file_name,
           });
           loadQueue();
+          if (previewPatientRef.current?.appointmentId === doc.appointment_id) {
+            setPreviewRefreshTick((t) => t + 1);
+          }
         }
       )
       .subscribe();
@@ -1006,6 +1012,7 @@ export function DoctorDashboard({
               <PatientPreviewPanel
                 patient={previewPatient}
                 doctorId={doctorId}
+                refreshToken={previewRefreshTick}
                 onStartConsultation={(id) => {
                   if (id) startConsultation(id);
                 }}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,8 @@ import type { PatientLifecycleStatus, QueuePatient } from "@/types";
 interface PatientPreviewPanelProps {
   patient: QueuePatient | null;
   doctorId?: string;
+  /** Bump this to force a re-fetch of the patient's history (e.g. a new document just arrived in real time). */
+  refreshToken?: number;
   onStartConsultation?: (appointmentId: string) => void;
   onGenerateReport?: (patient: QueuePatient) => void;
 }
@@ -44,6 +46,7 @@ function isImageFile(fileName: string): boolean {
 export function PatientPreviewPanel({
   patient,
   doctorId,
+  refreshToken,
   onStartConsultation,
   onGenerateReport,
 }: PatientPreviewPanelProps) {
@@ -106,6 +109,28 @@ export function PatientPreviewPanel({
       cancelled = true;
     };
   }, [patient?.patientId, patient?.appointmentId, doctorId]);
+
+  const isFirstRefreshRef = useRef(true);
+  useEffect(() => {
+    if (isFirstRefreshRef.current) {
+      isFirstRefreshRef.current = false;
+      return;
+    }
+    if (!patient) return;
+    const { patientId, appointmentId } = patient;
+    let cancelled = false;
+    clinicApi
+      .getPatientHistory(patientId, doctorId)
+      .then((data) => {
+        if (cancelled || !data?.appointments || !Array.isArray(data.clinicalRecords)) return;
+        setHistory(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshToken]);
 
   if (!patient) {
     return (
@@ -343,21 +368,21 @@ export function PatientPreviewPanel({
     </Card>
 
     <Dialog open={!!previewDoc} onOpenChange={(open) => !open && setPreviewDoc(null)}>
-      <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col overflow-hidden">
-        <DialogTitle className="truncate pr-6">{previewDoc?.fileName}</DialogTitle>
+      <DialogContent className="flex h-[95vh] max-h-[95vh] w-[95vw] max-w-[95vw] sm:max-w-[95vw] flex-col overflow-hidden">
+        <DialogTitle className="truncate pr-6 text-base">{previewDoc?.fileName}</DialogTitle>
         <div className="min-h-0 flex-1 overflow-auto rounded-md border border-slate-100 bg-slate-50">
           {previewDoc && isPdfFile(previewDoc.fileName) ? (
             <iframe
               src={previewDoc.downloadUrl}
               title={previewDoc.fileName}
-              className="h-[75vh] w-full"
+              className="h-full w-full"
             />
           ) : previewDoc && isImageFile(previewDoc.fileName) ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={previewDoc.downloadUrl}
               alt={previewDoc.fileName}
-              className="mx-auto max-w-full"
+              className="mx-auto h-full max-h-full w-auto max-w-full object-contain"
             />
           ) : (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
