@@ -368,7 +368,7 @@ export function DoctorDashboard({
       .from("clinical_notes")
       .select("content")
       .eq("appointment_id", appointmentId)
-      .single();
+      .maybeSingle();
 
     if (notesRes.data) {
       useConsultationStore.getState().setClinicalNotes(notesRes.data.content);

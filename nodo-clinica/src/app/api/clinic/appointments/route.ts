@@ -539,9 +539,14 @@ export async function GET(request: NextRequest) {
       .eq("doctor_id", doctorId);
 
     if (scope === "queue") {
+      // A patient who is actively waiting or in consultation must always
+      // show up regardless of their original scheduled date — only merely
+      // "scheduled" (not yet arrived) turnos are restricted to today+.
       dbQuery = dbQuery
-        .gte("scheduled_at", `${todayKey}T00:00:00`)
-        .in("status", ["scheduled", "waiting", "in_consultation"]);
+        .in("status", ["scheduled", "waiting", "in_consultation"])
+        .or(
+          `scheduled_at.gte.${todayKey}T00:00:00,status.in.(waiting,in_consultation)`,
+        );
     } else {
       dbQuery = dbQuery.neq("status", "cancelled");
       if (scope === "today" || scope === "active") {
