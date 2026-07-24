@@ -251,6 +251,31 @@ async function fetchSessionUncached(): Promise<ClinicSessionResult> {
     }
   }
 
+  // Local mode: cookie is what API routes trust. sessionStorage alone can lie
+  // (e.g. patient tab + doctor login in another tab → booking 401).
+  if (!useBrowserSupabaseAuth()) {
+    const res = await fetch(`${BASE}/api/clinic/auth/session`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    const data = await parseJsonResponse(res);
+    if (data.session && data.user) {
+      saveClientSession({
+        userId: data.user.id ?? data.session.userId,
+        role: data.session.role,
+        email: data.user.email ?? data.session.email ?? "",
+        fullName: data.user.fullName ?? data.session.fullName ?? "",
+        profilePhotoUrl: data.user.profilePhotoUrl,
+      });
+      return {
+        session: data.session,
+        user: data.user,
+      };
+    }
+    clearClientSession();
+    return { session: null, user: null };
+  }
+
   const stored = getClientSession();
   if (stored) {
     return {
@@ -268,15 +293,6 @@ async function fetchSessionUncached(): Promise<ClinicSessionResult> {
         org_id: null,
       },
     };
-  }
-
-  if (!useBrowserSupabaseAuth()) {
-    const res = await fetch(`${BASE}/api/clinic/auth/session`, {
-      credentials: "include",
-      cache: "no-store",
-    });
-    const data = await parseJsonResponse(res);
-    return { session: data.session ?? null, user: data.user ?? null };
   }
 
   const res = await fetch(`${BASE}/api/clinic/account/session`, clinicFetchOpts());
@@ -385,6 +401,7 @@ export const clinicApi = {
         fullName: respData.user.fullName,
       });
     }
+    invalidateClinicApiCache();
     return respData;
   },
 
@@ -474,6 +491,7 @@ export const clinicApi = {
 
   async logout() {
     clearClientSession();
+    invalidateClinicApiCache();
     // Sign out from browser Supabase client (clears cookies)
     const client = getBrowserSupabase();
     if (client) {
@@ -1125,9 +1143,26 @@ export const clinicApi = {
       credentials: "include",
       body: form,
     });
-    const data = await res.json();
+    const data = await parseJsonResponse(res);
     if (!res.ok) throw new Error(data.error || "Error al subir archivo");
-    return data;
+    return data as {
+      id: string;
+      fileName: string;
+      uploadedAt: string;
+      downloadUrl?: string;
+    };
+  },
+
+  async deleteDocument(documentId: string, accessToken?: string) {
+    const q = new URLSearchParams({ id: documentId });
+    if (accessToken) q.set("token", accessToken);
+    const res = await fetch(`${BASE}/api/clinic/documents?${q}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "Error al eliminar archivo");
+    return data as { ok: boolean };
   },
 
   async getDocuments(params: {

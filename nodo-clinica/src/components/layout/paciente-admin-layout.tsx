@@ -54,7 +54,6 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
       let sessionFullName: string = "";
       let sessionPhoto: string | undefined;
 
-      const stored = getClientSession();
       try {
         const { session, user } = await clinicApi.getSession();
         if (session?.role === "patient" && user?.id) {
@@ -62,17 +61,18 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
           sessionEmail = user.email ?? session.email ?? "";
           sessionFullName = user.fullName ?? "";
           sessionPhoto = user.profilePhotoUrl;
-        } else if (user?.id && stored?.role === "patient" && stored.userId === user.id) {
-          sessionUserId = user.id;
-          sessionEmail = user.email ?? stored.email;
-          sessionFullName = user.fullName ?? stored.fullName;
         }
       } catch { /* ignore */ }
 
-      if (!sessionUserId && stored?.role === "patient") {
-        sessionUserId = stored.userId;
-        sessionEmail = stored.email;
-        sessionFullName = stored.fullName;
+      if (!sessionUserId) {
+        const stored = getClientSession();
+        // Only trust sessionStorage when it is explicitly a patient and API
+        // did not return another role (cookie is source of truth in local).
+        if (stored?.role === "patient") {
+          sessionUserId = stored.userId;
+          sessionEmail = stored.email;
+          sessionFullName = stored.fullName;
+        }
       }
 
       if (!sessionUserId) {

@@ -4,6 +4,7 @@ import { useEffect, useCallback, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { Stethoscope, Pill, FlaskConical, Brain, LogOut, CheckCircle, Settings, CalendarPlus } from "lucide-react";
 import { PatientQueue } from "@/components/dashboard/patient-queue";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
