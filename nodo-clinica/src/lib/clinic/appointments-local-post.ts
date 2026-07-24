@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { appBaseUrl, patientLoginUrl } from "@/lib/clinic/appointment-payment";
-import { attachDocumentToAppointment } from "@/lib/clinic/appointment-documents";
+import { attachLocalDocument } from "@/lib/clinic/documents-local";
 import { buildPaymentReceiptAudit } from "@/lib/clinic/payment-receipt-audit";
 import { notifyDoctorTransferPendingReview } from "@/lib/clinic/doctor-notifications";
 import {
@@ -187,13 +187,13 @@ export async function handleAppointmentsPostLocal(request: NextRequest) {
         validatedReceipt.dataBase64.replace(/^data:[^;]+;base64,/, ""),
         "base64",
       );
-      await attachDocumentToAppointment(
-        apt.id,
-        session.userId,
-        validatedReceipt.fileName || "comprobante.jpg",
-        validatedReceipt.mimeType || "image/jpeg",
+      await attachLocalDocument({
+        appointmentId: apt.id,
+        patientId: session.userId,
+        fileName: validatedReceipt.fileName || "comprobante.jpg",
+        mimeType: validatedReceipt.mimeType || "image/jpeg",
         buffer,
-      );
+      });
     } catch (err) {
       console.error("[appointments] receipt attach failed", err);
     }
@@ -207,13 +207,13 @@ export async function handleAppointmentsPostLocal(request: NextRequest) {
         String(study.dataBase64).replace(/^data:[^;]+;base64,/, ""),
         "base64",
       );
-      await attachDocumentToAppointment(
-        apt.id,
-        session.userId,
-        study.fileName || "estudio.pdf",
-        study.mimeType || "application/pdf",
+      await attachLocalDocument({
+        appointmentId: apt.id,
+        patientId: session.userId,
+        fileName: study.fileName || "estudio.pdf",
+        mimeType: study.mimeType || "application/pdf",
         buffer,
-      );
+      });
     } catch (err) {
       console.error("[appointments] study attach failed", err);
     }
