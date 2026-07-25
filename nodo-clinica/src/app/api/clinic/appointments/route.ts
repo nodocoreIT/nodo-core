@@ -52,6 +52,7 @@ import { getBookableProfessional } from "@/lib/clinic/db/professionals";
 import { attachDocumentToAppointment } from "@/lib/clinic/appointment-documents";
 import { appointmentNeedsDoctorPaymentReviewFromDbRow } from "@/lib/clinic/payment";
 import { isLocalMode } from "@/lib/clinic/config";
+import { resolveAppointmentByAccessToken } from "@/lib/clinic/appointment-token-auth";
 import { handleAppointmentsGetLocal } from "@/lib/clinic/appointments-local-get";
 import { handleAppointmentsPostLocal } from "@/lib/clinic/appointments-local-post";
 import { handleAppointmentsPatchLocal } from "@/lib/clinic/appointments-local-patch";
@@ -92,22 +93,39 @@ export async function GET(request: NextRequest) {
     return handleAppointmentsGetLocal(request);
   }
 
-  const authResult = await requireAuth(request);
-  if (authResult instanceof NextResponse) return authResult;
-  const { user, supabase } = authResult;
-
   const { searchParams } = new URL(request.url);
-  const doctorId = searchParams.get("doctorId");
-  const patientId = searchParams.get("patientId");
   const token = searchParams.get("token");
 
+  // A valid, non-expired access_token is sufficient credential to read this
+  // ONE appointment — no login required (magic-link style). This must stay
+  // scoped to exactly this branch; it does not affect doctorId/patientId
+  // lookups below, which still require a real session via requireAuth().
   if (token) {
-    const { data: apt } = await getAppointmentByToken(supabase, token);
+    const apt = await resolveAppointmentByAccessToken(token);
     if (!apt) {
       return NextResponse.json(
         { error: "Turno no encontrado" },
         { status: 404 },
       );
+    }
+
+    const supabase = await createServiceClient();
+
+    // Check the patient into the queue as soon as they load the turno with
+    // payment already settled — done here (server-side, on read) so it works
+    // the same whether this GET came from a logged-in session or straight
+    // from the magic-link token, with no separate authenticated PATCH needed.
+    if (
+      apt.status === "scheduled" &&
+      (!apt.payment_status ||
+        apt.payment_status === "confirmed" ||
+        apt.payment_status === "waived")
+    ) {
+      await supabase
+        .from("appointments")
+        .update({ status: "waiting" })
+        .eq("id", apt.id);
+      apt.status = "waiting";
     }
 
     const [{ data: patient }, { data: professional }, { data: doctorQueueApts }, { data: docs }] =
@@ -208,10 +226,17 @@ export async function GET(request: NextRequest) {
         fileName: d.file_name,
         uploadedAt: d.uploaded_at,
         mimeType: d.mime_type,
-        downloadUrl: `/api/clinic/documents?id=${d.id}&download=1`,
+        downloadUrl: `/api/clinic/documents?id=${d.id}&download=1&token=${encodeURIComponent(apt.access_token)}`,
       })),
     });
   }
+
+  const authResult = await requireAuth(request);
+  if (authResult instanceof NextResponse) return authResult;
+  const { user } = authResult;
+
+  const doctorId = searchParams.get("doctorId");
+  const patientId = searchParams.get("patientId");
 
   if (patientId) {
     const svc = await createServiceClient();
@@ -233,7 +258,7 @@ export async function GET(request: NextRequest) {
           .select("*, patient_documents(*)")
           .eq("patient_id", patientRow.id)
           .eq("org_id", patientRow.org_id)
-          .order("scheduled_at", { ascending: false })
+          .order("scheduled_at", { ascending: true })
       : { data: [], error: null };
 
     const doctorIds = [
@@ -968,10 +993,6 @@ export async function PATCH(request: NextRequest) {
     return handleAppointmentsPatchLocal(request);
   }
 
-  const authResult = await requireAuth(request);
-  if (authResult instanceof NextResponse) return authResult;
-  const { user, supabase } = authResult;
-
   const body = await request.json();
   const {
     appointmentId,
@@ -983,6 +1004,53 @@ export async function PATCH(request: NextRequest) {
     transcription,
     clinicalNotes,
   } = body;
+
+  // A valid, non-expired access_token is sufficient credential to confirm
+  // payment for THIS one appointment — no login required (magic-link style).
+  // Every other action below still requires a real session via requireAuth().
+  if (action === "confirmPayment" && accessToken) {
+    const publicApt = await resolveAppointmentByAccessToken(accessToken);
+    if (publicApt) {
+      if (
+        publicApt.payment_status === "confirmed" ||
+        publicApt.payment_status === "waived"
+      ) {
+        return NextResponse.json(publicApt);
+      }
+      if (isStrictPaymentValidation()) {
+        return NextResponse.json(
+          {
+            error:
+              "En producción debés validar el comprobante con IA o pedir al médico que confirme el pago.",
+          },
+          { status: 403 },
+        );
+      }
+      const updated = await confirmAppointmentPaymentAndNotify(publicApt.id);
+      return NextResponse.json(updated ?? publicApt);
+    }
+  }
+
+  // Same token-as-credential bypass for saving the intake reason — this is
+  // the only other patient-facing write reachable from the magic-link screen
+  // before a session exists (Motivo de consulta on the waiting-room card).
+  if (action === "saveIntake" && accessToken) {
+    const publicApt = await resolveAppointmentByAccessToken(accessToken);
+    if (publicApt) {
+      const svc = await createServiceClient();
+      const { data: updated } = await updateAppointment(
+        svc,
+        publicApt.id,
+        publicApt.org_id,
+        { intake_reason: String(intakeReason ?? "").slice(0, 4000) },
+      );
+      return NextResponse.json(updated);
+    }
+  }
+
+  const authResult = await requireAuth(request);
+  if (authResult instanceof NextResponse) return authResult;
+  const { user, supabase } = authResult;
 
   if (action === "saveIntake" && accessToken) {
     const { data: apt } = await getAppointmentByToken(supabase, accessToken);

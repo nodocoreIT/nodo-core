@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 import { validatePaymentReceipt } from "@/lib/ai/payment-receipt";
 import { buildPaymentReceiptAudit } from "@/lib/clinic/payment-receipt-audit";
 import { markTransferReceiptPendingReview } from "@/lib/clinic/transfer-receipt-pending";
 import { confirmAppointmentPaymentAndNotify } from "@/lib/clinic/appointment-payment";
-import { requireAuth } from "@/lib/supabase/auth-guard";
+import { resolveAppointmentByAccessToken } from "@/lib/clinic/appointment-token-auth";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -20,32 +20,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const supabase = await createClient();
-
-  const { data: apt } = await supabase
-    .from("appointments")
-    .select("*")
-    .eq("access_token", aptAccessToken)
-    .maybeSingle();
-
+  // A valid, non-expired access_token is sufficient credential to validate
+  // the payment receipt for THIS one appointment — no login required
+  // (magic-link style), same as the rest of the payment flow.
+  const apt = await resolveAppointmentByAccessToken(aptAccessToken);
   if (!apt) {
     return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
   }
 
   const row = apt as Record<string, unknown>;
-
-  // Optionally verify patient ownership
-  const auth = await requireAuth(request);
-  if (!(auth instanceof NextResponse) && auth.user.role === "patient") {
-    const { data: patient } = await supabase
-      .from("patients")
-      .select("id")
-      .eq("profile_id", auth.user.id)
-      .maybeSingle();
-    if (!patient || patient.id !== row.patient_id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
-  }
+  const supabase = await createServiceClient();
 
   const { data: doc } = await supabase
     .from("patient_documents")

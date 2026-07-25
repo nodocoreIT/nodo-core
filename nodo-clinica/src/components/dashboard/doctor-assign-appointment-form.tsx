@@ -68,6 +68,7 @@ export function DoctorAssignAppointmentForm({
   );
   const [patientEmail, setPatientEmail] = useState("");
   const [intakeReason, setIntakeReason] = useState("");
+  const [requirePayment, setRequirePayment] = useState(true);
 
   const [dates, setDates] = useState<CalendarDay[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -88,6 +89,7 @@ export function DoctorAssignAppointmentForm({
     setSelectedPatient(null);
     setPatientEmail("");
     setIntakeReason("");
+    setRequirePayment(true);
     setSelectedDate(null);
     setSelectedSlots([]);
     setSlots([]);
@@ -117,6 +119,18 @@ export function DoctorAssignAppointmentForm({
       .then((data) => setDates(data.dates ?? []))
       .catch(() => toast.error("No se pudieron cargar los días disponibles"))
       .finally(() => setLoadingDates(false));
+
+    // Default the checkbox to this doctor's actual payment setting instead
+    // of hardcoding it — a doctor with payment disabled shouldn't have to
+    // notice and uncheck it every time to avoid forcing payment by accident.
+    clinicApi
+      .getDoctorForBooking(doctorId)
+      .then((data) =>
+        setRequirePayment(data.payment?.requirePaymentBeforeBooking !== false),
+      )
+      .catch(() => {
+        /* keep the safe default (true) if this fetch fails */
+      });
   }, [active, doctorId, prefill, resetState]);
 
   useEffect(() => {
@@ -208,6 +222,7 @@ export function DoctorAssignAppointmentForm({
         patientEmail: patientEmail.trim(),
         scheduledAtList: selectedSlots,
         intakeReason: intakeReason.trim() || undefined,
+        requirePayment,
       });
 
       toast.success(
@@ -362,9 +377,26 @@ export function DoctorAssignAppointmentForm({
           />
         </div>
         <p className="text-xs text-slate-500">
-          El paciente recibirá un email para ingresar y completar el pago del turno.
+          {requirePayment
+            ? "El paciente recibirá un email para realizar el pago del turno."
+            : "El paciente recibirá un email con el turno ya confirmado, sin pago."}
         </p>
       </div>
+
+      <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={requirePayment}
+          onChange={(e) => setRequirePayment(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span className="text-sm text-slate-700">
+          Exigir pago
+          <span className="block text-xs text-slate-500">
+            Si lo destildás, el turno queda confirmado directo y no se le pide pago al paciente.
+          </span>
+        </span>
+      </label>
 
       <div className="space-y-2">
         <Label>Fecha y horarios</Label>

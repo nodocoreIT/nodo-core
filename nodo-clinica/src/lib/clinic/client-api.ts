@@ -612,6 +612,7 @@ export const clinicApi = {
     patientEmail?: string;
     scheduledAtList: string[];
     intakeReason?: string;
+    requirePayment?: boolean;
   }) {
     const res = await fetch(`${BASE}/api/clinic/appointments/assign`, {
       method: "POST",

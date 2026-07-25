@@ -5,11 +5,28 @@ import { isPaymentConfirmed } from "@/lib/clinic/payment";
 import { getSessionFromRequest } from "@/lib/clinic/session";
 import { buildCheckoutForAppointment } from "@/lib/mercadopago/checkout";
 import { requireAuth } from "@/lib/supabase/auth-guard";
-import { createClient } from "@/lib/supabase/server";
-import {
-  getAppointmentById,
-  getAppointmentByToken,
-} from "@/lib/clinic/db/appointments";
+import { getAppointmentById } from "@/lib/clinic/db/appointments";
+import { resolveAppointmentByAccessToken } from "@/lib/clinic/appointment-token-auth";
+
+async function checkoutOrPaidResponse(row: Record<string, unknown>) {
+  const paymentStatus = row.payment_status as string | null;
+  if (paymentStatus === "confirmed" || paymentStatus === "waived") {
+    return NextResponse.json({
+      paid: true,
+      waitingRoomUrl: `/paciente/sala/${row.access_token}`,
+    });
+  }
+
+  const result = await buildCheckoutForAppointment(row.id as string);
+  if (!result) {
+    return NextResponse.json(
+      { error: "Mercado Pago no configurado para este médico" },
+      { status: 400 },
+    );
+  }
+
+  return NextResponse.json(result);
+}
 
 /** Obtiene o regenera URL de checkout MP para un turno pendiente. */
 export async function GET(request: NextRequest) {
@@ -53,15 +70,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(result);
   }
 
-  const auth = await requireAuth(request);
-  const supabase =
-    auth instanceof NextResponse ? await createClient() : auth.supabase;
+  // A valid, non-expired access_token is sufficient credential — no login
+  // required (magic-link style), scoped to exactly this one appointment.
+  if (accessTokenParam) {
+    const apt = await resolveAppointmentByAccessToken(accessTokenParam);
+    if (!apt) {
+      return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
+    }
+    return checkoutOrPaidResponse(apt as Record<string, unknown>);
+  }
 
-  const { data: apt } = accessTokenParam
-    ? await getAppointmentByToken(supabase, accessTokenParam)
-    : appointmentId
-      ? await getAppointmentById(supabase, appointmentId, "")
-      : { data: null };
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const { supabase } = auth;
+
+  const { data: apt } = appointmentId
+    ? await getAppointmentById(supabase, appointmentId, "")
+    : { data: null };
 
   if (!apt) {
     return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
@@ -69,7 +94,7 @@ export async function GET(request: NextRequest) {
 
   const row = apt as Record<string, unknown>;
 
-  if (!(auth instanceof NextResponse) && auth.user.role === "patient") {
+  if (auth.user.role === "patient") {
     const { data: patient } = await supabase
       .from("patients")
       .select("id")
@@ -81,21 +106,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const paymentStatus = row.payment_status as string | null;
-  if (paymentStatus === "confirmed" || paymentStatus === "waived") {
-    return NextResponse.json({
-      paid: true,
-      waitingRoomUrl: `/paciente/sala/${row.access_token}`,
-    });
-  }
-
-  const result = await buildCheckoutForAppointment(row.id as string);
-  if (!result) {
-    return NextResponse.json(
-      { error: "Mercado Pago no configurado para este médico" },
-      { status: 400 },
-    );
-  }
-
-  return NextResponse.json(result);
+  return checkoutOrPaidResponse(row);
 }

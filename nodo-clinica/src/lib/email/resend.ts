@@ -146,13 +146,12 @@ export async function sendDoctorAssignedAppointmentEmail(
           </p>
           ${feeBlock}
           <p style="color: #64748b; line-height: 1.6;">
-            Para confirmar tu lugar, ingresá a la app, andá a <strong>Mis turnos</strong>
-            y completá el pago del turno.
+            Para confirmar tu lugar, realizá el pago del turno desde el siguiente botón.
           </p>
           <div style="text-align: center; margin: 32px 0;">
             <a href="${loginUrl}"
                style="background: #0f766e; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
-              Ingresar y completar pago
+              Realizar pago
             </a>
           </div>
         </div>
@@ -173,7 +172,7 @@ export async function sendDoctorAssignedAppointmentEmail(
         ? `Honorario: ${feeLabel} ${consultationFee.toLocaleString("es-AR")}`
         : "",
       "",
-      `Ingresá como paciente: ${loginUrl}`,
+      `Realizar pago: ${loginUrl}`,
     ]
       .filter(Boolean)
       .join("\n"),

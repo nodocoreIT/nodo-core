@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   Upload,
   Users,
@@ -16,6 +17,8 @@ import {
   Clock,
   XCircle,
   Trash2,
+  Eye,
+  Download,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -34,6 +37,14 @@ import { clinicApi } from "@/lib/clinic/client-api";
 import { clinicTimeLabelFromIso, formatDateKeyLabel, localDateKeyFromIso } from "@/lib/clinic/schedule";
 import type { PaymentReceiptAudit } from "@/lib/clinic/types";
 import { UserAvatar } from "@/components/ui/user-avatar";
+
+function isPdfFile(fileName: string): boolean {
+  return /\.pdf$/i.test(fileName);
+}
+
+function isImageFile(fileName: string): boolean {
+  return /\.(png|jpe?g|gif|webp|bmp)$/i.test(fileName);
+}
 
 interface WaitingRoomProps {
   accessToken: string;
@@ -79,6 +90,10 @@ export function WaitingRoom({
   >([]);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{
+    name: string;
+    downloadUrl: string;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [meta, setMeta] = useState<WaitingMeta | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string | undefined>();
@@ -155,15 +170,9 @@ export function WaitingRoom({
         setIntakeReason(apt.intakeReason ?? "");
         setStrictPaymentValidation(!!data.strictPaymentValidation);
 
-        if (
-          apt.status === "scheduled" &&
-          (!apt.paymentStatus ||
-            apt.paymentStatus === "confirmed" ||
-            apt.paymentStatus === "waived")
-        ) {
-          await clinicApi.updateAppointmentStatus(apt.id, "waiting");
-          apt.status = "waiting";
-        }
+        // The scheduled → waiting check-in now happens server-side in the
+        // GET itself (works with or without a login session), so `apt` here
+        // already reflects the post-check-in status.
 
         setAppointment({
           id: apt.id,
@@ -1170,14 +1179,16 @@ export function WaitingRoom({
                     <FileText className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                     <span className="truncate flex-1">{file.name}</span>
                     {file.downloadUrl ? (
-                      <a
-                        href={file.downloadUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline shrink-0"
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPreviewDoc({ name: file.name, downloadUrl: file.downloadUrl! })
+                        }
+                        className="text-blue-600 hover:text-blue-700 shrink-0 p-0.5"
+                        aria-label={`Ver ${file.name}`}
                       >
-                        Ver
-                      </a>
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
                     ) : (
                       <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                     )}
@@ -1207,6 +1218,44 @@ export function WaitingRoom({
           Será notificado automáticamente cuando el médico esté disponible
         </p>
       </div>
+
+      <Dialog open={!!previewDoc} onOpenChange={(open) => !open && setPreviewDoc(null)}>
+        <DialogContent className="flex h-[95vh] max-h-[95vh] w-[95vw] max-w-[95vw] sm:max-w-[95vw] flex-col overflow-hidden">
+          <DialogTitle className="truncate pr-6 text-base">{previewDoc?.name}</DialogTitle>
+          <div className="min-h-0 flex-1 overflow-auto rounded-md border border-slate-100 bg-slate-50">
+            {previewDoc && isPdfFile(previewDoc.name) ? (
+              <iframe
+                src={previewDoc.downloadUrl}
+                title={previewDoc.name}
+                className="h-full w-full"
+              />
+            ) : previewDoc && isImageFile(previewDoc.name) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewDoc.downloadUrl}
+                alt={previewDoc.name}
+                className="mx-auto h-full max-h-full w-auto max-w-full object-contain"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+                <FileText className="h-10 w-10 text-slate-300" />
+                <p className="text-sm text-slate-500">
+                  No se puede previsualizar este tipo de archivo.
+                </p>
+              </div>
+            )}
+          </div>
+          <a
+            href={previewDoc?.downloadUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 self-start text-xs font-medium text-blue-700 hover:underline"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Descargar / abrir en pestaña nueva
+          </a>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

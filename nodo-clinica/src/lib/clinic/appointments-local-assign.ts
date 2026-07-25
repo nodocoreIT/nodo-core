@@ -50,12 +50,14 @@ export async function handleAppointmentsAssignLocal(request: NextRequest) {
     scheduledAt,
     scheduledAtList,
     intakeReason,
+    requirePayment,
   } = body as {
     patientId?: string;
     patientEmail?: string;
     scheduledAt?: string;
     scheduledAtList?: string[];
     intakeReason?: string;
+    requirePayment?: boolean;
   };
 
   if (!patientId) {
@@ -94,7 +96,7 @@ export async function handleAppointmentsAssignLocal(request: NextRequest) {
     return NextResponse.json({ error: "Ingresá un email válido para el paciente" }, { status: 400 });
   }
 
-  const requiresPayment = doctorRequiresPayment(doctor);
+  const requiresPayment = requirePayment ?? doctorRequiresPayment(doctor);
   const availability = doctor.availability ?? DEFAULT_AVAILABILITY;
   const paymentStatus: PaymentStatus = requiresPayment ? "pending" : "waived";
   const baseUrl = appBaseUrl();

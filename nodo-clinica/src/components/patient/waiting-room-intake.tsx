@@ -134,22 +134,24 @@ export function WaitingRoomIntake({
               </>
             )}
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            className="flex-1 bg-violet-700 hover:bg-violet-800"
-            disabled={!text.trim() || saving}
-            onClick={handleSave}
-          >
-            {saving ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <>
-                <Save className="h-3.5 w-3.5 mr-1" />
-                {saved ? "Guardado" : "Guardar"}
-              </>
-            )}
-          </Button>
+          {(text.trim() || listening) && (
+            <Button
+              type="button"
+              size="sm"
+              className="flex-1 bg-violet-700 hover:bg-violet-800"
+              disabled={!text.trim() || saving}
+              onClick={handleSave}
+            >
+              {saving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <>
+                  <Save className="h-3.5 w-3.5 mr-1" />
+                  {saved ? "Guardado" : "Guardar"}
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

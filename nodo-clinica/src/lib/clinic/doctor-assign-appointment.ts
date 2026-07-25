@@ -31,6 +31,8 @@ export interface DoctorAssignAppointmentsInput {
   patientEmail?: string;
   scheduledAtList: string[];
   intakeReason?: string;
+  /** Overrides the doctor's default payment requirement for this specific assignment. */
+  requirePayment?: boolean;
 }
 
 export interface DoctorAssignAppointmentsResult {
@@ -64,6 +66,7 @@ export async function doctorAssignAppointments(
     patientEmail: patientEmailOverride,
     scheduledAtList,
     intakeReason,
+    requirePayment,
   } = input;
 
   const uniqueSlots = [
@@ -128,7 +131,8 @@ export async function doctorAssignAppointments(
     availability: officeSettings.availability,
   };
 
-  const requiresPayment = doctorRequiresPayment(doctorForLogic as never);
+  const requiresPayment =
+    requirePayment ?? doctorRequiresPayment(doctorForLogic as never);
   const availability = doctorForLogic.availability ?? DEFAULT_AVAILABILITY;
   const paymentStatus = requiresPayment ? "pending" : "waived";
 

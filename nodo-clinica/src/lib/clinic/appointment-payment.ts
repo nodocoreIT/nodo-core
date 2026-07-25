@@ -111,13 +111,16 @@ export function patientLoginUrl(
   return url.toString();
 }
 
-/** Login → Mis turnos → auto-open payment modal for the given turno. */
+/**
+ * Direct, no-login link to the payment/waiting-room screen for one turno.
+ * The access_token itself is the credential (validated + expiry-checked
+ * server-side in the appointments/mercadopago routes) — no session needed.
+ */
 export function patientTurnosPaymentUrl(
   accessToken: string,
   baseUrl: string = appBaseUrl(),
 ) {
-  const turnosPath = `/paciente/turnos?token=${encodeURIComponent(accessToken)}`;
-  return patientLoginUrl(baseUrl, { next: turnosPath });
+  return `${baseUrl.replace(/\/$/, "")}/paciente/sala/${encodeURIComponent(accessToken)}`;
 }
 
 export async function confirmAppointmentPaymentAndNotify(

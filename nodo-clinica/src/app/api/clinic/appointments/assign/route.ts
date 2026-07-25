@@ -33,12 +33,14 @@ export async function POST(request: NextRequest) {
     scheduledAt,
     scheduledAtList,
     intakeReason,
+    requirePayment,
   } = body as {
     patientId?: string;
     patientEmail?: string;
     scheduledAt?: string;
     scheduledAtList?: string[];
     intakeReason?: string;
+    requirePayment?: boolean;
   };
 
   if (!patientId) {
@@ -61,6 +63,7 @@ export async function POST(request: NextRequest) {
       patientEmail,
       scheduledAtList: slots,
       intakeReason,
+      requirePayment,
     });
 
     return NextResponse.json({

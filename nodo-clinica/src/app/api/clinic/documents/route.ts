@@ -5,6 +5,7 @@ import { ALLOWED_MIME, MAX_FILE_BYTES } from "@/lib/clinic/storage";
 import { markTransferReceiptPendingReview } from "@/lib/clinic/transfer-receipt-pending";
 import { createPatientDocument } from "@/lib/clinic/db/clinical-records";
 import { isLocalMode } from "@/lib/clinic/config";
+import { resolveAppointmentByAccessToken } from "@/lib/clinic/appointment-token-auth";
 import {
   handleDocumentsDeleteLocal,
   handleDocumentsGetLocal,
@@ -48,6 +49,42 @@ export async function GET(request: NextRequest) {
   const patientId = searchParams.get("patientId");
   const appointmentId = searchParams.get("appointmentId");
   const accessToken = searchParams.get("token");
+
+  // A valid, non-expired appointment access_token is sufficient credential
+  // to download a document that belongs to THAT ONE appointment — no login
+  // required (magic-link style), matching the rest of the payment flow.
+  if (id && download && accessToken) {
+    const publicApt = await resolveAppointmentByAccessToken(accessToken);
+    if (publicApt) {
+      const serviceClient = await createServiceClient();
+      const { data: doc } = await serviceClient
+        .from("patient_documents")
+        .select("*")
+        .eq("id", id)
+        .eq("appointment_id", publicApt.id)
+        .maybeSingle();
+
+      if (!doc) {
+        return NextResponse.json(
+          { error: "Archivo no encontrado" },
+          { status: 404 },
+        );
+      }
+
+      const { data: signedUrl, error: signError } = await serviceClient.storage
+        .from(STORAGE_BUCKET)
+        .createSignedUrl(doc.file_path, 3600);
+
+      if (signError || !signedUrl?.signedUrl) {
+        return NextResponse.json(
+          { error: "Archivo no disponible" },
+          { status: 404 },
+        );
+      }
+
+      return NextResponse.redirect(signedUrl.signedUrl);
+    }
+  }
 
   const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
@@ -162,6 +199,86 @@ export async function GET(request: NextRequest) {
 
 // ── POST (upload) ─────────────────────────────────────────────────────────────
 
+type UploadableAppointment = {
+  id: string;
+  patient_id: string;
+  org_id: string;
+  status: string;
+  payment_status: string | null;
+};
+
+async function uploadReceiptForAppointment(
+  file: File,
+  appointment: UploadableAppointment,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+) {
+  if (!["scheduled", "waiting", "in_consultation"].includes(appointment.status)) {
+    return NextResponse.json(
+      { error: "No se pueden subir archivos a este turno" },
+      { status: 400 },
+    );
+  }
+
+  // Upload to Supabase Storage via service role (bypasses storage RLS for server-side uploads)
+  const serviceClient = await createServiceClient();
+  const storagePath = `${appointment.org_id}/${appointment.patient_id}/${Date.now()}-${file.name}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  const { error: uploadError } = await serviceClient.storage
+    .from(STORAGE_BUCKET)
+    .upload(storagePath, buffer, {
+      contentType: file.type,
+      upsert: false,
+    });
+
+  if (uploadError) {
+    return NextResponse.json(
+      { error: `Error al subir archivo: ${uploadError.message}` },
+      { status: 500 },
+    );
+  }
+
+  const { data: doc, error: insertError } = await createPatientDocument(
+    supabase,
+    {
+      org_id: appointment.org_id,
+      patient_id: appointment.patient_id,
+      appointment_id: appointment.id,
+      file_name: file.name,
+      file_path: storagePath,
+      mime_type: file.type,
+    },
+  );
+
+  if (insertError || !doc) {
+    // Attempt to clean up uploaded file
+    await serviceClient.storage.from(STORAGE_BUCKET).remove([storagePath]);
+    return NextResponse.json(
+      { error: "Error al registrar documento" },
+      { status: 500 },
+    );
+  }
+
+  if (appointment.payment_status === "pending") {
+    await markTransferReceiptPendingReview(appointment as never, {
+      fileName: file.name,
+    });
+  }
+
+  return NextResponse.json(
+    mapDocument({
+      id: doc.id,
+      patient_id: doc.patient_id,
+      appointment_id: doc.appointment_id,
+      file_name: doc.file_name,
+      mime_type: doc.mime_type,
+      uploaded_at: doc.uploaded_at,
+      file_path: doc.file_path,
+    }),
+  );
+}
+
 export async function POST(request: NextRequest) {
   if (isLocalMode()) {
     return handleDocumentsPostLocal(request);
@@ -190,18 +307,27 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // A valid, non-expired access_token for an appointment still awaiting
+  // payment is sufficient credential to upload a payment receipt for THIS
+  // one appointment — no login required (magic-link style). Once payment is
+  // no longer pending, this bypass no longer applies.
+  if (accessToken) {
+    const publicApt = await resolveAppointmentByAccessToken(accessToken);
+    if (publicApt && publicApt.payment_status === "pending") {
+      return uploadReceiptForAppointment(
+        file,
+        publicApt as UploadableAppointment,
+        await createServiceClient(),
+      );
+    }
+  }
+
   const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
   const { user, supabase } = authResult;
 
   // Resolve the appointment
-  let appointment: {
-    id: string;
-    patient_id: string;
-    org_id: string;
-    status: string;
-    payment_status: string | null;
-  } | null = null;
+  let appointment: UploadableAppointment | null = null;
 
   if (accessToken) {
     const { data } = await supabase
@@ -249,73 +375,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (
-    !["scheduled", "waiting", "in_consultation"].includes(appointment.status)
-  ) {
-    return NextResponse.json(
-      { error: "No se pueden subir archivos a este turno" },
-      { status: 400 },
-    );
-  }
-
-  // Upload to Supabase Storage via service role (bypasses storage RLS for server-side uploads)
-  const serviceClient = await createServiceClient();
-  const storagePath = `${appointment.org_id}/${appointment.patient_id}/${Date.now()}-${file.name}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
-
-  const { error: uploadError } = await serviceClient.storage
-    .from(STORAGE_BUCKET)
-    .upload(storagePath, buffer, {
-      contentType: file.type,
-      upsert: false,
-    });
-
-  if (uploadError) {
-    return NextResponse.json(
-      { error: `Error al subir archivo: ${uploadError.message}` },
-      { status: 500 },
-    );
-  }
-
-  // Insert metadata row using the user's session client (RLS scoped)
-  const { data: doc, error: insertError } = await createPatientDocument(
-    supabase,
-    {
-      org_id: appointment.org_id,
-      patient_id: appointment.patient_id,
-      appointment_id: appointment.id,
-      file_name: file.name,
-      file_path: storagePath,
-      mime_type: file.type,
-    },
-  );
-
-  if (insertError || !doc) {
-    // Attempt to clean up uploaded file
-    await serviceClient.storage.from(STORAGE_BUCKET).remove([storagePath]);
-    return NextResponse.json(
-      { error: "Error al registrar documento" },
-      { status: 500 },
-    );
-  }
-
-  if (appointment.payment_status === "pending") {
-    await markTransferReceiptPendingReview(appointment as never, {
-      fileName: file.name,
-    });
-  }
-
-  return NextResponse.json(
-    mapDocument({
-      id: doc.id,
-      patient_id: doc.patient_id,
-      appointment_id: doc.appointment_id,
-      file_name: doc.file_name,
-      mime_type: doc.mime_type,
-      uploaded_at: doc.uploaded_at,
-      file_path: doc.file_path,
-    }),
-  );
+  return uploadReceiptForAppointment(file, appointment, supabase);
 }
 
 // ── DELETE ────────────────────────────────────────────────────────────────────

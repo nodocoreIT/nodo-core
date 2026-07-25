@@ -96,7 +96,8 @@ function PacienteTurnosContent() {
       appointmentsPromise && storedPatientId === patientAuthId
         ? await appointmentsPromise
         : await clinicApi.getPatientAppointments(patientAuthId);
-    setAppointments(Array.isArray(apts) ? (apts as PatientAppointment[]) : []);
+    const list = Array.isArray(apts) ? (apts as PatientAppointment[]) : [];
+    setAppointments(list.filter((a) => a.status !== "completed"));
     setLoading(false);
   }, []);
 

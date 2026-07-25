@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   readDb,
+  writeDb,
   publicDoctorSummary,
   publicPatient,
 } from "@/lib/clinic/local-db";
@@ -68,6 +69,23 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
       return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
     }
 
+    // Check the patient into the queue as soon as they load the turno with
+    // payment already settled — mirrors the same server-side check-in done
+    // in the Supabase GET branch, so it works whether or not there's a
+    // login session (magic-link visitors included).
+    if (
+      apt.status === "scheduled" &&
+      (!apt.paymentStatus ||
+        apt.paymentStatus === "confirmed" ||
+        apt.paymentStatus === "waived")
+    ) {
+      apt.status = "waiting";
+      await writeDb((d) => {
+        const row = d.appointments.find((a) => a.id === apt.id);
+        if (row) row.status = "waiting";
+      });
+    }
+
     const patient = db.patients.find((p) => p.id === apt.patientId);
     const doctor = db.doctors.find((d) => d.id === apt.doctorId);
     // Queue order follows appointment time (same day as this turno), not
@@ -116,7 +134,7 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
       .filter((a) => a.patientId === patientId)
       .sort(
         (a, b) =>
-          new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime(),
+          new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime(),
       )
       .map((apt) => {
         const doctor = db.doctors.find((d) => d.id === apt.doctorId);
