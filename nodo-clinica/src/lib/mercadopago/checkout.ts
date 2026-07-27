@@ -58,7 +58,7 @@ async function buildLocalCheckout(appointmentId: string, options: CheckoutOption
 
   const pref = await createCheckoutPreference({
     accessToken: token,
-    title: `Consulta — Dr/a. ${doctor.fullName}`,
+    title: `Consulta — ${doctor.fullName}`,
     amount: fee,
     currency: doctor.payment?.currency,
     externalReference: apt.id,
@@ -131,7 +131,7 @@ async function buildSupabaseCheckout(appointmentId: string, options: CheckoutOpt
 
   const pref = await createCheckoutPreference({
     accessToken: token,
-    title: `Consulta — Dr/a. ${professional.full_name}`,
+    title: `Consulta — ${professional.full_name}`,
     amount: fee,
     currency,
     externalReference: apt.id,
