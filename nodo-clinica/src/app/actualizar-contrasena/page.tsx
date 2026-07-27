@@ -19,6 +19,10 @@ export default function ActualizarContrasenaPage() {
   const [sessionReady, setSessionReady] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
+  // Raw token captured at session-establishment time — used instead of the
+  // browser's mutable Supabase session, which can go stale before submit
+  // (see /api/clinic/account/set-password).
+  const [recoveryAccessToken, setRecoveryAccessToken] = useState<string | null>(null);
   const [intendedRole, setIntendedRole] = useState<"medico" | "paciente">("paciente");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -51,6 +55,7 @@ export default function ActualizarContrasenaPage() {
         if (refreshed.session) {
           setUserEmail(refreshed.session.user?.email ?? null);
           setAuthUserId(refreshed.session.user?.id ?? null);
+          setRecoveryAccessToken(refreshed.session.access_token);
           const metaRole = parseClinicDbRole(
             refreshed.session.user?.app_metadata?.role as string | undefined,
           );
@@ -72,6 +77,7 @@ export default function ActualizarContrasenaPage() {
           if (!error && data.session) {
             setUserEmail(data.session.user?.email ?? null);
             setAuthUserId(data.session.user?.id ?? null);
+            setRecoveryAccessToken(access_token);
             const metaRole = parseClinicDbRole(
               data.session.user?.app_metadata?.role as string | undefined,
             );
@@ -109,15 +115,24 @@ export default function ActualizarContrasenaPage() {
       return;
     }
 
+    if (!recoveryAccessToken) {
+      setError("La sesión expiró. Solicitá un nuevo enlace de recuperación.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { error: updateError } = await supabase.auth.updateUser({ password });
+      const setPwRes = await fetch("/api/clinic/account/set-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: recoveryAccessToken, password }),
+      });
+      const setPwData = await setPwRes.json().catch(() => ({}));
       const passwordAlreadySet =
-        updateError?.message ===
-          "New password should be different from the old password." ||
-        (updateError as { code?: string } | null)?.code === "same_password";
-      if (updateError && !passwordAlreadySet) throw updateError;
+        setPwData.error === "New password should be different from the old password.";
+      if (!setPwRes.ok && !passwordAlreadySet) {
+        throw new Error(setPwData.error || "Error al actualizar contraseña");
+      }
 
       let redirectPath = intendedRole === "medico" ? "/medico/dashboard" : "/paciente";
       let loginRole: "doctor" | "patient" =
