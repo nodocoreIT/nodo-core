@@ -794,7 +794,7 @@ export function DoctorOfficePanel({
                 onChange={(e) =>
                   setPayment((p) => ({ ...p, beneficiaryName: e.target.value }))
                 }
-                placeholder="Ej: Mendia Juan Esteban"
+                placeholder="Ingrese el nombre del titular de la cuenta."
                 className="mt-1 h-9"
               />
               <p className="text-[10px] text-slate-500 mt-1">

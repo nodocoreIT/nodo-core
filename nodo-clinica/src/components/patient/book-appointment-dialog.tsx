@@ -689,7 +689,7 @@ export function BookAppointmentDialog({
                   ) : (
                     <>
                       <Wallet className="h-4 w-4 mr-2" />
-                      Pagar con Mercado Pago (celular o QR)
+                      Pagar con Mercado Pago
                     </>
                   )}
                 </Button>
