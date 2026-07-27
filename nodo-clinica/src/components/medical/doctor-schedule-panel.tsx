@@ -30,18 +30,27 @@ interface DoctorSchedulePanelProps {
 }
 
 export function DoctorSchedulePanel({ doctorId }: DoctorSchedulePanelProps) {
-  const [availability, setAvailability] =
-    useState<DoctorAvailability>(DEFAULT_AVAILABILITY);
+  // Start with no days selected — never flash the Mon-Fri default before the
+  // fetch resolves. A doctor who hasn't set an agenda should see "no days"
+  // until they configure it. slotDurationMinutes keeps the sensible default.
+  const [availability, setAvailability] = useState<DoctorAvailability>({
+    slotDurationMinutes: DEFAULT_AVAILABILITY.slotDurationMinutes,
+    days: [],
+  });
   const [signatureText, setSignatureText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    clinicApi.getDoctorSchedule(doctorId).then((data) => {
-      if (data.availability) {
-        setAvailability(normalizeAvailability(data.availability));
-      }
-      if (data.signatureText) setSignatureText(data.signatureText);
-    });
+    clinicApi
+      .getDoctorSchedule(doctorId)
+      .then((data) => {
+        if (data.availability) {
+          setAvailability(normalizeAvailability(data.availability));
+        }
+        if (data.signatureText) setSignatureText(data.signatureText);
+      })
+      .finally(() => setLoading(false));
   }, [doctorId]);
 
   const toggleDay = (dayOfWeek: number) => {
@@ -123,7 +132,12 @@ export function DoctorSchedulePanel({ doctorId }: DoctorSchedulePanelProps) {
 
         <div className="space-y-2">
           <Label className="text-xs">Días que atiendo</Label>
-          {ALL_DAYS.map((dow) => {
+          {loading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
+            </div>
+          ) : (
+          ALL_DAYS.map((dow) => {
             const active = availability.days.some((d) => d.dayOfWeek === dow);
             const day = availability.days.find((d) => d.dayOfWeek === dow);
             return (
@@ -170,7 +184,8 @@ export function DoctorSchedulePanel({ doctorId }: DoctorSchedulePanelProps) {
                 )}
               </div>
             );
-          })}
+          })
+          )}
         </div>
 
         <div>
