@@ -302,9 +302,6 @@ export async function sendPasswordResetEmail({
         <!-- Header: logo + brand strip -->
         <div style="background-color:${brandColor};padding:28px 32px 24px;text-align:center;">
           ${logoHtml}
-          <span style="display:inline-block;background:${badgeBg};color:${badgeText};font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 12px;border-radius:100px;">
-            ◎ ${nodeLabel}
-          </span>
         </div>
 
         <!-- Body -->
