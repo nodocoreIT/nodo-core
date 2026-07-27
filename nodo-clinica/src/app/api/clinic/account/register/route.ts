@@ -6,11 +6,15 @@ import { CLINIC_ORG_ID } from "@/lib/clinic/clinic-org";
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
-    const { email, role } = body as { email?: string; role?: string };
+    const { email, fullName, role } = body as {
+      email?: string;
+      fullName?: string;
+      role?: string;
+    };
 
-    if (!email || !role) {
+    if (!email || !fullName?.trim() || !role) {
       return NextResponse.json(
-        { error: "Se requieren email y rol." },
+        { error: "Se requieren nombre completo, email y rol." },
         { status: 400 },
       );
     }
@@ -51,7 +55,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // WHERE verified_at IS NULL prevents duplicate pending rows.
     const { data: row, error: insertError } = await serviceClient
       .from("pending_clinic_registrations")
-      .insert({ email: email.toLowerCase().trim(), role })
+      .insert({ email: email.toLowerCase().trim(), full_name: fullName.trim(), role })
       .select("token")
       .single();
 
@@ -89,6 +93,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } else {
       await sendClinicVerificationEmail({
         email: email.toLowerCase().trim(),
+        fullName: fullName.trim(),
         role: role as "medico" | "paciente",
         token,
         origin,

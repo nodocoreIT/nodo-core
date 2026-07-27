@@ -7,6 +7,15 @@ const PORT = Number(process.env.ZOHO_SMTP_PORT ?? 465);
 const USER = process.env.ZOHO_SMTP_USER;
 const PASS = process.env.ZOHO_SMTP_PASSWORD;
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export function isMailConfigured(): boolean {
   return Boolean(USER && PASS);
 }
@@ -158,6 +167,7 @@ export async function sendPasswordResetEmail(params: {
 
 export async function sendClinicVerificationEmail(params: {
   email: string;
+  fullName: string;
   role: "medico" | "paciente";
   token: string;
   origin: string;
@@ -168,7 +178,7 @@ export async function sendClinicVerificationEmail(params: {
     );
   }
 
-  const { email, role, token } = params;
+  const { email, fullName, role, token } = params;
   const origin = resolveOrigin(params.origin);
   const verificationUrl = `${origin}/api/clinic/account/verify?token=${token}&role=${role}`;
   const roleLabel = role === "medico" ? "médico" : "paciente";
@@ -181,7 +191,7 @@ export async function sendClinicVerificationEmail(params: {
     to: email,
     subject: "Verificá tu cuenta en NODO | Clínica",
     text: [
-      `Hola,`,
+      `Hola ${fullName},`,
       ``,
       `Gracias por registrarte como ${roleLabel} en NODO | Clínica.`,
       `Para verificar tu cuenta, hacé clic en el siguiente enlace:`,
@@ -209,12 +219,12 @@ export async function sendClinicVerificationEmail(params: {
             Verificá tu cuenta
           </h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin-bottom:8px;">
-            Hola,
+            Hola ${escapeHtml(fullName)},
           </p>
           <p style="color:#374151;font-size:15px;line-height:1.6;">
             Gracias por registrarte como <strong>${roleLabel}</strong> en
             <strong>NODO | Clínica</strong>.
-            Para continuar con tu registro (datos personales y celular), hacé clic en el botón:
+            Para continuar con tu registro hacé click en el siguiente botón:
           </p>
           <div style="margin:28px 0;text-align:center;">
             <a

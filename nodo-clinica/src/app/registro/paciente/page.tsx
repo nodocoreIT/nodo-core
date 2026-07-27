@@ -9,18 +9,30 @@ import { Label } from "@/components/ui/label";
 import { User, Loader2, ArrowLeft, MailCheck } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 export default function RegistroPacientePage() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [submittedEmail, setSubmittedEmail] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await clinicApi.register({ email, role: "paciente" });
+      await clinicApi.register({ email, fullName, role: "paciente" });
+      setSubmittedEmail(email);
       setSubmitted(true);
+      setFullName("");
+      setEmail("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al registrarse");
     } finally {
@@ -55,64 +67,75 @@ export default function RegistroPacientePage() {
           </CardHeader>
 
           <CardContent>
-            {submitted ? (
-              <div className="flex flex-col items-center gap-4 py-6 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-100">
-                  <MailCheck className="h-7 w-7 text-teal-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-800">
-                  Revisá tu correo
-                </h3>
-                <p className="text-sm text-slate-500 max-w-xs">
-                  Te enviamos un enlace de verificación a{" "}
-                  <span className="font-medium text-slate-700">{email}</span>.
-                  Hacé clic en el enlace para continuar con tu registro.
-                </p>
-                <p className="text-xs text-slate-400">
-                  El enlace vence en 24 horas.
-                </p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="fullName">Nombre completo</Label>
+                <Input
+                  id="fullName"
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Juan Pérez"
+                  className="mt-1"
+                />
               </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="nombre@ejemplo.com"
-                    className="mt-1"
-                  />
-                </div>
 
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-teal-600 hover:bg-teal-700"
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="nombre@ejemplo.com"
+                  className="mt-1"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-teal-600 hover:bg-teal-700"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Continuar"
+                )}
+              </Button>
+
+              <p className="text-sm text-center text-slate-500">
+                ¿Ya tenés cuenta?{" "}
+                <Link
+                  href="/login/paciente"
+                  className="text-teal-600 hover:underline"
                 >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "Continuar"
-                  )}
-                </Button>
-
-                <p className="text-sm text-center text-slate-500">
-                  ¿Ya tenés cuenta?{" "}
-                  <Link
-                    href="/login/paciente"
-                    className="text-teal-600 hover:underline"
-                  >
-                    Ingresar
-                  </Link>
-                </p>
-              </form>
-            )}
+                  Ingresar
+                </Link>
+              </p>
+            </form>
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={submitted} onOpenChange={setSubmitted}>
+        <DialogContent className="text-center sm:max-w-md">
+          <DialogHeader className="items-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-100">
+              <MailCheck className="h-7 w-7 text-teal-600" />
+            </div>
+            <DialogTitle className="text-lg">Registro completado</DialogTitle>
+            <DialogDescription className="max-w-xs">
+              En breve recibirás un mail de Nodo Code a{" "}
+              <span className="font-medium text-slate-700">{submittedEmail}</span>{" "}
+              confirmando tu registro. Hacé clic en el enlace para continuar.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-xs text-slate-400">El enlace vence en 24 horas.</p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

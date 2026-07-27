@@ -407,6 +407,7 @@ export const clinicApi = {
 
   async register(payload: {
     email: string;
+    fullName: string;
     role: "medico" | "paciente";
   }): Promise<{ ok: boolean }> {
     const res = await fetch(`${BASE}/api/clinic/account/register`, {

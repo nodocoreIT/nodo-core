@@ -349,9 +349,11 @@ export function LoginPortal() {
     try {
       await clinicApi.register({
         email: form.email.trim(),
+        fullName: form.fullName.trim(),
         role: isDoctor ? "medico" : "paciente",
       });
       setRegisterSuccess(true);
+      setForm((f) => ({ ...f, fullName: "", email: "" }));
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al registrarse";
       setGeneralError(msg);
@@ -611,7 +613,7 @@ export function LoginPortal() {
                       : "border-transparent text-slate2 hover:text-navy"
                   }`}
                 >
-                  Suscribirme
+                  Registrarse
                 </button>
               ) : null}
             </div>}
