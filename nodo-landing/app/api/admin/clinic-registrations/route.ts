@@ -148,40 +148,59 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Generate recovery link for password setup using nodo-clínica's own Supabase project.
-  // Redirect directly to the clinica app — no nodo-landing intermediary needed.
-  // Supabase handles the token exchange and appends #access_token=...&type=recovery.
+  // Account activation uses our own single-use token instead of a Supabase
+  // recovery link. The recovery link's session was fragile — email scanners
+  // prefetching it consumed the one-time token, and it expired before the user
+  // finished typing — surfacing as "El enlace expiró o ya fue usado". See
+  // nodo-clinica migration 20260731_account_activation_tokens.sql.
   const clinicaAppUrl = (process.env.NODO_CLINICA_APP_URL ?? "https://clinica.nodocore.com.ar").replace(/\/$/, "");
-  const redirectToUrl = `${clinicaAppUrl}/actualizar-contrasena?role=${reg.role}`;
 
   const nodoAdmin = createNodoAdminClient("clinica");
   if (!nodoAdmin) {
     return Response.json({ error: "Nodo Clínica no está configurado (NODO_CLINICA_SUPABASE_URL / SERVICE_ROLE_KEY)." }, { status: 500 });
   }
+
+  // Resolve the auth user id (onboarding already created the account).
   const { data: linkData, error: linkError } =
     await nodoAdmin.auth.admin.generateLink({
       type: "recovery",
       email: reg.email,
-      options: { redirectTo: redirectToUrl },
     });
 
-  if (linkError || !linkData?.properties?.action_link) {
-    console.error("[admin/clinic-registrations] generateLink error", linkError);
+  const authUserId = linkData?.user?.id;
+  if (linkError || !authUserId) {
+    console.error("[admin/clinic-registrations] could not resolve auth user", linkError);
     return Response.json(
       { error: "Error al generar enlace de activación." },
       { status: 500 },
     );
   }
 
-  // Set app_metadata.role so getSession() returns the correct role after login.
+  // Set app_metadata.role so getSession() returns the correct role after login,
+  // and confirm the email so the account can log in once the password is set.
   // Users created via the verify flow have no role in app_metadata — without this
   // they land in the patient portal and get kicked out of /medico/dashboard.
-  const authUserId = linkData.user?.id;
-  if (authUserId) {
-    await nodoAdmin.auth.admin.updateUserById(authUserId, {
-      app_metadata: { role: reg.role }, // "medico" or "paciente"
-    });
+  await nodoAdmin.auth.admin.updateUserById(authUserId, {
+    app_metadata: { role: reg.role }, // "medico" or "paciente"
+    email_confirm: true,
+  });
+
+  // Mint our own activation token in the clinica schema (shared Supabase project).
+  const { data: tokenRow, error: tokenError } = await clinicAdmin
+    .from("account_activation_tokens")
+    .insert({ user_id: authUserId, email: reg.email, role: reg.role })
+    .select("token")
+    .single();
+
+  if (tokenError || !tokenRow?.token) {
+    console.error("[admin/clinic-registrations] activation token error", tokenError);
+    return Response.json(
+      { error: "Error al generar enlace de activación." },
+      { status: 500 },
+    );
   }
+
+  const activationUrl = `${clinicaAppUrl}/actualizar-contrasena?token=${tokenRow.token}&role=${reg.role}`;
 
   // Send activation email
   try {
@@ -189,7 +208,7 @@ export async function POST(request: NextRequest) {
       nombre: profile.full_name ?? reg.email,
       email: reg.email,
       nodeLabel: "Nodo Clínica",
-      loginUrl: linkData.properties.action_link,
+      loginUrl: activationUrl,
       unitCode: "clinica",
     });
   } catch (mailErr) {

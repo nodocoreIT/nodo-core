@@ -23,6 +23,9 @@ export default function ActualizarContrasenaPage() {
   // browser's mutable Supabase session, which can go stale before submit
   // (see /api/clinic/account/set-password).
   const [recoveryAccessToken, setRecoveryAccessToken] = useState<string | null>(null);
+  // Our own activation token (?token=...) — the primary flow for admin-enabled
+  // accounts. Doesn't need a Supabase session to survive to submit.
+  const [activationToken, setActivationToken] = useState<string | null>(null);
   const [intendedRole, setIntendedRole] = useState<"medico" | "paciente">("paciente");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -34,6 +37,15 @@ export default function ActualizarContrasenaPage() {
       const searchParams = new URLSearchParams(window.location.search);
       const roleFromUrl = parseClinicDbRole(searchParams.get("role"));
       if (roleFromUrl) setIntendedRole(roleFromUrl);
+
+      // Primary flow (admin-enabled accounts): our own activation token. It is
+      // validated server-side on submit — no Supabase session needs to survive.
+      const tokenFromUrl = searchParams.get("token");
+      if (tokenFromUrl) {
+        setActivationToken(tokenFromUrl);
+        setSessionReady(true);
+        return;
+      }
 
       // Link expired — callback route forwarded this error
       if (searchParams.get("error") === "link_expired") {
@@ -115,7 +127,7 @@ export default function ActualizarContrasenaPage() {
       return;
     }
 
-    if (!recoveryAccessToken) {
+    if (!activationToken && !recoveryAccessToken) {
       setError("La sesión expiró. Solicitá un nuevo enlace de recuperación.");
       return;
     }
@@ -125,7 +137,11 @@ export default function ActualizarContrasenaPage() {
       const setPwRes = await fetch("/api/clinic/account/set-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessToken: recoveryAccessToken, password }),
+        body: JSON.stringify(
+          activationToken
+            ? { activationToken, password }
+            : { accessToken: recoveryAccessToken, password },
+        ),
       });
       const setPwData = await setPwRes.json().catch(() => ({}));
       const passwordAlreadySet =
@@ -134,16 +150,21 @@ export default function ActualizarContrasenaPage() {
         throw new Error(setPwData.error || "Error al actualizar contraseña");
       }
 
+      // set-password resolves the account from the token, so it can tell us who
+      // this is even when the client never held a Supabase session.
+      const resolvedEmail = (setPwData.email as string | undefined) ?? userEmail;
+      const resolvedUserId = (setPwData.userId as string | undefined) ?? authUserId;
+
       let redirectPath = intendedRole === "medico" ? "/medico/dashboard" : "/paciente";
       let loginRole: "doctor" | "patient" =
         intendedRole === "medico" ? "doctor" : "patient";
-      if (userEmail || authUserId) {
+      if (resolvedEmail || resolvedUserId) {
         const roleRes = await fetch("/api/clinic/account/ensure-role", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            email: userEmail ?? undefined,
-            userId: authUserId ?? undefined,
+            email: resolvedEmail ?? undefined,
+            userId: resolvedUserId ?? undefined,
             intendedRole,
           }),
         });
@@ -164,8 +185,8 @@ export default function ActualizarContrasenaPage() {
       }
 
       // 2. Re-authenticate — the new JWT will have app_metadata.role set from step 1.
-      if (userEmail) {
-        await clinicApi.login(userEmail, password, loginRole);
+      if (resolvedEmail) {
+        await clinicApi.login(resolvedEmail, password, loginRole);
       }
 
       setSuccess(true);
