@@ -430,7 +430,11 @@ export async function deleteNodoUser(user: NodoUserRecord): Promise<{ ok: true }
             access_password: null,
             provision_user_id: null,
             provisioned_at: null,
-            status: "pausado",
+            // "sin_acceso", not "pausado" — this wasn't a reversible business
+            // pause, the credentials are gone. Keeps the two cases visually
+            // distinct in Clientes and blocks the one-click "Reactivar"
+            // toggle (client-unit-status/route.ts only allows activo/pausado).
+            status: "sin_acceso",
           })
           .eq("id", unit.id);
 

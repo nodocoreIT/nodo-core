@@ -4,7 +4,10 @@ export type ClientUnitStatus =
   | "pending_onboarding"
   | "onboarding"
   | "activo"
-  | "pausado";
+  | "pausado"
+  /** Credentials wiped after deleting the nodo user — distinct from a
+   * reversible business "pausado" (which keeps credentials intact). */
+  | "sin_acceso";
 
 export type VerificationDocType =
   | "id_photo"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Fragment, type CSSProperties } from "react";
-import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, RotateCcw, Database, AlertTriangle, Loader2 } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, RotateCcw, Database, AlertTriangle, Loader2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
 import { NODES, getPanelAssignableNodes, unitHasClientAccessCredentials, type NodeDef } from "@/lib/nodes";
@@ -18,7 +18,8 @@ type ClientStatus =
   | "onboarding"
   | "pausado"
   | "pending_review"
-  | "pending_onboarding";
+  | "pending_onboarding"
+  | "sin_acceso";
 
 type Client = {
   id: string;
@@ -63,7 +64,11 @@ const STATUS_STYLES: Record<ClientStatus, { bg: string; color: string; label: st
   pausado: { bg: "var(--color-mist)", color: "var(--color-slate2)", label: "Pausado" },
   pending_review: { bg: "#FCE9D8", color: "#B5630C", label: "Pendiente revisión" },
   pending_onboarding: { bg: "#E8EEF8", color: "#2A6FDB", label: "Onboarding pendiente" },
+  sin_acceso: { bg: "#FBE3E1", color: "#C0392B", label: "Sin credenciales" },
 };
+
+type SortKey = "cliente" | "contacto" | "estado" | "desde";
+type SortDir = "asc" | "desc";
 
 const ALL_STATUSES: ClientStatus[] = [
   "activo",
@@ -181,6 +186,9 @@ export default function ClientesPage() {
   const [units, setUnits] = useState<ClientUnit[]>([]);
   const [planes, setPlanes] = useState<NodePlan[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [nodeFilter, setNodeFilter] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -259,18 +267,53 @@ export default function ClientesPage() {
     unitsByClient.set(u.client_id, arr);
   }
 
-  const filtered = searchTerm
-    ? clients.filter((c) => {
-        const term = searchTerm.toLowerCase();
-        const cu = unitsByClient.get(c.id) ?? [];
-        return (
-          c.name.toLowerCase().includes(term) ||
-          (c.email?.toLowerCase().includes(term) ?? false) ||
-          (c.phone?.toLowerCase().includes(term) ?? false) ||
-          cu.some((u) => u.unit_code.toLowerCase().includes(term))
-        );
+  const availableNodeCodes = Array.from(new Set(units.map((u) => u.unit_code))).sort((a, b) =>
+    a.localeCompare(b, "es"),
+  );
+
+  const filtered = clients.filter((c) => {
+    const cu = unitsByClient.get(c.id) ?? [];
+    if (nodeFilter && !cu.some((u) => u.unit_code === nodeFilter)) return false;
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      c.name.toLowerCase().includes(term) ||
+      (c.email?.toLowerCase().includes(term) ?? false) ||
+      (c.phone?.toLowerCase().includes(term) ?? false) ||
+      cu.some((u) => u.unit_code.toLowerCase().includes(term))
+    );
+  });
+
+  function getSortValue(client: Client, key: SortKey): string {
+    switch (key) {
+      case "cliente":
+        return client.name.toLowerCase();
+      case "contacto":
+        return (client.email ?? client.phone ?? "").toLowerCase();
+      case "estado": {
+        const cu = unitsByClient.get(client.id) ?? [];
+        return cu[0] ? statusStyle(cu[0].status).label.toLowerCase() : "";
+      }
+      case "desde":
+        return client.since ?? client.created_at ?? "";
+    }
+  }
+
+  const sorted = sortKey
+    ? [...filtered].sort((a, b) => {
+        const cmp = getSortValue(a, sortKey).localeCompare(getSortValue(b, sortKey), "es");
+        return sortDir === "asc" ? cmp : -cmp;
       })
-    : clients;
+    : filtered;
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   // Stats (per-nodo)
   const activeCount = units.filter((u) => u.status === "activo").length;
@@ -830,6 +873,37 @@ export default function ClientesPage() {
 
   const modalSelectProps = { contentClassName: "z-[200]" } as const;
 
+  function renderSortableTh(label: string, key: SortKey) {
+    const isActive = sortKey === key;
+    return (
+      <th
+        key={key}
+        onClick={() => toggleSort(key)}
+        style={{
+          padding: "11px 16px",
+          textAlign: "left",
+          fontSize: 11.5,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: "var(--color-slate2)",
+          whiteSpace: "nowrap",
+          cursor: "pointer",
+          userSelect: "none",
+        }}
+      >
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          {label}
+          {isActive ? (
+            sortDir === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+          ) : (
+            <ArrowUpDown size={12} style={{ opacity: 0.4 }} />
+          )}
+        </span>
+      </th>
+    );
+  }
+
   const allSelected = filtered.length > 0 && selected.size === filtered.length;
   const activeFormUnit = formUnits.find((u) => u.key === activeUnitKey) ?? formUnits[0];
   const assignableNodes = getAssignableNodes(formUnits.map((u) => u.unit_code));
@@ -862,11 +936,23 @@ export default function ClientesPage() {
 
         {/* Header + actions */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 12 }}>
-          <p style={{ margin: 0, fontSize: 14, color: "var(--color-slate2)" }}>
-            {selected.size > 0
-              ? `${selected.size} seleccionado${selected.size === 1 ? "" : "s"}`
-              : `${filtered.length} ${filtered.length === 1 ? "cliente" : "clientes"}`}
-          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--color-slate2)" }}>
+              {selected.size > 0
+                ? `${selected.size} seleccionado${selected.size === 1 ? "" : "s"}`
+                : `${filtered.length} ${filtered.length === 1 ? "cliente" : "clientes"}`}
+            </p>
+            <FormSelect
+              value={nodeFilter}
+              onChange={setNodeFilter}
+              options={availableNodeCodes.map((code) => ({ value: code, label: code }))}
+              allowEmpty
+              placeholder="Todos los nodos"
+              emptyLabel="Todos los nodos"
+              className="w-48"
+              aria-label="Filtrar por nodo"
+            />
+          </div>
           <div style={{ display: "flex", gap: 10 }}>
             {selected.size > 0 && (
               <button onClick={requestBulkDelete} style={{ background: "#C0392B", color: "white", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}>
@@ -892,13 +978,16 @@ export default function ClientesPage() {
                   <th style={{ padding: "11px 16px", textAlign: "left", width: 40 }}>
                     <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Seleccionar todos" style={{ accentColor: "var(--color-brand)", cursor: "pointer" }} />
                   </th>
-                  {["Cliente", "Contacto", "Estado", "Nodos", "Cliente desde", ""].map((col, i) => (
-                    <th key={col || `c-${i}`} style={{ padding: "11px 16px", textAlign: "left", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-slate2)", whiteSpace: "nowrap" }}>{col}</th>
-                  ))}
+                  {renderSortableTh("Cliente", "cliente")}
+                  {renderSortableTh("Contacto", "contacto")}
+                  {renderSortableTh("Estado", "estado")}
+                  <th style={{ padding: "11px 16px", textAlign: "left", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-slate2)", whiteSpace: "nowrap" }}>Nodos</th>
+                  {renderSortableTh("Cliente desde", "desde")}
+                  <th style={{ padding: "11px 16px", textAlign: "left", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-slate2)", whiteSpace: "nowrap" }} />
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((client) => {
+                {sorted.map((client) => {
                   const cu = unitsByClient.get(client.id) ?? [];
                   const isSelected = selected.has(client.id);
                   const isOpen = expanded.has(client.id);
@@ -1521,6 +1610,7 @@ export default function ClientesPage() {
                                 { value: "pending_review", label: "Pendiente revisión" },
                                 { value: "pending_onboarding", label: "Onboarding pendiente" },
                                 { value: "onboarding", label: "Onboarding" },
+                                { value: "sin_acceso", label: "Sin credenciales" },
                               ]}
                             />
                           </div>
