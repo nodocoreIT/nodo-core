@@ -17,7 +17,13 @@ export function useMyOrgs() {
 
     async function load() {
       try {
-        const { data, error: rpcError } = await supabase.rpc("get_my_orgs");
+        // get_my_orgs lives in the public schema. Nodos whose client is scoped
+        // to another schema (e.g. clinica → nodo_clinica) would otherwise 404
+        // looking for the function in the wrong schema — same pattern as
+        // verify-node-access.ts.
+        const { data, error: rpcError } = await supabase
+          .schema("public")
+          .rpc("get_my_orgs");
         if (cancelled) return;
         if (rpcError) {
           setError(new Error(rpcError.message));
