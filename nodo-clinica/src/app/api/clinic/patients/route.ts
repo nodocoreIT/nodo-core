@@ -216,13 +216,29 @@ export async function PUT(request: NextRequest) {
           org_id: user.org_id ?? null,
         })
         .select("id, org_id")
-        .single() as { data: { id: string; org_id: string | null } | null; error: { message: string } | null };
+        .single() as { data: { id: string; org_id: string | null } | null; error: { code?: string; message: string } | null };
 
-      if (!created) {
+      if (created) {
+        patientRow = created;
+      } else if (createError?.code === "23505") {
+        // Race: a concurrent request (e.g. simultaneous photo + profile save
+        // on a brand-new profile) already created the row. Reuse it instead
+        // of erroring — patients_profile_id_key makes this the only outcome.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: existing } = await (svc as any)
+          .from("patients")
+          .select("id, org_id")
+          .eq("profile_id", user.id)
+          .maybeSingle() as { data: { id: string; org_id: string | null } | null; error: unknown };
+        if (!existing) {
+          console.error("[patients PUT] race recovery failed:", createError?.message);
+          return NextResponse.json({ error: `No se pudo crear el perfil: ${createError?.message}` }, { status: 500 });
+        }
+        patientRow = existing;
+      } else {
         console.error("[patients PUT] auto-create failed:", createError?.message);
         return NextResponse.json({ error: `No se pudo crear el perfil: ${createError?.message}` }, { status: 500 });
       }
-      patientRow = created;
     }
 
     // Build patient-level update (only defined fields)
