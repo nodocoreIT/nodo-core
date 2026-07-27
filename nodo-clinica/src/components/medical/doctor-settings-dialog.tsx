@@ -785,51 +785,109 @@ export function DoctorSettingsDialog({
                               Los pacientes pueden pagarte con Mercado Pago. Los cobros van a tu
                               cuenta vinculada.
                             </p>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-8 text-xs"
-                              disabled={testingMpConnection}
-                              onClick={async () => {
-                                setTestingMpConnection(true);
-                                try {
-                                  const result = await clinicApi.testMercadoPagoConnection();
-                                  toast.success(result.message ?? "Conexión con Mercado Pago OK");
-                                } catch (e) {
-                                  toast.error(
-                                    e instanceof Error ? e.message : "Token de Mercado Pago inválido",
-                                    { duration: 12_000 },
-                                  );
-                                } finally {
-                                  setTestingMpConnection(false);
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs"
+                                disabled={testingMpConnection}
+                                onClick={async () => {
+                                  setTestingMpConnection(true);
+                                  try {
+                                    const result = await clinicApi.testMercadoPagoConnection();
+                                    toast.success(result.message ?? "Conexión con Mercado Pago OK");
+                                  } catch (e) {
+                                    toast.error(
+                                      e instanceof Error ? e.message : "Token de Mercado Pago inválido",
+                                      { duration: 12_000 },
+                                    );
+                                  } finally {
+                                    setTestingMpConnection(false);
+                                  }
+                                }}
+                              >
+                                {testingMpConnection ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  "Probar conexión"
+                                )}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs"
+                                onClick={() =>
+                                  window.open(
+                                    "https://www.mercadopago.com.ar/money-inflows/account-data/detail",
+                                    "_blank",
+                                    "noopener,noreferrer",
+                                  )
                                 }
-                              }}
-                            >
-                              {testingMpConnection ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                "Probar conexión"
-                              )}
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-8 text-xs border-red-200 text-red-700"
-                              onClick={async () => {
-                                try {
-                                  await clinicApi.disconnectMercadoPago();
-                                  toast.success("Mercado Pago desconectado");
-                                  const data = await clinicApi.getDoctorSchedule(doctorId);
-                                  applyOfficeData(data);
-                                } catch (e) {
-                                  toast.error(e instanceof Error ? e.message : "Error al desconectar");
-                                }
-                              }}
-                            >
-                              Desconectar
-                            </Button>
+                              >
+                                Ver datos de mi cuenta
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs border-red-200 text-red-700"
+                                onClick={async () => {
+                                  try {
+                                    await clinicApi.disconnectMercadoPago();
+                                    toast.success("Mercado Pago desconectado");
+                                    const data = await clinicApi.getDoctorSchedule(doctorId);
+                                    applyOfficeData(data);
+                                  } catch (e) {
+                                    toast.error(e instanceof Error ? e.message : "Error al desconectar");
+                                  }
+                                }}
+                              >
+                                Desconectar
+                              </Button>
+                            </div>
+
+                            <div className="pt-2 mt-1 border-t border-emerald-200/70 space-y-2">
+                              <p className="text-[11px] font-medium text-emerald-900">
+                                Datos de tu cuenta de Mercado Pago
+                              </p>
+                              <div>
+                                <Label className="text-xs">Alias</Label>
+                                <Input
+                                  value={payment.mercadopagoAlias ?? ""}
+                                  onChange={(e) =>
+                                    setPayment((p) => ({ ...p, mercadopagoAlias: e.target.value }))
+                                  }
+                                  placeholder="mi.alias.mp"
+                                  className="mt-1 h-9 bg-white"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">CVU</Label>
+                                <Input
+                                  value={payment.mercadopagoCvu ?? ""}
+                                  onChange={(e) =>
+                                    setPayment((p) => ({ ...p, mercadopagoCvu: e.target.value }))
+                                  }
+                                  className="mt-1 h-9 bg-white"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Titular de la cuenta</Label>
+                                <Input
+                                  value={payment.mercadopagoBeneficiaryName ?? ""}
+                                  onChange={(e) =>
+                                    setPayment((p) => ({
+                                      ...p,
+                                      mercadopagoBeneficiaryName: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="Ej: Mendia Juan Esteban"
+                                  className="mt-1 h-9 bg-white"
+                                />
+                              </div>
+                            </div>
                           </div>
                         ) : (
                           <div className="rounded-md border border-slate-200 bg-white p-3 space-y-2">
@@ -868,10 +926,6 @@ export function DoctorSettingsDialog({
                     )}
                   </div>
 
-                  <p className="text-[11px] text-slate-500">
-                    Transferencia manual: alias/CBU/CVU abajo. MP tiene prioridad si está activo y hay
-                    honorario cargado.
-                  </p>
                   <div className="grid grid-cols-[6.5rem_1fr] gap-3">
                     <div>
                       <Label className="text-xs">Moneda</Label>
@@ -910,36 +964,62 @@ export function DoctorSettingsDialog({
                       </div>
                     </div>
                   </div>
-                  <div>
-                    <Label className="text-xs">Alias / CBU/CVU transferencia</Label>
-                    <Input
-                      value={payment.alias ?? ""}
-                      onChange={(e) => setPayment((p) => ({ ...p, alias: e.target.value }))}
-                      placeholder="mi.alias.mp"
-                      className="mt-1 h-9"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">CBU/CVU (opcional)</Label>
-                    <Input
-                      value={payment.cbu ?? ""}
-                      onChange={(e) => setPayment((p) => ({ ...p, cbu: e.target.value }))}
-                      className="mt-1 h-9"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Titular de la cuenta (como figura en el banco)</Label>
-                    <Input
-                      value={payment.beneficiaryName ?? ""}
-                      onChange={(e) =>
-                        setPayment((p) => ({ ...p, beneficiaryName: e.target.value }))
-                      }
-                      placeholder="Ej: Mendia Juan Esteban"
-                      className="mt-1 h-9"
-                    />
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      La IA compara este nombre con el destinatario del comprobante.
-                    </p>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-3">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={
+                          payment.useAlternateAccount ??
+                          !!(payment.alias || payment.cbu || payment.beneficiaryName)
+                        }
+                        onChange={(e) =>
+                          setPayment((p) => ({ ...p, useAlternateAccount: e.target.checked }))
+                        }
+                        className="mt-0.5"
+                      />
+                      <span className="text-sm text-slate-700">
+                        ¿Querés cobrar tu consulta en otra cuenta? Poné aquí los datos de la
+                        cuenta donde se haría la transferencia.
+                      </span>
+                    </label>
+                    {(payment.useAlternateAccount ??
+                      !!(payment.alias || payment.cbu || payment.beneficiaryName)) && (
+                      <div className="space-y-3 pl-1">
+                        <div>
+                          <Label className="text-xs">Alias / CBU/CVU transferencia</Label>
+                          <Input
+                            value={payment.alias ?? ""}
+                            onChange={(e) => setPayment((p) => ({ ...p, alias: e.target.value }))}
+                            placeholder="mi.alias.mp"
+                            className="mt-1 h-9"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">CBU/CVU (opcional)</Label>
+                          <Input
+                            value={payment.cbu ?? ""}
+                            onChange={(e) => setPayment((p) => ({ ...p, cbu: e.target.value }))}
+                            className="mt-1 h-9"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">
+                            Titular de la cuenta (como figura en el banco)
+                          </Label>
+                          <Input
+                            value={payment.beneficiaryName ?? ""}
+                            onChange={(e) =>
+                              setPayment((p) => ({ ...p, beneficiaryName: e.target.value }))
+                            }
+                            placeholder="Ej: Mendia Juan Esteban"
+                            className="mt-1 h-9"
+                          />
+                          <p className="text-[10px] text-slate-500 mt-1">
+                            La IA compara este nombre con el destinatario del comprobante.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <Label className="text-xs">Instrucciones de pago</Label>

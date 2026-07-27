@@ -23,6 +23,12 @@ export interface DoctorPaymentSettings {
   /** Nombre del titular como figura en el comprobante bancario */
   beneficiaryName?: string;
   bankName?: string;
+  /** Si true, se muestran/usan alias/cbu/beneficiaryName como cuenta alternativa de cobro. */
+  useAlternateAccount?: boolean;
+  /** Datos informativos de la cuenta de Mercado Pago vinculada (no provistos por la API de MP). */
+  mercadopagoAlias?: string;
+  mercadopagoCvu?: string;
+  mercadopagoBeneficiaryName?: string;
   paymentInstructions?: string;
   qrImageData?: string;
   /** Si true (default cuando hay honorario), el turno requiere confirmar transferencia. */
