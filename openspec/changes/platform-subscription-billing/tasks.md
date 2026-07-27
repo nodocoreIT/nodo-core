@@ -1,0 +1,86 @@
+# Tasks: Platform Subscription Billing (per client_unit)
+
+## Review Workload Forecast
+
+| Field | Value |
+|-------|-------|
+| Estimated changed lines | ~1450-1750 total across all units (largest single unit ~280-320) |
+| 400-line budget risk | High (aggregate) |
+| Chained PRs recommended | Yes |
+| Suggested split | 9 work units, PR 1 → PR 9 (see table below) |
+| Delivery strategy | ask-on-risk |
+| Chain strategy | pending |
+
+Decision needed before apply: Yes
+Chained PRs recommended: Yes
+Chain strategy: pending
+400-line budget risk: High
+
+### Suggested Work Units
+
+| Unit | Goal | Likely PR | Notes |
+|------|------|-----------|-------|
+| 1 | `nodo_core.fx_rates` table + refresh job + fallback chain | PR 1 | ~150-200 lines; independent, no consumers yet |
+| 2 | `client_unit_subscriptions` + `subscription_payments` tables (nodo_core) | PR 2 | ~150-180 lines; additive, depends on PR 1 for FX column refs only by convention |
+| 3 | `user_node_access_reason` RPC (new, additive) + `impago` status wiring | PR 3 | ~120-160 lines; `user_has_node_access` DDL untouched |
+| 4 | RPC-drift CI guard + allowlist | PR 4 | ~60-100 lines; fully independent, can land any time |
+| 5 | `shared-components` gate: `accessReason`/`billingLocked` + `isBillingWhitelistedPath` | PR 5 | ~150-200 lines; depends on PR 3 (reason RPC) |
+| 6 | `nodo-landing` MP Preapproval helpers + webhook + reconciliation job (flagged off) | PR 6 | ~300-350 lines; largest unit, borderline over budget — flag if it grows |
+| 7 | Finanzas Suscripción screen + redirect wiring | PR 7 | ~150-200 lines; depends on PR 5 |
+| 8 | Autos Suscripción screen + redirect wiring | PR 8 | ~150-200 lines; depends on PR 5, template from PR 7 |
+| 9a/9b | Inmo, then Clinica Suscripción screens + redirect wiring | PR 9a, PR 9b | ~150-200 lines each; depends on PR 5 |
+
+Unit 6 (MP helpers + webhook + reconciliation job) is the one most likely to individually exceed 400
+lines once tests are included — if so, split into 6a (Preapproval create/helpers) and 6b
+(webhook + reconciliation job) before implementation.
+
+## Phase 1: Foundation — Schema & FX Subsystem
+
+- [ ] 1.1 Create migration `nodo-landing/supabase/migrations/{ts}_fx_rates.sql`: `nodo_core.fx_rates(id, rate_date date, rate numeric(10,4), source text, created_at)`, unique `(rate_date, source)`, RLS via `is_team_member()`. Ref: spec `platform-billing` — FX Conversion.
+- [ ] 1.2 Add `nodo-landing/lib/billing/fx-rate.ts`: `resolveFxRate()` implementing fallback chain — (1) today's fetched rate → (2) most recent stored rate ≤ N days → (3) admin manual override row → (4) return explicit `fx-unavailable` result (never `0`, never throw). Unit test: all 4 branches, esp. "all missing → explicit failure, no charge, no crash". Ref: spec `platform-billing` — Scenario "FX rate unavailable at charge time".
+- [ ] 1.3 Add `nodo-landing/lib/billing/fetch-fx-rate.ts`: fetches dólar-tarjeta rate from external source (e.g. dolarapi.com), upserts into `fx_rates`. Wire into a daily refresh (reuse `app/api/cron/backup-orgs/route.ts`'s `Authorization: Bearer CRON_SECRET` pattern) — new `nodo-landing/app/api/cron/refresh-fx-rate/route.ts`.
+- [ ] 1.4 Create migration `nodo-landing/supabase/migrations/{ts}_client_unit_subscriptions.sql`: `nodo_core.client_unit_subscriptions` (per design schema — `client_unit_id` unique fk, `plane_id` fk to existing `nodo_core.planes`, `mp_preapproval_id` unique, `billing_currency`, `billing_amount`, `cycle_started_at`, `next_due_at`, `status`), RLS `is_team_member()`. Do NOT recreate or alter `nodo_core.planes`. Ref: spec `platform-billing` — Canonical Plan Pricing, One Preapproval per client_unit.
+- [ ] 1.5 Create migration `nodo-landing/supabase/migrations/{ts}_subscription_payments.sql`: `nodo_core.subscription_payments` (ledger, `UNIQUE(subscription_id, cycle_key, attempt_no)`), RLS `is_team_member()`. Ref: spec `platform-billing` — Payment History Ledger.
+- [ ] 1.6 Add TS type `'impago'` to the `client_unit` status union in `nodo-landing` (status column stays free-text per design; no enum/check needed) — locate and extend existing status union type, do not touch `client_units.status` column DDL.
+- [ ] 1.7 Run `supabase db advisors` (or MCP `get_advisors`) against the 3 new migrations before committing; fix any RLS/index findings.
+
+## Phase 2: node-access — Additive Reason RPC
+
+- [ ] 2.1 Create migration `nodo-landing/supabase/migrations/{ts}_user_node_access_reason_rpc.sql`: new function `public.user_node_access_reason(p_unit_code text) returns text` (values `ok|payment_overdue|banned|invalid_credentials`), `SECURITY INVOKER` (or `DEFINER` only if strictly required — if so, add explicit `auth.uid()` guard per Supabase security checklist). Do NOT modify `public.user_has_node_access` DDL — verify byte-for-byte via `supabase db diff` before commit. Ref: spec `node-access` — Cross-Nodo Login Access Check.
+- [ ] 2.2 On companion-RPC error or missing row, function/caller MUST resolve to `'ok'` (fail-open) — encode this in the RPC's exception handler or in the TS wrapper, whichever is simpler; document the choice in the migration comment.
+- [ ] 2.3 Add `packages/shared-components/src/lib/verify-node-access.ts`: new exported `getNodeAccessReason(supabase, unitCode): Promise<NodeAccessReason>` calling the new RPC, fail-open to `'ok'` on error. Do NOT change `userHasNodeAccess`/`enforceNodeAccess` signatures or behavior.
+- [ ] 2.4 Unit tests: `impago` → `payment_overdue` + access allowed (no sign-out); `pausado` → unaffected (existing behavior, denied+signed out); banned → `banned`; no matching row → `invalid_credentials`; RPC error/missing → `ok`. Ref: spec `node-access` — all 5 scenarios.
+
+## Phase 3: RPC Drift CI Guard
+
+- [ ] 3.1 Create `.github/workflows/rpc-drift-guard.yml`: on PR, grep all `**/supabase/migrations/*.sql` outside `nodo-landing/supabase/migrations/` for `function public.user_has_node_access`; fail if found. Allowlist `nodo-inmo/supabase/migrations/20260622120001_*.sql` and `nodo-inmo/supabase/migrations/20260623000002_*.sql` by exact filename match (grandfathered — do not naive-grep-fail on these). Ref: spec `node-access` — Single Source of Truth, both scenarios.
+- [ ] 3.2 Add a short comment in the workflow explaining WHY those two files are allowlisted (incident reference) so future maintainers don't remove the exception blindly.
+
+## Phase 4: shared-components — Billing Lockout Gate
+
+- [ ] 4.1 Extend `packages/shared-components/src/providers/auth-provider.tsx`: add `accessReason: NodeAccessReason` and `billingLocked: boolean` to `AuthContextValue`, populated via `getNodeAccessReason` (Phase 2.3), fail-open to `ok`/`false` on any error. Ref: spec `billing-lockout` — Session Survives payment_overdue.
+- [ ] 4.2 Add `packages/shared-components/src/lib/billing-whitelist.ts`: export `SUBSCRIPTION_ROUTE_ALLOWLIST` type + `isBillingWhitelistedPath(path, allowlist): boolean`. Pure function, no redirect logic (redirect stays per-nodo). Ref: spec `billing-lockout` — Central Whitelisted-Route Enforcement.
+- [ ] 4.3 Add a reusable gate hook/component (e.g. `use-billing-lockout.ts`) that each nodo's layout can wire: given current path + `billingLocked` + configured Suscripción path, returns whether to redirect. Fail-closed default (no route configured yet ⇒ block non-whitelisted routes, show generic notice). Ref: spec `billing-lockout` — Missing Suscripción Screen Fails Safe.
+- [ ] 4.4 Unit tests: `isBillingWhitelistedPath` matches/non-matches; gate hook redirect decision table (locked+whitelisted=allow, locked+other=block, unlocked=allow all, no-screen-configured=fail-closed). Ref: spec `billing-lockout` — all 6 scenarios.
+- [ ] 4.5 Document (JSDoc, not a new .md file) that server-side/API enforcement (spec requirement "Server-Side (API) Enforcement") is each nodo's own responsibility when wiring middleware — the shared package only exposes the state + matcher.
+
+## Phase 5: nodo-landing — Billing Engine
+
+- [ ] 5.1 Add `nodo-landing/lib/billing/mp-preapproval.ts`: `createPreapproval(clientUnitId)` — mirrors `nodo-clinica`'s `nodo-clinica/src/lib/mercadopago/client.ts` pattern, uses NODO's own MP token (not client's), resolves price via `nodo_core.planes` (Phase 1.4) and `resolveFxRate` (Phase 1.2), sets `billing_day` from `client_units.enabled_at` with month-end clamping. Ref: spec `platform-billing` — One Preapproval per client_unit, both scenarios.
+- [ ] 5.2 Add `nodo-landing/app/api/mp/subscription-webhook/route.ts` (separate route from any existing clinica webhook): validates MP signature, matches `mp_preapproval_id`, on `approved` writes `subscription_payments` row + sets `active`/resets cycle from payment date; on terminal failure defers to reconciliation job for the actual `impago` transition (webhook alone doesn't have full MP retry-exhaustion visibility). Idempotent on `(subscription_id, cycle_key, attempt_no)`. Ref: spec `platform-billing` — Reacting to MP's Recurring Billing Outcome, Successful Payment Resets the Cycle.
+- [ ] 5.3 Add `nodo-landing/app/api/cron/billing-reconciliation/route.ts`: `Authorization: Bearer CRON_SECRET` (same pattern as `backup-orgs`), daily job selecting subscriptions where `now >= anniversary + 30 days` and latest cycle payment isn't `approved`; confirms MP terminal state via `getPreapproval`/authorized_payments before flipping `impago`; `for update skip locked`; feature-flagged off initially (env-gated no-op). Ref: spec `platform-billing` — day-30 checkpoint, idempotent re-run scenario.
+- [ ] 5.4 On `impago` transition, send dunning email (reuse existing mail util) — idempotent, only sent once per cycle transition. Ref: spec `platform-billing` — Scenario "MP reports a terminal failure for the cycle".
+- [ ] 5.5 Tests: FX-unavailable charge attempt records failure in `subscription_payments` and does not create/renew a Preapproval; reconciliation re-run does not duplicate email/history; webhook approved-payment resets cycle from payment date not original anniversary. Ref: spec `platform-billing` — all remaining scenarios not covered above.
+
+## Phase 6: Per-Nodo Suscripción Screens (phased rollout — one PR per nodo)
+
+- [ ] 6.1 **Finanzas**: add "Configuración → Suscripción" screen showing plan/status/next charge + wire billing-lockout gate (Phase 4.3) into Finanzas' route layout with its Suscripción path registered in the allowlist. First nodo — validates the shared gate end-to-end (single plan, lowest complexity).
+- [ ] 6.2 **Autos**: same screen + gate wiring, using Finanzas' implementation as the template.
+- [ ] 6.3 **Inmo**: same screen + gate wiring.
+- [ ] 6.4 **Clinica**: same screen + gate wiring — verify it does NOT interact with/modify the existing `professionals`-based Preapproval flow (out of scope, untouched).
+- [ ] 6.5 Per nodo (each of 6.1-6.4): E2E check that normal (non-impago) login for that nodo is unaffected, and that `impago` login redirects everywhere except Suscripción. Ref: spec `billing-lockout` — Blocked route redirects, Suscripción route itself is allowed.
+
+## Phase 7: Cross-Nodo Regression
+
+- [ ] 7.1 After Phase 2 ships (before any per-nodo screen work), manually verify login for all 5 nodos (Landing, Finanzas, Autos, Inmo, Clinica) against `activo`, `pausado`, `sin_acceso` units — confirm byte-identical behavior to pre-change. Ref: spec `node-access` — Scenario "existing caller ignoring reason is unaffected".
+- [ ] 7.2 Verify `nodo-clinica`'s existing `professionals`-based Preapproval/webhook flow is untouched by any Phase 5 file additions (new files only, no shared file edits in that flow).
