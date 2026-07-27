@@ -31,6 +31,7 @@ import {
   Bell,
   Palette,
   Receipt,
+  Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
@@ -153,7 +154,6 @@ export function DoctorSettingsDialog({
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [testingReminder, setTestingReminder] = useState(false);
   const [mpOAuthConfigured, setMpOAuthConfigured] = useState<boolean | null>(null);
-  const [testingMpConnection, setTestingMpConnection] = useState(false);
   const [subscription, setSubscription] = useState<{
     status: string;
     plan: string | null;
@@ -791,27 +791,16 @@ export function DoctorSettingsDialog({
                                 size="sm"
                                 variant="outline"
                                 className="h-8 text-xs"
-                                disabled={testingMpConnection}
-                                onClick={async () => {
-                                  setTestingMpConnection(true);
-                                  try {
-                                    const result = await clinicApi.testMercadoPagoConnection();
-                                    toast.success(result.message ?? "Conexión con Mercado Pago OK");
-                                  } catch (e) {
-                                    toast.error(
-                                      e instanceof Error ? e.message : "Token de Mercado Pago inválido",
-                                      { duration: 12_000 },
-                                    );
-                                  } finally {
-                                    setTestingMpConnection(false);
-                                  }
-                                }}
+                                onClick={() =>
+                                  window.open(
+                                    "https://www.mercadopago.com.ar/costs-section/payment-link/processing/options",
+                                    "_blank",
+                                    "noopener,noreferrer",
+                                  )
+                                }
                               >
-                                {testingMpConnection ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  "Probar conexión"
-                                )}
+                                <Receipt className="h-3.5 w-3.5 mr-1.5" />
+                                Ver comisiones de Mercado Pago
                               </Button>
                               <Button
                                 type="button"
@@ -826,6 +815,7 @@ export function DoctorSettingsDialog({
                                   )
                                 }
                               >
+                                <Wallet className="h-3.5 w-3.5 mr-1.5" />
                                 Ver datos de mi cuenta
                               </Button>
                               <Button
