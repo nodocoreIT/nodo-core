@@ -11,6 +11,7 @@ import { useSearchStore } from "@nodocore/shared-components";
 import { matchesQuery } from "@/shared/search/matches-query";
 import { CreateContractDialog } from "./create-contract-dialog";
 import { ContractPdfViewer } from "./contract-pdf-viewer";
+import { GeneratePaymentsDialog } from "./generate-payments-dialog";
 import { ContractStatusBadge } from "./contract-status-badge";
 import {
   AlertDialog,
@@ -56,6 +57,15 @@ export function ContractsList() {
     useState<ContractWithRelations | null>(null);
   const archiveContract = useArchiveContract();
   const updateContract = useUpdateContract();
+  const [generateForContract, setGenerateForContract] = useState<{
+    id: string;
+    start_date: string;
+    end_date: string;
+    rent_amount: number;
+    currency: string;
+    status: string;
+    expenses_amount: number;
+  } | null>(null);
   const [page, setPage] = useState(0);
   const [sortConfig, setSortConfig] = useState<{
     key: "tenant" | "property" | "start_date" | "end_date" | null;
@@ -387,14 +397,27 @@ export function ContractsList() {
           }}
           contract={editContract}
           onSuccess={() => setEditContract(null)}
-          onSubmit={(payload) =>
-            updateContract
-              .mutateAsync({ id: editContract.id, ...payload })
-              .then(() => undefined)
-          }
+          onSubmit={async (payload) => {
+            await updateContract.mutateAsync({ id: editContract.id, ...payload });
+            setGenerateForContract({
+              id: editContract.id,
+              start_date: payload.start_date,
+              end_date: payload.end_date,
+              rent_amount: payload.rent_amount,
+              currency: payload.currency,
+              status: payload.status,
+              expenses_amount: payload.expenses_amount ?? 0,
+            });
+          }}
           isPending={updateContract.isPending}
         />
       )}
+
+      <GeneratePaymentsDialog
+        open={!!generateForContract}
+        contract={generateForContract}
+        onClose={() => setGenerateForContract(null)}
+      />
 
       {/* PDF viewer dialog */}
       <Dialog
