@@ -224,7 +224,7 @@ export async function handleAppointmentsPostLocal(request: NextRequest) {
 
   if (usesMercadoPago) {
     try {
-      const checkout = await buildCheckoutForAppointment(apt.id);
+      const checkout = await buildCheckoutForAppointment(apt.id, { returnTo: "portal" });
       if (!checkout) {
         return NextResponse.json(
           { error: "No se pudo iniciar el pago con Mercado Pago" },

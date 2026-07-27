@@ -893,7 +893,10 @@ export async function POST(request: NextRequest) {
 
   if (usesMercadoPago) {
     try {
-      const checkout = await buildCheckoutForAppointment(apt.id);
+      // Booked from the portal's dialog (logged-in patient) — return to the
+      // portal so the same WaitingRoomModal used for no-payment bookings
+      // opens, instead of navigating away to the standalone sala page.
+      const checkout = await buildCheckoutForAppointment(apt.id, { returnTo: "portal" });
       if (!checkout) {
         await cancelAppointment(supabase, apt.id, patientRow.org_id);
         return NextResponse.json(

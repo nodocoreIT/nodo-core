@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -164,6 +165,8 @@ interface Doctor {
 
 
 export function PacienteInicioPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [bookingDoctor, setBookingDoctor] = useState<{
     id: string;
@@ -173,6 +176,23 @@ export function PacienteInicioPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
+
+  // Mercado Pago returns here (not to a full-page /paciente/sala route) after
+  // a portal-initiated booking, so the confirmation/retry UI shows inside the
+  // same WaitingRoomModal used for the no-payment booking path instead of
+  // navigating away from the portal. WaitingRoom reads `mp`/payment params
+  // itself to sync status and toast (and never strips them either) — only
+  // `turno` is ours to remove, and only after the modal has picked it up.
+  useEffect(() => {
+    const turno = searchParams.get("turno");
+    if (!turno) return;
+    setWaitingRoomToken(turno);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("turno");
+    const rest = params.toString();
+    router.replace(rest ? `/paciente?${rest}` : "/paciente");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     async function load() {

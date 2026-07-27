@@ -10,7 +10,30 @@ import {
   getMercadoPagoUser,
 } from "@/lib/mercadopago/client";
 
-async function buildLocalCheckout(appointmentId: string) {
+export interface CheckoutOptions {
+  /**
+   * "sala" (default): back_urls point to the standalone /paciente/sala/[token]
+   * page — required for doctor-assigned appointments, reached via an
+   * unauthenticated magic link with nowhere else to return to.
+   * "portal": back_urls point to /paciente?turno=... so the logged-in patient
+   * lands back inside the portal, where the same WaitingRoomModal used for
+   * the no-payment booking path opens automatically (see paciente-inicio-page).
+   */
+  returnTo?: "sala" | "portal";
+}
+
+function buildBackUrls(base: string, accessToken: string, returnTo: "sala" | "portal") {
+  const path =
+    returnTo === "portal" ? `/paciente?turno=${accessToken}` : `/paciente/sala/${accessToken}`;
+  const join = path.includes("?") ? "&" : "?";
+  return {
+    success: `${base}${path}${join}mp=success`,
+    failure: `${base}${path}${join}mp=failure`,
+    pending: `${base}${path}${join}mp=pending`,
+  };
+}
+
+async function buildLocalCheckout(appointmentId: string, options: CheckoutOptions = {}) {
   const db = await readDb();
   const apt = db.appointments.find((a) => a.id === appointmentId);
   if (!apt) return null;
@@ -32,7 +55,6 @@ async function buildLocalCheckout(appointmentId: string) {
   }
 
   const base = appBaseUrl();
-  const waitingPath = `/paciente/sala/${apt.accessToken}`;
 
   const pref = await createCheckoutPreference({
     accessToken: token,
@@ -42,11 +64,7 @@ async function buildLocalCheckout(appointmentId: string) {
     externalReference: apt.id,
     payerEmail: patient.email,
     notificationUrl: `${base}/api/webhooks/mercadopago`,
-    backUrls: {
-      success: `${base}${waitingPath}?mp=success`,
-      failure: `${base}${waitingPath}?mp=failure`,
-      pending: `${base}${waitingPath}?mp=pending`,
-    },
+    backUrls: buildBackUrls(base, apt.accessToken, options.returnTo ?? "sala"),
   });
 
   await writeDb((d) => {
@@ -64,7 +82,7 @@ async function buildLocalCheckout(appointmentId: string) {
   };
 }
 
-async function buildSupabaseCheckout(appointmentId: string) {
+async function buildSupabaseCheckout(appointmentId: string, options: CheckoutOptions = {}) {
   const supabase = await createServiceClient();
 
   const { data: apt } = await supabase
@@ -110,7 +128,6 @@ async function buildSupabaseCheckout(appointmentId: string) {
   if (!token) return null;
 
   const base = appBaseUrl();
-  const waitingPath = `/paciente/sala/${apt.access_token}`;
 
   const pref = await createCheckoutPreference({
     accessToken: token,
@@ -120,11 +137,7 @@ async function buildSupabaseCheckout(appointmentId: string) {
     externalReference: apt.id,
     payerEmail: patient.email,
     notificationUrl: `${base}/api/webhooks/mercadopago`,
-    backUrls: {
-      success: `${base}${waitingPath}?mp=success`,
-      failure: `${base}${waitingPath}?mp=failure`,
-      pending: `${base}${waitingPath}?mp=pending`,
-    },
+    backUrls: buildBackUrls(base, apt.access_token, options.returnTo ?? "sala"),
   });
 
   await supabase
@@ -142,7 +155,10 @@ async function buildSupabaseCheckout(appointmentId: string) {
   };
 }
 
-export async function buildCheckoutForAppointment(appointmentId: string) {
-  if (isLocalMode()) return buildLocalCheckout(appointmentId);
-  return buildSupabaseCheckout(appointmentId);
+export async function buildCheckoutForAppointment(
+  appointmentId: string,
+  options: CheckoutOptions = {},
+) {
+  if (isLocalMode()) return buildLocalCheckout(appointmentId, options);
+  return buildSupabaseCheckout(appointmentId, options);
 }
