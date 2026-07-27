@@ -1651,6 +1651,36 @@ export const clinicApi = {
     return data as { count: number; cobrosCount: number };
   },
 
+  async getMercadoPagoPaymentNotifications() {
+    const res = await fetch(
+      `${BASE}/api/clinic/notifications?scope=unread&types=mercadopago_payment`,
+      clinicFetchOpts(),
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar notificaciones");
+    return data as {
+      items: Array<{
+        id: string;
+        title: string;
+        message: string;
+        href?: string;
+        createdAt: string;
+      }>;
+    };
+  },
+
+  async markNotificationsRead(ids: string[]) {
+    const res = await fetch(`${BASE}/api/clinic/notifications`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ ids }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al marcar notificación");
+    return data as { ok: boolean; marked: number };
+  },
+
   async getMercadoPagoOAuthConfig() {
     const res = await fetch(
       `${BASE}/api/clinic/mercadopago/oauth/config`,

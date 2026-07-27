@@ -44,6 +44,8 @@ export async function processMercadoPagoPaymentId(
 
     await confirmAppointmentPaymentAndNotify(appointmentId, {
       mercadopagoPaymentId: String(payment.id),
+      amount: payment.transaction_amount,
+      currency: payment.currency_id,
     });
 
     return { ok: true, appointmentId };

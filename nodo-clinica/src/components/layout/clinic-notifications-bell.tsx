@@ -1,12 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Calendar, CreditCard } from "lucide-react";
+import { Calendar, CreditCard, Wallet } from "lucide-react";
 import { NotificationsDropdown } from "@nodocore/nodo-modules/notifications";
-import type { NotificationKindStyle } from "@nodocore/nodo-modules/notifications";
+import type { AppNotification, NotificationKindStyle } from "@nodocore/nodo-modules/notifications";
 import { useClinicNotifications } from "@/hooks/use-clinic-notifications";
 
 const KIND_STYLES: Record<string, NotificationKindStyle> = {
+  mercadopago_payment: {
+    icon: Wallet,
+    iconColor: "text-emerald-600 bg-emerald-50",
+  },
   pending_cobros: {
     icon: CreditCard,
     iconColor: "text-amber-600 bg-amber-50",
@@ -27,7 +31,14 @@ interface ClinicNotificationsBellProps {
 
 export function ClinicNotificationsBell({ doctorId }: ClinicNotificationsBellProps) {
   const router = useRouter();
-  const { items, loading, error } = useClinicNotifications(doctorId);
+  const { items, loading, error, markMercadoPagoPaymentRead } =
+    useClinicNotifications(doctorId);
+
+  const consumeIfMpPayment = (notif: AppNotification) => {
+    if (notif.kind === "mercadopago_payment") {
+      void markMercadoPagoPaymentRead(notif.id);
+    }
+  };
 
   return (
     <NotificationsDropdown
@@ -36,6 +47,7 @@ export function ClinicNotificationsBell({ doctorId }: ClinicNotificationsBellPro
       error={error ? "No se pudieron cargar las notificaciones." : null}
       kindStyles={KIND_STYLES}
       onNavigate={(href) => router.push(href)}
+      onDismiss={consumeIfMpPayment}
       headerRingClass="ring-[#EEF3F8]"
       storageKey="clinica"
     />

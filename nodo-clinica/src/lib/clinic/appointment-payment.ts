@@ -125,7 +125,7 @@ export function patientTurnosPaymentUrl(
 
 export async function confirmAppointmentPaymentAndNotify(
   appointmentId: string,
-  opts?: { mercadopagoPaymentId?: string },
+  opts?: { mercadopagoPaymentId?: string; amount?: number; currency?: string },
 ): Promise<Record<string, unknown> | null> {
   const supabase = await createServiceClient();
 
@@ -147,6 +147,25 @@ export async function confirmAppointmentPaymentAndNotify(
   const now = new Date().toISOString();
   const wasPending = apt.payment_status === "pending";
 
+  // MP Checkout payments never go through the receipt-upload/AI-audit path,
+  // so payment_receipt_audit stays empty and Cobros (which reads amount from
+  // there) shows "—" and excludes the payment from "Total de Ingresos" even
+  // though the payment is approved. Write an audit-shaped record here too,
+  // using the real amount MP reports — not the doctor's current configured
+  // fee, which can drift from what was actually charged.
+  const receiptAudit =
+    opts?.mercadopagoPaymentId && opts?.amount != null
+      ? {
+          validatedAt: now,
+          valid: true,
+          confidence: 1,
+          amount: opts.amount,
+          currency: opts.currency ?? "ARS",
+          operationId: opts.mercadopagoPaymentId,
+          summary: "Pago confirmado automáticamente vía Mercado Pago Checkout.",
+        }
+      : undefined;
+
   const { data: updated, error: updateError } = await supabase
     .from("appointments")
     .update({
@@ -155,6 +174,9 @@ export async function confirmAppointmentPaymentAndNotify(
       updated_at: now,
       ...(opts?.mercadopagoPaymentId
         ? { mercadopago_payment_id: opts.mercadopagoPaymentId }
+        : {}),
+      ...(receiptAudit && !apt.payment_receipt_audit
+        ? { payment_receipt_audit: receiptAudit }
         : {}),
     })
     .eq("id", appointmentId)
@@ -221,8 +243,8 @@ export async function confirmAppointmentPaymentAndNotify(
     mercadopagoPaymentId:
       opts?.mercadopagoPaymentId ?? `confirmed-${appointmentId}`,
     patientName: patient.full_name,
-    amount: fee,
-    currency: (payment.currency as string | undefined) ?? "ARS",
+    amount: opts?.amount ?? fee,
+    currency: opts?.currency ?? (payment.currency as string | undefined) ?? "ARS",
   });
 
   await supabase
