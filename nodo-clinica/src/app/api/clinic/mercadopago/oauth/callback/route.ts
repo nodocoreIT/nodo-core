@@ -157,13 +157,19 @@ export async function GET(request: NextRequest) {
 
     const expiresAt = tokenExpiresAtIso(tokens.expires_in);
 
-    await upsertPaymentCredentials(match.professional_id, {
+    const stored = await upsertPaymentCredentials(match.professional_id, {
       org_id: match.org_id,
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token ?? null,
       public_key: tokens.public_key ?? null,
       token_expires_at: expiresAt ?? null,
     });
+
+    // Don't report success if the credentials didn't persist — otherwise the
+    // dialog shows "conectado" while the read path still sees no connection.
+    if (!stored) {
+      return settingsRedirect(appBase, { mp: "error", mp_msg: "credentials_not_saved" });
+    }
 
     const cleanedPayment = Object.fromEntries(
       Object.entries(payment).filter(([k]) => k !== "mercadopagoOAuthPending"),
