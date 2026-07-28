@@ -15,6 +15,7 @@ import {
   Lock,
   Fingerprint,
   Bot,
+  DollarSign,
 } from "lucide-react";
 import {
   Button,
@@ -25,6 +26,7 @@ import {
   type AdminCommandPaletteItem,
   useAuth,
   useFixedDocumentTitle,
+  useBillingLockout,
 } from "@nodocore/shared-components";
 import { cn } from "@/shared/lib/utils";
 import { useDealershipBrand } from "@/shared/hooks/use-dealership-brand";
@@ -47,6 +49,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/caja", label: "Caja", icon: Wallet },
   { to: "/admin/agenda", label: "Agenda y Tareas", icon: Calendar },
   { to: "/admin/documentacion", label: "Documentación", icon: FileText },
+  { to: "/admin/configuracion", label: "Suscripción", icon: DollarSign },
 ];
 
 const ROUTE_TITLES: Record<string, string> = {
@@ -59,6 +62,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/caja": "Caja",
   "/admin/agenda": "Agenda y Tareas",
   "/admin/documentacion": "Documentación",
+  "/admin/configuracion": "Suscripción",
 };
 
 function initials(value: string): string {
@@ -69,10 +73,24 @@ function initials(value: string): string {
   return base.slice(0, 2).toUpperCase();
 }
 
+const SUBSCRIPTION_PATH = "/admin/configuracion";
+
 export function AdminLayout() {
-  const { user, plan, signOut } = useAuth();
+  const { user, plan, billingLocked, signOut } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
+
+  const billingGate = useBillingLockout({
+    billingLocked,
+    pathname,
+    subscriptionPath: SUBSCRIPTION_PATH,
+  });
+
+  useEffect(() => {
+    if (billingGate.shouldRedirect && billingGate.redirectTo) {
+      navigate(billingGate.redirectTo, { replace: true });
+    }
+  }, [billingGate.shouldRedirect, billingGate.redirectTo, navigate]);
   const { name: dealershipName, logoUrl } = useDealershipBrand();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -344,7 +362,18 @@ export function AdminLayout() {
 
         {/* Content */}
         <main className="flex-1 overflow-auto p-6">
-          <Outlet />
+          {billingGate.shouldRedirect && !billingGate.redirectTo ? (
+            // Fail-safe: no Suscripción route configured — block rather than grant access.
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+              <Lock className="h-10 w-10 text-slate2" />
+              <p className="text-sm text-slate2 max-w-sm">
+                Tu acceso está restringido por un problema con el pago de la suscripción.
+                Contactate con NODO Core para regularizarlo.
+              </p>
+            </div>
+          ) : billingGate.shouldRedirect ? null : (
+            <Outlet />
+          )}
         </main>
       </div>
 
