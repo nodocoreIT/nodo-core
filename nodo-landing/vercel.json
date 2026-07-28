@@ -5,6 +5,10 @@
     {
       "path": "/api/cron/backup-orgs",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-fx-rate",
+      "schedule": "0 1 * * *"
     }
   ]
 }

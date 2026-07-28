@@ -11,6 +11,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./"),
+      // Next.js resolves "server-only" via its own webpack config; vitest
+      // (plain Vite) has no such package installed. See test/stubs/server-only.ts.
+      "server-only": path.resolve(__dirname, "./test/stubs/server-only.ts"),
     },
   },
 });

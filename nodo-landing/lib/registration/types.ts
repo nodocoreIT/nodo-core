@@ -7,7 +7,12 @@ export type ClientUnitStatus =
   | "pausado"
   /** Credentials wiped after deleting the nodo user — distinct from a
    * reversible business "pausado" (which keeps credentials intact). */
-  | "sin_acceso";
+  | "sin_acceso"
+  /** Set by the billing reconciliation job when MercadoPago reports a
+   * terminal failure for the cycle (all of MP's own retries exhausted).
+   * Access stays allowed (user_has_node_access is unaffected) — only the
+   * machine-readable reason RPC surfaces this, gating routes client-side. */
+  | "impago";
 
 export type VerificationDocType =
   | "id_photo"

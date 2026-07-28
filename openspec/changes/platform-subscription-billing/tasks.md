@@ -9,11 +9,11 @@
 | Chained PRs recommended | Yes |
 | Suggested split | 9 work units, PR 1 → PR 9 (see table below) |
 | Delivery strategy | ask-on-risk |
-| Chain strategy | pending |
+| Chain strategy | stacked-to-main |
 
-Decision needed before apply: Yes
+Decision needed before apply: No (resolved — stacked-to-main, PR 1 of 9)
 Chained PRs recommended: Yes
-Chain strategy: pending
+Chain strategy: stacked-to-main
 400-line budget risk: High
 
 ### Suggested Work Units
@@ -36,13 +36,13 @@ lines once tests are included — if so, split into 6a (Preapproval create/helpe
 
 ## Phase 1: Foundation — Schema & FX Subsystem
 
-- [ ] 1.1 Create migration `nodo-landing/supabase/migrations/{ts}_fx_rates.sql`: `nodo_core.fx_rates(id, rate_date date, rate numeric(10,4), source text, created_at)`, unique `(rate_date, source)`, RLS via `is_team_member()`. Ref: spec `platform-billing` — FX Conversion.
-- [ ] 1.2 Add `nodo-landing/lib/billing/fx-rate.ts`: `resolveFxRate()` implementing fallback chain — (1) today's fetched rate → (2) most recent stored rate ≤ N days → (3) admin manual override row → (4) return explicit `fx-unavailable` result (never `0`, never throw). Unit test: all 4 branches, esp. "all missing → explicit failure, no charge, no crash". Ref: spec `platform-billing` — Scenario "FX rate unavailable at charge time".
-- [ ] 1.3 Add `nodo-landing/lib/billing/fetch-fx-rate.ts`: fetches dólar-tarjeta rate from external source (e.g. dolarapi.com), upserts into `fx_rates`. Wire into a daily refresh (reuse `app/api/cron/backup-orgs/route.ts`'s `Authorization: Bearer CRON_SECRET` pattern) — new `nodo-landing/app/api/cron/refresh-fx-rate/route.ts`.
-- [ ] 1.4 Create migration `nodo-landing/supabase/migrations/{ts}_client_unit_subscriptions.sql`: `nodo_core.client_unit_subscriptions` (per design schema — `client_unit_id` unique fk, `plane_id` fk to existing `nodo_core.planes`, `mp_preapproval_id` unique, `billing_currency`, `billing_amount`, `cycle_started_at`, `next_due_at`, `status`), RLS `is_team_member()`. Do NOT recreate or alter `nodo_core.planes`. Ref: spec `platform-billing` — Canonical Plan Pricing, One Preapproval per client_unit.
-- [ ] 1.5 Create migration `nodo-landing/supabase/migrations/{ts}_subscription_payments.sql`: `nodo_core.subscription_payments` (ledger, `UNIQUE(subscription_id, cycle_key, attempt_no)`), RLS `is_team_member()`. Ref: spec `platform-billing` — Payment History Ledger.
-- [ ] 1.6 Add TS type `'impago'` to the `client_unit` status union in `nodo-landing` (status column stays free-text per design; no enum/check needed) — locate and extend existing status union type, do not touch `client_units.status` column DDL.
-- [ ] 1.7 Run `supabase db advisors` (or MCP `get_advisors`) against the 3 new migrations before committing; fix any RLS/index findings.
+- [x] 1.1 Create migration `nodo-landing/supabase/migrations/{ts}_fx_rates.sql`: `nodo_core.fx_rates(id, rate_date date, rate numeric(10,4), source text, created_at)`, unique `(rate_date, source)`, RLS via `is_team_member()`. Ref: spec `platform-billing` — FX Conversion.
+- [x] 1.2 Add `nodo-landing/lib/billing/fx-rate.ts`: `resolveFxRate()` implementing fallback chain — (1) today's fetched rate → (2) most recent stored rate ≤ N days → (3) admin manual override row → (4) return explicit `fx-unavailable` result (never `0`, never throw). Unit test: all 4 branches, esp. "all missing → explicit failure, no charge, no crash". Ref: spec `platform-billing` — Scenario "FX rate unavailable at charge time".
+- [x] 1.3 Add `nodo-landing/lib/billing/fetch-fx-rate.ts`: fetches dólar-tarjeta rate from external source (e.g. dolarapi.com), upserts into `fx_rates`. Wire into a daily refresh (reuse `app/api/cron/backup-orgs/route.ts`'s `Authorization: Bearer CRON_SECRET` pattern) — new `nodo-landing/app/api/cron/refresh-fx-rate/route.ts`.
+- [x] 1.4 Create migration `nodo-landing/supabase/migrations/{ts}_client_unit_subscriptions.sql`: `nodo_core.client_unit_subscriptions` (per design schema — `client_unit_id` unique fk, `plane_id` fk to existing `nodo_core.planes`, `mp_preapproval_id` unique, `billing_currency`, `billing_amount`, `cycle_started_at`, `next_due_at`, `status`), RLS `is_team_member()`. Do NOT recreate or alter `nodo_core.planes`. Ref: spec `platform-billing` — Canonical Plan Pricing, One Preapproval per client_unit.
+- [x] 1.5 Create migration `nodo-landing/supabase/migrations/{ts}_subscription_payments.sql`: `nodo_core.subscription_payments` (ledger, `UNIQUE(subscription_id, cycle_key, attempt_no)`), RLS `is_team_member()`. Ref: spec `platform-billing` — Payment History Ledger.
+- [x] 1.6 Add TS type `'impago'` to the `client_unit` status union in `nodo-landing` (status column stays free-text per design; no enum/check needed) — locate and extend existing status union type, do not touch `client_units.status` column DDL.
+- [x] 1.7 Run `supabase db advisors` (or MCP `get_advisors`) against the 3 new migrations before committing; fix any RLS/index findings. **Not run**: no Supabase MCP tools available in this session and local Docker daemon is not running (`supabase status` failed). Performed a manual review against the Supabase security checklist instead (RLS enabled on all 3 tables, `to authenticated` + `(select is_team_member())` on every policy, UPDATE policies have both USING and WITH CHECK, FK/query columns indexed). Orchestrator should run `get_advisors` before merge.
 
 ## Phase 2: node-access — Additive Reason RPC
 
