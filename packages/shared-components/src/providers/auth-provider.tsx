@@ -15,7 +15,9 @@ import { useSupabase } from "./supabase-provider";
 import {
   userHasNodeAccess,
   getNodeAccessReason,
+  getNodeIdentity,
   type NodeAccessReason,
+  type NodeIdentity,
 } from "../lib/verify-node-access";
 
 // ─── Public interfaces ──────────────────────────────────────────────────────
@@ -70,9 +72,12 @@ export interface AuthContextValue {
 
 /**
  * Decodes the JWT access_token payload and extracts custom claims from
- * app_metadata. This is the canonical source of truth for role, orgId, and
- * plan — NOT session.user.app_metadata, which may not reflect claims injected
- * by the Custom Access Token Hook in Supabase.
+ * app_metadata. These are a single value shared across every nodo for a given
+ * auth user (stamped by whichever nodo the user last onboarded/synced into),
+ * NOT scoped to the nodo currently being accessed — used only as a fallback
+ * when `config.unitCode` is unset, or when `getNodeIdentity` (imported above,
+ * the authoritative per-nodo source of truth) finds no nodo-scoped membership
+ * row for this user.
  *
  * Uses URL-safe base64 decoding (replaces `-` → `+`, `_` → `/`) to handle
  * the standard JWT encoding correctly.
@@ -117,6 +122,12 @@ export function AuthProvider({
   const [isLoading, setIsLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
   const [accessReason, setAccessReason] = useState<NodeAccessReason>("ok");
+  // Role/org/plan resolved SCOPED TO THIS NODE (see getNodeIdentity) — null
+  // when there's no session, no unitCode configured, or no team-membership
+  // row for this nodo (pure client_units/node_email_access customers). The
+  // effective value exposed on the context falls back to the JWT claims
+  // (readClaims) whenever this is null, so client-only accounts are unaffected.
+  const [nodeIdentity, setNodeIdentity] = useState<NodeIdentity | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,21 +137,12 @@ export function AuthProvider({
         if (!cancelled) {
           setAccessDenied(false);
           setAccessReason("ok");
+          setNodeIdentity(null);
         }
         return;
       }
 
       const claims = readClaims(s);
-
-      if (config.allowedRoles?.length && claims.role) {
-        if (!config.allowedRoles.includes(claims.role)) {
-          if (!cancelled) {
-            setAccessDenied(true);
-            setAccessReason("ok");
-          }
-          return;
-        }
-      }
 
       if (config.unitCode) {
         const allowed = await userHasNodeAccess(supabase, config.unitCode);
@@ -148,15 +150,53 @@ export function AuthProvider({
           if (!cancelled) {
             setAccessDenied(true);
             setAccessReason("ok");
+            setNodeIdentity(null);
             await supabase.auth.signOut({ scope: "local" });
           }
           return;
         }
 
-        const reason = await getNodeAccessReason(supabase, config.unitCode);
+        const [reason, identity] = await Promise.all([
+          getNodeAccessReason(supabase, config.unitCode),
+          getNodeIdentity(supabase, config.unitCode),
+        ]);
+
+        // allowedRoles gates on the NODE-SCOPED role (identity.role) when a
+        // team-membership row exists for this nodo, falling back to the JWT
+        // claim only for accounts with no such row (see getNodeIdentity docs).
+        const effectiveRole = identity?.role ?? claims.role;
+        if (
+          config.allowedRoles?.length &&
+          effectiveRole &&
+          !config.allowedRoles.includes(effectiveRole)
+        ) {
+          if (!cancelled) {
+            setAccessDenied(true);
+            setAccessReason("ok");
+            setNodeIdentity(null);
+          }
+          return;
+        }
+
         if (!cancelled) {
           setAccessDenied(false);
           setAccessReason(reason);
+          setNodeIdentity(identity);
+        }
+        return;
+      }
+
+      // No unitCode configured for this nodo — no per-nodo table to resolve
+      // against, so allowedRoles (if set) can only gate on the JWT claim.
+      if (
+        config.allowedRoles?.length &&
+        claims.role &&
+        !config.allowedRoles.includes(claims.role)
+      ) {
+        if (!cancelled) {
+          setAccessDenied(true);
+          setAccessReason("ok");
+          setNodeIdentity(null);
         }
         return;
       }
@@ -164,6 +204,7 @@ export function AuthProvider({
       if (!cancelled) {
         setAccessDenied(false);
         setAccessReason("ok");
+        setNodeIdentity(null);
       }
     }
 
@@ -214,20 +255,19 @@ export function AuthProvider({
     await supabase.auth.signOut({ scope: "local" });
   }, [supabase]);
 
-  const { role, orgId, plan } = readClaims(session);
-  const roleBlocked =
-    role != null &&
-    !!config.allowedRoles?.length &&
-    !config.allowedRoles.includes(role);
-  const denied = accessDenied || roleBlocked;
+  const claims = readClaims(session);
+  const effectiveRole = nodeIdentity?.role ?? claims.role;
+  const effectiveOrgId = nodeIdentity?.orgId ?? claims.orgId;
+  const effectivePlan = nodeIdentity?.plan ?? claims.plan;
+  const denied = accessDenied;
   const effectiveAccessReason: NodeAccessReason = denied ? "ok" : accessReason;
 
   const value: AuthContextValue = {
     session: denied ? null : session,
     user: denied ? null : session?.user ?? null,
-    role: denied ? null : role,
-    orgId: denied ? null : orgId,
-    plan: denied ? null : plan,
+    role: denied ? null : effectiveRole,
+    orgId: denied ? null : effectiveOrgId,
+    plan: denied ? null : effectivePlan,
     isLoading,
     accessReason: effectiveAccessReason,
     billingLocked: effectiveAccessReason === "payment_overdue",

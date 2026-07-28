@@ -12,13 +12,14 @@ export {
   userHasNodeAccess,
   enforceNodeAccess,
   getNodeAccessReason,
+  getNodeIdentity,
   INVALID_LOGIN_MESSAGE,
   ACCESS_DENIED_MESSAGE,
   AUTH_ERROR_CREDENTIALS,
   nodeLoginUrlWithAuthError,
   mapAuthLoginError,
 } from "./lib/verify-node-access";
-export type { NodeAccessReason } from "./lib/verify-node-access";
+export type { NodeAccessReason, NodeIdentity } from "./lib/verify-node-access";
 export {
   isBillingWhitelistedPath,
   type SubscriptionRouteAllowlist,

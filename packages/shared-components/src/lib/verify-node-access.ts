@@ -88,6 +88,49 @@ export async function getNodeAccessReason(
   return "ok";
 }
 
+export interface NodeIdentity {
+  orgId: string | null;
+  role: string | null;
+  plan: string | null;
+}
+
+/**
+ * Resolves role/org/plan SCOPED TO THIS SPECIFIC NODE via `user_node_role`, instead
+ * of trusting the raw JWT app_metadata claims — which are a single value shared
+ * across every nodo for a given auth user, stamped by whichever nodo the user last
+ * onboarded/synced into. An account with legitimate access to multiple nodos would
+ * otherwise carry one nodo's role into another's `allowedRoles` gate.
+ *
+ * Returns `null` when there's no team-membership row for this nodo (e.g. a pure
+ * client_units/node_email_access customer with no `org_members` row) — callers
+ * should fall back to the JWT-decoded claims in that case, not treat it as denial.
+ */
+export async function getNodeIdentity(
+  supabase: SupabaseClient,
+  unitCode: string,
+): Promise<NodeIdentity | null> {
+  const code = unitCode.trim();
+  if (!code) return null;
+
+  const { data, error } = await supabase.schema("public").rpc("user_node_role", {
+    p_unit_code: code,
+  });
+
+  if (error) {
+    console.error("user_node_role RPC failed:", error.message);
+    return null;
+  }
+
+  if (!Array.isArray(data) || data.length === 0) return null;
+
+  const row = data[0] as { org_id?: string | null; role?: string | null; plan?: string | null };
+  return {
+    orgId: row.org_id ?? null,
+    role: row.role ?? null,
+    plan: row.plan ?? null,
+  };
+}
+
 export async function enforceNodeAccess(
   supabase: SupabaseClient,
   unitCode: string,
