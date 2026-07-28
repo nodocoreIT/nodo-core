@@ -57,6 +57,14 @@ Deno.serve(async (req) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+
+    if (user.email && normalizedEmail === user.email.trim().toLowerCase()) {
+      return json(
+        { error: "No podés invitarte a vos mismo — ya tenés una sesión activa con ese email." },
+        400,
+      );
+    }
+
     const displayName = name?.trim() || normalizedEmail.split("@")[0];
     const dbRole = DISPLAY_TO_DB_ROLE[memberRole] ?? "agent";
     const orgName = await getOrgName(sql, orgId);
