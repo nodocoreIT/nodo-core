@@ -48,6 +48,46 @@ export async function userHasNodeAccess(
   return false;
 }
 
+export type NodeAccessReason = "ok" | "payment_overdue" | "banned" | "invalid_credentials";
+
+/**
+ * Returns a machine-readable reason alongside the boolean access check, so callers
+ * can distinguish `payment_overdue` (client_unit is `impago` — access stays allowed,
+ * see userHasNodeAccess/enforceNodeAccess, unaffected) from real denial reasons.
+ * Uses RPC `user_node_access_reason` — purely additive, does not gate access itself.
+ *
+ * Fail-open: any error (network, RPC failure) resolves to `"ok"` — this function must
+ * never be the reason a user gets locked out. userHasNodeAccess/enforceNodeAccess remain
+ * the sole access decision.
+ */
+export async function getNodeAccessReason(
+  supabase: SupabaseClient,
+  unitCode: string,
+): Promise<NodeAccessReason> {
+  const code = unitCode.trim();
+  if (!code) return "ok";
+
+  const { data, error } = await supabase.schema("public").rpc("user_node_access_reason", {
+    p_unit_code: code,
+  });
+
+  if (error) {
+    console.error("user_node_access_reason RPC failed:", error.message);
+    return "ok";
+  }
+
+  if (
+    data === "ok" ||
+    data === "payment_overdue" ||
+    data === "banned" ||
+    data === "invalid_credentials"
+  ) {
+    return data;
+  }
+
+  return "ok";
+}
+
 export async function enforceNodeAccess(
   supabase: SupabaseClient,
   unitCode: string,

@@ -11,12 +11,14 @@ export {
 export {
   userHasNodeAccess,
   enforceNodeAccess,
+  getNodeAccessReason,
   INVALID_LOGIN_MESSAGE,
   ACCESS_DENIED_MESSAGE,
   AUTH_ERROR_CREDENTIALS,
   nodeLoginUrlWithAuthError,
   mapAuthLoginError,
 } from "./lib/verify-node-access";
+export type { NodeAccessReason } from "./lib/verify-node-access";
 export { mapAuthPasswordError, isSamePasswordAuthError } from "./lib/auth-password-errors";
 export {
   createNodoAuthClient,
