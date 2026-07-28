@@ -43,5 +43,7 @@ export function findSubscriptionPlan(id: string): SubscriptionPlan | undefined {
 }
 
 export function formatPlanPrice(plan: SubscriptionPlan): string {
-  return plan.amount === 0 ? "$0" : `$${plan.amount.toLocaleString("es-AR")}`;
+  if (plan.amount === 0) return plan.currency === "USD" ? "US$0" : "$0";
+  const formatted = plan.amount.toLocaleString("es-AR");
+  return plan.currency === "USD" ? `US$${formatted}` : `$${formatted}`;
 }

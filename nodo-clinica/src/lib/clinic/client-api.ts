@@ -452,6 +452,27 @@ export const clinicApi = {
     return data as { ok: boolean; verified: boolean; phoneE164: string };
   },
 
+  /**
+   * Display-only pricing for the onboarding plan cards, read from
+   * nodo_core.planes. Returns an empty map on any failure — callers keep
+   * their static fallback copy, this never blocks onboarding.
+   */
+  async getOnboardingPlanPricing(): Promise<
+    Record<string, { label: string; amount: number; currency: string }>
+  > {
+    try {
+      const res = await fetch(`${BASE}/api/clinic/account/onboarding/plans`);
+      const data = await parseJsonResponse(res);
+      if (!res.ok || !data.ok) return {};
+      return data.plans as Record<
+        string,
+        { label: string; amount: number; currency: string }
+      >;
+    } catch {
+      return {};
+    }
+  },
+
   async completeOnboardingMedico(data: {
     fullName: string;
     specialty: string;

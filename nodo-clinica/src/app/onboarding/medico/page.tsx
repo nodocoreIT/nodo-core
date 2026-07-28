@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Stethoscope, Loader2, CheckCircle } from "lucide-react";
@@ -11,6 +11,18 @@ import { NeuralNodesBackground } from "@/components/ui/neural-nodes-background";
 import { ONBOARDING_PLANS, formatPlanPrice } from "@/lib/clinic/subscription-plans";
 import { PhoneVerificationField } from "@/components/onboarding/phone-verification-field";
 import { CLINIC_BRAND_LOGO_SRC } from "@/lib/clinic/brand";
+
+/**
+ * Maps the onboarding plan ids (which stay fixed — they flow into
+ * `professionals.plan` and the MercadoPago checkout's `findSubscriptionPlan`
+ * lookup, see subscription-plans.ts) to their nodo_core.planes `code`, purely
+ * to pull live display pricing. "basico" has no nodo_core.planes counterpart
+ * today, so it keeps its static copy untouched.
+ */
+const ONBOARDING_PLAN_DB_CODES: Record<string, string> = {
+  trial: "medico_demo",
+  profesional: "medico_pro",
+};
 
 const inputClass =
   "mt-1 w-full rounded-lg px-3 py-2.5 text-sm bg-white border border-slate-200 text-navy placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/25 focus:border-teal-500 transition-shadow [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_#ffffff] [&:-webkit-autofill]:[-webkit-text-fill-color:#1e293b]";
@@ -31,6 +43,27 @@ function OnboardingMedicoContent() {
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [phoneSkipped, setPhoneSkipped] = useState(false);
   const canSubmitPhone = phoneVerified || phoneSkipped;
+
+  const [livePricing, setLivePricing] = useState<
+    Record<string, { label: string; amount: number; currency: string }>
+  >({});
+
+  useEffect(() => {
+    let cancelled = false;
+    clinicApi.getOnboardingPlanPricing().then((pricing) => {
+      if (!cancelled) setLivePricing(pricing);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const displayPlans = ONBOARDING_PLANS.map((p) => {
+    const dbCode = ONBOARDING_PLAN_DB_CODES[p.id];
+    const live = dbCode ? livePricing[dbCode] : undefined;
+    if (!live) return p;
+    return { ...p, name: live.label, amount: live.amount, currency: live.currency };
+  });
 
   if (!token) {
     return (
@@ -151,25 +184,25 @@ function OnboardingMedicoContent() {
             <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Plan de suscripción</p>
               <div className="grid sm:grid-cols-3 gap-3">
-                {ONBOARDING_PLANS.map((p) => (
+                {displayPlans.map((p) => (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => setPlan(p.id)}
                     className={`rounded-lg px-4 py-4 text-left border font-medium transition-all ${
                       plan === p.id
-                        ? "border-teal-500 bg-white text-navy ring-1 ring-teal-400 shadow-sm"
+                        ? "border-teal-600 bg-teal-600 text-white shadow-sm"
                         : "border-slate-200 bg-white text-slate-600 hover:border-teal-300"
                     }`}
                   >
                     <span className="block text-sm font-semibold">{p.name}</span>
-                    <span className={`block text-base font-bold mt-1 ${plan === p.id ? "text-teal-600" : "text-slate-500"}`}>
-                      {formatPlanPrice(p)} <span className="text-xs font-normal text-slate-400">{p.period}</span>
+                    <span className={`block text-base font-bold mt-1 ${plan === p.id ? "text-white" : "text-slate-500"}`}>
+                      {formatPlanPrice(p)} <span className={`text-xs font-normal ${plan === p.id ? "text-teal-100" : "text-slate-400"}`}>{p.period}</span>
                     </span>
                     <ul className="mt-2 space-y-1">
                       {p.features.map((f) => (
-                        <li key={f} className="text-xs text-slate-400 flex items-center gap-1">
-                          <span className={plan === p.id ? "text-teal-500" : "text-slate-300"}>✓</span> {f}
+                        <li key={f} className={`text-xs flex items-center gap-1 ${plan === p.id ? "text-teal-50" : "text-slate-400"}`}>
+                          <span className={plan === p.id ? "text-white" : "text-slate-300"}>✓</span> {f}
                         </li>
                       ))}
                     </ul>

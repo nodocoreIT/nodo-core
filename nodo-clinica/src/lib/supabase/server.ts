@@ -56,3 +56,18 @@ export async function createSharedServiceClient() {
     }
   );
 }
+
+/** Read-only access to the cross-nodo commercial catalog (nodo_core.planes and friends). */
+export async function createNodoCoreServiceClient() {
+  const { createClient: createSupabaseClient } = await import(
+    "@supabase/supabase-js"
+  );
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: { persistSession: false },
+      db: { schema: "nodo_core" },
+    }
+  );
+}
