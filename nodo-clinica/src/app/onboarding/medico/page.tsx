@@ -9,7 +9,7 @@ import { clinicApi } from "@/lib/clinic/client-api";
 import { SpecialtyCombobox } from "@/components/ui/specialty-combobox";
 import { NeuralNodesBackground } from "@/components/ui/neural-nodes-background";
 import { ONBOARDING_PLANS, formatPlanPrice } from "@/lib/clinic/subscription-plans";
-import { PhoneVerificationField } from "@/components/onboarding/phone-verification-field";
+import { PhoneField } from "@/components/onboarding/phone-field";
 import { CLINIC_BRAND_LOGO_SRC } from "@/lib/clinic/brand";
 
 /**
@@ -40,9 +40,8 @@ function OnboardingMedicoContent() {
     specialty: "",
     licenseNumber: "",
   });
-  const [phoneVerified, setPhoneVerified] = useState(false);
-  const [phoneSkipped, setPhoneSkipped] = useState(false);
-  const canSubmitPhone = phoneVerified || phoneSkipped;
+  const [phone, setPhone] = useState("");
+  const [phoneValid, setPhoneValid] = useState(false);
 
   const [livePricing, setLivePricing] = useState<
     Record<string, { label: string; amount: number; currency: string }>
@@ -87,8 +86,8 @@ function OnboardingMedicoContent() {
       toast.error("El nombre completo y la especialidad son requeridos.");
       return;
     }
-    if (!canSubmitPhone) {
-      toast.error("Verificá tu celular o marcá omitir este campo para continuar.");
+    if (!phoneValid) {
+      toast.error("Ingresá un número de celular con formato válido.");
       return;
     }
     setLoading(true);
@@ -99,7 +98,7 @@ function OnboardingMedicoContent() {
         licenseNumber: form.licenseNumber,
         plan,
         token,
-        skipPhoneVerification: phoneSkipped,
+        phone: phone.trim(),
       });
       setSubmitted(true);
     } catch (err) {
@@ -173,11 +172,11 @@ function OnboardingMedicoContent() {
               </div>
             </div>
 
-            <PhoneVerificationField
-              onboardingToken={token}
+            <PhoneField
+              value={phone}
+              onChange={setPhone}
+              onValidChange={setPhoneValid}
               labelClass={labelClass}
-              onVerifiedChange={setPhoneVerified}
-              onSkipChange={setPhoneSkipped}
             />
 
             {/* Planes */}
@@ -214,7 +213,7 @@ function OnboardingMedicoContent() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading || !canSubmitPhone}
+              disabled={loading || !phoneValid}
               className="w-full rounded-lg py-3.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar y solicitar habilitación"}

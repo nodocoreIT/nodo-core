@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient, createSharedServiceClient } from "@/lib/supabase/server";
-import { assertOnboardingPhoneVerified } from "@/lib/clinic/phone-verification";
+import { normalizeArMobilePhone } from "@/lib/clinic/phone-utils";
 import { CLINIC_ORG_ID, syncClinicaAuthClaims } from "@/lib/clinic/clinic-org";
 import { upsertProfessionalOnboardingRecord } from "@/lib/clinic/db/professionals";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
-    const { fullName, specialty, licenseNumber, plan, token, skipPhoneVerification } = body as {
+    const { fullName, specialty, licenseNumber, plan, token, phone } = body as {
       fullName?: string;
       specialty?: string;
       licenseNumber?: string;
       plan?: string;
       token?: string;
-      skipPhoneVerification?: boolean;
+      phone?: string;
     };
 
     if (!token) {
@@ -48,16 +48,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    let verifiedPhone: string | null = null;
-    if (!skipPhoneVerification) {
-      try {
-        verifiedPhone = await assertOnboardingPhoneVerified(token);
-      } catch (e) {
-        return NextResponse.json(
-          { error: e instanceof Error ? e.message : "Celular no verificado." },
-          { status: 400 },
-        );
-      }
+    const normalizedPhone = normalizeArMobilePhone((phone ?? "").trim());
+    if (!normalizedPhone) {
+      return NextResponse.json(
+        { error: "Ingresá un número de celular con formato válido." },
+        { status: 400 },
+      );
     }
 
     const email = pending.email as string;
@@ -110,8 +106,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       specialty,
       licenseNumber,
       plan,
-      phone: verifiedPhone,
-      phoneVerifiedAt: verifiedPhone ? new Date().toISOString() : null,
+      phone: normalizedPhone,
+      phoneVerifiedAt: null,
     });
 
     if (!profResult.ok) {

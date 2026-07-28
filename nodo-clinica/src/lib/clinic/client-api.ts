@@ -423,37 +423,6 @@ export const clinicApi = {
     return data as { ok: boolean };
   },
 
-  async sendOnboardingPhoneCode(payload: {
-    token: string;
-    phone: string;
-  }): Promise<{ ok: boolean; phoneE164: string; mock?: boolean; devCode?: string }> {
-    const res = await fetch(`${BASE}/api/clinic/account/onboarding/phone/send-code`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(payload),
-    });
-    const data = await parseJsonResponse(res);
-    if (!res.ok) throw new Error(data.error || "Error al enviar código");
-    return data as { ok: boolean; phoneE164: string; mock?: boolean; devCode?: string };
-  },
-
-  async verifyOnboardingPhoneCode(payload: {
-    token: string;
-    phone: string;
-    code: string;
-  }): Promise<{ ok: boolean; verified: boolean; phoneE164: string }> {
-    const res = await fetch(`${BASE}/api/clinic/account/onboarding/phone/verify-code`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(payload),
-    });
-    const data = await parseJsonResponse(res);
-    if (!res.ok) throw new Error(data.error || "Error al verificar código");
-    return data as { ok: boolean; verified: boolean; phoneE164: string };
-  },
-
   /**
    * Display-only pricing for the onboarding plan cards, read from
    * nodo_core.planes. Returns an empty map on any failure — callers keep
@@ -481,7 +450,7 @@ export const clinicApi = {
     licenseNumber: string;
     plan: string;
     token: string;
-    skipPhoneVerification?: boolean;
+    phone: string;
   }): Promise<{ ok: boolean }> {
     const res = await fetch(`${BASE}/api/clinic/account/onboarding/medico`, {
       method: "POST",

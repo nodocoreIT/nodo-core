@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { assertOnboardingPhoneVerified } from "@/lib/clinic/phone-verification";
+import { normalizeArMobilePhone } from "@/lib/clinic/phone-utils";
 import { CLINIC_ORG_ID, syncClinicaAuthClaims } from "@/lib/clinic/clinic-org";
 import {
   upsertHealthProfile,
@@ -25,9 +25,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const plan = formData.get("plan") as string | null;
     const dniFront = formData.get("dniFront") as File | null;
     const dniBack = formData.get("dniBack") as File | null;
-    const skipPhoneVerification =
-      formData.get("skipPhoneVerification") === "1" ||
-      formData.get("skipPhoneVerification") === "true";
+    const phone = formData.get("phone") as string | null;
 
     if (!token) {
       return NextResponse.json(
@@ -61,16 +59,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    let verifiedPhone: string | null = null;
-    if (!skipPhoneVerification) {
-      try {
-        verifiedPhone = await assertOnboardingPhoneVerified(token);
-      } catch (e) {
-        return NextResponse.json(
-          { error: e instanceof Error ? e.message : "Celular no verificado." },
-          { status: 400 },
-        );
-      }
+    const normalizedPhone = normalizeArMobilePhone((phone ?? "").trim());
+    if (!normalizedPhone) {
+      return NextResponse.json(
+        { error: "Ingresá un número de celular con formato válido." },
+        { status: 400 },
+      );
     }
 
     const email = pending.email as string;
@@ -167,8 +161,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       address: address ?? null,
       obraSocial: obraSocial?.trim() || null,
       plan,
-      phone: verifiedPhone,
-      phoneVerifiedAt: verifiedPhone ? new Date().toISOString() : null,
+      phone: normalizedPhone,
+      phoneVerifiedAt: null,
       dniFrontPath,
       dniBackPath,
     });
