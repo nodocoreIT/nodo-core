@@ -212,6 +212,56 @@ function SubmissionOverlay({ message }: { message: string }) {
   );
 }
 
+function PasswordToggleButton({
+  visible,
+  onToggle,
+}: {
+  visible: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate2 hover:text-ink cursor-pointer select-none bg-transparent border-none p-1"
+    >
+      {visible ? (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+          <line x1="1" y1="1" x2="23" y2="23" />
+        </svg>
+      ) : (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 export default function LoginPage() {
   return (
     <Suspense
@@ -307,6 +357,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [nameError, setNameError] = useState("");
@@ -1228,33 +1279,45 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                   <label htmlFor="forced-pass" className="block text-[13px] font-semibold text-navy mb-1.5">
                     Contraseña
                   </label>
-                  <input
-                    id="forced-pass"
-                    type="password"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setPasswordError("");
-                    }}
-                    className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
-                    placeholder="Mínimo 8 caracteres"
-                  />
+                  <div className="relative">
+                    <input
+                      id="forced-pass"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setPasswordError("");
+                      }}
+                      className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus} pr-12`}
+                      placeholder="Mínimo 8 caracteres"
+                    />
+                    <PasswordToggleButton
+                      visible={showPassword}
+                      onToggle={() => setShowPassword(!showPassword)}
+                    />
+                  </div>
                 </div>
 
                 <div className="mb-4">
                   <label htmlFor="forced-pass-confirm" className="block text-[13px] font-semibold text-navy mb-1.5">
                     Repetir contraseña
                   </label>
-                  <input
-                    id="forced-pass-confirm"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => {
-                      setConfirmPassword(e.target.value);
-                      setPasswordError("");
-                    }}
-                    className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
-                  />
+                  <div className="relative">
+                    <input
+                      id="forced-pass-confirm"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        setPasswordError("");
+                      }}
+                      className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus} pr-12`}
+                    />
+                    <PasswordToggleButton
+                      visible={showConfirmPassword}
+                      onToggle={() => setShowConfirmPassword(!showConfirmPassword)}
+                    />
+                  </div>
                   {passwordError && <p className="text-[12.5px] text-[#C0392B] mt-1.5">{passwordError}</p>}
                 </div>
 
@@ -1355,44 +1418,10 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                         }}
                         className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus} pr-16`}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate2 hover:text-ink cursor-pointer select-none bg-transparent border-none p-1"
-                      >
-                        {showPassword ? (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                            <line x1="1" y1="1" x2="23" y2="23" />
-                          </svg>
-                        ) : (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                            <circle cx="12" cy="12" r="3" />
-                          </svg>
-                        )}
-                      </button>
+                      <PasswordToggleButton
+                        visible={showPassword}
+                        onToggle={() => setShowPassword(!showPassword)}
+                      />
                     </div>
                     {passwordError && (
                       <p className="text-[12.5px] text-[#C0392B] mt-1.5">
@@ -1513,34 +1542,46 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                   <label htmlFor="first-pass" className="block text-[13px] font-semibold text-navy mb-1.5">
                     Contraseña
                   </label>
-                  <input
-                    id="first-pass"
-                    type="password"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setPasswordError("");
-                    }}
-                    className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
-                    placeholder="Ingresé contraseña…"
-                  />
+                  <div className="relative">
+                    <input
+                      id="first-pass"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setPasswordError("");
+                      }}
+                      className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus} pr-12`}
+                      placeholder="Ingresé contraseña…"
+                    />
+                    <PasswordToggleButton
+                      visible={showPassword}
+                      onToggle={() => setShowPassword(!showPassword)}
+                    />
+                  </div>
                 </div>
 
                 <div className="mb-4">
                   <label htmlFor="first-pass-confirm" className="block text-[13px] font-semibold text-navy mb-1.5">
                     Repetir contraseña
                   </label>
-                  <input
-                    id="first-pass-confirm"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => {
-                      setConfirmPassword(e.target.value);
-                      setPasswordError("");
-                    }}
-                    placeholder="Repetí la contraseña…"
-                    className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
-                  />
+                  <div className="relative">
+                    <input
+                      id="first-pass-confirm"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        setPasswordError("");
+                      }}
+                      placeholder="Repetí la contraseña…"
+                      className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus} pr-12`}
+                    />
+                    <PasswordToggleButton
+                      visible={showConfirmPassword}
+                      onToggle={() => setShowConfirmPassword(!showConfirmPassword)}
+                    />
+                  </div>
                   {passwordError && <p className="text-[12.5px] text-[#C0392B] mt-1.5">{passwordError}</p>}
                 </div>
 
@@ -1774,17 +1815,23 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                             >
                               Contraseña
                             </label>
-                            <input
-                              id="reg-patient-pass"
-                              type="password"
-                              placeholder="Ingresé contraseña…"
-                              value={password}
-                              onChange={(e) => {
-                                setPassword(e.target.value);
-                                setPasswordError("");
-                              }}
-                              className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus}`}
-                            />
+                            <div className="relative">
+                              <input
+                                id="reg-patient-pass"
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Ingresé contraseña…"
+                                value={password}
+                                onChange={(e) => {
+                                  setPassword(e.target.value);
+                                  setPasswordError("");
+                                }}
+                                className={`${inputBase} ${passwordError ? inputError : inputNormal} ${inputFocus} pr-12`}
+                              />
+                              <PasswordToggleButton
+                                visible={showPassword}
+                                onToggle={() => setShowPassword(!showPassword)}
+                              />
+                            </div>
                             {passwordError && (
                               <p className="text-[12.5px] text-[#C0392B] mt-1.5">
                                 {passwordError}
