@@ -213,7 +213,7 @@ export async function notifyDoctorMercadoPagoPayment(params: {
 
     const amountLabel =
       params.amount != null
-        ? `${params.currency ?? "ARS"} ${params.amount.toLocaleString("es-AR")}`
+        ? `${params.currency ?? "$ "} ${params.amount.toLocaleString("es-AR")}`
         : "honorario";
 
     const notification: LocalDoctorNotification = {

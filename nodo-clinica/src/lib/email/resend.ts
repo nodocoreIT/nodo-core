@@ -48,10 +48,7 @@ export async function sendAppointmentConfirmationEmail(
     <head><meta charset="utf-8"></head>
     <body style="font-family: 'Inter', Arial, sans-serif; background: #f8fafc; padding: 32px;">
       <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
-        <div style="background: linear-gradient(135deg, #1e40af, #3b82f6); padding: 32px; text-align: center;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">Clínica Virtual</h1>
-          <p style="color: #bfdbfe; margin: 8px 0 0;">Confirmación de turno</p>
-        </div>
+        ${clinicEmailTealHeader("Confirmación de turno")}
         <div style="padding: 32px;">
           <p style="color: #334155; font-size: 16px;">Hola <strong>${patientName}</strong>,</p>
           <p style="color: #64748b; line-height: 1.6;">
@@ -64,18 +61,13 @@ export async function sendAppointmentConfirmationEmail(
           </p>
           <div style="text-align: center; margin: 32px 0;">
             <a href="${waitingRoomUrl}"
-               style="background: #1e40af; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
+               style="background: #0f766e; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
               Ingresar como paciente
             </a>
           </div>
           <p style="color: #94a3b8; font-size: 13px; line-height: 1.5;">
             Este enlace es único y personal. No lo compartas con terceros.
             Podrás subir estudios previos desde la sala de espera.
-          </p>
-        </div>
-        <div style="background: #f1f5f9; padding: 16px 32px; text-align: center;">
-          <p style="color: #94a3b8; font-size: 12px; margin: 0;">
-            © Clínica Virtual — Consulta médica segura
           </p>
         </div>
       </div>
