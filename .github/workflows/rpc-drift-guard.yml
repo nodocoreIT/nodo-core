@@ -1,0 +1,71 @@
+name: RPC drift guard
+
+# public.user_has_node_access runs on EVERY login of EVERY nodo. It has a
+# documented incident: a nodo-inmo migration once silently redefined it and
+# broke Autos/Finanzas login until a follow-up migration restored it (see
+# nodo-inmo/supabase/migrations/20260622120001_local_inmo_node_access_rpc.sql
+# and 20260623000002_restore_user_has_node_access.sql — both are grandfathered
+# below since they legitimately still contain the function body from that
+# incident; they are historical record, not new drift).
+#
+# nodo-landing/supabase/migrations is the single permitted place to define or
+# replace this function (see openspec/changes/platform-subscription-billing/
+# specs/node-access/spec.md — "Single Source of Truth for user_has_node_access").
+# This job fails any PR that introduces a NEW migration file outside that
+# directory containing a redefinition, so the incident can't repeat silently.
+
+on:
+  pull_request:
+    paths:
+      - "**/supabase/migrations/*.sql"
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for user_has_node_access redefinitions outside nodo-landing
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Grandfathered by exact filename — legitimate historical record of
+          # the incident above, not permitted for any *new* file to match.
+          allowlist=(
+            "nodo-inmo/supabase/migrations/20260622120001_local_inmo_node_access_rpc.sql"
+            "nodo-inmo/supabase/migrations/20260623000002_restore_user_has_node_access.sql"
+          )
+
+          violations=()
+          while IFS= read -r -d '' file; do
+            case "$file" in
+              ./nodo-landing/supabase/migrations/*) continue ;;
+            esac
+
+            rel="${file#./}"
+            allowed=false
+            for entry in "${allowlist[@]}"; do
+              if [[ "$rel" == "$entry" ]]; then
+                allowed=true
+                break
+              fi
+            done
+            if [[ "$allowed" == true ]]; then
+              continue
+            fi
+
+            if grep -qiE 'function[[:space:]]+public\.user_has_node_access' "$file"; then
+              violations+=("$rel")
+            fi
+          done < <(find . -path '*/supabase/migrations/*.sql' -print0)
+
+          if [ "${#violations[@]}" -gt 0 ]; then
+            echo "::error::user_has_node_access must only be defined in nodo-landing/supabase/migrations. Offending file(s):"
+            for v in "${violations[@]}"; do
+              echo "::error file=${v}::Redefines public.user_has_node_access outside nodo-landing/supabase/migrations"
+            done
+            exit 1
+          fi
+
+          echo "OK — no migration outside nodo-landing/supabase/migrations redefines public.user_has_node_access."

@@ -53,8 +53,8 @@ lines once tests are included — if so, split into 6a (Preapproval create/helpe
 
 ## Phase 3: RPC Drift CI Guard
 
-- [ ] 3.1 Create `.github/workflows/rpc-drift-guard.yml`: on PR, grep all `**/supabase/migrations/*.sql` outside `nodo-landing/supabase/migrations/` for `function public.user_has_node_access`; fail if found. Allowlist `nodo-inmo/supabase/migrations/20260622120001_*.sql` and `nodo-inmo/supabase/migrations/20260623000002_*.sql` by exact filename match (grandfathered — do not naive-grep-fail on these). Ref: spec `node-access` — Single Source of Truth, both scenarios.
-- [ ] 3.2 Add a short comment in the workflow explaining WHY those two files are allowlisted (incident reference) so future maintainers don't remove the exception blindly.
+- [x] 3.1 Created `.github/workflows/rpc-drift-guard.yml` (first workflow in the repo — no `.github/workflows` existed before). Triggers on PRs touching any `**/supabase/migrations/*.sql`; greps every migration file outside `nodo-landing/supabase/migrations/` for `function public.user_has_node_access` (case-insensitive), failing with `::error::` annotations listing offenders. Allowlists the 2 grandfathered nodo-inmo files by exact relative path. Verified locally (not just YAML-valid): confirmed it passes clean against the real repo, confirmed it genuinely catches an injected fake-violation file (temporarily created + removed), and confirmed the 2 allowlisted files DO match the grep pattern (so the allowlist is actually being exercised, not coincidentally passing). Ref: spec `node-access` — Single Source of Truth, both scenarios.
+- [x] 3.2 Explanatory comment block at the top of the workflow references the actual incident (nodo-inmo migration `20260622120001` broke Autos/Finanzas login, restored by `20260623000002`) and states both are historical record, not permission for new drift.
 
 ## Phase 4: shared-components — Billing Lockout Gate
 
