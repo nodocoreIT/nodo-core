@@ -776,6 +776,98 @@ export async function sendAccountEnabledEmail({
   });
 }
 
+/** Sent once when a client_unit's platform subscription flips to `impago` (see lib/billing). */
+export async function sendPaymentOverdueEmail({
+  nombre,
+  email,
+  nodeLabel,
+  subscriptionUrl,
+  unitCode = "",
+}: {
+  nombre: string;
+  email: string;
+  nodeLabel: string;
+  subscriptionUrl: string;
+  unitCode?: string;
+}): Promise<void> {
+  const transporter = createTransporter();
+
+  const slug = unitCode.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const brandMap: Record<string, { brand: string; light: boolean }> = {
+    finanzas:    { brand: "#43936C", light: false },
+    clinica:     { brand: "#0D9488", light: false },
+    salud:       { brand: "#0D9488", light: false },
+    autos:       { brand: "#D12D3C", light: false },
+    automotores: { brand: "#D12D3C", light: false },
+    obra:        { brand: "#CA8A04", light: false },
+    contable:    { brand: "#7C3AED", light: false },
+    ecommerce:   { brand: "#FFF600", light: true  },
+  };
+  const theme      = brandMap[slug] ?? { brand: "#DA5A0E", light: false };
+  const brandColor = theme.brand;
+  const buttonText = theme.light ? "#000000" : "#ffffff";
+  const linkColor  = theme.light ? "#857f00" : brandColor;
+
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://www.nodocore.com.ar").replace(/\/$/, "");
+  const logoUrl = `${appUrl}/logos/logo%20compuesto%20estrella%20az%20letra%20blanca_50.png`;
+  const logoHtml = `<img src="${logoUrl}" alt="NODO Core" style="height:44px;width:auto;display:inline-block;"/>`;
+
+  await transporter.sendMail({
+    from: `"NODO Core · Suscripción" <${USER}>`,
+    to: email,
+    subject: `Hay un problema con el pago de tu suscripción a ${nodeLabel}`,
+    text: `Hola ${nombre},\n\nNo pudimos procesar el cobro de tu suscripción a ${nodeLabel}. Mientras el pago esté pendiente, el acceso queda limitado a la sección de Suscripción para que puedas regularizarlo:\n\n${subscriptionUrl}\n\nSaludos,\nNODO Core`,
+    html: `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+
+        <!-- Header brandado -->
+        <div style="background-color:${brandColor};padding:36px 48px 28px;text-align:center;">
+          ${logoHtml}
+        </div>
+
+        <!-- Body -->
+        <div style="background:#ffffff;padding:32px;">
+          <h2 style="color:#0a0a0a;margin:0 0 8px;font-size:22px;font-weight:800;text-align:center;">
+            Hay un problema con tu pago
+          </h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;text-align:center;margin:0 0 8px;">
+            en <strong>${nodeLabel}</strong>
+          </p>
+          <hr style="border:none;border-top:1px solid #f3f4f6;margin:20px 0;"/>
+          <p style="color:#4b5563;font-size:15px;line-height:1.6;margin:0 0 24px;">
+            Hola <strong>${nombre}</strong>,<br/><br/>
+            No pudimos procesar el cobro de tu suscripción a <strong>${nodeLabel}</strong>. Mientras el pago esté pendiente, el acceso queda limitado a la sección de Suscripción para que puedas regularizarlo.
+          </p>
+
+          <!-- CTA -->
+          <div style="text-align:center;margin:0 0 28px;">
+            <a href="${subscriptionUrl}"
+               style="background-color:${brandColor};color:${buttonText};padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:800;display:inline-block;font-size:15px;letter-spacing:.01em;">
+              Regularizar suscripción
+            </a>
+          </div>
+
+          <p style="color:#9ca3af;font-size:12px;line-height:1.5;margin:0;">
+            Si el botón no funciona, copiá este enlace en tu navegador:<br/>
+            <a href="${subscriptionUrl}" style="color:${linkColor};word-break:break-all;">${subscriptionUrl}</a>
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="background:#f9fafb;border-top:1px solid #f3f4f6;padding:16px 32px;text-align:center;">
+          <p style="color:#9ca3af;font-size:11px;margin:0;">
+            Si ya regularizaste el pago, podés ignorar este correo.
+          </p>
+          <p style="color:#d1d5db;font-size:11px;margin:6px 0 0;">
+            © 2026 NODO Core · nodocore.com.ar
+          </p>
+        </div>
+
+      </div>
+    `,
+  });
+}
+
 export async function sendActivationEmail({
   nombre,
   email,
