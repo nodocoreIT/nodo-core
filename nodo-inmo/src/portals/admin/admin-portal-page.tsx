@@ -14,6 +14,7 @@ import { PortalPage } from "@/features/portal/components/portal-page";
 import { AgendaPage } from "@/features/agenda/components/agenda-page";
 import { ReclamosAdminPage } from "@/features/reclamos/components/reclamos-admin-page";
 import { RedesSocialesPage } from "@/features/redes-sociales/components/redes-sociales-page";
+import { SuscripcionPage } from "@/features/config/suscripcion-page";
 import { PlanGate } from "@/shared/components/plan-gate";
 
 export function AdminPortalPage() {
@@ -45,6 +46,7 @@ export function AdminPortalPage() {
         <Route path="nodo-id" element={<PlanGate requiredPlan="pro" fullPage><div /></PlanGate>} />
         <Route path="bot-integraciones" element={<PlanGate requiredPlan="pro" fullPage><div /></PlanGate>} />
         <Route path="redes-sociales" element={<RedesSocialesPage />} />
+        <Route path="suscripcion" element={<SuscripcionPage />} />
       </Route>
     </Routes>
   );

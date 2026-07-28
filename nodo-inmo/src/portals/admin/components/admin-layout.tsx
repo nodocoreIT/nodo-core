@@ -22,6 +22,7 @@ import {
   Fingerprint,
   Bot,
   Share2,
+  DollarSign,
 } from "lucide-react";
 import {
   Button,
@@ -45,7 +46,11 @@ import {
   DialogDescription,
 } from "@/shared/components/ui/dialog";
 import { AgencyProfileForm } from "@/features/agency-profile/components/agency-profile-form";
-import { useAuth } from "@nodocore/shared-components";
+import {
+  useAuth,
+  useBillingLockout,
+  type BillingLockoutResult,
+} from "@nodocore/shared-components";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import { cn } from "@/shared/lib/utils";
 import { SettingsDialog, type SettingsTabId } from "@nodocore/nodo-modules/settings";
@@ -99,6 +104,7 @@ const NAV_ENTRIES: NavEntry[] = [
       { to: "/admin/agenda", label: "Agenda y Tareas", icon: Calendar },
     ],
   },
+  { to: "/admin/suscripcion", label: "Suscripción", icon: DollarSign },
 ];
 
 const PRO_NAV_ITEMS: NavItem[] = [
@@ -142,6 +148,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/agenda": "Agenda y Tareas",
   "/admin/reclamos": "Reclamos",
   "/admin/redes-sociales": "Redes Sociales",
+  "/admin/suscripcion": "Suscripción",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -172,11 +179,25 @@ function initials(value: string): string {
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
+const SUBSCRIPTION_PATH = "/admin/suscripcion";
+
 export function AdminLayout() {
-  const { user, role, plan, signOut } = useAuth();
+  const { user, role, plan, billingLocked, signOut } = useAuth();
   const { data: profile } = useOrgProfile();
   const { pathname } = useLocation();
   const navigate = useNavigate();
+
+  const billingGate = useBillingLockout({
+    billingLocked,
+    pathname,
+    subscriptionPath: SUBSCRIPTION_PATH,
+  });
+
+  useEffect(() => {
+    if (billingGate.shouldRedirect && billingGate.redirectTo) {
+      navigate(billingGate.redirectTo, { replace: true });
+    }
+  }, [billingGate.shouldRedirect, billingGate.redirectTo, navigate]);
   const resetSearch = useSearchStore((s) => s.reset);
   const setSearchQuery = useSearchStore((s) => s.setQuery);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -331,6 +352,7 @@ export function AdminLayout() {
         plan={plan}
         signOut={signOut}
         pathname={pathname}
+        billingGate={billingGate}
         placeholder={placeholder}
         title={title}
         fullName={fullName}
@@ -357,6 +379,7 @@ interface AdminLayoutShellProps {
   plan: ReturnType<typeof useAuth>["plan"];
   signOut: ReturnType<typeof useAuth>["signOut"];
   pathname: string;
+  billingGate: BillingLockoutResult;
   placeholder: string | undefined;
   title: string;
   fullName: string;
@@ -380,6 +403,7 @@ function AdminLayoutShell({
   plan,
   signOut,
   pathname,
+  billingGate,
   placeholder,
   title,
   fullName,
@@ -623,7 +647,18 @@ function AdminLayoutShell({
 
         {/* Content area — extra bottom padding on mobile for the feedback nodo FAB */}
         <main className="flex-1 overflow-auto p-4 pb-24 sm:p-6 sm:pb-6">
-          <Outlet />
+          {billingGate.shouldRedirect && !billingGate.redirectTo ? (
+            // Fail-safe: no Suscripción route configured — block rather than grant access.
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+              <Lock className="h-10 w-10 text-slate2" />
+              <p className="text-sm text-slate2 max-w-sm">
+                Tu acceso está restringido por un problema con el pago de la suscripción.
+                Contactate con NODO Core para regularizarlo.
+              </p>
+            </div>
+          ) : billingGate.shouldRedirect ? null : (
+            <Outlet />
+          )}
         </main>
       </div>
 

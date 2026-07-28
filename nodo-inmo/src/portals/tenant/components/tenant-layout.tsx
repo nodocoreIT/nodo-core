@@ -7,8 +7,13 @@ import {
   LogOut,
   Menu,
   X,
+  Lock,
 } from "lucide-react";
-import { useAuth, useFixedDocumentTitle } from "@nodocore/shared-components";
+import {
+  useAuth,
+  useFixedDocumentTitle,
+  useBillingLockout,
+} from "@nodocore/shared-components";
 import { BrandMark } from "@/shared/components/brand-mark";
 import { cn } from "@/shared/lib/utils";
 
@@ -48,9 +53,13 @@ function initials(value: string): string {
 // ── Layout ────────────────────────────────────────────────────────────────────
 
 export function TenantLayout() {
-  const { user, signOut } = useAuth();
+  const { user, billingLocked, signOut } = useAuth();
   const { pathname } = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // No Suscripción screen for tenants (they can't pay it) — any lock always
+  // shows the generic notice below instead of redirecting anywhere.
+  const billingGate = useBillingLockout({ billingLocked, pathname });
 
   const email = user?.email ?? "";
   const fullName = (user?.user_metadata?.full_name as string | undefined) ?? "";
@@ -175,7 +184,17 @@ export function TenantLayout() {
 
         {/* Content */}
         <main className="flex-1 overflow-auto p-6">
-          <Outlet />
+          {billingGate.shouldRedirect ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+              <Lock className="h-10 w-10 text-slate2" />
+              <p className="text-sm text-slate2 max-w-sm">
+                El acceso está restringido por un problema con el pago de la suscripción de tu
+                inmobiliaria. Contactate con ellos para regularizarlo.
+              </p>
+            </div>
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
     </div>
