@@ -13,7 +13,13 @@ export const CLINICA_REGISTRATION_URL =
 export const CLINICA_UNIT_CODES = ["clinica", "Clínica", "salud", "Salud"] as const;
 
 export const CLINICA_AUTH_CONFIG: AuthConfig = {
-  unitCode: "clinica",
+  // Must match nodo_core.client_units/planes.unit_code exactly ("Clínica",
+  // capitalized with accent) — user_has_node_access does an exact string
+  // match, no case/accent folding. Previously "clinica" (lowercase, no
+  // accent), which never matched and made AuthProvider's session validation
+  // silently no-op (no visible effect since nothing consumed useAuth() here
+  // until the billing-lockout gate).
+  unitCode: "Clínica",
   allowedRoles: ["super_admin", "admin", "medico", "agent"],
   roleDestinations: {
     super_admin: "/medico/dashboard",

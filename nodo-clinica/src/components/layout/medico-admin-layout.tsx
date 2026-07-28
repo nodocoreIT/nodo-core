@@ -14,6 +14,7 @@ import {
   Wallet,
   CalendarDays,
   CalendarPlus,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/nodo/brand-mark";
@@ -39,6 +40,7 @@ import { DoctorSpecialtySetupModal } from "@/components/medical/doctor-specialty
 import { ClinicNotificationsBell } from "@/components/layout/clinic-notifications-bell";
 import { needsSpecialtyAssignment } from "@/lib/clinic/unassigned-specialty";
 import { PlanBadge } from "@/components/plan/plan-badge";
+import { BillingLockoutGate } from "@/components/layout/billing-lockout-gate";
 import { toast } from "sonner";
 
 function mpErrorLabel(code: string) {
@@ -66,6 +68,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/medico/turnos-programados", label: "Turnos Programados", icon: CalendarDays },
   { href: "/medico/cobros", label: "Cobros", icon: Wallet },
   { href: "/medico/interconsultas", label: "Interconsultas", icon: MessageSquare },
+  { href: "/medico/suscripcion-plataforma", label: "Suscripción NODO", icon: DollarSign },
 ];
 
 const ROUTE_TITLES: Record<string, string> = {
@@ -75,6 +78,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/medico/turnos-programados": "Turnos Programados",
   "/medico/cobros": "Cobros",
   "/medico/interconsultas": "Interconsultas",
+  "/medico/suscripcion-plataforma": "Suscripción NODO",
 };
 
 function initials(value: string): string {
@@ -544,7 +548,11 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
           </header>
 
           <main className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] sm:p-6 sm:pb-6">
-            {children}
+            {isPlatformMode() && isBrowserSupabaseEnabled() ? (
+              <BillingLockoutGate>{children}</BillingLockoutGate>
+            ) : (
+              children
+            )}
           </main>
         </div>
 
