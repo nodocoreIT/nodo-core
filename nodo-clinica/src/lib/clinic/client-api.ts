@@ -643,10 +643,12 @@ export const clinicApi = {
   async getMercadoPagoCheckout(params: {
     accessToken?: string;
     appointmentId?: string;
+    returnTo?: "sala" | "portal";
   }) {
     const q = new URLSearchParams();
     if (params.accessToken) q.set("accessToken", params.accessToken);
     if (params.appointmentId) q.set("appointmentId", params.appointmentId);
+    if (params.returnTo) q.set("returnTo", params.returnTo);
     const res = await fetch(`${BASE}/api/clinic/mercadopago?${q}`, {
       credentials: "include",
     });

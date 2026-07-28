@@ -742,6 +742,7 @@ export function WaitingRoom({
                     try {
                       const result = await clinicApi.getMercadoPagoCheckout({
                         accessToken,
+                        returnTo: embedded ? "portal" : "sala",
                       });
                       if (result.paid && result.waitingRoomUrl) {
                         await loadAppointment();

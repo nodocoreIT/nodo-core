@@ -3,12 +3,18 @@ import { isLocalMode } from "@/lib/clinic/config";
 import { readDb } from "@/lib/clinic/local-db";
 import { isPaymentConfirmed } from "@/lib/clinic/payment";
 import { getSessionFromRequest } from "@/lib/clinic/session";
-import { buildCheckoutForAppointment } from "@/lib/mercadopago/checkout";
+import {
+  buildCheckoutForAppointment,
+  type CheckoutOptions,
+} from "@/lib/mercadopago/checkout";
 import { requireAuth } from "@/lib/supabase/auth-guard";
 import { getAppointmentById } from "@/lib/clinic/db/appointments";
 import { resolveAppointmentByAccessToken } from "@/lib/clinic/appointment-token-auth";
 
-async function checkoutOrPaidResponse(row: Record<string, unknown>) {
+async function checkoutOrPaidResponse(
+  row: Record<string, unknown>,
+  returnTo: CheckoutOptions["returnTo"],
+) {
   const paymentStatus = row.payment_status as string | null;
   if (paymentStatus === "confirmed" || paymentStatus === "waived") {
     return NextResponse.json({
@@ -17,7 +23,7 @@ async function checkoutOrPaidResponse(row: Record<string, unknown>) {
     });
   }
 
-  const result = await buildCheckoutForAppointment(row.id as string);
+  const result = await buildCheckoutForAppointment(row.id as string, { returnTo });
   if (!result) {
     return NextResponse.json(
       { error: "Mercado Pago no configurado para este médico" },
@@ -33,6 +39,11 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const accessTokenParam = searchParams.get("accessToken");
   const appointmentId = searchParams.get("appointmentId");
+  // Set by the client when this WaitingRoom is rendered inside the portal's
+  // modal (not the standalone /paciente/sala page) — see waiting-room.tsx's
+  // `embedded` flag — so MP sends the patient back into that same modal
+  // instead of navigating them out of the portal.
+  const returnTo = searchParams.get("returnTo") === "portal" ? "portal" : "sala";
 
   if (isLocalMode()) {
     const session = await getSessionFromRequest(request);
@@ -59,7 +70,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const result = await buildCheckoutForAppointment(apt.id);
+    const result = await buildCheckoutForAppointment(apt.id, { returnTo });
     if (!result) {
       return NextResponse.json(
         { error: "Mercado Pago no configurado para este médico" },
@@ -77,7 +88,7 @@ export async function GET(request: NextRequest) {
     if (!apt) {
       return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
     }
-    return checkoutOrPaidResponse(apt as Record<string, unknown>);
+    return checkoutOrPaidResponse(apt as Record<string, unknown>, returnTo);
   }
 
   const auth = await requireAuth(request);
@@ -106,5 +117,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return checkoutOrPaidResponse(row);
+  return checkoutOrPaidResponse(row, returnTo);
 }
