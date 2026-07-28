@@ -27,6 +27,7 @@ import {
   type AdminCommandPaletteItem,
   useFixedDocumentTitle,
   useAuth,
+  useBillingLockout,
 } from "@nodocore/shared-components";
 import { SettingsDialog, type SettingsTabId } from "@nodocore/nodo-modules/settings";
 import { NodoSwitcher } from "@nodocore/nodo-modules";
@@ -85,9 +86,22 @@ export function AdminLayout() {
     setSettingsInitialTab(tab);
     setSettingsOpen(true);
   }, []);
-  const { user, role, plan, signOut } = useAuth();
+  const { user, role, plan, billingLocked, signOut } = useAuth();
   const aiSettingsValue = useAiSettingsProvider(user?.id);
   const isSuperAdmin = role === "super_admin";
+
+  const SUBSCRIPTION_PATH = "/admin/configuracion?tab=suscripcion";
+  const billingGate = useBillingLockout({
+    billingLocked,
+    pathname,
+    subscriptionPath: "/admin/configuracion",
+  });
+
+  useEffect(() => {
+    if (billingGate.shouldRedirect && billingGate.redirectTo) {
+      navigate(SUBSCRIPTION_PATH, { replace: true });
+    }
+  }, [billingGate.shouldRedirect, billingGate.redirectTo, navigate]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -333,9 +347,20 @@ export function AdminLayout() {
 
           {/* Content */}
           <main className="flex-1 overflow-auto p-6">
-            <OpenSettingsContext.Provider value={{ openSettings }}>
-              <Outlet />
-            </OpenSettingsContext.Provider>
+            {billingGate.shouldRedirect && !billingGate.redirectTo ? (
+              // Fail-safe: no Suscripción route configured — block rather than grant access.
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+                <Lock className="h-10 w-10 text-slate2" />
+                <p className="text-sm text-slate2 max-w-sm">
+                  Tu acceso está restringido por un problema con el pago de la suscripción.
+                  Contactate con NODO Core para regularizarlo.
+                </p>
+              </div>
+            ) : billingGate.shouldRedirect ? null : (
+              <OpenSettingsContext.Provider value={{ openSettings }}>
+                <Outlet />
+              </OpenSettingsContext.Provider>
+            )}
           </main>
         </div>
 

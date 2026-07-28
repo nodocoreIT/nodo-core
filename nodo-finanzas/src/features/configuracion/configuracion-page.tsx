@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Plus,
   Edit,
@@ -26,6 +27,8 @@ import { useFinanzas } from '@/hooks/use-finanzas';
 import { getFechaHoy } from '@/utils/formatters';
 import toast from 'react-hot-toast';
 import { SettingsMobileNav, type SettingsSectionNavItem } from '@nodocore/shared-components';
+import { useBillingSubscription } from '@/shared/hooks/use-billing-subscription';
+import { formatearMoneda, formatearFecha } from '@/utils/formatters';
 import type {
   CuentaBancaria,
   Tarjeta,
@@ -79,7 +82,7 @@ type FormCategoria = z.infer<typeof schemaCategoria>;
 type FormSueldo = z.infer<typeof schemaSueldo>;
 type FormMedio = z.infer<typeof schemaMedio>;
 
-type Seccion = 'rubros' | 'categorias' | 'cuentas' | 'tarjetas' | 'sueldos' | 'medios';
+type Seccion = 'rubros' | 'categorias' | 'cuentas' | 'tarjetas' | 'sueldos' | 'medios' | 'suscripcion';
 
 const CONFIG_TABS: SettingsSectionNavItem<Seccion>[] = [
   { id: 'rubros', label: 'Rubros', icon: Tag },
@@ -88,13 +91,91 @@ const CONFIG_TABS: SettingsSectionNavItem<Seccion>[] = [
   { id: 'tarjetas', label: 'Tarjetas', icon: CreditCard },
   { id: 'sueldos', label: 'Sueldos', icon: Banknote },
   { id: 'medios', label: 'Medios', icon: CreditCard },
+  { id: 'suscripcion', label: 'Suscripción', icon: DollarSign },
 ];
+
+// ─── Suscripción panel ──────────────────────────────────────────────────────
+
+function SuscripcionPanel() {
+  const { subscription, isLoading } = useBillingSubscription();
+
+  const ESTADO_LABELS: Record<string, { label: string; className: string }> = {
+    activo: { label: 'Al día', className: 'bg-mist text-brand' },
+    impago: { label: 'Pago pendiente', className: 'bg-orange-100 text-orange-700' },
+    pausado: { label: 'Pausado', className: 'bg-mist/30 text-slate2' },
+    sin_acceso: { label: 'Sin acceso', className: 'bg-mist/30 text-slate2' },
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="p-6 animate-pulse">
+        <div className="h-4 w-32 bg-mist rounded-md mb-3" />
+        <div className="h-6 w-48 bg-mist rounded-md" />
+      </Card>
+    );
+  }
+
+  if (!subscription) {
+    return (
+      <Card className="p-6 text-center">
+        <p className="text-sm text-slate2">
+          Todavía no hay una suscripción de plataforma configurada para esta cuenta.
+        </p>
+      </Card>
+    );
+  }
+
+  const estado = ESTADO_LABELS[subscription.clientUnitStatus] ?? {
+    label: subscription.clientUnitStatus,
+    className: 'bg-mist/30 text-slate2',
+  };
+
+  return (
+    <Card className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-navy">{subscription.planLabel}</h3>
+          <p className="text-sm text-slate2">Suscripción a NODO Finanzas</p>
+        </div>
+        <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider ${estado.className}`}>
+          {estado.label}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <p className="text-xs text-slate2 uppercase tracking-wider mb-1">Monto</p>
+          <p className="text-base font-bold text-navy">
+            {formatearMoneda(subscription.billingAmount, subscription.billingCurrency as 'ARS' | 'USD')}
+            <span className="text-xs font-normal text-slate2"> /mes</span>
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-slate2 uppercase tracking-wider mb-1">Próximo cobro</p>
+          <p className="text-base font-bold text-navy">{formatearFecha(subscription.nextDueAt, 'largo')}</p>
+        </div>
+      </div>
+
+      {subscription.clientUnitStatus === 'impago' && (
+        <p className="text-sm text-orange-700 bg-orange-50 rounded-lg px-4 py-3">
+          No pudimos procesar el último cobro. Mientras el pago esté pendiente, el acceso queda
+          limitado a esta pantalla.
+        </p>
+      )}
+    </Card>
+  );
+}
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
+const SECCION_IDS = new Set(CONFIG_TABS.map((t) => t.id));
+
 export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } = {}) {
   const finanzas = useFinanzas();
-  const [seccion, setSeccion] = useState<Seccion>('rubros');
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const initialSeccion: Seccion = tabParam && SECCION_IDS.has(tabParam as Seccion) ? (tabParam as Seccion) : 'rubros';
+  const [seccion, setSeccion] = useState<Seccion>(initialSeccion);
   const [mostrarForm, setMostrarForm] = useState(false);
 
   // editing state
@@ -409,6 +490,7 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
         <TabBtn id="tarjetas" label="Tarjetas" icon={CreditCard} />
         <TabBtn id="sueldos" label="Sueldos" icon={Banknote} />
         <TabBtn id="medios" label="Medios" icon={CreditCard} />
+        <TabBtn id="suscripcion" label="Suscripción" icon={DollarSign} />
       </div>
 
       {/* ── Rubros ── */}
@@ -955,6 +1037,13 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
               </table>
             </div>
           </Card>
+        </div>
+      )}
+
+      {/* ── Suscripción ── */}
+      {seccion === 'suscripcion' && (
+        <div className="space-y-4">
+          <SuscripcionPanel />
         </div>
       )}
 
