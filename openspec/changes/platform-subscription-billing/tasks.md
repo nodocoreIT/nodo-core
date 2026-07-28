@@ -92,5 +92,13 @@ This completes Phase 6 (Per-Nodo Suscripción Screens) for all 4 nodos.
 
 ## Phase 7: Cross-Nodo Regression
 
-- [ ] 7.1 After Phase 2 ships (before any per-nodo screen work), manually verify login for all 5 nodos (Landing, Finanzas, Autos, Inmo, Clinica) against `activo`, `pausado`, `sin_acceso` units — confirm byte-identical behavior to pre-change. Ref: spec `node-access` — Scenario "existing caller ignoring reason is unaffected".
-- [ ] 7.2 Verify `nodo-clinica`'s existing `professionals`-based Preapproval/webhook flow is untouched by any Phase 5 file additions (new files only, no shared file edits in that flow).
+**Status (2026-07-28): all code for Phases 1-6 is written, committed, and pushed to main.** Remaining
+items below (6.5, 7.1, 7.2) are manual/live verification against real data, not code — user has
+deferred this testing to a later session. Static verification already done in place of it: code
+review of every gate/RPC path, `tsc`/`eslint`/build clean across all 4 nodos + nodo-landing, and
+(for 7.2 specifically) a file-diff check confirming zero shared files were touched between Phase 5's
+new `nodo-landing/lib/billing/*` additions and nodo-clinica's existing `lib/mercadopago/*`/`professionals`
+flow — genuinely separate file trees, no import overlap.
+
+- [ ] 7.1 Manually verify login for all 5 nodos (Landing, Finanzas, Autos, Inmo, Clinica) against `activo`, `pausado`, `sin_acceso` units — confirm byte-identical behavior to pre-change. Ref: spec `node-access` — Scenario "existing caller ignoring reason is unaffected". **Deferred to a later testing session.**
+- [ ] 7.2 Manually verify `nodo-clinica`'s existing `professionals`-based Preapproval/webhook flow still works end-to-end (live MP sandbox) — static/file-level check already done, see note above. **Deferred to a later testing session.**
