@@ -19,6 +19,10 @@ export {
   mapAuthLoginError,
 } from "./lib/verify-node-access";
 export type { NodeAccessReason } from "./lib/verify-node-access";
+export {
+  isBillingWhitelistedPath,
+  type SubscriptionRouteAllowlist,
+} from "./lib/billing-whitelist";
 export { mapAuthPasswordError, isSamePasswordAuthError } from "./lib/auth-password-errors";
 export {
   createNodoAuthClient,
@@ -192,5 +196,10 @@ export {
   type ThemeSettings,
 } from "./hooks/use-theme-settings";
 export { useUIStore } from "./hooks/use-ui-store";
+export {
+  useBillingLockout,
+  type UseBillingLockoutOptions,
+  type BillingLockoutResult,
+} from "./hooks/use-billing-lockout";
 export { useSearchStore } from "./hooks/use-search-store";
 export { useGlobalSearchHotkey } from "./hooks/use-global-search-hotkey";

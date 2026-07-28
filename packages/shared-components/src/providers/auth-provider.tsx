@@ -12,7 +12,11 @@ import type {
   AuthTokenResponsePassword,
 } from "@supabase/supabase-js";
 import { useSupabase } from "./supabase-provider";
-import { userHasNodeAccess } from "../lib/verify-node-access";
+import {
+  userHasNodeAccess,
+  getNodeAccessReason,
+  type NodeAccessReason,
+} from "../lib/verify-node-access";
 
 // ─── Public interfaces ──────────────────────────────────────────────────────
 
@@ -36,6 +40,14 @@ export interface AuthContextValue {
   plan: string | null;
   /** True while the initial session is being resolved. */
   isLoading: boolean;
+  /**
+   * Machine-readable access reason from `getNodeAccessReason` (fail-open to "ok").
+   * "payment_overdue" means the client_unit is impago — access stays allowed but
+   * the nodo's layout should gate navigation via `useBillingLockout`.
+   */
+  accessReason: NodeAccessReason;
+  /** Convenience flag: `accessReason === "payment_overdue"`. */
+  billingLocked: boolean;
   /**
    * Sign in and throw on failure.
    * Use this when you only care about success/failure (no need for the raw response).
@@ -104,13 +116,17 @@ export function AuthProvider({
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [accessReason, setAccessReason] = useState<NodeAccessReason>("ok");
 
   useEffect(() => {
     let cancelled = false;
 
   async function validateSession(s: Session | null) {
       if (!s) {
-        if (!cancelled) setAccessDenied(false);
+        if (!cancelled) {
+          setAccessDenied(false);
+          setAccessReason("ok");
+        }
         return;
       }
 
@@ -118,7 +134,10 @@ export function AuthProvider({
 
       if (config.allowedRoles?.length && claims.role) {
         if (!config.allowedRoles.includes(claims.role)) {
-          if (!cancelled) setAccessDenied(true);
+          if (!cancelled) {
+            setAccessDenied(true);
+            setAccessReason("ok");
+          }
           return;
         }
       }
@@ -128,13 +147,24 @@ export function AuthProvider({
         if (!allowed) {
           if (!cancelled) {
             setAccessDenied(true);
+            setAccessReason("ok");
             await supabase.auth.signOut({ scope: "local" });
           }
           return;
         }
+
+        const reason = await getNodeAccessReason(supabase, config.unitCode);
+        if (!cancelled) {
+          setAccessDenied(false);
+          setAccessReason(reason);
+        }
+        return;
       }
 
-      if (!cancelled) setAccessDenied(false);
+      if (!cancelled) {
+        setAccessDenied(false);
+        setAccessReason("ok");
+      }
     }
 
     // Seed session from cache
@@ -189,14 +219,18 @@ export function AuthProvider({
     role != null &&
     !!config.allowedRoles?.length &&
     !config.allowedRoles.includes(role);
+  const denied = accessDenied || roleBlocked;
+  const effectiveAccessReason: NodeAccessReason = denied ? "ok" : accessReason;
 
   const value: AuthContextValue = {
-    session: accessDenied || roleBlocked ? null : session,
-    user: accessDenied || roleBlocked ? null : session?.user ?? null,
-    role: accessDenied || roleBlocked ? null : role,
-    orgId: accessDenied || roleBlocked ? null : orgId,
-    plan: accessDenied || roleBlocked ? null : plan,
+    session: denied ? null : session,
+    user: denied ? null : session?.user ?? null,
+    role: denied ? null : role,
+    orgId: denied ? null : orgId,
+    plan: denied ? null : plan,
     isLoading,
+    accessReason: effectiveAccessReason,
+    billingLocked: effectiveAccessReason === "payment_overdue",
     signIn,
     signInWithPassword,
     signOut,
