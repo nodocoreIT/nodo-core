@@ -94,6 +94,8 @@ export interface LocalDoctor {
   licenseNumber: string;
   subscriptionStatus: SubscriptionStatus;
   subscriptionPlan: string;
+  /** ISO deadline for the Free/Demo trial window (see src/lib/clinic/trial.ts). */
+  trialEndsAt?: string;
   /** Organización Nodo (JWT org_id) — modo plataforma */
   orgId?: string;
   /** auth.users.id de Supabase */

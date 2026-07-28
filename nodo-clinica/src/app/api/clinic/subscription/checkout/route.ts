@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   const supabase = await createServiceClient();
   const { data } = await supabase
     .from("professionals")
-    .select("subscription_status, subscription_plan, subscription_next_payment_at")
+    .select("subscription_status, subscription_plan, subscription_next_payment_at, trial_ends_at")
     .eq("id", professional.id)
     .maybeSingle();
 
@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     status: data?.subscription_status ?? "trial",
     plan: data?.subscription_plan ?? null,
     nextPaymentAt: data?.subscription_next_payment_at ?? null,
+    trialEndsAt: data?.trial_ends_at ?? null,
   });
 }
 

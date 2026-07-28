@@ -10,6 +10,7 @@ import {
   localDateKeyFromIso,
 } from "@/lib/clinic/schedule";
 import { doctorRequiresPayment, isPaymentConfirmed } from "@/lib/clinic/payment";
+import { isSubscriptionActive } from "@/lib/clinic/trial";
 import {
   appBaseUrl,
   patientTurnosPaymentUrl,
@@ -97,7 +98,7 @@ export async function doctorAssignAppointments(
       .maybeSingle(),
   ]);
 
-  if (!professional || professional.subscription_status === "expired") {
+  if (!professional || !isSubscriptionActive(professional)) {
     throw new Error("Médico no disponible");
   }
   if (!patientRow) {

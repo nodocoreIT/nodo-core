@@ -104,6 +104,8 @@ export interface LocalDoctor {
   licenseNumber: string;
   subscriptionStatus: SubscriptionStatus;
   subscriptionPlan: string;
+  /** ISO deadline for the Free/Demo trial window (see src/lib/clinic/trial.ts). */
+  trialEndsAt?: string;
   availability?: import("@/lib/clinic/schedule").DoctorAvailability;
   signatureText?: string;
   signatureImageData?: string;

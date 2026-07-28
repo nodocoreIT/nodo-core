@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { clearSessionResponse, getSessionFromRequest } from "@/lib/clinic/session";
 import { readDb, publicPatient } from "@/lib/clinic/local-db";
+import { trialDaysRemaining } from "@/lib/clinic/trial";
 
 export async function POST() {
   return clearSessionResponse();
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest) {
         licenseNumber: doctor.licenseNumber,
         subscriptionPlan: doctor.subscriptionPlan,
         subscriptionStatus: doctor.subscriptionStatus,
+        trialDaysRemaining: trialDaysRemaining(doctor.trialEndsAt),
         role: "doctor" as const,
       },
     });

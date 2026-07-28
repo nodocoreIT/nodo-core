@@ -12,8 +12,8 @@ export const TRIAL_PLAN: SubscriptionPlan = {
   name: "Prueba gratis",
   amount: 0,
   currency: "ARS",
-  period: "30 días",
-  features: ["Hasta 20 consultas/mes", "Recetas PDF", "1 especialidad"],
+  period: "10 días",
+  features: ["Acceso completo a Nodo Clínica", "Sin límite de consultas", "Válido por 10 días"],
 };
 
 /** Paid plans a doctor can subscribe to via Mercado Pago. */

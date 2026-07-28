@@ -19,10 +19,8 @@ import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/nodo/brand-mark";
 import { NodoChatBell } from "@/components/nodo-chat/nodo-chat-bell";
 import { clinicApi } from "@/lib/clinic/client-api";
-import { isProPlan } from "@/lib/nodo-chat/is-pro-plan";
 import { isBrowserSupabaseEnabled } from "@/lib/clinic/config";
 import { isPlatformMode } from "@/lib/clinic/platform-config";
-import { isProOnlyMedicoRoute } from "@/lib/clinic/pro-features";
 import { useConsultorioStore, useConsultorioTheme } from "@/hooks/use-consultorio-theme";
 import { mergeThemeSettings } from "@/lib/clinic/theme-settings";
 import { Button } from "@/components/ui/button";
@@ -105,6 +103,8 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
     fullName: string;
     email: string;
     subscriptionPlan?: string;
+    subscriptionStatus?: string;
+    trialDaysRemaining?: number;
     profilePhotoUrl?: string;
   } | null>(null);
   const [checking, setChecking] = useState(true);
@@ -114,7 +114,6 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const [cobrosUnread, setCobrosUnread] = useState(0);
   const mpCallbackHandled = useRef(false);
 
-  const isPro = isProPlan(doctor?.subscriptionPlan);
   const chatEmbedded = pathname === "/medico/interconsultas";
 
   const refreshCobrosUnread = useCallback(async () => {
@@ -144,11 +143,11 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   }, [doctor, refreshCobrosUnread]);
 
   useEffect(() => {
-    if (!doctor || !isPro) return;
+    if (!doctor) return;
     clinicApi.pingInterconsultPresence();
     const interval = setInterval(() => clinicApi.pingInterconsultPresence(), 30_000);
     return () => clearInterval(interval);
-  }, [doctor, isPro]);
+  }, [doctor]);
 
   useEffect(() => {
     clinicApi.getSession().then(async ({ session, user }) => {
@@ -181,6 +180,8 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
           fullName: user.fullName,
           email: user.email ?? session.email,
           subscriptionPlan: user.subscriptionPlan,
+          subscriptionStatus: user.subscriptionStatus,
+          trialDaysRemaining: user.trialDaysRemaining,
           profilePhotoUrl: user.profilePhotoUrl,
         });
         try {
@@ -408,22 +409,19 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                   const isActive =
                     pathname === href ||
                     (href !== "/medico/dashboard" && pathname.startsWith(href));
-                  const proLocked = isProOnlyMedicoRoute(href) && !isPro;
                   const showCobrosBadge =
                     href === "/medico/cobros" && cobrosUnread > 0;
                   return (
                     <Link
                       key={href}
-                      href={proLocked ? "/medico/dashboard" : href}
+                      href={href}
                       onClick={() => setMobileMenuOpen(false)}
                       className={cn(
                         "flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors",
                         isActive
                           ? "bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)]"
                           : "text-[var(--color-sidebar-text)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]",
-                        proLocked && "opacity-50",
                       )}
-                      title={proLocked ? "Disponible en Plan Pro" : undefined}
                     >
                       <Icon className="h-4 w-4 flex-shrink-0" />
                       <span className="flex-1">{label}</span>
@@ -525,15 +523,17 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                 notifications={
                   <div className="flex items-center gap-0.5">
                     <ClinicNotificationsBell doctorId={doctor.id} />
-                    {isPro && (
-                      <NodoChatBell
-                        isPro={isPro}
-                        chatEmbedded={chatEmbedded}
-                      />
-                    )}
+                    <NodoChatBell chatEmbedded={chatEmbedded} />
                   </div>
                 }
-                metrics={<PlanBadge fallbackPlan={doctor.subscriptionPlan} />}
+                metrics={
+                  <PlanBadge
+                    subscriptionStatus={
+                      doctor.subscriptionStatus as "trial" | "active" | "expired" | undefined
+                    }
+                    trialDaysRemaining={doctor.trialDaysRemaining}
+                  />
+                }
                 trailing={
                   isPlatformMode() && isBrowserSupabaseEnabled() ? (
                     <NodoSwitcher product="clinica" />

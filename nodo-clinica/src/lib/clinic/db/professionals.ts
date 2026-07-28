@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { isUnassignedSpecialty } from "@/lib/clinic/unassigned-specialty";
+import { computeTrialEndsAt, isSubscriptionActive } from "@/lib/clinic/trial";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
@@ -47,6 +48,7 @@ export async function upsertProfessionalOnboardingRecord(
     license_number: input.licenseNumber ?? null,
     subscription_status: "trial",
     subscription_plan: input.plan,
+    trial_ends_at: computeTrialEndsAt(),
   };
 
   async function findExistingProfessionalId(): Promise<string | undefined> {
@@ -140,6 +142,7 @@ export type BookableProfessional = {
   email: string | null;
   specialty: string | null;
   subscription_status: string | null;
+  trial_ends_at: string | null;
 };
 
 export type ProfessionalOfficeSettings = {
@@ -157,14 +160,14 @@ export async function getBookableProfessional(doctorId: string): Promise<{
 
   const { data: professional } = await service
     .from("professionals")
-    .select("id, org_id, full_name, email, specialty, subscription_status")
+    .select("id, org_id, full_name, email, specialty, subscription_status, trial_ends_at")
     .eq("id", doctorId)
     .maybeSingle();
 
   if (!professional || isUnassignedSpecialty(professional.specialty)) {
     return null;
   }
-  if (professional.subscription_status === "expired") {
+  if (!isSubscriptionActive(professional as BookableProfessional)) {
     return null;
   }
 

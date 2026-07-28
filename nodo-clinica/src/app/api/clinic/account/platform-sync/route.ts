@@ -84,10 +84,11 @@ export async function POST(_request: NextRequest) {
     return forbidden(portalNotRegisteredMessage("medico"));
   }
 
-  // Returning user — keep data fresh
+  // Returning user — keep identity fresh. subscription_status/subscription_plan
+  // are NOT touched here: they're owned by trial creation (upsertProfessionalOnboardingRecord)
+  // and the MercadoPago Preapproval webhook (handle-subscription-webhook.ts). Overwriting
+  // them on every login used to force "active" regardless of real payment status.
   const updates: Record<string, unknown> = {
-    subscription_plan: plan,
-    subscription_status: "active",
     user_id: session.user.id,
   };
   if (!professional.full_name || professional.full_name === "Médico") {

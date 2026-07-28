@@ -64,6 +64,8 @@ type ClinicSessionResult = {
     profilePhotoUrl?: string;
     role?: "doctor" | "patient";
     subscriptionPlan?: string;
+    subscriptionStatus?: string;
+    trialDaysRemaining?: number;
     org_id?: string | null;
   } | null;
 };
@@ -714,6 +716,7 @@ export const clinicApi = {
       status: string;
       plan: string | null;
       nextPaymentAt: string | null;
+      trialEndsAt: string | null;
     };
   },
 

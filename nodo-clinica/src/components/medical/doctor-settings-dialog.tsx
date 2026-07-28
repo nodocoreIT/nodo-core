@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { currencySymbol, formatThousands, parseThousands } from "@/lib/clinic/currency";
 import { PAID_SUBSCRIPTION_PLANS, formatPlanPrice } from "@/lib/clinic/subscription-plans";
+import { trialDaysRemaining, isTrialExpired } from "@/lib/clinic/trial";
 import {
   dayLabel,
   DEFAULT_AVAILABILITY,
@@ -158,6 +159,7 @@ export function DoctorSettingsDialog({
     status: string;
     plan: string | null;
     nextPaymentAt: string | null;
+    trialEndsAt: string | null;
   } | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [choosingPlan, setChoosingPlan] = useState(false);
@@ -1067,9 +1069,14 @@ export function DoctorSettingsDialog({
                   ) : (
                     <div className="rounded-md border border-amber-200 bg-amber-50/70 p-3 space-y-3">
                       <p className="text-sm text-amber-900">
-                        {subscription?.status === "expired"
-                          ? "Tu suscripción no está activa."
-                          : "Todavía no tenés una suscripción paga a Nodocore."}
+                        {subscription?.status === "trial" &&
+                        !isTrialExpired(subscription.trialEndsAt)
+                          ? `Estás en prueba gratis: te quedan ${trialDaysRemaining(subscription.trialEndsAt)} día(s).`
+                          : subscription?.status === "expired" ||
+                              (subscription?.status === "trial" &&
+                                isTrialExpired(subscription.trialEndsAt))
+                            ? "Tu período de prueba venció. Suscribite para seguir usando Nodo Clínica."
+                            : "Todavía no tenés una suscripción paga a Nodocore."}
                       </p>
                       {!choosingPlan ? (
                         <Button

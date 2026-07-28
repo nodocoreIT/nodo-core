@@ -7,7 +7,6 @@ import { clinicApi } from "@/lib/clinic/client-api";
 import { cn } from "@/lib/utils";
 
 interface NodoChatBellProps {
-  isPro: boolean;
   onOpenChat?: () => void;
   /** En /medico/interconsultas el chat ya está visible en pantalla */
   chatEmbedded?: boolean;
@@ -21,7 +20,6 @@ function formatPreviewTime(iso: string) {
 }
 
 export function NodoChatBell({
-  isPro,
   onOpenChat,
   chatEmbedded = false,
 }: NodoChatBellProps) {
@@ -40,11 +38,6 @@ export function NodoChatBell({
   const panelRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
-    if (!isPro) {
-      setCount(0);
-      setItems([]);
-      return;
-    }
     try {
       const data = await clinicApi.getNodoChatUnread();
       setCount(data.count);
@@ -53,11 +46,10 @@ export function NodoChatBell({
       setCount(0);
       setItems([]);
     }
-  }, [isPro]);
+  }, []);
 
   useEffect(() => {
     refresh();
-    if (!isPro) return;
     const interval = setInterval(refresh, 20_000);
     const onRead = () => refresh();
     window.addEventListener("nodo-chat-read", onRead);
@@ -65,7 +57,7 @@ export function NodoChatBell({
       clearInterval(interval);
       window.removeEventListener("nodo-chat-read", onRead);
     };
-  }, [isPro, refresh]);
+  }, [refresh]);
 
   useEffect(() => {
     if (!open) return;
@@ -101,8 +93,6 @@ export function NodoChatBell({
 
   const handleOpenChat = () =>
     openChatWithPeer(items[0]?.fromDoctorId, items[0]?.fromDoctorName);
-
-  if (!isPro) return null;
 
   return (
     <div className="relative" ref={panelRef}>

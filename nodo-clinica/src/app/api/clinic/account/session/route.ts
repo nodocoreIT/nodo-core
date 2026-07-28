@@ -7,6 +7,7 @@ import {
   lookupClinicMembershipByAuthUserId,
 } from "@/lib/clinic/resolve-clinic-role";
 import { resolveSupabaseAuthUser } from "@/lib/supabase/resolve-auth-user";
+import { trialDaysRemaining } from "@/lib/clinic/trial";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const [clinicSession, resolved] = await Promise.all([
@@ -53,6 +54,27 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         resolvedId = membership.patientProfileId;
       }
 
+      let subscriptionPlan: string | undefined;
+      let subscriptionStatus: string | undefined;
+      let trialDays: number | undefined;
+      if (sessionRole === "doctor" && resolvedId) {
+        const { data: professional } = await svc
+          .from("professionals")
+          .select("subscription_plan, subscription_status, trial_ends_at")
+          .eq("id", resolvedId)
+          .maybeSingle();
+        if (professional) {
+          const prof = professional as unknown as {
+            subscription_plan: string | null;
+            subscription_status: string | null;
+            trial_ends_at: string | null;
+          };
+          subscriptionPlan = prof.subscription_plan ?? undefined;
+          subscriptionStatus = prof.subscription_status ?? undefined;
+          trialDays = trialDaysRemaining(prof.trial_ends_at);
+        }
+      }
+
       return NextResponse.json({
         session: {
           userId: user.id,
@@ -67,6 +89,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           profilePhotoUrl: clinicSession?.profilePhotoUrl,
           role: sessionRole,
           org_id: appMeta.org_id ?? null,
+          subscriptionPlan,
+          subscriptionStatus,
+          trialDaysRemaining: trialDays,
         },
       });
     }
