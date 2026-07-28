@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveFxRate } from "./fx-rate";
+import { billingDayFrom, currentCycleKey } from "./billing-time";
 
 /**
  * Creates/refreshes NODO's own MercadoPago Preapproval (recurring subscription
@@ -12,7 +13,6 @@ import { resolveFxRate } from "./fx-rate";
  */
 
 const MP_API = "https://api.mercadopago.com";
-const BUENOS_AIRES_TZ = "America/Argentina/Buenos_Aires";
 
 export type CreatePreapprovalFailureReason =
   | "missing_token"
@@ -64,28 +64,6 @@ function appBaseUrl(): string {
     /\/$/,
     "",
   );
-}
-
-/**
- * Day-of-month (1-31) in America/Argentina/Buenos_Aires for `date` — used as
- * MP's `auto_recurring.billing_day`. MP clamps this to a shorter month's last
- * day on its own when advancing the recurring cycle (per its Preapproval API);
- * verify against the MP sandbox before Phase 6 wires this to a live UI.
- */
-function billingDayFrom(date: Date): number {
-  const formatted = new Intl.DateTimeFormat("en-US", {
-    timeZone: BUENOS_AIRES_TZ,
-    day: "numeric",
-  }).format(date);
-  return Number(formatted);
-}
-
-function currentCycleKey(date: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: BUENOS_AIRES_TZ,
-    year: "numeric",
-    month: "2-digit",
-  }).format(date);
 }
 
 function round2(value: number): number {
