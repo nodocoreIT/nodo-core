@@ -96,6 +96,8 @@ function OnboardingForm() {
   const [idPhotoBack, setIdPhotoBack] = useState<File | null>(null);
   const [documentNumber, setDocumentNumber] = useState("");
   const [identityVerificationRequired, setIdentityVerificationRequired] = useState(false);
+  const [existingUser, setExistingUser] = useState(false);
+  const [existingNodeLabels, setExistingNodeLabels] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -124,10 +126,17 @@ function OnboardingForm() {
           setEmail(data.email ?? "");
           setFirstName(data.firstName ?? "");
           setLastName(data.lastName ?? "");
+          if (data.phone) setPhone(data.phone);
           setNodeSlug(data.nodeSlug ?? "");
           setNodeCode(data.nodeCode ?? "");
           setPlans(Array.isArray(data.plans) ? data.plans : []);
-          setIdentityVerificationRequired(Boolean(data.identityVerificationRequired));
+          setExistingUser(Boolean(data.existingUser));
+          setExistingNodeLabels(
+            Array.isArray(data.existingNodeLabels) ? data.existingNodeLabels : [],
+          );
+          setIdentityVerificationRequired(
+            data.existingUser ? false : Boolean(data.identityVerificationRequired),
+          );
 
           const catalogPlans: OnboardingPlanOption[] = Array.isArray(data.plans) ? data.plans : [];
           const initialPlan =
@@ -153,24 +162,27 @@ function OnboardingForm() {
 
     const formData = new FormData();
     formData.append("token", token);
-    formData.append("firstName", firstName);
-    formData.append("lastName", lastName);
     formData.append("email", email);
-    formData.append("address", address);
-    formData.append("city", city);
-    formData.append("province", province);
-    formData.append("phone", phone);
     formData.append("planChoice", planChoice);
-    if (documentNumber) formData.append("documentNumber", documentNumber);
-    formData.append("cardHolder", cardHolder);
-    formData.append("cardNumber", cardNumber);
-    formData.append("cardExpiry", cardExpiry);
-    formData.append("cardCvc", cardCvc);
-    if (idPhotoFront) {
-      formData.append("idPhotoFront", idPhotoFront);
-    }
-    if (idPhotoBack) {
-      formData.append("idPhotoBack", idPhotoBack);
+
+    if (!existingUser) {
+      formData.append("firstName", firstName);
+      formData.append("lastName", lastName);
+      formData.append("address", address);
+      formData.append("city", city);
+      formData.append("province", province);
+      formData.append("phone", phone);
+      if (documentNumber) formData.append("documentNumber", documentNumber);
+      formData.append("cardHolder", cardHolder);
+      formData.append("cardNumber", cardNumber);
+      formData.append("cardExpiry", cardExpiry);
+      formData.append("cardCvc", cardCvc);
+      if (idPhotoFront) {
+        formData.append("idPhotoFront", idPhotoFront);
+      }
+      if (idPhotoBack) {
+        formData.append("idPhotoBack", idPhotoBack);
+      }
     }
 
     const res = await fetch("/api/onboarding/complete", { method: "POST", body: formData });
@@ -184,6 +196,13 @@ function OnboardingForm() {
     setSubmitted(true);
   }
 
+  const existingNodesText =
+    existingNodeLabels.length > 0
+      ? existingNodeLabels.length === 1
+        ? existingNodeLabels[0]
+        : `${existingNodeLabels.slice(0, -1).join(", ")} y ${existingNodeLabels.at(-1)}`
+      : "otro nodo del ecosistema";
+
   const submitDisabled =
     loading ||
     !token;
@@ -193,6 +212,26 @@ function OnboardingForm() {
       <div className="relative min-h-screen flex items-center justify-center">
         <NeuralNodesBackground />
         <p className="relative z-10 text-white text-sm">Validando enlace…</p>
+      </div>
+    );
+  }
+
+  if (error && !email && !nodeSlug && !submitted) {
+    return (
+      <div className="relative min-h-screen flex items-center justify-center px-4">
+        <NeuralNodesBackground />
+        <div
+          className="relative z-10 mx-auto w-full max-w-md rounded-2xl border p-8 text-center shadow-2xl backdrop-blur-md"
+          style={{
+            background: "rgba(27, 42, 65, 0.88)",
+            borderColor: "rgba(255,255,255,.1)",
+          }}
+        >
+          <p className="text-sm text-red-300">{error}</p>
+          <p className="mt-6 text-xs" style={{ color: "rgba(234,240,247,.4)" }}>
+            <Link href="/" className="underline hover:text-white">Volver al inicio</Link>
+          </p>
+        </div>
       </div>
     );
   }
@@ -222,8 +261,16 @@ function OnboardingForm() {
             <>
               <h1 className="text-2xl font-semibold text-white">Solicitud enviada</h1>
               <p className="text-sm mt-3 leading-relaxed max-w-lg mx-auto" style={{ color: "rgba(234,240,247,.65)" }}>
-                Estamos revisando tus datos. Pronto el equipo de NODO Core se contactará con vos
-                para confirmar tu habilitación.
+                {existingUser
+                  ? "Recibimos la elección de plan. Pronto el equipo de NODO Core habilitará tu nuevo nodo. Usá las mismas credenciales que ya tenés para ingresar."
+                  : "Estamos revisando tus datos. Pronto el equipo de NODO Core se contactará con vos para confirmar tu habilitación."}
+              </p>
+            </>
+          ) : existingUser ? (
+            <>
+              <h1 className="text-2xl font-semibold text-white">Elegí el plan de tu nuevo nodo</h1>
+              <p className="text-sm mt-2 max-w-2xl mx-auto" style={{ color: "rgba(234,240,247,.55)" }}>
+                Ya tenés una cuenta activa en el ecosistema. Usá las mismas credenciales para acceder.
               </p>
             </>
           ) : (
@@ -237,7 +284,56 @@ function OnboardingForm() {
           )}
         </div>
 
-        {!submitted && (
+        {!submitted && existingUser && (
+          <form onSubmit={handleSubmit} className="space-y-6 max-w-xl mx-auto">
+            <div
+              className="rounded-xl border p-4 md:p-5 text-left space-y-2"
+              style={{
+                borderColor: `rgba(${accent.rgb}, 0.35)`,
+                background: `rgba(${accent.rgb}, 0.1)`,
+              }}
+            >
+              <p className="text-sm font-medium text-white">
+                Ya tenés un nodo activo
+              </p>
+              <p className="text-sm leading-relaxed" style={{ color: "rgba(234,240,247,.7)" }}>
+                Detectamos que ya usás {existingNodesText}. Para este nuevo nodo{" "}
+                <strong className="text-white font-medium">usá el mismo email y contraseña</strong>{" "}
+                con los que ya ingresás. Solo necesitamos que elijas el plan contratado.
+              </p>
+              {email ? (
+                <p className="text-xs pt-1" style={{ color: "rgba(234,240,247,.45)" }}>
+                  Cuenta: <span className="text-slate-200">{email}</span>
+                </p>
+              ) : null}
+            </div>
+
+            <fieldset>
+              <span className={labelClass}>Plan del nuevo nodo</span>
+              <OnboardingPlanSelector
+                plans={plans}
+                value={planChoice}
+                onChange={setPlanChoice}
+                accent={accent}
+              />
+            </fieldset>
+
+            {error && (
+              <p className="text-sm text-red-300 bg-red-950/40 border border-red-400/30 rounded-lg px-4 py-2.5">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitDisabled || !planChoice}
+              className="w-full rounded-lg py-3.5 text-sm font-semibold disabled:opacity-50 hover:opacity-95 transition-opacity"
+              style={{ background: accent.brand, color: "var(--color-brand-on, #ffffff)" }}
+            >
+              {loading ? "Enviando…" : "Confirmar plan"}
+            </button>
+          </form>
+        )}
+
+        {!submitted && !existingUser && (
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <label className="block">

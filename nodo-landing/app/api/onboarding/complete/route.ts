@@ -9,6 +9,7 @@ import {
   isValidArgentineDni,
   normalizeDocumentNumber,
 } from "@/lib/identity-verification";
+import { resolveExistingOnboardingUser } from "@/lib/onboarding/existing-user";
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
   const idPhotoBack = formData.get("idPhotoBack") as File | null;
   const documentNumber = normalizeDocumentNumber(String(formData.get("documentNumber") ?? ""));
 
-  if (!token || !firstName || !lastName || !phone || !email) {
+  if (!token || !email) {
     return NextResponse.json({ error: "Complete todos los campos obligatorios." }, { status: 400 });
   }
 
@@ -64,6 +65,95 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "La solicitud no está disponible." }, { status: 400 });
   }
 
+  const { data: clientRow } = await admin
+    .from("clients")
+    .select("id, name, email, phone")
+    .eq("id", unitRow.client_id)
+    .maybeSingle();
+
+  const existing = await resolveExistingOnboardingUser(admin, {
+    email: clientRow?.email ?? email,
+    clientId: unitRow.client_id,
+    currentUnitId: unitRow.id,
+    unitCode: unitRow.unit_code,
+  });
+
+  const planLabel = planChoice.trim().toLowerCase() || "starter";
+  const cfg = getNodeRegistrationConfig(unitRow.unit_code);
+
+  // Returning users only choose the plan for the new nodo — reuse profile + credentials.
+  if (existing.existingUser) {
+    if (!planLabel) {
+      return NextResponse.json({ error: "Elegí un plan para continuar." }, { status: 400 });
+    }
+
+    const nameParts = (clientRow?.name ?? "").trim().split(/\s+/);
+    const resolvedFirst = firstName || nameParts[0] || "Cliente";
+    const resolvedLast = lastName || nameParts.slice(1).join(" ") || "";
+    const resolvedPhone = phone || clientRow?.phone || "";
+    const fullName = `${resolvedFirst} ${resolvedLast}`.trim();
+
+    await admin.from("onboarding_profiles").upsert({
+      client_unit_id: unitRow.id,
+      first_name: resolvedFirst,
+      last_name: resolvedLast,
+      address: address || "",
+      city: city || "",
+      province: province || "",
+      phone: resolvedPhone || "",
+      plan_choice: planChoice,
+      demo_days: null,
+      username: email,
+      document_number: null,
+      gender: null,
+      card_holder: null,
+      card_number: null,
+      card_cvc: null,
+      card_expiry: null,
+      completed_at: new Date().toISOString(),
+    });
+
+    await admin
+      .from("client_units")
+      .update({
+        status: "pending_review",
+        progress: 25,
+        plan: planLabel,
+        access_user: email,
+        access_url: cfg?.accessUrl ?? null,
+      })
+      .eq("id", unitRow.id);
+
+    await admin
+      .from("node_email_access")
+      .update({ status: "pending_review" })
+      .eq("client_unit_id", unitRow.id);
+
+    await admin
+      .from("activation_tokens")
+      .update({ used_at: new Date().toISOString() })
+      .eq("id", tokenRow.id);
+
+    const origin = request.nextUrl.origin;
+    await notifyAdminPendingRegistration({
+      clientName: fullName || email,
+      email,
+      unitCode: unitRow.unit_code,
+      plan: planLabel,
+      origin,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      nodeSlug: cfg?.slug,
+      existingUser: true,
+    });
+  }
+
+  if (!firstName || !lastName || !phone) {
+    return NextResponse.json({ error: "Complete todos los campos obligatorios." }, { status: 400 });
+  }
+
   const nodeRequiresIdentity = requiresIdentityVerification(unitRow.unit_code, unitRow.plan);
 
   if (nodeRequiresIdentity) {
@@ -82,8 +172,6 @@ export async function POST(request: NextRequest) {
   }
 
   const fullName = `${firstName} ${lastName}`.trim();
-  const cfg = getNodeRegistrationConfig(unitRow.unit_code);
-  const planLabel = planChoice.trim().toLowerCase() || "starter";
 
   async function uploadDoc(file: File, docType: string, suffix: string) {
     const ext = file.name.split(".").pop() ?? "jpg";

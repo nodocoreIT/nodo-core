@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadOnboardingPlanCatalog } from "@/lib/onboarding/plan-catalog";
+import { resolveExistingOnboardingUser } from "@/lib/onboarding/existing-user";
 import {
   getNodeRegistrationConfig,
   requiresIdentityVerification,
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
 
   const { data: unit } = await admin
     .from("client_units")
-    .select("status, unit_code, plan, clients(email, name)")
+    .select("id, client_id, status, unit_code, plan, clients(email, name, phone)")
     .eq("id", tokenRow.client_unit_id)
     .single();
 
@@ -42,24 +43,40 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "La solicitud no está disponible." }, { status: 400 });
   }
 
-  const clientsRow = unit.clients as { email: string | null; name: string | null } | { email: string | null; name: string | null }[] | null;
+  const clientsRow = unit.clients as
+    | { email: string | null; name: string | null; phone: string | null }
+    | { email: string | null; name: string | null; phone: string | null }[]
+    | null;
   const client = Array.isArray(clientsRow) ? clientsRow[0] : clientsRow;
   const nameParts = (client?.name ?? "").trim().split(/\s+/);
   const nodeDef = NODES.find((node) => node.code === unit.unit_code);
   const registrationCfg = getNodeRegistrationConfig(unit.unit_code);
   const planCatalog = await loadOnboardingPlanCatalog(unit.unit_code);
+  const email = client?.email ?? "";
+
+  const existing = await resolveExistingOnboardingUser(admin, {
+    email,
+    clientId: unit.client_id,
+    currentUnitId: unit.id,
+    unitCode: unit.unit_code,
+  });
 
   return NextResponse.json({
     ok: true,
-    email: client?.email ?? "",
+    email,
     firstName: nameParts[0] ?? "",
     lastName: nameParts.slice(1).join(" ") ?? "",
+    phone: client?.phone ?? "",
     unitCode: unit.unit_code,
     nodeSlug: registrationCfg?.slug ?? nodeDef?.slug ?? "",
     nodeCode: nodeDef?.code ?? unit.unit_code,
     nodeLabel: getNodeMailLabelByCode(unit.unit_code),
     plan: unit.plan,
     plans: planCatalog.plans,
-    identityVerificationRequired: requiresIdentityVerification(unit.unit_code, unit.plan),
+    identityVerificationRequired: existing.existingUser
+      ? false
+      : requiresIdentityVerification(unit.unit_code, unit.plan),
+    existingUser: existing.existingUser,
+    existingNodeLabels: existing.existingNodeLabels,
   });
 }
