@@ -5,6 +5,7 @@ import {
   ensureLandingAuthUser,
   provisionNodoAccess,
 } from "@/lib/registration/provision";
+import { authConfigForNodoCode, findAuthUserByEmail } from "@/lib/registration/auth-user-lookup";
 
 const ONBOARDING_TTL_HOURS = 72;
 
@@ -254,8 +255,15 @@ export async function GET(request: NextRequest) {
       await admin.from("node_email_access").insert(accessRow);
     }
 
+    let wasExistingGlobalUser = false;
+
     if (selfService && row.password) {
       let provisionUserId: string | null = null;
+
+      const authConfig = authConfigForNodoCode(unitCode);
+      wasExistingGlobalUser = authConfig
+        ? Boolean(await findAuthUserByEmail(authConfig, row.email, admin))
+        : false;
 
       if (unitCode.toLowerCase() === "finanzas") {
         const provision = await provisionNodoAccess({
@@ -305,11 +313,10 @@ export async function GET(request: NextRequest) {
       .eq("id", row.id);
 
     if (selfService) {
+      const roleParam = row.plan === "paciente" ? "&role=paciente" : "";
+      const statusParam = wasExistingGlobalUser ? "&status=linked" : "";
       return NextResponse.redirect(
-        new URL(
-          `/registro/verificado?node=${redirectSlug}${row.plan === "paciente" ? "&role=paciente" : ""}`,
-          request.url,
-        ),
+        new URL(`/registro/verificado?node=${redirectSlug}${roleParam}${statusParam}`, request.url),
       );
     }
 

@@ -26,6 +26,8 @@ import {
   revokeNodoUser,
 } from "@/lib/panel/nodo-user-lifecycle";
 import type { NodoUserRecord } from "@/lib/panel/nodo-users-list";
+import { provisionNodoAccessPendingPassword } from "@/lib/registration/provision";
+import { sendActivationEmail, sendNodeLinkedEmail } from "@/lib/mail";
 
 function asSingleRelation<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
@@ -44,6 +46,8 @@ type ActionBody = {
   clinic_row_id?: string;
   user?: NodoUserRecord;
   confirm_email?: string;
+  full_name?: string;
+  plan?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -350,9 +354,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `El nodo "${unitCode}" no está configurado.` }, { status: 400 });
     }
 
+    const { data: existingUser } = await authAdmin.auth.admin.getUserById(authUserId);
+    const currentAppMetadata = existingUser.user?.app_metadata ?? {};
+
     const { error } = await authAdmin.auth.admin.updateUserById(authUserId, {
       password,
-      app_metadata: { must_set_password: false },
+      app_metadata: { ...currentAppMetadata, must_set_password: false },
     });
 
     if (error) {
@@ -360,6 +367,108 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ ok: true });
+  }
+
+  if (action === "create") {
+    const unitCode = String(body.unit_code ?? "").trim();
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const fullName = String(body.full_name ?? "").trim();
+    const plan = String(body.plan ?? "").trim();
+
+    if (!unitCode || !email || !fullName || !plan) {
+      return NextResponse.json(
+        { error: "unit_code, email, full_name y plan son obligatorios." },
+        { status: 400 },
+      );
+    }
+
+    const landingAdmin = createAdminClient();
+
+    const { data: existingClient } = await landingAdmin
+      .from("clients")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
+
+    let newClientId: string | null = null;
+    if (!existingClient?.id) {
+      const { data: newClient, error: clientErr } = await landingAdmin
+        .from("clients")
+        .insert({ name: fullName, email })
+        .select("id")
+        .single();
+      if (clientErr || !newClient) {
+        return NextResponse.json({ error: "No se pudo crear el cliente." }, { status: 400 });
+      }
+      newClientId = newClient.id;
+    }
+    const clientId: string = existingClient?.id ?? newClientId!;
+
+    const { data: existingUnit } = await landingAdmin
+      .from("client_units")
+      .select("id")
+      .eq("client_id", clientId)
+      .eq("unit_code", unitCode)
+      .maybeSingle();
+
+    if (existingUnit) {
+      return NextResponse.json(
+        { error: "Este cliente ya tiene una membresía en este nodo." },
+        { status: 400 },
+      );
+    }
+
+    const provision = await provisionNodoAccessPendingPassword({
+      nodoCode: unitCode,
+      clientName: fullName,
+      email,
+      plan,
+    });
+
+    if (!provision.ok || !provision.user_id) {
+      return NextResponse.json({ error: provision.error ?? "No se pudo provisionar el acceso." }, { status: 400 });
+    }
+
+    const { data: newUnit, error: unitErr } = await landingAdmin
+      .from("client_units")
+      .insert({
+        client_id: clientId,
+        unit_code: unitCode,
+        plan,
+        status: "activo",
+        progress: 100,
+        access_user: email,
+        provision_user_id: provision.user_id,
+        provisioned_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+
+    if (unitErr || !newUnit) {
+      return NextResponse.json({ error: "No se pudo crear la membresía del nodo." }, { status: 400 });
+    }
+
+    await syncNodeEmailAccessForClient(landingAdmin, clientId);
+
+    const nodeLabel = unitCode;
+    if (provision.existing) {
+      await sendNodeLinkedEmail({
+        nombre: fullName,
+        email,
+        nodeLabel,
+        confirmUrl: `${origin}/login`,
+        forgotPasswordUrl: `${origin}/${unitCode.toLowerCase()}/login?mode=forgot`,
+      });
+    } else {
+      await sendActivationEmail({
+        nombre: fullName,
+        email,
+        nodeLabel,
+        activationUrl: `${origin}/${unitCode.toLowerCase()}/login?mode=activate-invite`,
+      });
+    }
+
+    return NextResponse.json({ ok: true, user_id: provision.user_id, client_unit_id: newUnit.id });
   }
 
   return NextResponse.json({ error: "Acción no reconocida." }, { status: 400 });

@@ -12,9 +12,13 @@ function VerifiedContent() {
   const role = searchParams.get("role");
 
   const isPendingReview = status === "pending_review";
+  const isLinked = status === "linked";
   const loginHref = role === "paciente"
     ? `/nodo-clinica/login?role=paciente`
     : `/${node}/login`;
+  const forgotPasswordHref = role === "paciente"
+    ? `/nodo-clinica/login?role=paciente&mode=forgot`
+    : `/${node}/login?mode=forgot`;
 
   return (
     <div
@@ -43,6 +47,30 @@ function VerifiedContent() {
               Tu correo fue confirmado. Nuestro equipo revisará tu solicitud y te enviará un
               email cuando tu acceso esté habilitado para completar el registro.
             </p>
+          </>
+        ) : isLinked ? (
+          <>
+            <h1 className="text-xl font-semibold text-white mb-3">¡Nodo vinculado!</h1>
+            <p className="text-sm mb-6" style={{ color: "rgba(234,240,247,.65)" }}>
+              Ya tenías una cuenta en NODO Core — te sumamos este nodo. Ingresá con la misma
+              contraseña que ya usabas en tus otros nodos.
+            </p>
+            <Link
+              href={loginHref}
+              className="inline-block rounded-lg px-6 py-3 text-sm font-semibold text-white mb-3"
+              style={{ background: "#DA5A0E" }}
+            >
+              Ir al login
+            </Link>
+            <div>
+              <Link
+                href={forgotPasswordHref}
+                className="text-sm underline"
+                style={{ color: "rgba(234,240,247,.65)" }}
+              >
+                ¿No recordás tu contraseña?
+              </Link>
+            </div>
           </>
         ) : status === "existing" ? (
           <>

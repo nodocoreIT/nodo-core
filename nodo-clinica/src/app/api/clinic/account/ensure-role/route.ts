@@ -44,14 +44,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   let authUserId = userIdFromBody;
 
   if (!authUserId && email) {
-    const { data: listData } = await adminClient.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const found = listData?.users?.find(
-      (u: any) => String(u.email ?? "").toLowerCase() === email,
-    );
+    // Direct auth.users lookup — O(1), doesn't silently miss users past a
+    // fixed listUsers() page.
+    const { data: found } = await adminClient
+      .schema("auth")
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
     authUserId = found?.id ?? null;
   }
 
@@ -135,21 +135,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       .neq("org_id", CLINIC_ORG_ID);
   }
 
-  const { error: updateError } = await adminClient.auth.admin.updateUserById(
-    authUserId,
-    {
-      app_metadata: {
-        ...currentAppMetadata,
-        role,
-        org_id: CLINIC_ORG_ID,
-        must_set_password: false,
-      },
-    },
-  );
+  // Never overwrite the role/org_id claim if this global user already
+  // belongs to a DIFFERENT node's org — their Clínica membership above is
+  // already linked by user_id in patients/professionals regardless.
+  const foreignOrg =
+    typeof currentAppMetadata.org_id === "string" &&
+    currentAppMetadata.org_id.length > 0 &&
+    currentAppMetadata.org_id !== CLINIC_ORG_ID;
 
-  if (updateError) {
-    console.error("[ensure-role] updateUserById error", updateError);
-    return NextResponse.json({ error: "Failed to update role" }, { status: 500 });
+  if (!foreignOrg) {
+    const { error: updateError } = await adminClient.auth.admin.updateUserById(
+      authUserId,
+      {
+        app_metadata: {
+          ...currentAppMetadata,
+          role,
+          org_id: CLINIC_ORG_ID,
+          must_set_password: false,
+        },
+      },
+    );
+
+    if (updateError) {
+      console.error("[ensure-role] updateUserById error", updateError);
+      return NextResponse.json({ error: "Failed to update role" }, { status: 500 });
+    }
   }
 
   if (email) {

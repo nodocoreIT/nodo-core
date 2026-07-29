@@ -22,7 +22,7 @@ async function findAuthUserByEmailFromAuthSchema(
     .schema("auth")
     .from("users")
     .select("id, raw_app_meta_data, email")
-    .ilike("email", normalized)
+    .eq("email", normalized)
     .maybeSingle();
 
   if (error || !data?.id) return null;
@@ -103,6 +103,23 @@ export async function findAuthUserByEmail(
   }
 
   return null;
+}
+
+/**
+ * True when the existing account's app_metadata.org_id already points at a
+ * DIFFERENT org than the one being provisioned right now (or, when
+ * `currentOrgId` is omitted — nodes with no org concept of their own, like
+ * Finanzas — true whenever ANY org_id is already present). Signals that this
+ * global user belongs to another node — never overwrite their password or
+ * app_metadata.role/org_id, only attach this node's own membership.
+ */
+export function hasForeignMembership(
+  appMetadata: Record<string, unknown> | null | undefined,
+  currentOrgId?: string,
+): boolean {
+  const existingOrgId = appMetadata?.org_id;
+  if (typeof existingOrgId !== "string" || existingOrgId.length === 0) return false;
+  return existingOrgId !== currentOrgId;
 }
 
 export function authConfigForNodoCode(nodoCode: string): AuthProjectConfig | null {

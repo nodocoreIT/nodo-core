@@ -12,7 +12,11 @@ import {
   ensureClinicaSharedOrgMembership,
   ensureClinicaPortalProfile,
 } from "@/lib/registration/clinica-provision";
-import { findAuthUserByEmail, authConfigForNodoCode } from "@/lib/registration/auth-user-lookup";
+import {
+  findAuthUserByEmail,
+  authConfigForNodoCode,
+  hasForeignMembership,
+} from "@/lib/registration/auth-user-lookup";
 
 function planToTier(plan: string): "starter" | "pro" {
   return plan.toLowerCase().includes("pro") ? "pro" : "starter";
@@ -32,9 +36,11 @@ async function ensureAutosAccess(
     clientName: string;
     password: string;
     plan: string;
+    allowPasswordWrite: boolean;
+    existingAppMetadata?: Record<string, unknown> | null;
   },
 ): Promise<{ clienteId: string } | { error: string }> {
-  const { userId, email, clientName, password, plan } = params;
+  const { userId, email, clientName, password, plan, allowPasswordWrite, existingAppMetadata } = params;
   const tier = planToTier(plan);
   const defaultTheme = getNodeDefaultTheme("Autos");
 
@@ -73,16 +79,34 @@ async function ensureAutosAccess(
     return { error: "Error al crear membresía autos: " + membershipErr.message };
   }
 
-  const { error: authErr } = await admin.auth.admin.updateUserById(userId, {
-    password,
+  // If this global user already belongs to a DIFFERENT node's org, never
+  // overwrite their password or the role/org_id claim that node depends on —
+  // the membership RPCs above already recorded this node's own access.
+  const foreign = hasForeignMembership(existingAppMetadata, orgId as string);
+
+  const updatePayload: {
+    password?: string;
+    ban_duration: string;
+    app_metadata?: Record<string, unknown>;
+  } = {
     ban_duration: "none",
-    app_metadata: {
+  };
+
+  if (!foreign) {
+    updatePayload.app_metadata = {
+      ...(existingAppMetadata ?? {}),
       role: "administrador",
       cliente_id: clienteId,
       plan: tier,
       org_id: orgId,
-    },
-  });
+    };
+  }
+
+  if (allowPasswordWrite) {
+    updatePayload.password = password;
+  }
+
+  const { error: authErr } = await admin.auth.admin.updateUserById(userId, updatePayload);
 
   if (authErr) {
     return { error: "Error al actualizar credenciales autos: " + authErr.message };
@@ -131,9 +155,10 @@ async function ensureInmoAccess(
     password: string;
     plan: string;
     product: "inmo" | "clinica";
+    allowPasswordWrite: boolean;
   },
 ): Promise<{ orgId: string } | { error: string }> {
-  const { userId, password, plan, product } = params;
+  const { userId, password, plan, product, allowPasswordWrite } = params;
   const tier = planToTier(plan);
 
   const portalRole =
@@ -172,23 +197,31 @@ async function ensureInmoAccess(
   const orgRole = (memberRow?.role as string | undefined) ?? "super_admin";
   const jwtRole = portalRole ?? orgRole;
 
+  // If this global user already belongs to a DIFFERENT node's org, never
+  // overwrite the role/org_id claim that node depends on — this node's own
+  // membership was already recorded above (shared.org_members / clinica portal).
+  const foreign = hasForeignMembership(currentAppMetadata, membership.orgId);
+
   const updatePayload: {
     password?: string;
     ban_duration: string;
-    app_metadata: Record<string, unknown>;
+    app_metadata?: Record<string, unknown>;
   } = {
     ban_duration: "none",
-    app_metadata: {
+  };
+
+  if (!foreign) {
+    updatePayload.app_metadata = {
       ...currentAppMetadata,
       org_id: membership.orgId,
       role: jwtRole,
       plan: tier,
       subscription_plan: plan,
       must_set_password: false,
-    },
-  };
+    };
+  }
 
-  if (password) {
+  if (allowPasswordWrite && password) {
     updatePayload.password = password;
   }
 
@@ -256,6 +289,8 @@ export async function syncInmoUserClaims(params: {
     password: params.password ?? "",
     plan: params.plan,
     product,
+    // Explicit dashboard-triggered resync — the admin deliberately intends this.
+    allowPasswordWrite: true,
   });
 
   if ("error" in result) {
@@ -310,18 +345,25 @@ export async function provisionNodoAccess(params: {
 
       if (code === "finanzas") {
         const currentMeta = found.appMetadata ?? {};
+        // No currentOrgId of its own to compare against — Finanzas has no
+        // per-node membership table yet, so ANY pre-existing org_id means
+        // this global user belongs to another node's context already.
+        const foreign = hasForeignMembership(currentMeta);
         const themePatch = isEmptyThemeSettings(currentMeta.theme_settings)
           ? finanzasThemeAppMetadata()
           : {};
-        await admin.auth.admin.updateUserById(userId, {
-          password,
-          app_metadata: {
-            ...currentMeta,
-            role: "user",
-            plan: planToTier(plan),
-            ...themePatch,
-          },
-        });
+
+        if (!foreign) {
+          await admin.auth.admin.updateUserById(userId, {
+            app_metadata: {
+              ...currentMeta,
+              role: "user",
+              plan: planToTier(plan),
+              ...themePatch,
+            },
+          });
+        }
+        // Never touch password here — this is an existing global account.
         return { ok: true, existing: true, user_id: userId };
       }
 
@@ -332,6 +374,8 @@ export async function provisionNodoAccess(params: {
           clientName,
           password,
           plan,
+          allowPasswordWrite: false,
+          existingAppMetadata: found.appMetadata,
         });
         if ("error" in autosResult) {
           return { ok: false, error: autosResult.error };
@@ -353,6 +397,7 @@ export async function provisionNodoAccess(params: {
           password,
           plan,
           product,
+          allowPasswordWrite: false,
         });
         if ("error" in inmoResult) {
           return { ok: false, error: inmoResult.error };
@@ -365,7 +410,9 @@ export async function provisionNodoAccess(params: {
         };
       }
 
-      await admin.auth.admin.updateUserById(userId, { password, ban_duration: "none" });
+      // Unrecognized/generic node (e.g. ecommerce): existing global user —
+      // never reset their password as a side effect of this registration.
+      await admin.auth.admin.updateUserById(userId, { ban_duration: "none" });
       return { ok: true, existing: true, user_id: userId };
     }
     return { ok: false, error: msg };
@@ -383,6 +430,7 @@ export async function provisionNodoAccess(params: {
       password,
       plan,
       product,
+      allowPasswordWrite: true,
     });
 
     if ("error" in claims) {
@@ -400,6 +448,8 @@ export async function provisionNodoAccess(params: {
       clientName,
       password,
       plan,
+      allowPasswordWrite: true,
+      existingAppMetadata: null,
     });
 
     if ("error" in autosResult) {
@@ -442,12 +492,19 @@ export async function provisionNodoAccessPendingPassword(params: {
 
   if (!result.ok || !result.user_id) return result;
 
-  const admin = createNodoAdminClient(params.nodoCode);
-  if (admin) {
-    await admin.auth.admin.updateUserById(result.user_id, {
-      app_metadata: { must_set_password: true, plan: planToTier(params.plan) },
-      ban_duration: "none",
-    });
+  // Only a brand-new user needs "must_set_password" — an existing global user
+  // already has a password, and this call would otherwise stomp the
+  // role/org_id/cliente_id that provisionNodoAccess just set (or preserved).
+  if (!result.existing) {
+    const admin = createNodoAdminClient(params.nodoCode);
+    if (admin) {
+      const { data: userData } = await admin.auth.admin.getUserById(result.user_id);
+      const currentAppMetadata = userData.user?.app_metadata ?? {};
+      await admin.auth.admin.updateUserById(result.user_id, {
+        app_metadata: { ...currentAppMetadata, must_set_password: true, plan: planToTier(params.plan) },
+        ban_duration: "none",
+      });
+    }
   }
 
   return result;
@@ -493,10 +550,15 @@ export async function createLandingAuthPendingPassword(
     const authConfig = getLandingAuthConfig();
     const matched = authConfig ? await findAuthUserByEmail(authConfig, email, admin) : null;
     if (matched) {
-      await admin.auth.admin.updateUserById(matched.userId, {
-        app_metadata: { role, must_set_password: true },
-        user_metadata: { full_name: fullName },
-      });
+      const currentMeta = matched.appMetadata ?? {};
+      // Global user already exists (e.g. a node customer) — only claim the
+      // landing "role" if they don't already carry a different node's claim.
+      if (!hasForeignMembership(currentMeta)) {
+        await admin.auth.admin.updateUserById(matched.userId, {
+          app_metadata: { ...currentMeta, role, must_set_password: currentMeta.must_set_password ?? true },
+          user_metadata: { full_name: fullName },
+        });
+      }
       return matched.userId;
     }
   }
@@ -527,11 +589,15 @@ export async function ensureLandingAuthUser(
     const authConfig = getLandingAuthConfig();
     const matched = authConfig ? await findAuthUserByEmail(authConfig, email, admin) : null;
     if (matched) {
-      await admin.auth.admin.updateUserById(matched.userId, {
-        password,
-        app_metadata: { role },
-        user_metadata: { full_name: fullName },
-      });
+      const currentMeta = matched.appMetadata ?? {};
+      // Global user already exists — never overwrite their password, and
+      // only claim the landing "role" if it doesn't belong to another node.
+      if (!hasForeignMembership(currentMeta)) {
+        await admin.auth.admin.updateUserById(matched.userId, {
+          app_metadata: { ...currentMeta, role },
+          user_metadata: { full_name: fullName },
+        });
+      }
       return matched.userId;
     }
   }
