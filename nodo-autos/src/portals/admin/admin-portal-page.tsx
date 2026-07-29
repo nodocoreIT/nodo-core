@@ -12,7 +12,6 @@ import { PublicationDetailPage } from "@/features/publications/publication-detai
 import { ContractsPage } from "@/features/contracts/contracts-page";
 import { AutosAgendaPage } from "@/features/agenda/agenda-page";
 import { AutosCajaPage } from "@/features/caja/caja-page";
-import { SuscripcionPage } from "@/features/config/suscripcion-page";
 
 export function AdminPortalPage() {
   return (
@@ -32,7 +31,6 @@ export function AdminPortalPage() {
         <Route path="agenda" element={<AutosAgendaPage />} />
         <Route path="documentacion" element={<ContractsPage />} />
         <Route path="contratos" element={<Navigate to="/admin/documentacion" replace />} />
-        <Route path="configuracion" element={<SuscripcionPage />} />
         <Route path="nodo-id" element={<PlanGate requiredPlan="pro" fullPage><div /></PlanGate>} />
         <Route path="bot-integraciones" element={<PlanGate requiredPlan="pro" fullPage><div /></PlanGate>} />
       </Route>

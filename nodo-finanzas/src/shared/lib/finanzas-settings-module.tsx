@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import {
   SettingsModuleProvider,
+  SubscriptionStatusCard,
   type SettingsModuleContextValue,
   DEFAULT_ALERT_SETTINGS,
 } from "@nodocore/nodo-modules/settings";
@@ -11,6 +12,7 @@ import { useAiSettings } from "@/hooks/use-ai-settings";
 // useAiSettings reads from AiSettingsContext — single shared instance mounted in admin-layout
 import { useFinanzasStaff } from "@/shared/hooks/use-finanzas-staff";
 import { ConfiguracionPage } from "@/features/configuracion/configuracion-page";
+import { useBillingSubscription } from "@/shared/hooks/use-billing-subscription";
 
 const FINANZAS_MANAGED_NAV = [
   { to: "/admin/dashboard", label: "Dashboard" },
@@ -28,6 +30,7 @@ export function FinanzasSettingsModuleProvider({ children }: { children: React.R
   const { settings, setSettings, resetSettings } = useThemeSettings();
   const { aiSettings, setAiSettings } = useAiSettings();
   const staff = useFinanzasStaff();
+  const billingSubscription = useBillingSubscription();
 
   const updateProfileMutation = useMutation({
     mutationFn: async ({ full_name, password }: { full_name: string; password?: string }) => {
@@ -84,6 +87,13 @@ export function FinanzasSettingsModuleProvider({ children }: { children: React.R
       updateUserProfile: updateProfileMutation.mutateAsync,
       isUpdatingUserProfile: updateProfileMutation.isPending,
       systemConfigContent: <ConfiguracionPage embedded />,
+      subscriptionContent: (
+        <SubscriptionStatusCard
+          subscription={billingSubscription.subscription}
+          isLoading={billingSubscription.isLoading}
+          nodeLabel="NODO Finanzas"
+        />
+      ),
       aiUseCases: [
         {
           icon: "🎤",
@@ -114,6 +124,7 @@ export function FinanzasSettingsModuleProvider({ children }: { children: React.R
     setAiSettings,
     staff,
     updateProfileMutation.isPending,
+    billingSubscription,
   ]);
 
   return <SettingsModuleProvider value={value}>{children}</SettingsModuleProvider>;

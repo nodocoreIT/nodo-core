@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Settings, Layout, Globe, HelpCircle, UserCircle, Building2, Phone } from 'lucide-react'
+import { Settings, Layout, Globe, HelpCircle, UserCircle, Building2, Phone, DollarSign } from 'lucide-react'
 import { SiteConfig } from '@/lib/site-config/getSiteConfig'
 import ConfiguracionSitioClient from './ConfiguracionSitioClient'
 import DashboardModulosClient from './DashboardModulosClient'
@@ -10,6 +10,7 @@ import FaqEditor from './FaqEditor'
 import MisDatosClient from './MisDatosClient'
 import DatosBancariosClient from './DatosBancariosClient'
 import ContactoClient from './ContactoClient'
+import SuscripcionClient from './SuscripcionClient'
 import {
   SettingsDesktopNav,
   SettingsMobileNav,
@@ -41,6 +42,7 @@ const TABS: SettingsSectionNavItem[] = [
   { id: 'faq', label: 'FAQ', icon: HelpCircle, mobileLabel: 'FAQ' },
   { id: 'mis-datos', label: 'Mis Datos', icon: UserCircle, mobileLabel: 'Datos' },
   { id: 'datos-bancarios', label: 'Datos Bancarios', icon: Building2, mobileLabel: 'Bancos' },
+  { id: 'suscripcion', label: 'Suscripción', icon: DollarSign, mobileLabel: 'Suscripción' },
 ]
 
 export default function ConfiguracionShell({
@@ -104,6 +106,9 @@ export default function ConfiguracionShell({
         )}
         {activeTab === 'datos-bancarios' && (
           <DatosBancariosClient config={datosBancariosConfig} />
+        )}
+        {activeTab === 'suscripcion' && (
+          <SuscripcionClient />
         )}
         </div>
       </div>

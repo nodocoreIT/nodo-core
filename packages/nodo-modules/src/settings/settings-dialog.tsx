@@ -1,7 +1,7 @@
 "use client";
 // @ts-nocheck
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Loader2, Mail, UserPlus, Image as ImageIcon, BrainCircuit, CheckCircle2, AlertTriangle, Eye, EyeOff, Pencil, Trash2, Lock, User, Building2, Users, Palette, Bell, TrendingUp, Share2, Settings as SettingsIcon } from "lucide-react";
+import { Loader2, Mail, UserPlus, Image as ImageIcon, BrainCircuit, CheckCircle2, AlertTriangle, Eye, EyeOff, Pencil, Trash2, Lock, User, Building2, Users, Palette, Bell, TrendingUp, Share2, Settings as SettingsIcon, DollarSign } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -566,6 +566,7 @@ const ALL_SETTINGS_TABS: SettingsSectionNavItem<SettingsTabId>[] = [
   { id: "ipc", label: "Índices", icon: TrendingUp, mobileLabel: "Índices" },
   { id: "redes-sociales", label: "Redes Sociales", icon: Share2, mobileLabel: "Redes" },
   { id: "system-config", label: "Configuración del Sistema", icon: SettingsIcon, mobileLabel: "Sistema" },
+  { id: "suscripcion", label: "Suscripción", icon: DollarSign, mobileLabel: "Suscripción" },
 ];
 
 export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialogProps) {
@@ -1886,6 +1887,9 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
 
           {/* TAB: Configuración del Sistema */}
           {activeTab === "system-config" && module.systemConfigContent}
+
+          {/* TAB: Suscripción */}
+          {activeTab === "suscripcion" && module.subscriptionContent}
           </div>
         </div>
       </DialogContent>

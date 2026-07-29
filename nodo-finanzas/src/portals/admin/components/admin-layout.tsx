@@ -90,18 +90,17 @@ export function AdminLayout() {
   const aiSettingsValue = useAiSettingsProvider(user?.id);
   const isSuperAdmin = role === "super_admin";
 
-  const SUBSCRIPTION_PATH = "/admin/configuracion?tab=suscripcion";
-  const billingGate = useBillingLockout({
-    billingLocked,
-    pathname,
-    subscriptionPath: "/admin/configuracion",
-  });
+  // Suscripción lives inside the settings dialog now, not a dedicated route —
+  // there's nowhere to redirect to, so the gate always fails closed (blocks
+  // the route and surfaces a notice) while the effect below opens the dialog
+  // on the Suscripción tab so the user can still check their billing status.
+  const billingGate = useBillingLockout({ billingLocked, pathname });
 
   useEffect(() => {
-    if (billingGate.shouldRedirect && billingGate.redirectTo) {
-      navigate(SUBSCRIPTION_PATH, { replace: true });
+    if (billingGate.shouldRedirect) {
+      openSettings("suscripcion");
     }
-  }, [billingGate.shouldRedirect, billingGate.redirectTo, navigate]);
+  }, [billingGate.shouldRedirect, openSettings]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -347,16 +346,17 @@ export function AdminLayout() {
 
           {/* Content */}
           <main className="flex-1 overflow-auto p-6">
-            {billingGate.shouldRedirect && !billingGate.redirectTo ? (
-              // Fail-safe: no Suscripción route configured — block rather than grant access.
+            {billingGate.shouldRedirect ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
                 <Lock className="h-10 w-10 text-slate2" />
                 <p className="text-sm text-slate2 max-w-sm">
                   Tu acceso está restringido por un problema con el pago de la suscripción.
-                  Contactate con NODO Core para regularizarlo.
                 </p>
+                <Button variant="outline" onClick={() => openSettings("suscripcion")}>
+                  Ver mi suscripción
+                </Button>
               </div>
-            ) : billingGate.shouldRedirect ? null : (
+            ) : (
               <OpenSettingsContext.Provider value={{ openSettings }}>
                 <Outlet />
               </OpenSettingsContext.Provider>
