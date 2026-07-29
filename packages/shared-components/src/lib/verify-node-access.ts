@@ -48,12 +48,18 @@ export async function userHasNodeAccess(
   return false;
 }
 
-export type NodeAccessReason = "ok" | "payment_overdue" | "banned" | "invalid_credentials";
+export type NodeAccessReason =
+  | "ok"
+  | "payment_overdue"
+  | "banned"
+  | "invalid_credentials"
+  | "trial_expired";
 
 /**
  * Returns a machine-readable reason alongside the boolean access check, so callers
  * can distinguish `payment_overdue` (client_unit is `impago` — access stays allowed,
- * see userHasNodeAccess/enforceNodeAccess, unaffected) from real denial reasons.
+ * see userHasNodeAccess/enforceNodeAccess, unaffected) and `trial_expired` (Nodo
+ * Finanzas' one-time 7-day demo ran out) from real denial reasons.
  * Uses RPC `user_node_access_reason` — purely additive, does not gate access itself.
  *
  * Fail-open: any error (network, RPC failure) resolves to `"ok"` — this function must
@@ -80,7 +86,8 @@ export async function getNodeAccessReason(
     data === "ok" ||
     data === "payment_overdue" ||
     data === "banned" ||
-    data === "invalid_credentials"
+    data === "invalid_credentials" ||
+    data === "trial_expired"
   ) {
     return data;
   }
