@@ -301,7 +301,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
+        <main className="flex-1 overflow-auto py-4 pl-3 pr-4 sm:py-6 sm:pl-4 sm:pr-6">{children}</main>
       </div>
     </div>
   );
