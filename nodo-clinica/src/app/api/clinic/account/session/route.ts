@@ -92,6 +92,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           subscriptionPlan,
           subscriptionStatus,
           trialDaysRemaining: trialDays,
+          // Dual-membership: whether this account can act as doctor and/or
+          // patient — drives whether the role switcher is shown at all.
+          canSwitchToDoctor: canDoctor,
+          canSwitchToPatient: canPatient,
         },
       });
     }

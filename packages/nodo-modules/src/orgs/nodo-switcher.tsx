@@ -7,6 +7,7 @@ import {
   Building2,
   Car,
   Coins,
+  Stethoscope,
   Check,
   AlertCircle,
   Loader2,
@@ -26,12 +27,15 @@ const ROLE_LABELS: Record<string, string> = {
   member: "Miembro",
   owner: "Propietario",
   tenant: "Inquilino",
+  medico: "Médico",
+  paciente: "Paciente",
 };
 
 const PRODUCT_META: Record<string, { label: string; color: string; Icon: LucideIcon }> = {
   inmo: { label: "Nodo Inmo", color: "#da5a0e", Icon: Building2 },
   autos: { label: "Nodo Autos", color: "#C41E3A", Icon: Car },
   finanzas: { label: "Nodo Finanzas", color: "#059669", Icon: Coins },
+  clinica: { label: "Nodo Clínica", color: "#0D9488", Icon: Stethoscope },
 };
 
 function getProductIcon(product?: string): LucideIcon {
@@ -44,12 +48,35 @@ const PRODUCT_PATHS: Record<string, string> = {
   finanzas: "/finanzas/admin/dashboard",
 };
 
-interface NodoSwitcherProps {
-  /** Current product (e.g. "inmo"). Same-product orgs shown first, others grouped below. */
-  product?: string;
+/**
+ * Inmo/Autos/Finanzas/Ecommerce are Next.js Multi-Zone apps under the same
+ * origin as nodo-landing — same Supabase session in localStorage, so
+ * switching between them is a plain same-origin navigation. Clinica is a
+ * genuinely separate deployment/domain, so switching to/from it needs the
+ * same access_token/refresh_token hash relay the login flow already uses
+ * (see nodo-landing/app/[nodeSlug]/login/page.tsx `redirectAfterSession` and
+ * each nodo's own /auth/callback route).
+ */
+const LANDING_ORIGIN = "https://www.nodocore.com.ar";
+const CLINICA_ORIGIN = "https://clinica.nodocore.com.ar";
+
+function crossOriginCallbackUrl(targetProduct: string, accessToken: string, refreshToken: string): string {
+  const base =
+    targetProduct === "clinica" ? `${CLINICA_ORIGIN}/auth/callback` : `${LANDING_ORIGIN}/${targetProduct}/auth/callback`;
+  return `${base}#access_token=${accessToken}&refresh_token=${refreshToken}`;
 }
 
-export function NodoSwitcher({ product }: NodoSwitcherProps = {}) {
+interface NodoSwitcherProps {
+  /** Current product (e.g. "inmo", "clinica"). Same-product orgs shown first, others grouped below. */
+  product?: string;
+  /**
+   * Current Clinica portal role ("medico" | "paciente"), when `product === "clinica"`.
+   * Lets the switcher mark the active Clinica entry and offer the other role.
+   */
+  clinicaRole?: "medico" | "paciente";
+}
+
+export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
   const supabase = useSupabase();
   const { orgs: allOrgs, loading } = useMyOrgs();
   const [open, setOpen] = useState(false);
@@ -137,14 +164,73 @@ export function NodoSwitcher({ product }: NodoSwitcherProps = {}) {
     });
   }
 
-  const currentOrg = sameProduct.find((o) => o.org_id === currentOrgId) ?? sameProduct[0];
+  const currentOrg =
+    product === "clinica"
+      ? (sameProduct.find((o) => o.role === clinicaRole) ?? sameProduct[0])
+      : (sameProduct.find((o) => o.org_id === currentOrgId) ?? sameProduct[0]);
+
+  function isEntryCurrent(org: OrgEntry): boolean {
+    if (org.product === "clinica") {
+      return product === "clinica" && org.role === clinicaRole;
+    }
+    return org.org_id === currentOrgId;
+  }
 
   async function handleSwitch(org: OrgEntry) {
-    if (org.org_id === currentOrgId || switching) return;
+    if (isEntryCurrent(org) || switching) return;
     setOpen(false);
     setSwitching(true);
     setSwitchingTo(org.org_name);
     setSwitchError(null);
+
+    const targetIsClinica = org.product === "clinica";
+    const currentIsClinica = product === "clinica";
+
+    // Same product (Clinica), switching medico <-> paciente: same origin,
+    // just flips the ClinicSession role via nodo-clinica's own endpoint.
+    if (targetIsClinica && currentIsClinica) {
+      try {
+        const res = await fetch("/api/clinic/auth/set-role", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ role: org.role === "medico" ? "doctor" : "patient" }),
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          setSwitchError(body.error ?? "No se pudo cambiar de rol");
+          setSwitching(false);
+          return;
+        }
+        window.location.href = org.role === "medico" ? "/medico" : "/paciente";
+      } catch (err) {
+        setSwitchError(err instanceof Error ? err.message : "No se pudo cambiar de rol");
+        setSwitching(false);
+      }
+      return;
+    }
+
+    // Genuinely cross-origin (Clinica <-> any other nodo): relay the current
+    // session's tokens to the target's own /auth/callback, same mechanism
+    // the login flow already uses — no switch-org edge function involved,
+    // since that function only knows about shared.organizations.
+    if (targetIsClinica || currentIsClinica) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const accessToken = data.session?.access_token;
+        const refreshToken = data.session?.refresh_token;
+        if (!accessToken || !refreshToken) {
+          setSwitchError("No se pudo resolver la sesión actual.");
+          setSwitching(false);
+          return;
+        }
+        window.location.href = crossOriginCallbackUrl(org.product, accessToken, refreshToken);
+      } catch (err) {
+        setSwitchError(err instanceof Error ? err.message : "No se pudo cambiar de nodo");
+        setSwitching(false);
+      }
+      return;
+    }
 
     const isCrossNodo = product && org.product !== product;
 
@@ -259,7 +345,7 @@ export function NodoSwitcher({ product }: NodoSwitcherProps = {}) {
   const currentProductColor = PRODUCT_META[product ?? ""]?.color ?? "var(--color-navy)";
 
   function renderOrgButton(org: OrgEntry, isCrossNodo = false) {
-    const isCurrent = org.org_id === currentOrgId && !isCrossNodo;
+    const isCurrent = isEntryCurrent(org) && !isCrossNodo;
     return (
       <button
         key={org.org_id}
