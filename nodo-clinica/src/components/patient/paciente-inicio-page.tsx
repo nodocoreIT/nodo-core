@@ -231,12 +231,12 @@ export function PacienteInicioPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl space-y-6">
       <section>
         <div className="mb-3">
         
           <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1">
+            <div className="relative w-full sm:w-56">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
               <Input
                 placeholder="Nombre del médico..."
@@ -254,7 +254,7 @@ export function PacienteInicioPage() {
                 </button>
               )}
             </div>
-            <div className="flex-1">
+            <div className="w-full sm:w-56">
               <SpecialtyFilterCombobox
                 value={specialtyFilter}
                 onChange={setSpecialtyFilter}
@@ -263,7 +263,7 @@ export function PacienteInicioPage() {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap- sm:grid-cols-2 max-w-2xl">
           {filteredDoctors.length === 0 ? (
             <p className="text-sm text-slate-400 col-span-2 text-center py-8 bg-white rounded-xl border">
               {doctors.length === 0

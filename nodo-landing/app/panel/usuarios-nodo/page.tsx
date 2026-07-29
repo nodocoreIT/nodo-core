@@ -125,6 +125,15 @@ export default function UsuariosNodoPage() {
     confirmEmail: string;
     error: string | null;
   } | null>(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    unitCode: "",
+    email: "",
+    fullName: "",
+    plan: "starter",
+  });
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -424,6 +433,40 @@ export default function UsuariosNodoPage() {
     }
   }
 
+  async function handleCreateUser() {
+    const { unitCode, email, fullName, plan } = createForm;
+    if (!unitCode || !email.trim() || !fullName.trim() || !plan) return;
+
+    setCreateLoading(true);
+    setCreateError(null);
+    try {
+      const res = await fetch("/api/admin/nodo-users/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create",
+          unit_code: unitCode,
+          email: email.trim(),
+          full_name: fullName.trim(),
+          plan,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCreateError(data.error ?? "No se pudo crear el usuario.");
+        return;
+      }
+      setNotice(`Usuario ${email.trim()} creado en ${unitCode}.`);
+      setCreateModalOpen(false);
+      setCreateForm({ unitCode: "", email: "", fullName: "", plan: "starter" });
+      await loadUsers();
+    } catch {
+      setCreateError("Error de red al crear el usuario.");
+    } finally {
+      setCreateLoading(false);
+    }
+  }
+
   const cardStyle: React.CSSProperties = {
     background: "white",
     border: "1px solid var(--color-mist)",
@@ -508,6 +551,26 @@ export default function UsuariosNodoPage() {
           <p style={{ margin: 0, alignSelf: "center", fontSize: 13, color: "var(--color-slate2)" }}>
             {filtered.length} {filtered.length === 1 ? "usuario" : "usuarios"}
           </p>
+          <button
+            type="button"
+            onClick={() => {
+              setCreateError(null);
+              setCreateModalOpen(true);
+            }}
+            style={{
+              marginLeft: "auto",
+              border: "none",
+              background: "var(--color-brand)",
+              color: "white",
+              borderRadius: 8,
+              padding: "9px 16px",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: 13.5,
+            }}
+          >
+            + Crear usuario
+          </button>
         </div>
 
         {loading ? (
@@ -710,6 +773,127 @@ export default function UsuariosNodoPage() {
                 }}
               >
                 Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {createModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.35)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 50,
+            padding: 16,
+          }}
+          onClick={() => !createLoading && setCreateModalOpen(false)}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 12,
+              padding: 24,
+              width: "100%",
+              maxWidth: 440,
+              boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700 }}>Crear usuario</h3>
+            <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--color-slate2)" }}>
+              Si el email ya existe en otro nodo, se vincula la membresía sin tocar su contraseña.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+              <FormSelect
+                value={createForm.unitCode}
+                onChange={(v) => setCreateForm((f) => ({ ...f, unitCode: v }))}
+                options={[
+                  { value: "", label: "Elegí un nodo…" },
+                  ...nodoOptions.filter((o) => o.value !== "all"),
+                ]}
+                aria-label="Nodo de destino"
+              />
+              <input
+                type="text"
+                value={createForm.fullName}
+                onChange={(e) => setCreateForm((f) => ({ ...f, fullName: e.target.value }))}
+                placeholder="Nombre completo"
+                style={{
+                  border: "1px solid var(--color-mist)",
+                  borderRadius: 8,
+                  padding: "10px 12px",
+                  fontSize: 14,
+                }}
+              />
+              <input
+                type="email"
+                value={createForm.email}
+                onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="Email"
+                style={{
+                  border: "1px solid var(--color-mist)",
+                  borderRadius: 8,
+                  padding: "10px 12px",
+                  fontSize: 14,
+                }}
+              />
+              <FormSelect
+                value={createForm.plan}
+                onChange={(v) => setCreateForm((f) => ({ ...f, plan: v }))}
+                options={[
+                  { value: "starter", label: "Starter" },
+                  { value: "pro", label: "Pro" },
+                ]}
+                aria-label="Tipo de membresía / suscripción"
+              />
+            </div>
+
+            {createError && (
+              <p style={{ margin: "0 0 12px", fontSize: 13, color: "#991B1B" }}>{createError}</p>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setCreateModalOpen(false)}
+                disabled={createLoading}
+                style={{
+                  border: "1px solid var(--color-mist)",
+                  background: "white",
+                  borderRadius: 8,
+                  padding: "8px 14px",
+                  cursor: "pointer",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={
+                  createLoading ||
+                  !createForm.unitCode ||
+                  !createForm.email.trim() ||
+                  !createForm.fullName.trim()
+                }
+                onClick={() => void handleCreateUser()}
+                style={{
+                  border: "none",
+                  background: "var(--color-brand)",
+                  color: "white",
+                  borderRadius: 8,
+                  padding: "8px 14px",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  opacity: createLoading ? 0.7 : 1,
+                }}
+              >
+                {createLoading ? "Creando…" : "Crear usuario"}
               </button>
             </div>
           </div>

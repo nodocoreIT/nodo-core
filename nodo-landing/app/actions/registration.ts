@@ -15,12 +15,14 @@ import {
   sendFinanzasVerificationEmail,
   sendEcommerceVerificationEmail,
   sendAdminNewRegistrationEmail,
+  sendNodeLinkedEmail,
 } from "@/lib/mail";
 import { resolveRegistrationOrigin } from "@/lib/registration/origin";
 import {
   duplicateRegistrationMessage,
   isEmailRegisteredForNode,
 } from "@/lib/registration/duplicate-check";
+import { authConfigForNodoCode, findAuthUserByEmail } from "@/lib/registration/auth-user-lookup";
 
 const VERIFICATION_TTL_HOURS = 24;
 
@@ -50,6 +52,37 @@ async function sendVerificationEmail(
     ...payload,
     plan,
   });
+}
+
+/**
+ * Picks Plantilla 1 (usuario nuevo) vs Plantilla 2 (usuario global existente,
+ * nodo nuevo vinculado) — la única diferencia entre "nuevo" y "existente" es
+ * si este email YA tiene una cuenta en auth.users (compartida entre nodos).
+ */
+async function sendRegistrationEmail(
+  unitCode: string,
+  plan: string,
+  payload: { nombre: string; email: string; token: string; origin: string },
+  nodeLabel: string,
+  nodeSlug: string,
+): Promise<void> {
+  const authConfig = authConfigForNodoCode(unitCode);
+  const globalUser = authConfig
+    ? await findAuthUserByEmail(authConfig, payload.email)
+    : null;
+
+  if (globalUser) {
+    await sendNodeLinkedEmail({
+      nombre: payload.nombre,
+      email: payload.email,
+      nodeLabel,
+      confirmUrl: `${payload.origin}/api/verify-registration?token=${payload.token}`,
+      forgotPasswordUrl: `${payload.origin}/${nodeSlug}/login?mode=forgot`,
+    });
+    return;
+  }
+
+  await sendVerificationEmail(unitCode, plan, payload);
 }
 
 /**
@@ -137,12 +170,18 @@ export async function submitNodeRegistration(
 
     if (isMailConfigured()) {
       try {
-        await sendVerificationEmail(unitCode, plan, {
-          nombre: fullName,
-          email,
-          token: pending.verification_token,
-          origin: emailOrigin,
-        });
+        await sendRegistrationEmail(
+          unitCode,
+          plan,
+          {
+            nombre: fullName,
+            email,
+            token: pending.verification_token,
+            origin: emailOrigin,
+          },
+          cfg.label,
+          cfg.slug,
+        );
         mailSent = true;
       } catch (mailErr) {
         console.error("submitNodeRegistration mail:", mailErr);
@@ -246,12 +285,18 @@ export async function resendVerificationEmail(params: {
     }
 
     const emailOrigin = resolveRegistrationOrigin(params.origin);
-    await sendVerificationEmail(unitCode, pending.plan, {
-      nombre: pending.full_name,
-      email,
-      token,
-      origin: emailOrigin,
-    });
+    await sendRegistrationEmail(
+      unitCode,
+      pending.plan,
+      {
+        nombre: pending.full_name,
+        email,
+        token,
+        origin: emailOrigin,
+      },
+      cfg.label,
+      cfg.slug,
+    );
 
     return {
       status: "success",

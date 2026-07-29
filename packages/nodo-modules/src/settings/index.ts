@@ -7,6 +7,8 @@ export { AgencyProfileForm } from "./agency-profile-form";
 export { BankAccountsSection } from "./bank-accounts-section";
 export { createTenantProfileHooks } from "./create-tenant-profile-hooks";
 export { createLogoHooks } from "./create-logo-hooks";
+export { SubscriptionStatusCard } from "./subscription-status-card";
+export type { SubscriptionStatusInfo, SubscriptionStatusCardProps } from "./subscription-status-card";
 export type {
   SettingsTabId,
   NavSection,

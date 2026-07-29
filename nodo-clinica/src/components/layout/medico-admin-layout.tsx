@@ -34,6 +34,7 @@ import {
   type AdminCommandPaletteItem,
 } from "@nodocore/shared-components";
 import { NodoSwitcher } from "@nodocore/nodo-modules";
+import { RoleSwitcher } from "@/components/nodo/role-switcher";
 import { MedicoDoctorProvider } from "@/contexts/medico-doctor-context";
 import { DoctorSettingsDialog, type SectionId } from "@/components/medical/doctor-settings-dialog";
 import { DoctorSpecialtySetupModal } from "@/components/medical/doctor-specialty-setup-modal";
@@ -112,6 +113,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
     profilePhotoUrl?: string;
   } | null>(null);
   const [checking, setChecking] = useState(true);
+  const [canSwitchToPatient, setCanSwitchToPatient] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SectionId | undefined>(undefined);
   const [specialtySetupOpen, setSpecialtySetupOpen] = useState(false);
@@ -179,6 +181,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
         };
         const professionalId = verifyData.professionalId ?? user.id;
 
+        setCanSwitchToPatient(Boolean(user.canSwitchToPatient));
         setDoctor({
           id: professionalId,
           fullName: user.fullName,
@@ -539,9 +542,12 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                   />
                 }
                 trailing={
-                  isPlatformMode() && isBrowserSupabaseEnabled() ? (
-                    <NodoSwitcher product="clinica" />
-                  ) : null
+                  <div className="flex items-center gap-2">
+                    <RoleSwitcher currentRole="doctor" canSwitchToOther={canSwitchToPatient} />
+                    {isPlatformMode() && isBrowserSupabaseEnabled() ? (
+                      <NodoSwitcher product="clinica" clinicaRole="medico" />
+                    ) : null}
+                  </div>
                 }
               />
             )}

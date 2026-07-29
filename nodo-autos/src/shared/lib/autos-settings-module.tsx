@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import {
   SettingsModuleProvider,
+  SubscriptionStatusCard,
   type AlertSettings,
   type AiSettings,
   type SettingsModuleContextValue,
@@ -10,6 +11,7 @@ import {
 import { useThemeSettings } from "@/shared/hooks/use-theme-settings";
 import { useAutosStaff } from "@/shared/hooks/use-autos-staff";
 import { useAutosBankAccounts } from "@/shared/hooks/use-autos-bank-accounts";
+import { useBillingSubscription } from "@/shared/hooks/use-billing-subscription";
 import {
   autosTenantProfileHooks,
   autosLogoHooks,
@@ -40,6 +42,7 @@ export function AutosSettingsModuleProvider({ children }: { children: React.Reac
   const pdfLogoUrlQuery = useLogoSignedUrl(profileQuery.data?.pdf_logo_path);
   const staff = useAutosStaff();
   const bankAccounts = useAutosBankAccounts();
+  const billingSubscription = useBillingSubscription();
   const updateProfileMutation = useMutation({
     mutationFn: async ({ full_name, password }: { full_name: string; password?: string }) => {
       const attrs: { data: { full_name: string }; password?: string } = {
@@ -121,6 +124,13 @@ export function AutosSettingsModuleProvider({ children }: { children: React.Reac
         isUpdating: bankAccounts.isUpdating,
         isRemoving: bankAccounts.isRemoving,
       },
+      subscriptionContent: (
+        <SubscriptionStatusCard
+          subscription={billingSubscription.subscription}
+          isLoading={billingSubscription.isLoading}
+          nodeLabel="NODO Autos"
+        />
+      ),
     };
   }, [
     settings,
@@ -139,6 +149,7 @@ export function AutosSettingsModuleProvider({ children }: { children: React.Reac
     updateProfileMutation.isPending,
     alertSettings,
     user,
+    billingSubscription,
   ]);
 
   return <SettingsModuleProvider value={value}>{children}</SettingsModuleProvider>;

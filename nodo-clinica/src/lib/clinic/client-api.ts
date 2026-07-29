@@ -67,6 +67,8 @@ type ClinicSessionResult = {
     subscriptionStatus?: string;
     trialDaysRemaining?: number;
     org_id?: string | null;
+    canSwitchToDoctor?: boolean;
+    canSwitchToPatient?: boolean;
   } | null;
 };
 
@@ -332,6 +334,20 @@ export const clinicApi = {
       });
 
     return sessionInflight;
+  },
+
+  /** Switches the active portal role for a dual patient+doctor account. */
+  async switchRole(role: "doctor" | "patient"): Promise<void> {
+    const res = await fetch(`${BASE}/api/clinic/auth/set-role`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...clinicFetchOpts().headers },
+      body: JSON.stringify({ role }),
+    });
+    const data = await parseJsonResponse(res);
+    if (!res.ok) {
+      throw new Error(data.error || "No se pudo cambiar de rol");
+    }
+    invalidateClinicApiCache("session");
   },
 
   /**

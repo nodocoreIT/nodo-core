@@ -9,7 +9,8 @@ export type SettingsTabId =
   | "alerts"
   | "ipc"
   | "redes-sociales"
-  | "system-config";
+  | "system-config"
+  | "suscripcion";
 
 export interface MetaSettings {
   instagram_account_id: string;
@@ -198,6 +199,8 @@ export interface SettingsModuleContextValue {
 
   metaSettingsContent?: ReactNode;
   systemConfigContent?: ReactNode;
+  /** Platform billing status card (plan, monto, próximo cobro) — the "Suscripción" tab. */
+  subscriptionContent?: ReactNode;
   /** Override the "¿Para qué se usa?" list in the AI settings tab. */
   aiUseCases?: Array<{ icon: string; title?: string; description: string }>;
 }

@@ -157,7 +157,7 @@ export async function sendPasswordResetEmail(params: {
         <!-- Footer -->
         <div style="background:#F0FAFA;padding:16px 32px;border-top:1px solid #CCEBE9;text-align:center;">
           <p style="color:#9CA3AF;font-size:11px;margin:0;">
-            Si no realizaste esta solicitud, ignorá este correo. · © 2026 Nodo Core
+            Si no realizaste esta solicitud, ignorá este correo.<br/>© 2026 NODO Core · nodocore.com.ar
           </p>
         </div>
       </div>
@@ -244,7 +244,7 @@ export async function sendClinicVerificationEmail(params: {
         <!-- Footer -->
         <div style="background:#F0FAFA;padding:16px 32px;border-top:1px solid #CCEBE9;text-align:center;">
           <p style="color:#9CA3AF;font-size:11px;margin:0;">
-            Si no realizaste esta solicitud, ignorá este correo. · © 2026 Nodo Core
+            Si no realizaste esta solicitud, ignorá este correo.<br/>© 2026 NODO Core · nodocore.com.ar
           </p>
         </div>
       </div>

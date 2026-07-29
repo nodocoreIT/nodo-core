@@ -95,24 +95,31 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return NextResponse.redirect(new URL(`/login?error=session_error`, request.url));
     }
 
-    const { data: listData } = await serviceClient.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    });
-    const existing = listData?.users?.find(
-      (u: { email?: string | null; id: string }) =>
-        String(u.email ?? "").toLowerCase() === pendingRow.email.toLowerCase(),
-    );
-    if (existing) {
-      const { data: userData } = await serviceClient.auth.admin.getUserById(existing.id);
-      const current = userData.user?.app_metadata ?? {};
-      await serviceClient.auth.admin.updateUserById(existing.id, {
-        app_metadata: {
-          ...current,
-          role: dbRole,
-          org_id: CLINIC_ORG_ID,
-        },
-      });
+    // Direct auth.users lookup — O(1), doesn't silently miss users past a
+    // fixed listUsers() page like the previous perPage:1000 scan did.
+    const { data: existing } = await serviceClient
+      .schema("auth")
+      .from("users")
+      .select("id, raw_app_meta_data")
+      .eq("email", pendingRow.email.toLowerCase())
+      .maybeSingle();
+
+    if (existing?.id) {
+      const current = (existing.raw_app_meta_data as Record<string, unknown>) ?? {};
+      // Global user already belongs to a DIFFERENT node's org — never
+      // overwrite the role/org_id claim that node depends on.
+      const foreign =
+        typeof current.org_id === "string" && current.org_id.length > 0 && current.org_id !== CLINIC_ORG_ID;
+
+      if (!foreign) {
+        await serviceClient.auth.admin.updateUserById(existing.id, {
+          app_metadata: {
+            ...current,
+            role: dbRole,
+            org_id: CLINIC_ORG_ID,
+          },
+        });
+      }
     }
   }
 

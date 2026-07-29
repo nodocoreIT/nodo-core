@@ -22,7 +22,6 @@ import {
   Fingerprint,
   Bot,
   Share2,
-  DollarSign,
 } from "lucide-react";
 import {
   Button,
@@ -104,7 +103,6 @@ const NAV_ENTRIES: NavEntry[] = [
       { to: "/admin/agenda", label: "Agenda y Tareas", icon: Calendar },
     ],
   },
-  { to: "/admin/suscripcion", label: "Suscripción", icon: DollarSign },
 ];
 
 const PRO_NAV_ITEMS: NavItem[] = [
@@ -148,7 +146,6 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin/agenda": "Agenda y Tareas",
   "/admin/reclamos": "Reclamos",
   "/admin/redes-sociales": "Redes Sociales",
-  "/admin/suscripcion": "Suscripción",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -179,25 +176,18 @@ function initials(value: string): string {
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
-const SUBSCRIPTION_PATH = "/admin/suscripcion";
-
 export function AdminLayout() {
   const { user, role, plan, billingLocked, signOut } = useAuth();
   const { data: profile } = useOrgProfile();
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
-  const billingGate = useBillingLockout({
-    billingLocked,
-    pathname,
-    subscriptionPath: SUBSCRIPTION_PATH,
-  });
+  // Suscripción lives inside the settings dialog now, not a dedicated route —
+  // there's nowhere to redirect to, so the gate always fails closed (blocks
+  // the route and surfaces a notice) while the effect below opens the dialog
+  // on the Suscripción tab so the user can still check their billing status.
+  const billingGate = useBillingLockout({ billingLocked, pathname });
 
-  useEffect(() => {
-    if (billingGate.shouldRedirect && billingGate.redirectTo) {
-      navigate(billingGate.redirectTo, { replace: true });
-    }
-  }, [billingGate.shouldRedirect, billingGate.redirectTo, navigate]);
   const resetSearch = useSearchStore((s) => s.reset);
   const setSearchQuery = useSearchStore((s) => s.setQuery);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -217,6 +207,13 @@ export function AdminLayout() {
     setSettingsOpen(true);
     clearPendingSettings();
   }, [pendingSettingsTab, clearPendingSettings]);
+
+  useEffect(() => {
+    if (billingGate.shouldRedirect) {
+      setSettingsInitialTab("suscripcion");
+      setSettingsOpen(true);
+    }
+  }, [billingGate.shouldRedirect]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -647,16 +644,23 @@ function AdminLayoutShell({
 
         {/* Content area — extra bottom padding on mobile for the feedback nodo FAB */}
         <main className="flex-1 overflow-auto p-4 pb-24 sm:p-6 sm:pb-6">
-          {billingGate.shouldRedirect && !billingGate.redirectTo ? (
-            // Fail-safe: no Suscripción route configured — block rather than grant access.
+          {billingGate.shouldRedirect ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
               <Lock className="h-10 w-10 text-slate2" />
               <p className="text-sm text-slate2 max-w-sm">
                 Tu acceso está restringido por un problema con el pago de la suscripción.
-                Contactate con NODO Core para regularizarlo.
               </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSettingsInitialTab("suscripcion");
+                  setSettingsOpen(true);
+                }}
+              >
+                Ver mi suscripción
+              </Button>
             </div>
-          ) : billingGate.shouldRedirect ? null : (
+          ) : (
             <Outlet />
           )}
         </main>

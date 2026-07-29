@@ -44,11 +44,12 @@ export interface AuthContextValue {
   isLoading: boolean;
   /**
    * Machine-readable access reason from `getNodeAccessReason` (fail-open to "ok").
-   * "payment_overdue" means the client_unit is impago — access stays allowed but
-   * the nodo's layout should gate navigation via `useBillingLockout`.
+   * "payment_overdue" means the client_unit is impago, "trial_expired" means a
+   * Finanzas demo ran out — access stays allowed in both cases, but the nodo's
+   * layout should gate navigation via `useBillingLockout`.
    */
   accessReason: NodeAccessReason;
-  /** Convenience flag: `accessReason === "payment_overdue"`. */
+  /** Convenience flag: `accessReason === "payment_overdue" || accessReason === "trial_expired"`. */
   billingLocked: boolean;
   /**
    * Sign in and throw on failure.
@@ -270,7 +271,8 @@ export function AuthProvider({
     plan: denied ? null : effectivePlan,
     isLoading,
     accessReason: effectiveAccessReason,
-    billingLocked: effectiveAccessReason === "payment_overdue",
+    billingLocked:
+      effectiveAccessReason === "payment_overdue" || effectiveAccessReason === "trial_expired",
     signIn,
     signInWithPassword,
     signOut,

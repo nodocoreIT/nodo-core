@@ -6,7 +6,12 @@ export function getClinicOrgId(): string {
   return CLINIC_ORG_ID;
 }
 
-/** JWT claims alineados con patients/professionals.org_id en registro y onboarding. */
+/**
+ * JWT claims alineados con patients/professionals.org_id en registro y onboarding.
+ * Nunca pisa el role/org_id si ese global user ya pertenece a OTRO nodo — su
+ * membresía de Clínica ya quedó registrada en patients/professionals por su
+ * propio user_id, que es la fuente de verdad real (ver auth-guard.ts).
+ */
 export async function syncClinicaAuthClaims(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   authAdmin: { auth: { admin: { getUserById: (id: string) => Promise<any>; updateUserById: (id: string, attrs: object) => Promise<any> } } },
@@ -15,6 +20,10 @@ export async function syncClinicaAuthClaims(
 ): Promise<void> {
   const { data: userData } = await authAdmin.auth.admin.getUserById(userId);
   const current = userData.user?.app_metadata ?? {};
+  const foreign =
+    typeof current.org_id === "string" && current.org_id.length > 0 && current.org_id !== CLINIC_ORG_ID;
+  if (foreign) return;
+
   await authAdmin.auth.admin.updateUserById(userId, {
     app_metadata: {
       ...current,

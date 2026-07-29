@@ -18,6 +18,10 @@ import { usePatientTheme } from "@/hooks/use-theme-settings";
 import { clinicApi, getClientSession } from "@/lib/clinic/client-api";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { RoleSwitcher } from "@/components/nodo/role-switcher";
+import { NodoSwitcher } from "@nodocore/nodo-modules";
+import { isBrowserSupabaseEnabled } from "@/lib/clinic/config";
+import { isPlatformMode } from "@/lib/clinic/platform-config";
 
 const NAV_ITEMS = [
   { href: "/paciente", label: "Buscar médico", icon: Stethoscope },
@@ -46,6 +50,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
     profilePhotoData?: string;
   } | null>(null);
   const [checking, setChecking] = useState(true);
+  const [canSwitchToDoctor, setCanSwitchToDoctor] = useState(false);
 
   useEffect(() => {
     async function check() {
@@ -61,6 +66,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
           sessionEmail = user.email ?? session.email ?? "";
           sessionFullName = user.fullName ?? "";
           sessionPhoto = user.profilePhotoUrl;
+          setCanSwitchToDoctor(Boolean(user.canSwitchToDoctor));
         }
       } catch { /* ignore */ }
 
@@ -287,9 +293,15 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
               </h1>
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <RoleSwitcher currentRole="patient" canSwitchToOther={canSwitchToDoctor} />
+            {isPlatformMode() && isBrowserSupabaseEnabled() ? (
+              <NodoSwitcher product="clinica" clinicaRole="paciente" />
+            ) : null}
+          </div>
         </header>
 
-        <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
+        <main className="flex-1 overflow-auto py-4 pl-3 pr-4 sm:py-6 sm:pl-4 sm:pr-6">{children}</main>
       </div>
     </div>
   );
