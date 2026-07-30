@@ -270,9 +270,22 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
         } catch {
           // ignore
         }
-        // Cross-nodo: navigate to the target nodo app.
-        const targetPath = PRODUCT_PATHS[org.product] ?? `/${org.product}/admin/dashboard`;
-        window.location.href = targetPath;
+        // Even though Inmo/Autos/Finanzas share an origin, each keeps its own
+        // independent Supabase session under a per-nodo localStorage key
+        // (nodoAuthStorageKey — see create-nodo-auth-client.ts). Navigating
+        // straight to the target's dashboard left it with no session under
+        // ITS key, since refreshSession() above only updated the CURRENT
+        // nodo's key. Relay the just-refreshed tokens through the target's
+        // own /auth/callback (same mechanism already used for Clínica) so it
+        // calls setSession() itself and populates its own storage key.
+        const relayAccessToken = refreshed?.session?.access_token;
+        const relayRefreshToken = refreshed?.session?.refresh_token;
+        if (relayAccessToken && relayRefreshToken) {
+          window.location.href = crossOriginCallbackUrl(org.product, relayAccessToken, relayRefreshToken);
+        } else {
+          const targetPath = PRODUCT_PATHS[org.product] ?? `/${org.product}/admin/dashboard`;
+          window.location.href = targetPath;
+        }
         // Reset state in case the navigation takes a moment.
         setSwitching(false);
         setSwitchingTo(null);
