@@ -53,6 +53,10 @@ interface WaitingRoomProps {
   onClose?: () => void;
   /** Called once, right after the appointment finishes loading successfully. */
   onReady?: () => void;
+  /** Called whenever a live video call starts or ends, so an embedding modal
+   * can block accidental dismissal only while a call is actually connected —
+   * every other screen (waiting, error, cancelled, ended) must stay closable. */
+  onCallActiveChange?: (active: boolean) => void;
 }
 
 interface WaitingMeta {
@@ -77,6 +81,7 @@ export function WaitingRoom({
   dataSource = "supabase",
   onClose,
   onReady,
+  onCallActiveChange,
 }: WaitingRoomProps) {
   const embedded = !!onClose;
   const readyNotifiedRef = useRef(false);
@@ -388,6 +393,11 @@ export function WaitingRoom({
       onReady?.();
     }
   }, [isLoading, appointment, onReady]);
+
+  const callActive = appointment?.status === "in_consultation" && !videoEnded;
+  useEffect(() => {
+    onCallActiveChange?.(callActive);
+  }, [callActive, onCallActiveChange]);
 
   useEffect(() => {
     const mp = searchParams.get("mp");
