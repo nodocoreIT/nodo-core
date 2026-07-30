@@ -118,6 +118,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const [settingsSection, setSettingsSection] = useState<SectionId | undefined>(undefined);
   const [specialtySetupOpen, setSpecialtySetupOpen] = useState(false);
   const [cobrosUnread, setCobrosUnread] = useState(0);
+  const [mpJustConnected, setMpJustConnected] = useState(false);
   const mpCallbackHandled = useRef(false);
 
   const chatEmbedded = pathname === "/medico/interconsultas";
@@ -251,7 +252,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
       toast.success(
         "Tu cuenta de Mercado Pago quedó vinculada. Los pacientes pueden pagarte por MP.",
       );
-      void clinicApi.getDoctorSchedule(doctor.id).catch(() => {});
+      setMpJustConnected(true);
     } else if (mp === "error") {
       const msg = searchParams.get("mp_msg") ?? "desconocido";
       toast.error(`No se pudo vincular Mercado Pago: ${mpErrorLabel(msg)}`);
@@ -566,9 +567,16 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
           <DoctorSettingsDialog
             key={doctor.id}
             open={settingsOpen}
-            onOpenChange={(o) => { setSettingsOpen(o); if (!o) setSettingsSection(undefined); }}
+            onOpenChange={(o) => {
+              setSettingsOpen(o);
+              if (!o) {
+                setSettingsSection(undefined);
+                setMpJustConnected(false);
+              }
+            }}
             doctorId={doctor.id}
             initialSection={settingsSection}
+            mpJustConnected={mpJustConnected}
           />
         )}
         {doctor && (

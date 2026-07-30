@@ -101,11 +101,17 @@ const CLINICA_SETTINGS_NAV: SettingsSectionNavItem<SectionId>[] = SECTIONS.map(
   }),
 );
 
+type PaymentUiState = DoctorPaymentSettings & {
+  mercadopagoConnected?: boolean;
+};
+
 interface DoctorSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   doctorId: string;
   initialSection?: SectionId;
+  /** After OAuth redirect: show connected UI immediately while schedule loads. */
+  mpJustConnected?: boolean;
 }
 
 function readImageFile(file: File, maxKb = 400): Promise<string> {
@@ -126,6 +132,7 @@ export function DoctorSettingsDialog({
   onOpenChange,
   doctorId,
   initialSection = "agenda",
+  mpJustConnected = false,
 }: DoctorSettingsDialogProps) {
   const [activeSection, setActiveSection] = useState<SectionId>(initialSection);
 
@@ -145,7 +152,7 @@ export function DoctorSettingsDialog({
   const [signatureImageData, setSignatureImageData] = useState("");
   const [profilePhotoData, setProfilePhotoData] = useState("");
   const [bio, setBio] = useState("");
-  const [payment, setPayment] = useState<DoctorPaymentSettings>({
+  const [payment, setPayment] = useState<PaymentUiState>({
     currency: "ARS",
     requirePaymentBeforeBooking: true,
   });
@@ -171,6 +178,8 @@ export function DoctorSettingsDialog({
   const [choosingPlan, setChoosingPlan] = useState(false);
   const [startingPlanId, setStartingPlanId] = useState<string | null>(null);
   const loadGen = useRef(0);
+  /** Keep optimistic "connected" until the schedule API confirms (or dialog closes). */
+  const mpOptimisticRef = useRef(false);
 
   useEffect(() => {
     void clinicApi.getMercadoPagoOAuthConfig().then((cfg) => {
@@ -209,7 +218,20 @@ export function DoctorSettingsDialog({
       if (data.profilePhotoData != null) setProfilePhotoData(String(data.profilePhotoData));
       if (data.bio != null) setBio(String(data.bio));
       if (data.payment) {
-        setPayment({ currency: "ARS", requirePaymentBeforeBooking: true, ...(data.payment as DoctorPaymentSettings) });
+        const fromApi = data.payment as PaymentUiState;
+        const next: PaymentUiState = {
+          currency: "ARS",
+          requirePaymentBeforeBooking: true,
+          ...fromApi,
+        };
+        // OAuth already succeeded; don't flash the "connect" CTA if the
+        // first schedule read races ahead of payment_credentials visibility.
+        if (mpOptimisticRef.current) {
+          next.mercadopagoEnabled = true;
+          next.mercadopagoConnected = true;
+          if (fromApi.mercadopagoConnected) mpOptimisticRef.current = false;
+        }
+        setPayment(next);
       }
       if (data.reminderSettings) {
         setReminderSettings({ enabled: false, minutesBefore: 1440, ...(data.reminderSettings as DoctorReminderSettings) });
@@ -227,6 +249,21 @@ export function DoctorSettingsDialog({
   useEffect(() => {
     if (open && initialSection) setActiveSection(initialSection);
   }, [open, initialSection]);
+
+  // Instant UI after Mercado Pago OAuth — don't wait for schedule round-trip.
+  useEffect(() => {
+    if (!open) {
+      mpOptimisticRef.current = false;
+      return;
+    }
+    if (!mpJustConnected) return;
+    mpOptimisticRef.current = true;
+    setPayment((p) => ({
+      ...p,
+      mercadopagoEnabled: true,
+      mercadopagoConnected: true,
+    }));
+  }, [open, mpJustConnected]);
 
   useEffect(() => {
     if (!open) return;
@@ -779,17 +816,14 @@ export function DoctorSettingsDialog({
                     </label>
                     {payment.mercadopagoEnabled && (
                       <div className="space-y-3 pl-1">
-                        {(payment as DoctorPaymentSettings & {
-                          mercadopagoConnected?: boolean;
-                          mercadopagoUserId?: string;
-                        }).mercadopagoConnected ? (
+                        {payment.mercadopagoConnected ? (
                           <div className="rounded-md border border-emerald-200 bg-emerald-50/80 p-3 space-y-2">
                             <p className="text-sm font-medium text-emerald-900">
                               Cuenta conectada
-                              {(payment as { mercadopagoUserId?: string }).mercadopagoUserId && (
+                              {payment.mercadopagoUserId && (
                                 <span className="font-normal text-emerald-700">
                                   {" "}· MP user{" "}
-                                  {(payment as { mercadopagoUserId?: string }).mercadopagoUserId}
+                                  {payment.mercadopagoUserId}
                                 </span>
                               )}
                             </p>
