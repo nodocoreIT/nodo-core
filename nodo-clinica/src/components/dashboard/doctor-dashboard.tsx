@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Stethoscope, Pill, FlaskConical, Brain, LogOut, CheckCircle, Settings, CalendarPlus } from "lucide-react";
+import { Stethoscope, Pill, FlaskConical, LogOut, CheckCircle, Settings, CalendarPlus } from "lucide-react";
+// import { Brain } from "lucide-react"; // SOAP tab disabled, see below
 import { PatientQueue } from "@/components/dashboard/patient-queue";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { JitsiMeet } from "@/components/consultation/jitsi-meet";
@@ -13,7 +14,7 @@ import { ConsultationEndScreen } from "@/components/consultation/consultation-en
 import { ImmediateActionPanel } from "@/components/consultation/immediate-action-panel";
 import { PrescriptionForm } from "@/components/medical/prescription-form";
 import { StudyRequestForm } from "@/components/medical/study-request-form";
-import { SoapSummaryPanel } from "@/components/medical/soap-summary-panel";
+// import { SoapSummaryPanel } from "@/components/medical/soap-summary-panel"; // SOAP tab disabled, see below
 import { DoctorOfficeSidebar } from "@/components/dashboard/doctor-office-sidebar";
 import { DoctorPendingPaymentsPanel } from "@/components/dashboard/doctor-pending-payments-panel";
 import { PatientPreviewPanel } from "@/components/dashboard/patient-preview-panel";
@@ -848,7 +849,7 @@ export function DoctorDashboard({
         </div>
 
         {/* Centro: ficha del paciente / video consulta */}
-        <div className="col-span-12 lg:col-span-6 space-y-4 min-h-[500px]">
+        <div className="col-span-12 lg:col-span-6 min-h-[500px] flex flex-col gap-4">
           {hasActiveSession() && activeAppointment ? (
             <>
               <ClinicalAlertsBanner
@@ -891,7 +892,7 @@ export function DoctorDashboard({
                 onValueChange={setConsultationToolsTab}
                 className="w-full"
               >
-                <TabsList className="grid w-full grid-cols-4 bg-white border border-slate-200">
+                <TabsList className="grid w-full grid-cols-3 bg-white border border-slate-200">
                   <TabsTrigger value="prescription" className="text-xs gap-1">
                     <Pill className="h-3.5 w-3.5" />
                     Receta
@@ -900,10 +901,12 @@ export function DoctorDashboard({
                     <FlaskConical className="h-3.5 w-3.5" />
                     Estudios
                   </TabsTrigger>
+                  {/* SOAP tab disabled for now — future feature, see TabsContent below
                   <TabsTrigger value="soap" className="text-xs gap-1">
                     <Brain className="h-3.5 w-3.5" />
                     SOAP
                   </TabsTrigger>
+                  */}
                   <TabsTrigger value="report" className="text-xs gap-1">
                     <Stethoscope className="h-3.5 w-3.5" />
                     Informe
@@ -942,6 +945,7 @@ export function DoctorDashboard({
                     }
                   />
                 </TabsContent>
+                {/* SOAP tab disabled for now — future feature, see TabsList above
                 <TabsContent value="soap">
                   <SoapSummaryPanel
                     appointmentId={activeAppointment.id}
@@ -952,6 +956,7 @@ export function DoctorDashboard({
                     }
                   />
                 </TabsContent>
+                */}
                 <TabsContent value="report">
                   <MedicalReportPanel
                     appointmentId={activeAppointment.id}
@@ -969,20 +974,26 @@ export function DoctorDashboard({
                 </TabsContent>
               </Tabs>
 
-              <ImmediateActionPanel
-                appointmentId={activeAppointment.id}
-                doctorId={doctorId}
-                patientId={activeAppointment.patient_id}
-                patientName={patientProfile?.profile?.full_name || "Paciente"}
-                patientEmail={patientProfile?.profile?.email}
-                doctorName={doctorName}
-                doctorSpecialty={doctorSpecialty}
-                doctorLicense={doctorLicense}
-                dataSource={dataSource}
-                onReportSaved={() =>
-                  loadClinicalHistory(activeAppointment.patient_id)
-                }
-              />
+              {/* flex-1: stretches to match the left/right columns' grid-stretched
+                  height instead of only sizing to its own tab content — this
+                  parent is a flex column now, not plain block flow, so h-full
+                  on the panel's own Card has something definite to fill. */}
+              <div className="flex-1 min-h-0">
+                <ImmediateActionPanel
+                  appointmentId={activeAppointment.id}
+                  doctorId={doctorId}
+                  patientId={activeAppointment.patient_id}
+                  patientName={patientProfile?.profile?.full_name || "Paciente"}
+                  patientEmail={patientProfile?.profile?.email}
+                  doctorName={doctorName}
+                  doctorSpecialty={doctorSpecialty}
+                  doctorLicense={doctorLicense}
+                  dataSource={dataSource}
+                  onReportSaved={() =>
+                    loadClinicalHistory(activeAppointment.patient_id)
+                  }
+                />
+              </div>
             </>
           ) : (
             inlineReport ? (
