@@ -6,11 +6,12 @@ import {
   mapAuthLoginError,
   fetchMustSetPassword,
   RequiredPasswordForm,
+  PAUSED_NODE_MESSAGE,
 } from "@nodocore/shared-components";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-import { CLINICA_REGISTRATION_URL } from "@/lib/clinic/platform-config";
+import { CLINICA_REGISTRATION_URL, CLINICA_AUTH_CONFIG, NODO_LANDING_URL } from "@/lib/clinic/platform-config";
 
 interface PlatformMedicoLoginProps {
   email: string;
@@ -49,6 +50,7 @@ export function PlatformMedicoLoginFields({
 }: PlatformMedicoLoginProps) {
   const supabase = getSupabaseBrowserClient();
   const [needsNewPassword, setNeedsNewPassword] = useState(false);
+  const [pausedModal, setPausedModal] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,9 +85,22 @@ export function PlatformMedicoLoginFields({
         return;
       }
 
-      const access = await enforceNodeAccess(supabase, "clinica");
+      const access = await enforceNodeAccess(supabase, CLINICA_AUTH_CONFIG.unitCode);
       if (!access.ok) {
-        setGeneralError(access.message);
+        if (access.reason === "paused") {
+          setPausedModal(true);
+          void fetch(`${NODO_LANDING_URL}/api/node-access/paused-notify`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: email.trim(),
+              unitCode: CLINICA_AUTH_CONFIG.unitCode,
+              nodeLabel: "Nodo Clínica",
+            }),
+          }).catch(() => undefined);
+        } else {
+          setGeneralError(access.message);
+        }
         return;
       }
 
@@ -136,6 +151,7 @@ export function PlatformMedicoLoginFields({
   }
 
   return (
+    <>
     <form onSubmit={handleSubmit} noValidate>
       <div className="mb-4">
         <label
@@ -211,5 +227,31 @@ export function PlatformMedicoLoginFields({
         Ingresar al consultorio
       </button>
     </form>
+    {pausedModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="w-full max-w-sm rounded-2xl border border-border bg-white p-7 text-center shadow-xl">
+          <h3 className="mb-2 text-xl font-extrabold text-navy">Nodo pausado</h3>
+          <p className="mb-2 text-sm leading-relaxed text-slate2">{PAUSED_NODE_MESSAGE}</p>
+          <p className="mb-6 text-xs leading-relaxed text-slate2">
+            Ya avisamos a NODO Core. También podés escribir a{" "}
+            <a
+              href="mailto:contacto@nodocore.com.ar"
+              className="font-semibold text-brand underline-offset-2 hover:underline"
+            >
+              contacto@nodocore.com.ar
+            </a>
+            .
+          </p>
+          <button
+            type="button"
+            className="w-full rounded-md bg-brand py-3 text-[15px] font-bold text-white hover:bg-brand-600"
+            onClick={() => setPausedModal(false)}
+          >
+            Entendido
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

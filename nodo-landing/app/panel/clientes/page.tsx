@@ -560,25 +560,17 @@ export default function ClientesPage() {
       }
     }
 
-    // Sync ban status: pausado → ban, onboarding/activo → unban.
+    // Never ban Auth on per-nodo pause — Auth is shared across all nodos for the
+    // same email, so suspending would lock Clínica/Finanzas/etc. too. Per-nodo
+    // pause is enforced by client_units/node_email_access + user_has_node_access.
+    // Only lift an existing ban when (re)activating a unit.
     const suspendTasks = formUnits
       .map((u) => {
         const nodeDef = NODES.find((n) => n.code === u.unit_code);
         if (!nodeDef?.provisionable) return null;
         const userId = provisionedUserIds.get(u.unit_code);
         if (!userId) return null;
-        if (freshlyProvisioned.has(u.unit_code) && u.status !== "pausado") {
-          // Fresh provision should unban via ensureInmoAccess; reactivate as safety net.
-          return fetch("/api/nodo-suspend", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              nodo_code: u.unit_code,
-              user_id: userId,
-              action: "reactivate",
-            }),
-          });
-        }
+        if (u.status === "pausado") return null;
 
         return fetch("/api/nodo-suspend", {
           method: "POST",
@@ -586,7 +578,7 @@ export default function ClientesPage() {
           body: JSON.stringify({
             nodo_code: u.unit_code,
             user_id: userId,
-            action: u.status === "pausado" ? "suspend" : "reactivate",
+            action: "reactivate",
           }),
         });
       })

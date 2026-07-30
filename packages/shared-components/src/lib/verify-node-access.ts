@@ -8,7 +8,7 @@ export const INVALID_LOGIN_MESSAGE =
 export const ACCESS_DENIED_MESSAGE = INVALID_LOGIN_MESSAGE;
 
 const BANNED_MESSAGE =
-  "Tu acceso fue pausado. Contactate con NODO Core para reactivarlo.";
+  "Tu cuenta está suspendida en NODO Core. Contactate con el administrador.";
 
 /** Shown when the client_unit / node_email_access status is `pausado`. */
 export const PAUSED_NODE_MESSAGE =
