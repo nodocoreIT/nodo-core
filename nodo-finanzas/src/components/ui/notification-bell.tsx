@@ -65,7 +65,7 @@ export function NotificationBell() {
       items={items}
       kindStyles={KIND_STYLES}
       onNavigate={(href) => navigate(href)}
-      headerRingClass="ring-white"
+      headerRingClass="ring-[#EEF3F8]"
       storageKey="finanzas"
     />
   );

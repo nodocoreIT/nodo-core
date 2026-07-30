@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Plus, Edit, Trash2, Eye, EyeOff, PiggyBank, History, ArrowLeftRight, ArrowRight, X, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, PiggyBank, History, ArrowLeftRight, ArrowRight, X, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Search, ChevronUp, ChevronDown, ChevronsUpDown, Copy } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -192,6 +192,18 @@ function MovimientosModal({ cuenta, onClose, finanzas }: MovimientosModalProps) 
     setVista('form');
   }
 
+  function abrirDuplicar(m: MovimientoCuenta) {
+    setEditando(null);
+    reset({
+      tipo: m.tipo,
+      monto: Math.abs(m.monto),
+      descripcion: m.descripcion,
+      fecha: m.fecha,
+      detalle: m.detalle ?? '',
+    });
+    setVista('form');
+  }
+
   function volverALista() {
     setVista('lista');
     setEditando(null);
@@ -282,7 +294,7 @@ function MovimientosModal({ cuenta, onClose, finanzas }: MovimientosModalProps) 
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-mist flex-shrink-0">
@@ -526,7 +538,7 @@ function MovimientosModal({ cuenta, onClose, finanzas }: MovimientosModalProps) 
                     ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)
                     : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
                 </button>
-                <span className="w-11 flex-shrink-0" />
+                <span className="w-[5.5rem] flex-shrink-0" />
               </div>
             )}
 
@@ -553,7 +565,7 @@ function MovimientosModal({ cuenta, onClose, finanzas }: MovimientosModalProps) 
               ) : (
                 <div className="divide-y divide-mist/50">
                   {movimientosFiltrados.map((m) => (
-                    <div key={m.id} className="flex items-center gap-3 py-2.5 group">
+                    <div key={m.id} className="flex items-center gap-3 py-2.5">
                       <div className={`flex-shrink-0 p-1.5 rounded-full ${m.tipo === 'entrada' ? 'bg-emerald-100' : 'bg-red-100'}`}>
                         {m.tipo === 'entrada'
                           ? <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
@@ -565,20 +577,35 @@ function MovimientosModal({ cuenta, onClose, finanzas }: MovimientosModalProps) 
                         <p className="text-sm font-medium text-ink truncate">{m.descripcion}</p>
                         {m.detalle && <p className="text-xs text-slate2/70 truncate">{m.detalle}</p>}
                       </div>
-                      <span className={`text-sm font-bold flex-shrink-0 ${m.tipo === 'entrada' ? 'text-emerald-600' : 'text-red-500'}`}>
+                      <span className={`text-sm font-bold flex-shrink-0 tabular-nums ${m.tipo === 'entrada' ? 'text-emerald-600' : 'text-red-500'}`}>
                         {m.tipo === 'entrada' ? '+' : '-'}{formatearMoneda(Math.abs(m.monto), cuenta.moneda)}
                       </span>
-                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <div className="flex items-center gap-0.5 flex-shrink-0 w-[5.5rem] justify-end">
                         <button
+                          type="button"
+                          onClick={() => abrirDuplicar(m)}
+                          className="p-1 text-slate2 hover:text-brand hover:bg-mist rounded transition-colors"
+                          title="Duplicar"
+                          aria-label="Duplicar"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => abrirEdicion(m)}
                           className="p-1 text-slate2 hover:text-brand hover:bg-mist rounded transition-colors"
+                          title="Editar"
+                          aria-label="Editar"
                         >
                           <Edit className="h-3.5 w-3.5" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleEliminar(m)}
                           disabled={eliminandoId === m.id}
                           className="p-1 text-slate2 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Eliminar"
+                          aria-label="Eliminar"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>

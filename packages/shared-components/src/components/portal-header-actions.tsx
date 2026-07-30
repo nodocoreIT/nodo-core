@@ -24,7 +24,11 @@ export function PortalHeaderMobileActions({
 >) {
   return (
     <div
-      className={cn("flex max-w-full items-center justify-end gap-1.5 overflow-x-auto md:hidden", className)}
+      className={cn(
+        // overflow-x-auto would clip the bell badge (-top) via CSS overflow coupling
+        "flex max-w-full items-center justify-end gap-1.5 overflow-visible py-0.5 md:hidden",
+        className,
+      )}
     >
       {metrics}
       {notifications}
