@@ -272,7 +272,7 @@ export function StudyRequestForm({
           size="sm"
         >
           <Download className="h-4 w-4 mr-1" />
-          PDF + historial ({selected.length})
+          PDF + Historial ({selected.length})
         </Button>
       </CardContent>
     </Card>

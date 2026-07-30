@@ -733,7 +733,7 @@ export async function sendNodeLinkedEmail({
       title: "¡Te sumaste a un nuevo nodo!",
       subtitleHtml: `en <strong>${nodeLabel}</strong>`,
       bodyHtml: `Hola <strong>${nombre}</strong>,<br/><br/>Tu cuenta ya existe en NODO Core. Te vinculamos el acceso a <strong>${nodeLabel}</strong> a tu perfil — confirmá para activarlo. Usá la misma contraseña que ya tenías en tus otros nodos.`,
-      ctaLabel: "Confirmar mi nuevo nodo",
+      ctaLabel: "Entrar a mi nuevo nodo",
       ctaUrl: confirmUrl,
       secondaryHtml: `<a href="${forgotPasswordUrl}" style="color:${theme.linkColor};text-decoration:underline;">¿No recordás tu contraseña?</a>`,
       footerNote: "Si no esperabas este correo, podés ignorarlo.",
