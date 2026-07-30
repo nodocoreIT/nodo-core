@@ -2,6 +2,7 @@ import { SearchableSelect } from '@nodocore/shared-components';
 import { useRubros } from '@/hooks/use-rubros';
 import { normalizarCodigoRubro } from '@/utils/rubro-formatters';
 import type { Rubro } from '@/types';
+import toast from 'react-hot-toast';
 
 interface RubroSelectorProps {
   rubroId: string | null | undefined;
@@ -14,6 +15,21 @@ interface RubroSelectorProps {
   triggerClassName?: string;
 }
 
+/** "Sin resultados" → "MI RUBRO", collision-safe by suffixing _2, _3, ... */
+function generarCodigoRubro(nombre: string, existentes: Set<string>): string {
+  const base = nombre
+    .toUpperCase()
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^A-Z0-9_]/g, '')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+  if (!existentes.has(base)) return base;
+  let n = 2;
+  while (existentes.has(`${base}_${n}`)) n++;
+  return `${base}_${n}`;
+}
+
 export function RubroSelector({
   rubroId,
   onChange,
@@ -24,7 +40,7 @@ export function RubroSelector({
   hideLabel = false,
   triggerClassName,
 }: RubroSelectorProps) {
-  const { rubrosActivos } = useRubros();
+  const { rubrosActivos, crearRubro } = useRubros();
 
   const options = rubrosActivos.map((rubro) => ({
     value: rubro.id,
@@ -38,6 +54,25 @@ export function RubroSelector({
     }
     const found = rubrosActivos.find((rubro) => rubro.id === id);
     onChange(found ?? null);
+  }
+
+  async function handleCreateNew(nombre: string) {
+    const existentes = new Set(rubrosActivos.map((r) => r.codigo));
+    const creado = await crearRubro({
+      codigo: generarCodigoRubro(nombre, existentes),
+      nombre,
+      emoji: '📦',
+      color: '',
+      activo: true,
+      esSistema: false,
+      orden: rubrosActivos.length,
+    });
+    if (creado) {
+      toast.success(`Rubro "${nombre}" creado`);
+      onChange(creado);
+    } else {
+      toast.error('No se pudo crear el rubro');
+    }
   }
 
   return (
@@ -57,6 +92,8 @@ export function RubroSelector({
         searchPlaceholder="Buscar rubro..."
         aria-label={label}
         triggerClassName={triggerClassName}
+        onCreateNew={handleCreateNew}
+        createNewLabel={(search) => `Agregar rubro "${search}"`}
       />
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
