@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
-import { sendAccountEnabledEmail } from "@/lib/mail";
+import { sendAccountEnabledEmail, sendNodeLinkedEmail } from "@/lib/mail";
 import { hasForeignMembership } from "@/lib/registration/auth-user-lookup";
 import { getDefaultClinicOrgId } from "@/lib/registration/clinica-provision";
 
@@ -197,38 +197,59 @@ export async function POST(request: NextRequest) {
     email_confirm: true,
   });
 
-  // Mint our own activation token in the clinica schema (shared Supabase project).
-  const { data: tokenRow, error: tokenError } = await clinicAdmin
-    .from("account_activation_tokens")
-    .insert({ user_id: authUserId, email: reg.email, role: reg.role })
-    .select("token")
-    .single();
+  if (foreign) {
+    // This email already has a real password on another nodo — never send a
+    // "set your password" link (it would let them overwrite that password
+    // with no warning it's shared). Tell them to reuse their credentials.
+    try {
+      await sendNodeLinkedEmail({
+        nombre: profile.full_name ?? reg.email,
+        email: reg.email,
+        nodeLabel: "Nodo Clínica",
+        confirmUrl: `${clinicaAppUrl}/login`,
+        forgotPasswordUrl: `${clinicaAppUrl}/recuperar-contrasena`,
+      });
+    } catch (mailErr) {
+      console.error("[admin/clinic-registrations] email error", mailErr);
+      return Response.json(
+        { error: "Error al enviar email de activación." },
+        { status: 500 },
+      );
+    }
+  } else {
+    // Mint our own activation token in the clinica schema (shared Supabase project).
+    const { data: tokenRow, error: tokenError } = await clinicAdmin
+      .from("account_activation_tokens")
+      .insert({ user_id: authUserId, email: reg.email, role: reg.role })
+      .select("token")
+      .single();
 
-  if (tokenError || !tokenRow?.token) {
-    console.error("[admin/clinic-registrations] activation token error", tokenError);
-    return Response.json(
-      { error: "Error al generar enlace de activación." },
-      { status: 500 },
-    );
-  }
+    if (tokenError || !tokenRow?.token) {
+      console.error("[admin/clinic-registrations] activation token error", tokenError);
+      return Response.json(
+        { error: "Error al generar enlace de activación." },
+        { status: 500 },
+      );
+    }
 
-  const activationUrl = `${clinicaAppUrl}/actualizar-contrasena?token=${tokenRow.token}&role=${reg.role}`;
+    const activationUrl = `${clinicaAppUrl}/actualizar-contrasena?token=${tokenRow.token}&role=${reg.role}`;
 
-  // Send activation email
-  try {
-    await sendAccountEnabledEmail({
-      nombre: profile.full_name ?? reg.email,
-      email: reg.email,
-      nodeLabel: "Nodo Clínica",
-      loginUrl: activationUrl,
-      unitCode: "clinica",
-    });
-  } catch (mailErr) {
-    console.error("[admin/clinic-registrations] email error", mailErr);
-    return Response.json(
-      { error: "Error al enviar email de activación." },
-      { status: 500 },
-    );
+    // Send activation email
+    try {
+      await sendAccountEnabledEmail({
+        nombre: profile.full_name ?? reg.email,
+        email: reg.email,
+        nodeLabel: "Nodo Clínica",
+        loginUrl: activationUrl,
+        unitCode: "clinica",
+      });
+    } catch (mailErr) {
+      console.error("[admin/clinic-registrations] email error", mailErr);
+      return Response.json(
+        { error: "Error al enviar email de activación." },
+        { status: 500 },
+      );
+    }
   }
 
   // Ensure the user has a client record + "Clínica" unit in the landing DB
