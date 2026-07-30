@@ -1,17 +1,19 @@
-// Función para normalizar códigos de rubros a texto legible
+/**
+ * Formatea un código de rubro legacy (p. ej. RESTAURACION_AUTOS → "Restauracion Autos").
+ * Si el valor ya es un nombre legible (con espacios o minúsculas), se devuelve tal cual
+ * para respetar el casing declarado.
+ */
 export const normalizarCodigoRubro = (codigo: string): string => {
   if (!codigo) return '';
 
-  return codigo
-    .toLowerCase()                    // Convertir a minúsculas
-    .split('_')                      // Separar por underscores
-    .map(palabra =>
-      palabra.charAt(0).toUpperCase() + palabra.slice(1)  // Capitalizar primera letra
-    )
-    .join(' ');                      // Unir con espacios
-};
+  const looksLikeCode =
+    /_/.test(codigo) || (/^[A-ZÁÉÍÓÚÜÑ0-9]+$/.test(codigo) && codigo.length > 1);
 
-// Ejemplos de uso:
-// 'RESTAURACION_AUTOS' -> 'Restauracion Autos'
-// 'ALIMENTACION' -> 'Alimentacion'
-// 'OTROS' -> 'Otros'
+  if (!looksLikeCode) return codigo;
+
+  return codigo
+    .toLowerCase()
+    .split('_')
+    .map((palabra) => palabra.charAt(0).toUpperCase() + palabra.slice(1))
+    .join(' ');
+};
