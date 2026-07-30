@@ -23,6 +23,27 @@ import type { Tarjeta, RubroConsumo } from '@/types';
 
 type Vista = 'resumen' | 'registro';
 
+/** Próxima fecha de cierre (YYYY-MM-DD) a partir del día del mes, para el input type=date. */
+function fechaCierreDesdeDia(diaCierre: number | undefined, referencia = new Date()): string {
+  if (!diaCierre || diaCierre < 1 || diaCierre > 31) return '';
+
+  const y = referencia.getFullYear();
+  const m = referencia.getMonth();
+  const hoyDia = referencia.getDate();
+  const maxEsteMes = new Date(y, m + 1, 0).getDate();
+  const diaEsteMes = Math.min(diaCierre, maxEsteMes);
+
+  if (diaEsteMes >= hoyDia) {
+    return `${y}-${String(m + 1).padStart(2, '0')}-${String(diaEsteMes).padStart(2, '0')}`;
+  }
+
+  const nextM = m === 11 ? 0 : m + 1;
+  const nextY = m === 11 ? y + 1 : y;
+  const maxNext = new Date(nextY, nextM + 1, 0).getDate();
+  const diaNext = Math.min(diaCierre, maxNext);
+  return `${nextY}-${String(nextM + 1).padStart(2, '0')}-${String(diaNext).padStart(2, '0')}`;
+}
+
 export function TarjetasPage() {
   const finanzas = useFinanzas();
   const navigate = useNavigate();
@@ -292,20 +313,18 @@ export function TarjetasPage() {
                       Día de Cierre:
                     </span>
                     <input
-                      type="number"
-                      min={1}
-                      max={31}
-                      placeholder="Ej: 20"
-                      value={resumen.tarjeta.diaCierre ?? ''}
+                      type="date"
+                      value={fechaCierreDesdeDia(resumen.tarjeta.diaCierre)}
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) => {
                         e.stopPropagation();
-                        const valor = e.target.value ? Number(e.target.value) : undefined;
+                        const iso = e.target.value;
+                        const dia = iso ? Number(iso.slice(8, 10)) : undefined;
                         finanzas.actualizarTarjeta(resumen.tarjeta.id, {
-                          diaCierre: valor,
+                          diaCierre: dia,
                         });
                       }}
-                      className="w-14 text-sm font-semibold text-ink border-0 bg-transparent cursor-pointer focus:outline-none focus:ring-0 text-right"
+                      className="text-sm font-semibold text-ink border-0 bg-transparent cursor-pointer focus:outline-none focus:ring-0 text-right"
                     />
                   </div>
 

@@ -6,7 +6,6 @@ import { Spinner } from '@/components/ui/spinner';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { useNotifications } from '@/hooks/use-notifications';
 import { formatearMoneda, formatearFecha } from '@/utils/formatters';
-import { calcularFechasTarjeta } from '@/utils/tarjeta-fechas';
 
 const CARD_LABELS = {
   saldo: 'Saldo del Mes',
@@ -121,28 +120,21 @@ export function DashboardPage() {
     )
     .reduce((s, p) => s + (p.importeCuota ?? 0), 0);
 
+  // Consumos del mes de fechaVencimiento de cada tarjeta (mismo criterio que
+  // notificaciones / pantalla de tarjetas). El pago se busca en ese mes o en el
+  // mes calendario actual (se suele pagar el resumen antes o en el vencimiento).
   const totalTarjetas = tarjetas
-    .filter((t) => t.activa && t.diaCierre && t.diaVencimiento)
+    .filter((t) => t.activa && t.fechaVencimiento)
     .reduce((sum, tarjeta) => {
-      const fechas = calcularFechasTarjeta(
-        {
-          closingDay: tarjeta.diaCierre!,
-          dueOffsetDays: (tarjeta.diaVencimiento! - tarjeta.diaCierre! + 30) % 30 || 14,
-        },
-        hoy,
-      );
+      const mesVto = tarjeta.fechaVencimiento!.slice(0, 7);
       const periodoMonto = consumosTarjetas
-        .filter(
-          (c) =>
-            c.tarjetaId === tarjeta.id &&
-            c.fecha > fechas.previousClosingDate &&
-            c.fecha <= fechas.currentClosingDate,
-        )
+        .filter((c) => c.tarjetaId === tarjeta.id && c.fecha.startsWith(mesVto))
         .reduce((s, c) => s + (c.importeARS ?? 0), 0);
 
-      // Deduct any payment registered this month for this card
       const gastoPago = finanzas.gastosDiarios.find(
-        (g) => g.pagoTarjetaId === tarjeta.id && g.fecha.startsWith(mesActualStr),
+        (g) =>
+          g.pagoTarjetaId === tarjeta.id &&
+          (g.fecha.startsWith(mesVto) || g.fecha.startsWith(mesActualStr)),
       );
       if (!gastoPago) return sum + periodoMonto;
       if (!gastoPago.pagoParcial) return sum; // fully paid — card contributes 0
@@ -343,7 +335,7 @@ export function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-[9px] font-extrabold uppercase tracking-wider text-white leading-tight">Total Tarjetas</p>
-                  <p className="text-[9px] font-bold text-white/70 mt-0.5">período actual</p>
+                  <p className="text-[9px] font-bold text-white/70 mt-0.5">mes de vencimiento</p>
                 </div>
               </div>
               <p className="text-base font-black text-white leading-tight text-center md:text-left">{formatearMoneda(totalTarjetas)}</p>
