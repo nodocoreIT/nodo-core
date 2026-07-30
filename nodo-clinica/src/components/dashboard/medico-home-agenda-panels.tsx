@@ -84,35 +84,55 @@ function PatientRow({
   );
 }
 
-interface MedicoHomeAgendaSidebarProps {
+interface MedicoHomeStatsProps {
   loading: boolean;
-  dayAppts: AppointmentRow[];
-  upcomingAppts: AppointmentRow[];
-  selectedBlocks: { startTime: string; endTime: string }[];
   stats: { waiting: number; inConsult: number; done: number };
-  selectedDateKey: string;
-  selectedDateLabel: string;
-  onSelectDate: (dateKey: string) => void;
-  onSelectToday: () => void;
-  onSelectTomorrow: () => void;
-  todayKey: string;
-  tomorrowKey: string;
 }
 
-export function MedicoHomeAgendaSidebar({
-  loading,
-  dayAppts,
-  upcomingAppts,
-  selectedBlocks,
-  stats,
-  selectedDateKey,
-  selectedDateLabel,
-  onSelectDate,
-  onSelectToday,
-  onSelectTomorrow,
-  todayKey,
-  tomorrowKey,
-}: MedicoHomeAgendaSidebarProps) {
+/** "En espera" / "En consulta" / "Finalizados" today counters — stacked under Turnos y horarios. */
+export function MedicoHomeStats({ loading, stats }: MedicoHomeStatsProps) {
+  if (loading) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="rounded-md border border-amber-100 bg-amber-50/70 px-3 py-2.5 flex items-center justify-between gap-1">
+        <div className="flex items-center gap-2">
+          <Hourglass className="h-4 w-4 text-amber-600 shrink-0" />
+          <span className="text-[10px] font-semibold uppercase text-slate2">
+            En espera
+          </span>
+        </div>
+        <p className="text-xl font-bold text-navy leading-none">{stats.waiting}</p>
+      </div>
+      <div className="rounded-md border border-brand/20 bg-brand/5 px-3 py-2.5 flex items-center justify-between gap-1">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-brand shrink-0" />
+          <span className="text-[10px] font-semibold uppercase text-slate2">
+            En consulta
+          </span>
+        </div>
+        <p className="text-xl font-bold text-navy leading-none">{stats.inConsult}</p>
+      </div>
+      <div className="rounded-md border border-mist bg-white px-3 py-2.5 flex items-center justify-between gap-1">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-slate2 shrink-0" />
+          <span className="text-[10px] font-semibold uppercase text-slate2">
+            Finalizados
+          </span>
+        </div>
+        <p className="text-xl font-bold text-navy leading-none">{stats.done}</p>
+      </div>
+    </div>
+  );
+}
+
+interface MedicoHomeUpcomingProps {
+  loading: boolean;
+  upcomingAppts: AppointmentRow[];
+}
+
+/** Right column: "Próximos turnos" (Programados). */
+export function MedicoHomeUpcoming({ loading, upcomingAppts }: MedicoHomeUpcomingProps) {
   if (loading) {
     return (
       <aside className="rounded-md border border-border bg-card p-6 text-center text-sm text-slate2">
@@ -122,116 +142,7 @@ export function MedicoHomeAgendaSidebar({
   }
 
   return (
-    <aside className="flex flex-col gap-3 lg:sticky lg:top-4 lg:self-start">
-      {/* Stats */}
-      <div className="grid grid-cols-3 lg:grid-cols-1 gap-2">
-        <div className="rounded-md border border-amber-100 bg-amber-50/70 px-3 py-2.5 flex lg:flex-row flex-col items-center lg:justify-between gap-1 text-center lg:text-left">
-          <div className="flex items-center gap-2">
-            <Hourglass className="h-4 w-4 text-amber-600 shrink-0" />
-            <span className="text-[10px] font-semibold uppercase text-slate2 hidden lg:inline">
-              En espera
-            </span>
-          </div>
-          <p className="text-xl font-bold text-navy leading-none">{stats.waiting}</p>
-          <span className="text-[10px] font-semibold uppercase text-slate2 lg:hidden">
-            En espera
-          </span>
-        </div>
-        <div className="rounded-md border border-brand/20 bg-brand/5 px-3 py-2.5 flex lg:flex-row flex-col items-center lg:justify-between gap-1 text-center lg:text-left">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-brand shrink-0" />
-            <span className="text-[10px] font-semibold uppercase text-slate2 hidden lg:inline">
-              En consulta
-            </span>
-          </div>
-          <p className="text-xl font-bold text-navy leading-none">{stats.inConsult}</p>
-          <span className="text-[10px] font-semibold uppercase text-slate2 lg:hidden">
-            En consulta
-          </span>
-        </div>
-        <div className="rounded-md border border-mist bg-white px-3 py-2.5 flex lg:flex-row flex-col items-center lg:justify-between gap-1 text-center lg:text-left">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-slate2 shrink-0" />
-            <span className="text-[10px] font-semibold uppercase text-slate2 hidden lg:inline">
-              Finalizados
-            </span>
-          </div>
-          <p className="text-xl font-bold text-navy leading-none">{stats.done}</p>
-          <span className="text-[10px] font-semibold uppercase text-slate2 lg:hidden">
-            Finalizados
-          </span>
-        </div>
-      </div>
-
-      {/* Pacientes del día */}
-      <section className="rounded-md border border-border bg-card shadow-sm overflow-hidden flex-1">
-        <div className="flex items-center justify-between px-3 py-2.5 border-b border-border bg-[#EEF3F8]">
-          <div className="flex items-center gap-2 min-w-0">
-            <CalendarDays className="h-4 w-4 text-brand shrink-0" />
-            <div className="min-w-0">
-              <p className="text-[9px] font-bold uppercase tracking-wide text-slate2">
-                Pacientes del día
-              </p>
-              <h3 className="font-display font-bold text-navy text-xs capitalize truncate">
-                {selectedDateLabel}
-              </h3>
-            </div>
-          </div>
-          <Link
-            href="/medico/consultorio"
-            className="text-[10px] font-semibold text-brand hover:underline shrink-0"
-          >
-            Consultorio
-          </Link>
-        </div>
-        <div className="px-2 pt-2 flex flex-wrap gap-1">
-          <Button
-            type="button"
-            size="sm"
-            variant={selectedDateKey === todayKey ? "default" : "outline"}
-            className="h-7 text-[10px] px-2"
-            onClick={onSelectToday}
-          >
-            Hoy
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={selectedDateKey === tomorrowKey ? "default" : "outline"}
-            className="h-7 text-[10px] px-2"
-            onClick={onSelectTomorrow}
-          >
-            Mañana
-          </Button>
-          <Input
-            type="date"
-            value={selectedDateKey}
-            onChange={(e) => {
-              if (e.target.value) onSelectDate(e.target.value);
-            }}
-            className="h-7 w-[9.5rem] text-[10px] px-2"
-          />
-        </div>
-        <div className="p-2 space-y-1.5 max-h-[200px] overflow-y-auto">
-          {selectedBlocks.length === 0 ? (
-            <p className="text-xs text-slate2 py-3 text-center">
-              No tenés franja de atención este día.
-            </p>
-          ) : dayAppts.length === 0 ? (
-            <p className="text-xs text-slate2 py-3 text-center">
-              Sin turnos reservados para este día.
-              <span className="block mt-1 text-[10px]">
-                Atención:{" "}
-                {selectedBlocks.map((b) => `${b.startTime}–${b.endTime}`).join(" · ")}
-              </span>
-            </p>
-          ) : (
-            dayAppts.map((apt) => <PatientRow key={apt.id} apt={apt} />)
-          )}
-        </div>
-      </section>
-
-      {/* Próximos turnos */}
+    <aside className="xl:sticky xl:top-4 xl:self-start">
       <section className="rounded-md border border-border bg-card shadow-sm overflow-hidden">
         <div className="px-3 py-2.5 border-b border-border bg-[#EEF3F8]">
           <div className="flex items-center gap-2">
@@ -246,7 +157,7 @@ export function MedicoHomeAgendaSidebar({
             </div>
           </div>
         </div>
-        <div className="p-2 space-y-1.5 max-h-[240px] overflow-y-auto">
+        <div className="p-2 space-y-1.5 max-h-[500px] overflow-y-auto">
           {upcomingAppts.length === 0 ? (
             <p className="text-xs text-slate2 py-3 text-center">
               No hay turnos programados a futuro.

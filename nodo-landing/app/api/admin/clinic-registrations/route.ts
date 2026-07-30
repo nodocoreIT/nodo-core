@@ -252,6 +252,16 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Mark the professional as admin-approved — until this, they must not
+  // appear in the patient-facing doctors list (see nodo-clinica migration
+  // 20260737_professionals_enabled_at.sql). Patients don't need this gate.
+  if (reg.role === "medico") {
+    await clinicAdmin
+      .from("professionals")
+      .update({ enabled_at: new Date().toISOString() })
+      .eq("email", reg.email);
+  }
+
   // Ensure the user has a client record + "Clínica" unit in the landing DB
   // so the badge "nodo | Clínica" appears in the admin panel.
   const landingSb = auth.supabase!;

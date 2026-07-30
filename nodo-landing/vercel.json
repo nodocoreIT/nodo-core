@@ -8,7 +8,7 @@
     },
     {
       "path": "/api/cron/refresh-fx-rate",
-      "schedule": "0 1 * * *"
+      "schedule": "0 19 * * *"
     }
   ]
 }

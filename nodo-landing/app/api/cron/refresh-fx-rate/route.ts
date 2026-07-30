@@ -4,7 +4,10 @@ import { fetchAndStoreFxRate } from "@/lib/billing/fetch-fx-rate";
 /**
  * GET /api/cron/refresh-fx-rate
  *
- * Vercel Cron handler — triggered daily at 01:00 UTC (before backup-orgs).
+ * Vercel Cron handler — triggered daily at 19:00 UTC (16:00 ART), well after
+ * dolarapi.com's dólar-tarjeta rate is published for the day. The previous
+ * 01:00 UTC schedule ran at 22:00 ART the prior evening — before that day's
+ * rate existed — so nodo_core.fx_rates never got a usable "today" row.
  * Fetches the dólar-tarjeta rate from dolarapi.com and upserts it into
  * nodo_core.fx_rates for today. Feeds resolveFxRate()'s fallback chain
  * (lib/billing/fx-rate.ts), used by the billing engine to convert USD plan

@@ -45,11 +45,11 @@ export async function GET(request: NextRequest) {
   if (doctorId) {
     const { data: professional } = await serviceClient
       .from("professionals")
-      .select("id, full_name, specialty, license_number, profile_photo_url, org_id")
+      .select("id, full_name, specialty, license_number, profile_photo_url, org_id, enabled_at")
       .eq("id", doctorId)
       .maybeSingle();
 
-    if (!professional) {
+    if (!professional || !professional.enabled_at) {
       return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
     }
 
@@ -92,7 +92,8 @@ export async function GET(request: NextRequest) {
 
   const { data: professionals } = await serviceClient
     .from("professionals")
-    .select("id, full_name, specialty, license_number, profile_photo_url");
+    .select("id, full_name, specialty, license_number, profile_photo_url")
+    .not("enabled_at", "is", null);
 
   return NextResponse.json(
     (professionals ?? [])

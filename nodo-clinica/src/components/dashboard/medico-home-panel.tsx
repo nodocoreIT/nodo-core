@@ -2,7 +2,8 @@
 
 import { DashboardActionCard } from "@/components/dashboard/dashboard-action-card";
 import {
-  MedicoHomeAgendaSidebar,
+  MedicoHomeStats,
+  MedicoHomeUpcoming,
   MedicoHomeTasks,
 } from "@/components/dashboard/medico-home-agenda-panels";
 import { useMedicoHomeAgenda } from "@/hooks/use-medico-home-agenda";
@@ -78,34 +79,24 @@ export function MedicoHomePanel({ doctorId, doctorName }: MedicoHomePanelProps) 
         />
       </div>
 
-      {/* Tareas (izq) + Agenda lateral (der) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_340px] gap-4 items-start">
-        <MedicoHomeTasks
-          loading={agenda.loading}
-          dayTasks={agenda.dayTasks}
-          calendarSrc={agenda.calendarSrc}
-          selectedDateKey={agenda.selectedDateKey}
-          selectedDateLabel={agenda.selectedDateLabel}
-          onSelectDate={agenda.setSelectedDateKey}
-          onSelectToday={agenda.selectToday}
-          onSelectTomorrow={agenda.selectTomorrow}
-          todayKey={agenda.todayKey}
-          tomorrowKey={agenda.tomorrowKey}
-        />
-        <MedicoHomeAgendaSidebar
-          loading={agenda.loading}
-          dayAppts={agenda.dayAppts}
-          upcomingAppts={agenda.upcomingAppts}
-          selectedBlocks={agenda.selectedBlocks}
-          stats={agenda.stats}
-          selectedDateKey={agenda.selectedDateKey}
-          selectedDateLabel={agenda.selectedDateLabel}
-          onSelectDate={agenda.setSelectedDateKey}
-          onSelectToday={agenda.selectToday}
-          onSelectTomorrow={agenda.selectTomorrow}
-          todayKey={agenda.todayKey}
-          tomorrowKey={agenda.tomorrowKey}
-        />
+      {/* Tareas (cols 1–2) · Stats (col 3, under Turnos) · Próximos (col 4, under Recetas) */}
+      <div className="grid grid-cols-1 gap-4 items-start sm:grid-cols-2 xl:grid-cols-4">
+        <div className="sm:col-span-2">
+          <MedicoHomeTasks
+            loading={agenda.loading}
+            dayTasks={agenda.dayTasks}
+            calendarSrc={agenda.calendarSrc}
+            selectedDateKey={agenda.selectedDateKey}
+            selectedDateLabel={agenda.selectedDateLabel}
+            onSelectDate={agenda.setSelectedDateKey}
+            onSelectToday={agenda.selectToday}
+            onSelectTomorrow={agenda.selectTomorrow}
+            todayKey={agenda.todayKey}
+            tomorrowKey={agenda.tomorrowKey}
+          />
+        </div>
+        <MedicoHomeStats loading={agenda.loading} stats={agenda.stats} />
+        <MedicoHomeUpcoming loading={agenda.loading} upcomingAppts={agenda.upcomingAppts} />
       </div>
 
       <div className="rounded-md border border-border bg-card p-5 shadow-sm">

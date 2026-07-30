@@ -4,6 +4,7 @@ import { appBaseUrl } from "@/lib/clinic/appointment-payment";
 import { createPreapproval } from "@/lib/mercadopago/client";
 import { createServiceClient } from "@/lib/supabase/server";
 import { findSubscriptionPlan } from "@/lib/clinic/subscription-plans";
+import { resolveFxRate } from "@/lib/mercadopago/fx-rate";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // MercadoPago Argentina rejects auto_recurring.currency_id = "USD"
+  // ("Invalid field") — Preapproval subscriptions must be billed in ARS even
+  // though nodo_core.planes prices this plan in USD. Convert at dólar-tarjeta
+  // rate, mirroring nodo-landing/lib/billing/mp-preapproval.ts.
+  let billingAmount = plan.amount;
+  if (plan.currency === "USD") {
+    const fx = await resolveFxRate();
+    if (!fx.ok) {
+      return NextResponse.json(
+        { error: "No se pudo obtener la cotización del dólar para procesar el cobro. Reintentá en unos minutos." },
+        { status: 503 },
+      );
+    }
+    billingAmount = Math.round(plan.amount * fx.rate * 100) / 100;
+  }
+  const billingCurrency = plan.currency === "USD" ? "ARS" : plan.currency;
+
   const base = appBaseUrl();
 
   try {
@@ -77,8 +95,8 @@ export async function POST(request: NextRequest) {
       reason: `Suscripción ${plan.name} — Nodo Clínica`,
       payerEmail: professional.email,
       externalReference: professional.id,
-      amount: plan.amount,
-      currency: plan.currency,
+      amount: billingAmount,
+      currency: billingCurrency,
       backUrl: `${base}/medico/dashboard?settings=suscripcion`,
     });
 
