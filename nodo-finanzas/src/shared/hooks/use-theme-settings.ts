@@ -39,7 +39,7 @@ export const DEFAULT_SETTINGS: ThemeSettings = {
   sidebarTextColor: "#9dbdb4",
   fontColor: "#0a1a14",
   buttonFontColor: "#ffffff",
-  backgroundColor: "#f0fdf4",
+  backgroundColor: "#F5F8FC",
   borderRadius: "md",
   fontFamily: "Inter",
   logoType: "default",
@@ -121,7 +121,7 @@ export function useThemeSettings() {
     root.style.setProperty("--color-foreground", settings.fontColor);
 
     // Apply background color
-    const bg = settings.backgroundColor ?? "#f0fdf4";
+    const bg = settings.backgroundColor ?? "#F5F8FC";
     root.style.setProperty("--color-paper", bg);
     root.style.setProperty("--color-background", bg);
 

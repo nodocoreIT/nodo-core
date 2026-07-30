@@ -924,22 +924,24 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
                 <DialogTitle className="text-xl">
                   Configuración del Panel
                 </DialogTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    resetSettings();
-                    try {
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      await upsertProfile({ theme_settings: null as any });
-                    } catch {
-                      // Best-effort
-                    }
-                  }}
-                  className="text-xs border-brand text-brand hover:bg-brand hover:text-white"
-                >
-                  Default Nodo (Restablecer)
-                </Button>
+                {activeTab === "customization" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      resetSettings();
+                      try {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        await upsertProfile({ theme_settings: null as any });
+                      } catch {
+                        // Best-effort
+                      }
+                    }}
+                    className="text-xs border-brand text-brand hover:bg-brand hover:text-white"
+                  >
+                    Default Nodo (Restablecer)
+                  </Button>
+                )}
               </div>
               <DialogDescription className="text-xs sm:text-sm">
                 Personalizá los datos de tu empresa, el look & feel del panel y
