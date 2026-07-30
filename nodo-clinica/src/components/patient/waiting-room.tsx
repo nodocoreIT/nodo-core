@@ -999,7 +999,7 @@ export function WaitingRoom({
             roomName={appointment.jitsi_room_id}
             displayName={patientName}
             accessToken={accessToken}
-            height={560}
+            height={embedded ? "min(70vh, 640px)" : 560}
             onMeetingEnd={() => setVideoEnded(true)}
             endScreen={
               <ConsultationEndScreen

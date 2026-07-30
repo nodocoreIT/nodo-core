@@ -45,7 +45,16 @@ export function WaitingRoomModal({
     <Dialog open={!!accessToken} onOpenChange={handleDialogOpenChange}>
       <DialogContent
         showCloseButton={!callActive}
-        className="max-w-[85%] sm:max-w-xl max-h-[90vh] overflow-y-auto px-6 pt-8"
+        className={
+          callActive
+            ? // Wider/taller while a call is live — the video itself sizes to
+              // ~70vh (see the JitsiMeet height prop in waiting-room.tsx), so
+              // this budget keeps header/badges/video fitting without scroll
+              // on most screens; overflow-y-auto stays as a safety net for
+              // short viewports rather than a first resort.
+              "max-w-[95vw] sm:max-w-3xl md:max-w-4xl max-h-[95vh] overflow-y-auto px-6 pt-8"
+            : "max-w-[85%] sm:max-w-xl max-h-[90vh] overflow-y-auto px-6 pt-8"
+        }
       >
         <DialogTitle className="sr-only">Turno</DialogTitle>
         {accessToken && (

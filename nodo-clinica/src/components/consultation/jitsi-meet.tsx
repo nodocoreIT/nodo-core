@@ -18,7 +18,8 @@ interface JitsiMeetProps {
   /** Token de sala del paciente (sala de espera) */
   accessToken?: string;
   onMeetingEnd?: () => void;
-  height?: number;
+  /** Number = fixed px. String = any CSS length (e.g. "60vh") for viewport-relative sizing. */
+  height?: number | string;
   endScreen?: ReactNode;
   enableConsultorioBackground?: boolean;
 }
