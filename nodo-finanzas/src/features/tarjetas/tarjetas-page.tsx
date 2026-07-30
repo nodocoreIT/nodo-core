@@ -289,6 +289,29 @@ export function TarjetasPage() {
                   <div className="flex justify-between items-center text-sm">
                     <span className="flex items-center gap-1 text-slate2">
                       <Calendar className="w-3.5 h-3.5" />
+                      Día de Cierre:
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      placeholder="Ej: 20"
+                      value={resumen.tarjeta.diaCierre ?? ''}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        const valor = e.target.value ? Number(e.target.value) : undefined;
+                        finanzas.actualizarTarjeta(resumen.tarjeta.id, {
+                          diaCierre: valor,
+                        });
+                      }}
+                      className="w-14 text-sm font-semibold text-ink border-0 bg-transparent cursor-pointer focus:outline-none focus:ring-0 text-right"
+                    />
+                  </div>
+
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="flex items-center gap-1 text-slate2">
+                      <Calendar className="w-3.5 h-3.5" />
                       Vencimiento:
                     </span>
                     <input
