@@ -16,23 +16,20 @@ export const TRIAL_PLAN: SubscriptionPlan = {
   features: ["Acceso completo a Nodo Clínica", "Sin límite de consultas", "Válido por 10 días"],
 };
 
-/** Paid plans a doctor can subscribe to via Mercado Pago. */
+/**
+ * Paid plans a doctor can subscribe to via Mercado Pago. Only one today —
+ * matches nodo_core.planes' single active médico paid plan (medico_pro).
+ * These static values are the fallback shown before ONBOARDING_PLAN_DB_CODES'
+ * live pricing loads (see onboarding/medico/page.tsx).
+ */
 export const PAID_SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
-    id: "basico",
-    name: "Básico",
-    amount: 100,
-    currency: "ARS",
-    period: "/mes",
-    features: ["Consultas ilimitadas", "Recetas + estudios", "Soporte email"],
-  },
-  {
     id: "profesional",
-    name: "Profesional",
-    amount: 19900,
-    currency: "ARS",
+    name: "Pro",
+    amount: 99,
+    currency: "USD",
     period: "/mes",
-    features: ["Todo lo anterior", "Resumen SOAP con IA", "Multi-dispositivo"],
+    features: ["Consultas ilimitadas", "Recetas + estudios", "Resumen SOAP con IA", "Multi-dispositivo"],
   },
 ];
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isLocalMode } from "@/lib/clinic/config";
-import { getSessionFromRequest } from "@/lib/clinic/session";
+import { getSessionFromRequest, jsonWithSession, type ClinicSession } from "@/lib/clinic/session";
 import {
   canAccessAsRole,
   linkClinicMembershipProfiles,
@@ -74,10 +74,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  return NextResponse.json({
-    ok: true,
-    role: toSessionRole(intendedRole),
-    professionalId: membership.professionalId,
-    patientId: membership.patientId,
-  });
+  const sessionRole = toSessionRole(intendedRole);
+
+  // Refresh the clinica_session cookie to match the role just verified —
+  // otherwise a stale cookie from an earlier login as the OTHER role (a
+  // dual patient+médico account switching portals) keeps overriding
+  // /api/clinic/account/session's role resolution, silently bouncing this
+  // login back to /login even though auth + portal access both succeeded.
+  const clinicSession: ClinicSession = {
+    userId: user.id,
+    role: sessionRole,
+    email: user.email ?? "",
+    fullName:
+      (user.user_metadata?.full_name as string | undefined) ??
+      (user.user_metadata?.name as string | undefined) ??
+      user.email ??
+      "",
+  };
+
+  return jsonWithSession(
+    {
+      ok: true,
+      role: sessionRole,
+      professionalId: membership.professionalId,
+      patientId: membership.patientId,
+    },
+    clinicSession,
+  );
 }
