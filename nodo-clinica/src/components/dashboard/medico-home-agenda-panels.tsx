@@ -13,6 +13,7 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { buildGoogleCalendarDayEmbed } from "@/lib/google-calendar";
 import { mapAppointmentStatusToLifecycle } from "@/types";
@@ -91,7 +92,13 @@ interface MedicoHomeStatsProps {
 
 /** "En espera" / "En consulta" / "Finalizados" today counters — stacked under Turnos y horarios. */
 export function MedicoHomeStats({ loading, stats }: MedicoHomeStatsProps) {
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="rounded-md border border-border bg-card p-6 flex items-center justify-center min-h-[164px]">
+        <Loader2 className="h-5 w-5 animate-spin text-slate2" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -135,7 +142,8 @@ interface MedicoHomeUpcomingProps {
 export function MedicoHomeUpcoming({ loading, upcomingAppts }: MedicoHomeUpcomingProps) {
   if (loading) {
     return (
-      <aside className="rounded-md border border-border bg-card p-6 text-center text-sm text-slate2">
+      <aside className="rounded-md border border-border bg-card p-6 flex flex-col items-center justify-center gap-2 text-sm text-slate2">
+        <Loader2 className="h-5 w-5 animate-spin" />
         Cargando agenda…
       </aside>
     );
@@ -209,7 +217,8 @@ export function MedicoHomeTasks({
 
   if (loading) {
     return (
-      <section className="rounded-md border border-border bg-card p-8 text-center text-sm text-slate2 min-h-[300px] flex items-center justify-center">
+      <section className="rounded-md border border-border bg-card p-8 text-sm text-slate2 min-h-[300px] flex flex-col items-center justify-center gap-2">
+        <Loader2 className="h-6 w-6 animate-spin" />
         Cargando tareas…
       </section>
     );
