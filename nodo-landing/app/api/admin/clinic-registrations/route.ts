@@ -187,7 +187,22 @@ export async function POST(request: NextRequest) {
   // DIFFERENT node's org (e.g. an Inmo admin), never overwrite its role —
   // only attach Clínica's own membership. Same guard as provision.ts's
   // ensureAutosAccess/ensureInmoAccess; this endpoint was missed originally.
-  const existingAppMetadata = linkData?.user?.app_metadata ?? null;
+  //
+  // Read app_metadata via a fresh getUserById(), not the `user` object embedded
+  // in generateLink()'s response — that one was observed returning a stale/thin
+  // app_metadata for existing users, which made hasForeignMembership() always
+  // see "no foreign org" and always send the "set your password" email even for
+  // accounts that already had a real password on another nodo.
+  const { data: freshUserData, error: freshUserError } =
+    await nodoAdmin.auth.admin.getUserById(authUserId);
+  if (freshUserError) {
+    console.error("[admin/clinic-registrations] could not refetch auth user", freshUserError);
+    return Response.json(
+      { error: "Error al generar enlace de activación." },
+      { status: 500 },
+    );
+  }
+  const existingAppMetadata = freshUserData.user?.app_metadata ?? null;
   const foreign = hasForeignMembership(existingAppMetadata, getDefaultClinicOrgId());
 
   await nodoAdmin.auth.admin.updateUserById(authUserId, {
