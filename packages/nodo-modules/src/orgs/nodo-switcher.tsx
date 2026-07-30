@@ -202,7 +202,7 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
           setSwitching(false);
           return;
         }
-        window.location.href = org.role === "medico" ? "/medico" : "/paciente";
+        window.location.href = org.role === "medico" ? "/medico/dashboard" : "/paciente";
       } catch (err) {
         setSwitchError(err instanceof Error ? err.message : "No se pudo cambiar de rol");
         setSwitching(false);

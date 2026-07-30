@@ -129,7 +129,13 @@ export function DoctorSettingsDialog({
 }: DoctorSettingsDialogProps) {
   const [activeSection, setActiveSection] = useState<SectionId>(initialSection);
 
-  const [availability, setAvailability] = useState<DoctorAvailability>(DEFAULT_AVAILABILITY);
+  // Starts empty, not DEFAULT_AVAILABILITY — a doctor who never configured
+  // their hours must see an unconfigured/empty schedule, not a fake
+  // pre-filled Mon-Fri template that looks already saved.
+  const [availability, setAvailability] = useState<DoctorAvailability>({
+    slotDurationMinutes: DEFAULT_AVAILABILITY.slotDurationMinutes,
+    days: [],
+  });
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
   const [fullName, setFullName] = useState("");
   const [licenseNumber, setLicenseNumber] = useState("");
@@ -186,7 +192,11 @@ export function DoctorSettingsDialog({
 
   const applyOfficeData = useCallback(
     (data: OfficeData) => {
-      if (data.availability) {
+      // hasAvailability distinguishes "doctor actually saved this" from the
+      // API's own DEFAULT_AVAILABILITY fallback (used for booking-slot
+      // computation) — without it, a brand-new doctor's unconfigured
+      // schedule would render as if it were already set.
+      if (data.hasAvailability && data.availability) {
         setAvailability(normalizeAvailability(data.availability as DoctorAvailability));
         const avail = data.availability as DoctorAvailability;
         setBlockedDates(avail.blockedDates ?? (data.blockedDates as string[]) ?? []);

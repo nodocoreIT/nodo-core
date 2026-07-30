@@ -76,8 +76,13 @@ export function DoctorOfficePanel({
   fullPage = false,
   defaultTab = "agenda",
 }: DoctorOfficePanelProps) {
-  const [availability, setAvailability] =
-    useState<DoctorAvailability>(DEFAULT_AVAILABILITY);
+  // Starts empty, not DEFAULT_AVAILABILITY — a doctor who never configured
+  // their hours must see an unconfigured/empty schedule, not a fake
+  // pre-filled Mon-Fri template that looks already saved.
+  const [availability, setAvailability] = useState<DoctorAvailability>({
+    slotDurationMinutes: DEFAULT_AVAILABILITY.slotDurationMinutes,
+    days: [],
+  });
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
   const [signatureText, setSignatureText] = useState("");
   const [signatureImageData, setSignatureImageData] = useState("");
@@ -116,7 +121,7 @@ export function DoctorOfficePanel({
 
   const applyOfficeData = useCallback(
     (data: OfficeData) => {
-      if (data.availability) {
+      if (data.hasAvailability && data.availability) {
         setAvailability(
           normalizeAvailability(
             data.availability as DoctorAvailability,

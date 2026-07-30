@@ -60,6 +60,11 @@ function doctorOfficePayload(professional: any, officeSettings: any, orgConnecte
   const availability = getAvailability(officeSettings);
   return {
     availability,
+    // Distinguishes "doctor actually saved a schedule" from the
+    // DEFAULT_AVAILABILITY fallback getAvailability() applies for booking
+    // slot computation — the settings dialog uses this to avoid rendering
+    // that fallback as if it were the doctor's own saved hours.
+    hasAvailability: Boolean(officeSettings?.availability),
     fullName: professional?.full_name ?? "",
     licenseNumber: professional?.license_number ?? "",
     specialties: Array.isArray(professional?.specialties)
@@ -107,6 +112,7 @@ function localDoctorOfficePayload(doctor: {
   const token = payment?.mercadopagoAccessToken?.trim();
   return {
     availability,
+    hasAvailability: Boolean(doctor.availability),
     fullName: doctor.fullName ?? "",
     licenseNumber: doctor.licenseNumber ?? "",
     specialties:

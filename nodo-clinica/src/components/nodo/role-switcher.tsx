@@ -11,7 +11,7 @@ interface RoleSwitcherProps {
 }
 
 const OTHER_ROLE_META = {
-  doctor: { label: "Ver como médico", Icon: Stethoscope, path: "/medico" },
+  doctor: { label: "Ver como médico", Icon: Stethoscope, path: "/medico/dashboard" },
   patient: { label: "Ver como paciente", Icon: User, path: "/paciente" },
 };
 
