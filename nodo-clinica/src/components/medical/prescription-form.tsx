@@ -28,7 +28,16 @@ interface PrescriptionFormProps {
   onSaved?: () => void;
 }
 
-const emptyMedication = (): Medication => ({
+/** Medication plus catalog-suggested defaults, shown only as placeholders — never
+ * written into the real value, so picking a drug from Vademécum never leaves text
+ * the doctor has to manually clear. */
+interface MedicationDraft extends Medication {
+  suggestedDosage?: string;
+  suggestedFrequency?: string;
+  suggestedDuration?: string;
+}
+
+const emptyMedication = (): MedicationDraft => ({
   name: "",
   dosage: "",
   frequency: "",
@@ -120,7 +129,7 @@ export function PrescriptionForm({
   patientEmail,
   onSaved,
 }: PrescriptionFormProps) {
-  const [medications, setMedications] = useState<Medication[]>([emptyMedication()]);
+  const [medications, setMedications] = useState<MedicationDraft[]>([emptyMedication()]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [signatureText, setSignatureText] = useState("");
   const [signatureImageData, setSignatureImageData] = useState("");
@@ -149,9 +158,9 @@ export function PrescriptionForm({
           ? {
               ...med,
               name: entry.name,
-              dosage: entry.defaultDosage,
-              frequency: entry.defaultFrequency,
-              duration: entry.defaultDuration,
+              suggestedDosage: entry.defaultDosage,
+              suggestedFrequency: entry.defaultFrequency,
+              suggestedDuration: entry.defaultDuration,
             }
           : med,
       ),
@@ -171,6 +180,19 @@ export function PrescriptionForm({
       return;
     }
 
+    // Strip the catalog-suggested placeholder fields — they're display-only
+    // hints, never the doctor's actual entry, and must not end up persisted
+    // in the patient's clinical record.
+    const medicationsToSave: Medication[] = medications.map(
+      ({ name, dosage, frequency, duration, instructions }) => ({
+        name,
+        dosage,
+        frequency,
+        duration,
+        instructions,
+      }),
+    );
+
     setIsGenerating(true);
     try {
       const doc = generatePrescriptionPdf({
@@ -180,7 +202,7 @@ export function PrescriptionForm({
           license_number: doctorLicense,
         },
         patientName,
-        medications,
+        medications: medicationsToSave,
         signatureText: signatureText || `Dr/a. ${doctorName}`,
         signatureImageData,
       });
@@ -191,7 +213,7 @@ export function PrescriptionForm({
         appointmentId,
         doctorId,
         patientId,
-        medications,
+        medications: medicationsToSave,
         pdfBase64: pdfToBase64(doc),
       });
 
@@ -260,7 +282,7 @@ export function PrescriptionForm({
               <Input
                 value={med.dosage}
                 onChange={(e) => updateMedication(index, "dosage", e.target.value)}
-                placeholder="1 comprimido"
+                placeholder={med.suggestedDosage || "1 comprimido"}
                 className="h-8 text-sm"
               />
             </div>
@@ -271,7 +293,7 @@ export function PrescriptionForm({
                 onChange={(e) =>
                   updateMedication(index, "frequency", e.target.value)
                 }
-                placeholder="Cada 8 horas"
+                placeholder={med.suggestedFrequency || "Cada 8 horas"}
                 className="h-8 text-sm"
               />
             </div>
@@ -282,7 +304,7 @@ export function PrescriptionForm({
                 onChange={(e) =>
                   updateMedication(index, "duration", e.target.value)
                 }
-                placeholder="7 días"
+                placeholder={med.suggestedDuration || "7 días"}
                 className="h-8 text-sm"
               />
             </div>
