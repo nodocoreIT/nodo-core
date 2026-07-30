@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Bell, Calendar, CreditCard, Wallet } from "lucide-react";
+import { Bell, Calendar, CreditCard, Target, Wallet } from "lucide-react";
 import { NotificationsDropdown } from "@nodocore/nodo-modules/notifications";
 import { useNotifications } from "@/hooks/use-notifications";
 import type { Notification } from "@/hooks/use-notifications";
@@ -17,26 +17,38 @@ const KIND_STYLES = {
     icon: Calendar,
     iconColor: "text-sky-600 bg-sky-50",
   },
+  presupuesto: {
+    icon: Target,
+    iconColor: "text-red-600 bg-red-50",
+  },
   default: {
     icon: Bell,
     iconColor: "text-slate2 bg-slate-100",
   },
 };
 
-function toAppNotification(notification: Notification) {
-  const href =
-    notification.tipo === "tarjeta"
-      ? "/admin/tarjetas"
-      : notification.tipo === "prestamo"
-        ? "/admin/prestamos"
-        : "/admin/planes-ahorro";
+function hrefForNotification(notification: Notification): string {
+  switch (notification.tipo) {
+    case "tarjeta":
+      return "/admin/tarjetas";
+    case "prestamo":
+      return "/admin/prestamos";
+    case "plan":
+      return "/admin/planes-ahorro";
+    case "presupuesto":
+      return "/admin/presupuestos";
+    default:
+      return "/admin/dashboard";
+  }
+}
 
+function toAppNotification(notification: Notification) {
   return {
     id: notification.id,
     kind: notification.tipo,
     title: notification.titulo,
     description: notification.mensaje,
-    href,
+    href: hrefForNotification(notification),
     priority: notification.urgencia === "alta" ? 1 : notification.urgencia === "media" ? 2 : 3,
     duesToday: notification.venceHoy,
   };

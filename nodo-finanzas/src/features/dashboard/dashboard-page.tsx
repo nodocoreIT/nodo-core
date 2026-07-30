@@ -418,7 +418,16 @@ export function DashboardPage() {
               {notifications.slice(0, 5).map((n) => {
                 const s = urgenciaStyle[n.urgencia];
                 const diffDays = Math.ceil((new Date(n.fecha + 'T00:00:00').getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
-                const diasLabel = diffDays <= 0 ? 'vence hoy' : diffDays === 1 ? 'vence mañana' : `vence en ${diffDays} días`;
+                const diasLabel =
+                  n.tipo === 'presupuesto'
+                    ? n.urgencia === 'alta'
+                      ? 'excedido'
+                      : 'cerca del tope'
+                    : diffDays <= 0
+                      ? 'vence hoy'
+                      : diffDays === 1
+                        ? 'vence mañana'
+                        : `vence en ${diffDays} días`;
                 return (
                   <button
                     key={n.id}
@@ -427,6 +436,8 @@ export function DashboardPage() {
                         navigate(`/admin/tarjetas/${n.entityId}`);
                       } else if (n.tipo === 'prestamo') {
                         navigate('/admin/prestamos', { state: { openId: n.entityId } });
+                      } else if (n.tipo === 'presupuesto') {
+                        navigate('/admin/presupuestos');
                       } else {
                         navigate('/admin/planes-ahorro', { state: { openId: n.entityId } });
                       }

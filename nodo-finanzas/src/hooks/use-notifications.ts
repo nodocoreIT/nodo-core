@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
 import { useFinanzas } from '@/hooks/use-finanzas';
+import { usePresupuestos } from '@/hooks/use-presupuestos';
+import { normalizarCodigoRubro } from '@/utils/rubro-formatters';
 import type { Tarjeta, Prestamo, PlanAhorro } from '@/types';
 
 export interface Notification {
   id: string;
-  tipo: 'tarjeta' | 'prestamo' | 'plan';
+  tipo: 'tarjeta' | 'prestamo' | 'plan' | 'presupuesto';
   entityId: string;
   titulo: string;
   mensaje: string;
@@ -20,8 +22,17 @@ function isoAFecha(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
+function fechaHoyIso(): string {
+  const hoy = new Date();
+  const y = hoy.getFullYear();
+  const m = String(hoy.getMonth() + 1).padStart(2, '0');
+  const d = String(hoy.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export const useNotifications = () => {
   const { tarjetas, prestamos, planesAhorro, gastosDiarios, consumosTarjetas } = useFinanzas();
+  const presupuestos = usePresupuestos();
 
   const notifications = useMemo(() => {
     const list: Notification[] = [];
@@ -29,6 +40,7 @@ export const useNotifications = () => {
     const mesActualIdx = hoy.getMonth();
     const anioActual = hoy.getFullYear();
     const mesActualStr = `${anioActual}-${String(mesActualIdx + 1).padStart(2, '0')}`;
+    const hoyIso = fechaHoyIso();
 
     // Helper para verificar si ya se pagó este mes
     const estaPagado = (tipo: 'tarjeta' | 'prestamo' | 'plan', id: string) => {
@@ -146,8 +158,44 @@ export const useNotifications = () => {
       }
     });
 
+    // 4. Presupuestos (mes calendario actual)
+    presupuestos.forEach((p) => {
+      if (!p.excedido && p.porcentaje < 80) return;
+
+      const nombre = normalizarCodigoRubro(p.rubro.nombre);
+      const id = `PRESUPUESTO-${p.rubro.id}-${mesActualStr}`;
+
+      if (p.excedido) {
+        list.push({
+          id,
+          tipo: 'presupuesto',
+          entityId: p.rubro.id,
+          titulo: `Presupuesto excedido: ${nombre}`,
+          mensaje: `Superaste el tope de ${nombre} este mes (${p.porcentaje.toFixed(0)}%).`,
+          fecha: hoyIso,
+          urgencia: 'alta',
+          venceHoy: false,
+          monto: p.gastado,
+          moneda: 'ARS',
+        });
+      } else {
+        list.push({
+          id,
+          tipo: 'presupuesto',
+          entityId: p.rubro.id,
+          titulo: `Presupuesto al ${p.porcentaje.toFixed(0)}%: ${nombre}`,
+          mensaje: `Te acercás al tope mensual de ${nombre}.`,
+          fecha: hoyIso,
+          urgencia: 'media',
+          venceHoy: false,
+          monto: p.gastado,
+          moneda: 'ARS',
+        });
+      }
+    });
+
     return list.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
-  }, [tarjetas, prestamos, planesAhorro, gastosDiarios, consumosTarjetas]);
+  }, [tarjetas, prestamos, planesAhorro, gastosDiarios, consumosTarjetas, presupuestos]);
 
   return {
     notifications,

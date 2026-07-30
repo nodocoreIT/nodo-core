@@ -11,6 +11,7 @@ import { PlanesAhorroPage } from "@/features/planes-ahorro/planes-ahorro-page";
 import { SaldosPage } from "@/features/saldos/saldos-page";
 import { InformeMensualPage } from "@/features/informe-mensual/informe-mensual-page";
 import { ConfiguracionPage } from "@/features/configuracion/configuracion-page";
+import { PresupuestosPage } from "@/features/presupuestos/presupuestos-page";
 
 const LEGACY_PATHS = [
   "dashboard",
@@ -19,6 +20,7 @@ const LEGACY_PATHS = [
   "tarjetas",
   "prestamos",
   "planes-ahorro",
+  "presupuestos",
   "saldos",
   "informe-mensual",
   "configuracion",
@@ -43,6 +45,7 @@ export function AdminPortalPage() {
         <Route path="tarjetas/:id" element={<DetalleTarjetaPage />} />
         <Route path="prestamos" element={<PrestamosPage />} />
         <Route path="planes-ahorro" element={<PlanesAhorroPage />} />
+        <Route path="presupuestos" element={<PresupuestosPage />} />
         <Route path="saldos" element={<SaldosPage />} />
         <Route path="informe-mensual" element={<InformeMensualPage />} />
         <Route path="configuracion" element={<ConfiguracionPage />} />
