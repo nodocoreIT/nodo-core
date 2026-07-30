@@ -10,6 +10,7 @@ import {
   nodeLoginUrlWithAuthError,
   RequiredPasswordForm,
   INVALID_LOGIN_MESSAGE,
+  AUTH_ERROR_PAUSED,
   Card,
   CardContent,
   CardHeader,
@@ -84,7 +85,12 @@ export function AuthCallbackPage() {
       const access = await enforceNodeAccess(supabase, "Finanzas");
       if (!access.ok) {
         hideAppSplash();
-        window.location.replace(nodeLoginUrlWithAuthError(LANDING_LOGIN_URL));
+        window.location.replace(
+          nodeLoginUrlWithAuthError(
+            LANDING_LOGIN_URL,
+            access.reason === "paused" ? AUTH_ERROR_PAUSED : undefined,
+          ),
+        );
         return;
       }
 

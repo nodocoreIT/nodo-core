@@ -11,6 +11,8 @@ import {
   mapAuthLoginError,
   fetchMustSetPassword,
   RequiredPasswordForm,
+  landingApiBase,
+  PAUSED_NODE_MESSAGE,
 } from "@nodocore/shared-components";
 import { acceptPendingInvitations } from "@/shared/lib/accept-pending-invitations";
 import { Card, CardContent, CardHeader } from "@nodocore/shared-components";
@@ -32,6 +34,7 @@ export function LoginPage() {
   const [needsNewPassword, setNeedsNewPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pausedModal, setPausedModal] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,7 +59,20 @@ export function LoginPage() {
 
     const access = await enforceNodeAccess(supabase, "Inmo");
     if (!access.ok) {
-      setError(access.message);
+      if (access.reason === "paused") {
+        setPausedModal(true);
+        void fetch(`${landingApiBase()}/api/node-access/paused-notify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: email.trim(),
+            unitCode: "Inmo",
+            nodeLabel: "Nodo Inmo",
+          }),
+        }).catch(() => undefined);
+      } else {
+        setError(access.message);
+      }
       setLoading(false);
       return;
     }
@@ -206,6 +222,28 @@ export function LoginPage() {
           </CardContent>
         </Card>
       </main>
+
+      {pausedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-white p-7 text-center shadow-xl">
+            <h3 className="mb-2 text-xl font-extrabold text-navy">Nodo pausado</h3>
+            <p className="mb-2 text-sm leading-relaxed text-slate2">{PAUSED_NODE_MESSAGE}</p>
+            <p className="mb-6 text-xs leading-relaxed text-slate2">
+              Ya avisamos a NODO Core. También podés escribir a{" "}
+              <a
+                href="mailto:contacto@nodocore.com.ar"
+                className="font-semibold text-brand underline-offset-2 hover:underline"
+              >
+                contacto@nodocore.com.ar
+              </a>
+              .
+            </p>
+            <Button type="button" className="w-full" onClick={() => setPausedModal(false)}>
+              Entendido
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

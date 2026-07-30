@@ -77,6 +77,10 @@ export function AuthCallbackPage() {
 
       const access = await enforceNodeAccess(supabase, "Autos");
       if (!access.ok) {
+        if (access.reason === "paused") {
+          window.location.replace("/nodo-autos/login?auth_error=paused");
+          return;
+        }
         setError(access.message);
         setReady(true);
         return;

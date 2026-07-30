@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DollarSign, TrendingUp } from 'lucide-react';
 import { supabase } from '@/shared/lib/supabase';
-import { enforceNodeAccess, mapAuthLoginError, mustSetPassword } from '@nodocore/shared-components';
+import { enforceNodeAccess, mapAuthLoginError, mustSetPassword, landingApiBase, PAUSED_NODE_MESSAGE } from '@nodocore/shared-components';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -9,12 +9,6 @@ const ACCENT = '#43936C';
 const ACCENT_RGB = '67,147,108';
 
 type Mode = 'login' | 'register';
-
-function landingApiBase(): string {
-  const configured = import.meta.env.VITE_NODO_LANDING_URL?.replace(/\/$/, '');
-  if (configured) return configured;
-  return window.location.origin;
-}
 
 export function LoginPage() {
   const [mode, setMode] = useState<Mode>('login');
@@ -25,6 +19,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [pausedModal, setPausedModal] = useState(false);
 
   const handleForcedPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +80,20 @@ export function LoginPage() {
       } else {
         const access = await enforceNodeAccess(supabase, 'Finanzas');
         if (!access.ok) {
-          setError(access.message);
+          if (access.reason === 'paused') {
+            setPausedModal(true);
+            void fetch(`${landingApiBase()}/api/node-access/paused-notify`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: email.trim(),
+                unitCode: 'Finanzas',
+                nodeLabel: 'Nodo Finanzas',
+              }),
+            }).catch(() => undefined);
+          } else {
+            setError(access.message);
+          }
         } else if (mustSetPassword(data.session)) {
           setNeedsNewPassword(true);
           setPassword('');
@@ -266,6 +274,25 @@ export function LoginPage() {
           )}
         </div>
       </main>
+
+      {pausedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-mist bg-white p-7 text-center shadow-xl">
+            <h3 className="mb-2 text-xl font-extrabold text-ink">Nodo pausado</h3>
+            <p className="mb-2 text-sm leading-relaxed text-slate2">{PAUSED_NODE_MESSAGE}</p>
+            <p className="mb-6 text-xs leading-relaxed text-slate2">
+              Ya avisamos a NODO Core. También podés escribir a{' '}
+              <a href="mailto:contacto@nodocore.com.ar" className="font-semibold text-brand underline-offset-2 hover:underline">
+                contacto@nodocore.com.ar
+              </a>
+              .
+            </p>
+            <Button type="button" className="w-full" onClick={() => setPausedModal(false)}>
+              Entendido
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

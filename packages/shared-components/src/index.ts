@@ -15,11 +15,13 @@ export {
   getNodeIdentity,
   INVALID_LOGIN_MESSAGE,
   ACCESS_DENIED_MESSAGE,
+  PAUSED_NODE_MESSAGE,
   AUTH_ERROR_CREDENTIALS,
+  AUTH_ERROR_PAUSED,
   nodeLoginUrlWithAuthError,
   mapAuthLoginError,
 } from "./lib/verify-node-access";
-export type { NodeAccessReason, NodeIdentity } from "./lib/verify-node-access";
+export type { NodeAccessReason, NodeIdentity, EnforceNodeAccessResult } from "./lib/verify-node-access";
 export {
   isBillingWhitelistedPath,
   type SubscriptionRouteAllowlist,

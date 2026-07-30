@@ -32,7 +32,12 @@ describe("getNodeAccessReason", () => {
     await expect(getNodeAccessReason(supabase, "Finanzas")).resolves.toBe("banned");
   });
 
-  it("returns 'invalid_credentials' when the RPC reports it (no matching row, or pausado/sin_acceso)", async () => {
+  it("returns 'paused' when the RPC reports it (client_unit status pausado)", async () => {
+    const supabase = stubSupabase({ data: "paused", error: null });
+    await expect(getNodeAccessReason(supabase, "Inmo")).resolves.toBe("paused");
+  });
+
+  it("returns 'invalid_credentials' when the RPC reports it (no matching row, or sin_acceso)", async () => {
     const supabase = stubSupabase({ data: "invalid_credentials", error: null });
     await expect(getNodeAccessReason(supabase, "Finanzas")).resolves.toBe("invalid_credentials");
   });

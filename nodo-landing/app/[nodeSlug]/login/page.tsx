@@ -14,7 +14,9 @@ import {
   enforceNodeAccess,
   mapAuthLoginError,
   INVALID_LOGIN_MESSAGE,
+  PAUSED_NODE_MESSAGE,
   AUTH_ERROR_CREDENTIALS,
+  AUTH_ERROR_PAUSED,
   mustSetPassword,
   fetchMustSetPassword,
   mapAuthPasswordError,
@@ -448,7 +450,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
   } | null>(null);
   const [successModal, setSuccessModal] = useState<{
     open: boolean;
-    type: "paciente" | "medico" | "patient_verify" | "forgot_verify" | "reset_success";
+    type: "paciente" | "medico" | "patient_verify" | "forgot_verify" | "reset_success" | "paused";
     message: string;
   }>({
     open: false,
@@ -487,6 +489,17 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
   const [resendLoading, setResendLoading] = useState(false);
 
   useEffect(() => {
+    if (authErrorCode === AUTH_ERROR_PAUSED) {
+      setSuccessModal({
+        open: true,
+        type: "paused",
+        message: PAUSED_NODE_MESSAGE,
+      });
+      const url = new URL(window.location.href);
+      url.searchParams.delete("auth_error");
+      router.replace(url.pathname + url.search, { scroll: false });
+      return;
+    }
     if (authErrorCode === AUTH_ERROR_CREDENTIALS) {
       setGeneralError(INVALID_LOGIN_MESSAGE);
       const url = new URL(window.location.href);
@@ -755,7 +768,25 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
       if (matchedNode?.code) {
         const access = await enforceNodeAccess(supabase, matchedNode.code);
         if (!access.ok) {
-          setGeneralError(access.message);
+          if (access.reason === "paused") {
+            setGeneralError("");
+            setSuccessModal({
+              open: true,
+              type: "paused",
+              message: access.message,
+            });
+            void fetch("/api/node-access/paused-notify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email: email.trim(),
+                unitCode: matchedNode.code,
+                nodeLabel: matchedNode.label ?? matchedNode.code,
+              }),
+            }).catch(() => undefined);
+          } else {
+            setGeneralError(access.message);
+          }
           setLoading(false);
           return;
         }
@@ -2167,6 +2198,53 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
                               ? "/nodo-ecommerce"
                               : "/nodo-clinica",
                     );
+                  }}
+                  className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
+                >
+                  Entendido
+                </button>
+              </>
+            ) : successModal.type === "paused" ? (
+              <>
+                <div className="h-14 w-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-5 border border-amber-200">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-7 w-7"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="font-display font-extrabold text-navy text-[21px] mb-2.5">
+                  Nodo pausado
+                </h3>
+                <p className="text-slate2 text-[14px] leading-relaxed mb-2">
+                  {successModal.message}
+                </p>
+                <p className="text-slate2 text-[13px] leading-relaxed mb-6">
+                  Ya avisamos a NODO Core. También podés escribir a{" "}
+                  <a
+                    href="mailto:contacto@nodocore.com.ar"
+                    className="text-brand font-semibold underline-offset-2 hover:underline"
+                  >
+                    contacto@nodocore.com.ar
+                  </a>
+                  .
+                </p>
+                <button
+                  onClick={() => {
+                    setSuccessModal({
+                      open: false,
+                      type: "paused",
+                      message: "",
+                    });
                   }}
                   className="w-full py-3 rounded-lg bg-brand text-white font-bold text-[14.5px] hover:bg-brand-600 active:scale-[.98] transition-all cursor-pointer shadow-md shadow-brand/15"
                 >

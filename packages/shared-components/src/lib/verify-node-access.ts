@@ -10,6 +10,10 @@ export const ACCESS_DENIED_MESSAGE = INVALID_LOGIN_MESSAGE;
 const BANNED_MESSAGE =
   "Tu acceso fue pausado. Contactate con NODO Core para reactivarlo.";
 
+/** Shown when the client_unit / node_email_access status is `pausado`. */
+export const PAUSED_NODE_MESSAGE =
+  "Este nodo se encuentra pausado. Ponganse en contacto con el administrador.";
+
 /** Maps Supabase auth login errors to user-friendly Spanish messages. */
 export function mapAuthLoginError(message: string | undefined): string {
   const msg = (message ?? "").toLowerCase();
@@ -53,13 +57,15 @@ export type NodeAccessReason =
   | "payment_overdue"
   | "banned"
   | "invalid_credentials"
-  | "trial_expired";
+  | "trial_expired"
+  | "paused";
 
 /**
  * Returns a machine-readable reason alongside the boolean access check, so callers
  * can distinguish `payment_overdue` (client_unit is `impago` — access stays allowed,
- * see userHasNodeAccess/enforceNodeAccess, unaffected) and `trial_expired` (Nodo
- * Finanzas' one-time 7-day demo ran out) from real denial reasons.
+ * see userHasNodeAccess/enforceNodeAccess, unaffected), `paused` (unit explicitly
+ * paused — show contact-admin UX), and `trial_expired` (Nodo Finanzas' one-time
+ * 7-day demo ran out) from real denial reasons.
  * Uses RPC `user_node_access_reason` — purely additive, does not gate access itself.
  *
  * Fail-open: any error (network, RPC failure) resolves to `"ok"` — this function must
@@ -87,7 +93,8 @@ export async function getNodeAccessReason(
     data === "payment_overdue" ||
     data === "banned" ||
     data === "invalid_credentials" ||
-    data === "trial_expired"
+    data === "trial_expired" ||
+    data === "paused"
   ) {
     return data;
   }
@@ -138,21 +145,37 @@ export async function getNodeIdentity(
   };
 }
 
+export type EnforceNodeAccessResult =
+  | { ok: true }
+  | { ok: false; message: string; reason: NodeAccessReason };
+
 export async function enforceNodeAccess(
   supabase: SupabaseClient,
   unitCode: string,
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<EnforceNodeAccessResult> {
   const allowed = await userHasNodeAccess(supabase, unitCode);
   if (allowed) return { ok: true };
+
+  // Reason must be read BEFORE sign-out — the RPC uses auth.uid().
+  const reason = await getNodeAccessReason(supabase, unitCode);
   await supabase.auth.signOut({ scope: "local" });
-  return { ok: false, message: INVALID_LOGIN_MESSAGE };
+
+  if (reason === "paused") {
+    return { ok: false, reason, message: PAUSED_NODE_MESSAGE };
+  }
+
+  return { ok: false, reason, message: INVALID_LOGIN_MESSAGE };
 }
 
 /** Query param value for redirecting back to node login after denied access. */
 export const AUTH_ERROR_CREDENTIALS = "credentials";
+export const AUTH_ERROR_PAUSED = "paused";
 
-export function nodeLoginUrlWithAuthError(loginPath: string): string {
+export function nodeLoginUrlWithAuthError(
+  loginPath: string,
+  errorCode: string = AUTH_ERROR_CREDENTIALS,
+): string {
   const base = loginPath.startsWith("/") ? loginPath : `/${loginPath}`;
   const join = base.includes("?") ? "&" : "?";
-  return `${base}${join}auth_error=${AUTH_ERROR_CREDENTIALS}`;
+  return `${base}${join}auth_error=${errorCode}`;
 }

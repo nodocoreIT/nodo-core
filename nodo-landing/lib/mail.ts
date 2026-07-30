@@ -810,3 +810,55 @@ export async function sendFeedbackEmail({
     `,
   });
 }
+
+/** Notify NODO Core when a user tries to log into a paused nodo. */
+export async function sendPausedNodeAccessEmail({
+  email,
+  unitCode,
+  nodeLabel,
+}: {
+  email: string;
+  unitCode: string;
+  nodeLabel?: string;
+}): Promise<void> {
+  if (!isMailConfigured()) {
+    throw new Error(
+      "SMTP no configurado: faltan ZOHO_SMTP_USER y/o ZOHO_SMTP_PASSWORD.",
+    );
+  }
+
+  const label = nodeLabel?.trim() || unitCode;
+  const transporter = nodemailer.createTransport({
+    host: HOST,
+    port: PORT,
+    secure: PORT === 465,
+    auth: { user: USER, pass: PASS },
+  });
+
+  const safeEmail = email.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const safeLabel = label.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  await transporter.sendMail({
+    from: `"NODO Core · Acceso" <${USER}>`,
+    to: CONTACT_TO,
+    replyTo: email,
+    subject: `Acceso a nodo pausado: ${label} — ${email}`,
+    text: `Un usuario intentó ingresar a un nodo pausado.\n\nNodo: ${label} (${unitCode})\nEmail: ${email}\nFecha: ${new Date().toISOString()}\n\nRevisá el estado del client_unit en el panel y reactivá el acceso si corresponde.`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+        <div style="background:#121e2f;padding:20px 24px;color:#fff;">
+          <h2 style="margin:0;font-size:18px;">Intento de acceso a nodo pausado</h2>
+        </div>
+        <div style="padding:24px;background:#fff;">
+          <p style="margin:0 0 8px;color:#64748b;font-size:13px;">Nodo</p>
+          <p style="margin:0 0 16px;font-size:16px;font-weight:700;color:#0f172a;">${safeLabel} <span style="font-weight:500;color:#64748b;">(${unitCode})</span></p>
+          <p style="margin:0 0 8px;color:#64748b;font-size:13px;">Usuario</p>
+          <p style="margin:0 0 16px;font-size:15px;color:#0f172a;"><a href="mailto:${safeEmail}" style="color:#DA5A0E;">${safeEmail}</a></p>
+          <p style="margin:0;font-size:13px;color:#64748b;line-height:1.5;">
+            Revisá el estado del client_unit en el panel y reactivá el acceso si corresponde.
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}

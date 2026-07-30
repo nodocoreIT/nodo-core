@@ -148,9 +148,11 @@ export function AuthProvider({
       if (config.unitCode) {
         const allowed = await userHasNodeAccess(supabase, config.unitCode);
         if (!allowed) {
+          // Read reason before sign-out — RPC needs auth.uid().
+          const reason = await getNodeAccessReason(supabase, config.unitCode);
           if (!cancelled) {
             setAccessDenied(true);
-            setAccessReason("ok");
+            setAccessReason(reason === "ok" ? "invalid_credentials" : reason);
             setNodeIdentity(null);
             await supabase.auth.signOut({ scope: "local" });
           }
