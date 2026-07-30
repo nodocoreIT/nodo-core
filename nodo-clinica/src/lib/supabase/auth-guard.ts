@@ -11,6 +11,7 @@ import {
   toSessionRole,
 } from "@/lib/clinic/resolve-clinic-role";
 import { resolveSupabaseAuthUser } from "@/lib/supabase/resolve-auth-user";
+import { getClinicOrgId } from "@/lib/clinic/clinic-org";
 
 async function createAuthedClinicClient(accessToken?: string) {
   if (accessToken) {
@@ -132,7 +133,6 @@ export async function requireAuth(
 
     if (resolved) {
       const { user, accessToken } = resolved;
-      const appMeta = user.app_metadata ?? {};
 
       const svc = await createServiceClient();
       const [membership, clinicSession] = await Promise.all([
@@ -163,12 +163,19 @@ export async function requireAuth(
 
       const supabase = await createAuthedClinicClient(accessToken);
 
+      // org_id is NOT read from user.app_metadata — that JWT claim is shared
+      // across every Nodo product the user has an account in, and is wrong
+      // whenever they also belong to another node (see the RLS fix in
+      // nodo_clinica migrations for the same root cause at the DB layer).
+      // This app is single-tenant: membership.professionalId/patientId being
+      // set (checked above) already guarantees the row's org_id is
+      // CLINIC_ORG_ID, so that's the only value org_id can ever be here.
       return {
         user: {
           id: user.id,
           email: user.email,
           role: effectiveRole,
-          org_id: appMeta.org_id ?? null,
+          org_id: getClinicOrgId(),
         },
         _professionalId: membership.professionalId,
         supabase,
@@ -176,6 +183,11 @@ export async function requireAuth(
     }
 
     // 2. Fallback: ClinicSession JWT cookie (platform-sync logins or local mode).
+    // This cookie only ever represents a Nodo Clínica session, so org_id is
+    // always CLINIC_ORG_ID here — never null. Routes that gate on org_id
+    // (prescriptions, study-orders, clinical-records) were always failing
+    // with 403 "org_id requerido" for any doctor/patient authenticated via
+    // this path (e.g. platform-sync SSO logins).
     const clinicSession = await getSession();
     if (clinicSession) {
       const sessionRole = clinicSession.role === "doctor" ? "doctor" : "patient";
@@ -185,7 +197,7 @@ export async function requireAuth(
           id: clinicSession.userId,
           email: clinicSession.email,
           role: sessionRole,
-          org_id: null,
+          org_id: getClinicOrgId(),
         },
         _professionalId: clinicSession.role === "doctor" ? clinicSession.userId : null,
         supabase,
@@ -206,7 +218,7 @@ export async function requireAuth(
       id: clinicSession.userId,
       email: clinicSession.email,
       role: sessionRole,
-      org_id: null,
+      org_id: getClinicOrgId(),
     },
     _professionalId: clinicSession.role === "doctor" ? clinicSession.userId : null,
     supabase: null as unknown as SupabaseClient<Database>,
