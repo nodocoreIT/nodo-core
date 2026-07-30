@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/ui/money-input';
 import { Spinner } from '@/components/ui/spinner';
+import { ModalConfirmacion } from '@/components/ui/modal-confirmacion';
 import { Calendar, Check, X, Plus, Trash2 } from 'lucide-react';
 import { formatearMoneda, formatearFecha } from '@/utils/formatters';
 import { useCuotasPlan } from '@/hooks/use-cuotas-plan';
@@ -26,6 +27,7 @@ export function GestionCuotasPlan({ plan, onClose }: Props) {
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [cuotasForm, setCuotasForm] = useState<CuotaForm[]>([]);
+  const [confirmarEliminarTodas, setConfirmarEliminarTodas] = useState(false);
 
   const inicializarFormulario = () => {
     const totalCuotas = plan.cuotasTotales || 84;
@@ -87,11 +89,14 @@ export function GestionCuotasPlan({ plan, onClose }: Props) {
     }
   };
 
-  const eliminarTodasCuotas = async () => {
-    if (window.confirm('¿Eliminar todo el historial de cuotas de este plan?')) {
-      await eliminarCuotas(plan.id);
-      setMostrarFormulario(false);
-    }
+  const eliminarTodasCuotas = () => {
+    setConfirmarEliminarTodas(true);
+  };
+
+  const confirmarEliminarTodasCuotas = async () => {
+    await eliminarCuotas(plan.id);
+    setMostrarFormulario(false);
+    setConfirmarEliminarTodas(false);
   };
 
   const manejarMarcarComoPagada = async (cuotaId: string) => {
@@ -303,6 +308,16 @@ export function GestionCuotasPlan({ plan, onClose }: Props) {
           )}
         </div>
       </div>
+
+      <ModalConfirmacion
+        open={confirmarEliminarTodas}
+        title="Eliminar historial de cuotas"
+        message="¿Confirmás que querés eliminar todo el historial de cuotas de este plan? Esta acción no se puede deshacer."
+        onConfirm={confirmarEliminarTodasCuotas}
+        onCancel={() => setConfirmarEliminarTodas(false)}
+        confirmText="Sí, eliminar"
+        cancelText="Cancelar"
+      />
     </div>
   );
 }

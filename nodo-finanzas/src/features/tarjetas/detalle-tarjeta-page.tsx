@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
+import { ModalConfirmacion } from '@/components/ui/modal-confirmacion';
 import { MonthPicker } from '@/components/ui/month-picker';
 import { RubroDisplay } from '@/components/rubros/rubro-display';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
@@ -39,6 +40,7 @@ export function DetalleTarjetaPage() {
   const [rubroFiltro, setRubroFiltro] = useState<string | null>(null);
   const [consumoEditando, setConsumoEditando] = useState<ConsumoTarjeta | null>(null);
   const [consumoClonar, setConsumoClonar] = useState<ConsumoTarjeta | null>(null);
+  const [consumoAEliminar, setConsumoAEliminar] = useState<ConsumoTarjeta | null>(null);
   const [vistaRegistro, setVistaRegistro] = useState(false);
   const [sortField, setSortField] = useState<SortField>('fecha');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -110,14 +112,20 @@ export function DetalleTarjetaPage() {
     });
   };
 
-  const handleEliminar = async (consumo: ConsumoTarjeta) => {
-    if (!window.confirm('¿Eliminar este consumo?')) return;
+  const handleEliminar = (consumo: ConsumoTarjeta) => {
+    setConsumoAEliminar(consumo);
+  };
+
+  const confirmarEliminarConsumo = async () => {
+    if (!consumoAEliminar) return;
     try {
-      await finanzas.eliminarConsumo(consumo.id);
+      await finanzas.eliminarConsumo(consumoAEliminar.id);
       await finanzas.recargarConsumosTarjetas();
       toast.success('Consumo eliminado');
     } catch {
       toast.error('Error al eliminar');
+    } finally {
+      setConsumoAEliminar(null);
     }
   };
 
@@ -407,6 +415,16 @@ export function DetalleTarjetaPage() {
         consumo={consumoEditando}
         onSave={handleSaveEdit}
         onCancel={() => setConsumoEditando(null)}
+      />
+
+      <ModalConfirmacion
+        open={!!consumoAEliminar}
+        title="Eliminar consumo"
+        message="¿Confirmás que querés eliminar este consumo? Esta acción no se puede deshacer."
+        onConfirm={confirmarEliminarConsumo}
+        onCancel={() => setConsumoAEliminar(null)}
+        confirmText="Sí, eliminar"
+        cancelText="Cancelar"
       />
     </div>
   );

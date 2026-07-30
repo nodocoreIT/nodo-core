@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/ui/money-input';
 import { Spinner } from '@/components/ui/spinner';
+import { ModalConfirmacion } from '@/components/ui/modal-confirmacion';
 import { Calendar, Check, X, Plus, Trash2 } from 'lucide-react';
 import { formatearMoneda, formatearFecha } from '@/utils/formatters';
 import { useCuotasProgramadas } from '@/hooks/use-cuotas-programadas';
@@ -24,6 +25,7 @@ export function GestionCuotasProgramadas({ prestamo, onClose }: Props) {
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [cuotasForm, setCuotasForm] = useState<CuotaForm[]>([]);
+  const [confirmarEliminarTodas, setConfirmarEliminarTodas] = useState(false);
 
   const inicializarFormulario = () => {
     const totalCuotas = prestamo.cuotasTotales || 12;
@@ -85,11 +87,14 @@ export function GestionCuotasProgramadas({ prestamo, onClose }: Props) {
     }
   };
 
-  const eliminarTodasCuotas = async () => {
-    if (window.confirm('¿Eliminar todas las cuotas programadas?')) {
-      await eliminarCuotas(prestamo.id);
-      inicializarFormulario();
-    }
+  const eliminarTodasCuotas = () => {
+    setConfirmarEliminarTodas(true);
+  };
+
+  const confirmarEliminarTodasCuotas = async () => {
+    await eliminarCuotas(prestamo.id);
+    inicializarFormulario();
+    setConfirmarEliminarTodas(false);
   };
 
   const moneda = (prestamo.moneda as 'ARS' | 'USD') || 'ARS';
@@ -253,6 +258,16 @@ export function GestionCuotasProgramadas({ prestamo, onClose }: Props) {
           )}
         </div>
       </div>
+
+      <ModalConfirmacion
+        open={confirmarEliminarTodas}
+        title="Eliminar cuotas programadas"
+        message="¿Confirmás que querés eliminar todas las cuotas programadas? Esta acción no se puede deshacer."
+        onConfirm={confirmarEliminarTodasCuotas}
+        onCancel={() => setConfirmarEliminarTodas(false)}
+        confirmText="Sí, eliminar"
+        cancelText="Cancelar"
+      />
     </div>
   );
 }

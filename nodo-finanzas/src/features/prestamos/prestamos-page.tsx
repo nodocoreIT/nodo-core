@@ -15,6 +15,7 @@ import {
   Paperclip,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ModalConfirmacion } from '@/components/ui/modal-confirmacion';
 import { MoneyInput } from '@/components/ui/money-input';
 import { FormSelect } from '@nodocore/shared-components';
 import { Spinner } from '@/components/ui/spinner';
@@ -122,6 +123,7 @@ export function PrestamosPage() {
   const [prestamoParaCuotas, setPrestamoParaCuotas] = useState<Prestamo | null>(null);
   const [prestamoParaComprobantes, setPrestamoParaComprobantes] = useState<Prestamo | null>(null);
   const [prestamoParaPago, setPrestamoParaPago] = useState<Prestamo | null>(null);
+  const [prestamoIdAEliminar, setPrestamoIdAEliminar] = useState<string | null>(null);
   const [cuentaPagoId, setCuentaPagoId] = useState('');
   const [procesandoPago, setProcesandoPago] = useState(false);
   const [busqueda, setBusqueda] = useState('');
@@ -364,13 +366,19 @@ export function PrestamosPage() {
     }
   };
 
-  const handleEliminar = async (id: string) => {
-    if (!window.confirm('¿Eliminar este préstamo?')) return;
+  const handleEliminar = (id: string) => {
+    setPrestamoIdAEliminar(id);
+  };
+
+  const confirmarEliminar = async () => {
+    if (!prestamoIdAEliminar) return;
     try {
-      await finanzas.eliminarPrestamo(id);
+      await finanzas.eliminarPrestamo(prestamoIdAEliminar);
       toast.success('Préstamo eliminado');
     } catch {
       toast.error('Error al eliminar');
+    } finally {
+      setPrestamoIdAEliminar(null);
     }
   };
 
@@ -1017,6 +1025,16 @@ export function PrestamosPage() {
           onClose={() => setPrestamoParaComprobantes(null)}
         />
       )}
+
+      <ModalConfirmacion
+        open={!!prestamoIdAEliminar}
+        title="Eliminar préstamo"
+        message="¿Confirmás que querés eliminar este préstamo? Esta acción no se puede deshacer."
+        onConfirm={confirmarEliminar}
+        onCancel={() => setPrestamoIdAEliminar(null)}
+        confirmText="Sí, eliminar"
+        cancelText="Cancelar"
+      />
     </div>
   );
 }

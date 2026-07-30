@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/ui/money-input';
 import { FormSelect } from '@nodocore/shared-components';
 import { Spinner } from '@/components/ui/spinner';
+import { ModalConfirmacion } from '@/components/ui/modal-confirmacion';
 import { useLocation } from 'react-router-dom';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { formatearMoneda, formatearFecha, getFechaHoy } from '@/utils/formatters';
@@ -99,6 +100,7 @@ export function PlanesAhorroPage() {
   const [planEditando, setPlanEditando] = useState<PlanAhorro | null>(null);
   const [planParaCuotas, setPlanParaCuotas] = useState<PlanAhorro | null>(null);
   const [planParaMarcarPagado, setPlanParaMarcarPagado] = useState<PlanAhorro | null>(null);
+  const [planIdAEliminar, setPlanIdAEliminar] = useState<string | null>(null);
   const [planParaPagar, setPlanParaPagar] = useState<PlanAhorro | null>(null);
   const [pagoFormaPago, setPagoFormaPago] = useState<FormaDePago>('TRANSFERENCIA BANCO');
   const [pagoCuentaId, setPagoCuentaId] = useState<string>('');
@@ -216,13 +218,19 @@ export function PlanesAhorroPage() {
     }
   };
 
-  const handleEliminar = async (id: string) => {
-    if (!window.confirm('¿Eliminar este plan de ahorro?')) return;
+  const handleEliminar = (id: string) => {
+    setPlanIdAEliminar(id);
+  };
+
+  const confirmarEliminar = async () => {
+    if (!planIdAEliminar) return;
     try {
-      await finanzas.eliminarPlanAhorro(id);
+      await finanzas.eliminarPlanAhorro(planIdAEliminar);
       toast.success('Plan eliminado');
     } catch {
       toast.error('Error al eliminar');
+    } finally {
+      setPlanIdAEliminar(null);
     }
   };
 
@@ -899,6 +907,16 @@ export function PlanesAhorroPage() {
           </div>
         </div>
       )}
+
+      <ModalConfirmacion
+        open={!!planIdAEliminar}
+        title="Eliminar plan de ahorro"
+        message="¿Confirmás que querés eliminar este plan de ahorro? Esta acción no se puede deshacer."
+        onConfirm={confirmarEliminar}
+        onCancel={() => setPlanIdAEliminar(null)}
+        confirmText="Sí, eliminar"
+        cancelText="Cancelar"
+      />
     </div>
   );
 }

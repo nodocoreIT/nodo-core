@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, Upload, Trash2, ZoomIn, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ModalConfirmacion } from '@/components/ui/modal-confirmacion';
 import { FinanzasService } from '@/services/finanzas-service';
 import toast from 'react-hot-toast';
 import type { Prestamo, PrestamoComprobante } from '@/types';
@@ -27,6 +28,7 @@ export function ModalComprobantes({ prestamo, onClose }: ModalComprobantesProps)
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<PrestamoComprobante | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [comprobanteAEliminar, setComprobanteAEliminar] = useState<PrestamoComprobante | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -64,8 +66,14 @@ export function ModalComprobantes({ prestamo, onClose }: ModalComprobantesProps)
     if (inputRef.current) inputRef.current.value = '';
   };
 
-  const handleDelete = async (c: PrestamoComprobante) => {
-    if (!window.confirm(`¿Eliminar "${c.nombre}"?`)) return;
+  const handleDelete = (c: PrestamoComprobante) => {
+    setComprobanteAEliminar(c);
+  };
+
+  const confirmarEliminar = async () => {
+    const c = comprobanteAEliminar;
+    if (!c) return;
+    setComprobanteAEliminar(null);
     setDeleting(c.id);
     const ok = await FinanzasService.eliminarComprobante(c);
     if (ok) {
@@ -239,6 +247,16 @@ export function ModalComprobantes({ prestamo, onClose }: ModalComprobantesProps)
           />
         </div>
       )}
+
+      <ModalConfirmacion
+        open={!!comprobanteAEliminar}
+        title="Eliminar comprobante"
+        message={`¿Confirmás que querés eliminar "${comprobanteAEliminar?.nombre}"? Esta acción no se puede deshacer.`}
+        onConfirm={confirmarEliminar}
+        onCancel={() => setComprobanteAEliminar(null)}
+        confirmText="Sí, eliminar"
+        cancelText="Cancelar"
+      />
     </>
   );
 }
