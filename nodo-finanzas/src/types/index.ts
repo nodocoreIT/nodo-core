@@ -9,6 +9,8 @@ export interface Rubro {
   activo: boolean;
   esSistema: boolean;
   orden: number;
+  /** Presupuesto mensual en ARS. undefined/null = sin presupuesto asignado. */
+  presupuestoMensual?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }

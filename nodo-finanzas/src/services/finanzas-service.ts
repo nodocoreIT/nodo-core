@@ -430,6 +430,7 @@ export class FinanzasService {
     activo,
     es_sistema,
     orden,
+    presupuesto_mensual,
     created_at,
     updated_at
   `;
@@ -460,7 +461,8 @@ export class FinanzasService {
         descripcion: rubro.descripcion,
         activo: rubro.activo,
         es_sistema: rubro.esSistema || false,
-        orden: rubro.orden || 999
+        orden: rubro.orden || 999,
+        presupuesto_mensual: rubro.presupuestoMensual ?? null
       })])
       .select(FinanzasService.RUBRO_SELECT)
       .single();
@@ -483,7 +485,8 @@ export class FinanzasService {
         ...(rubro.descripcion !== undefined && { descripcion: rubro.descripcion }),
         ...(rubro.activo !== undefined && { activo: rubro.activo }),
         ...(rubro.esSistema !== undefined && { es_sistema: rubro.esSistema }),
-        ...(rubro.orden !== undefined && { orden: rubro.orden })
+        ...(rubro.orden !== undefined && { orden: rubro.orden }),
+        ...(rubro.presupuestoMensual !== undefined && { presupuesto_mensual: rubro.presupuestoMensual })
       })
       .eq('id', id);
 
@@ -559,6 +562,9 @@ export class FinanzasService {
       activo: data.activo,
       esSistema: data.es_sistema || false,
       orden: data.orden || 0,
+      presupuestoMensual: data.presupuesto_mensual !== null && data.presupuesto_mensual !== undefined
+        ? Number(data.presupuesto_mensual)
+        : null,
       createdAt: data.created_at,
       updatedAt: data.updated_at
     };
