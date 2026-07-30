@@ -16,7 +16,7 @@ export interface ClinicSession {
   fullName: string;
 }
 
-export type SubscriptionStatus = "trial" | "active" | "expired";
+export type SubscriptionStatus = "demo" | "pending_payment" | "active" | "expired";
 export type AppointmentStatus =
   | "scheduled"
   | "waiting"

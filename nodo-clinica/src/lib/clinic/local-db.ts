@@ -7,7 +7,7 @@ import type { DoctorThemeSettings } from "@/lib/clinic/theme-settings";
 import { buildClinicSeed, CLINIC_SEED_VERSION } from "@/lib/clinic/seed";
 import { doctorHasMercadoPagoConnection } from "@/lib/mercadopago/connection";
 
-export type SubscriptionStatus = "trial" | "active" | "expired";
+export type SubscriptionStatus = "demo" | "pending_payment" | "active" | "expired";
 export type AppointmentStatus =
   | "scheduled"
   | "waiting"

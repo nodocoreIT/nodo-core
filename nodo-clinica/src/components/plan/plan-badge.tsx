@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 export interface PlanBadgeProps {
   /** Subscription status from the doctor's session (Supabase professionals.subscription_status). */
-  subscriptionStatus?: "trial" | "active" | "expired" | null;
+  subscriptionStatus?: "demo" | "pending_payment" | "active" | "expired" | null;
   /** Days left in the Free/Demo trial (0 when expired or unknown). */
   trialDaysRemaining?: number;
   variant?: "default" | "sidebar";
@@ -18,26 +18,34 @@ export function PlanBadge({
   variant = "default",
   className,
 }: PlanBadgeProps) {
+  // No status yet (e.g. session still resolving) — don't show a fake plan.
+  if (subscriptionStatus == null) return null;
+
   const isActive = subscriptionStatus === "active";
-  const isTrial = subscriptionStatus === "trial";
+  const isDemo = subscriptionStatus === "demo";
+  const isPendingPayment = subscriptionStatus === "pending_payment";
   const days = trialDaysRemaining ?? 0;
-  const trialExpired = isTrial && days <= 0;
+  const demoExpired = isDemo && days <= 0;
 
   const label = isActive
     ? "Pro"
-    : trialExpired || subscriptionStatus === "expired"
-      ? "Prueba vencida"
-      : isTrial
-        ? `Prueba · ${days} día${days === 1 ? "" : "s"}`
-        : "Starter";
+    : demoExpired || subscriptionStatus === "expired"
+      ? "Demo vencida"
+      : isPendingPayment
+        ? "Pago pendiente"
+        : isDemo
+          ? `Demo · ${days} día${days === 1 ? "" : "s"}`
+          : "Demo";
 
   const title = isActive
     ? "Plan Pro activo"
-    : trialExpired || subscriptionStatus === "expired"
+    : demoExpired || subscriptionStatus === "expired"
       ? "Tu período de prueba venció — suscribite para seguir usando Nodo Clínica"
-      : isTrial
-        ? `Te quedan ${days} día${days === 1 ? "" : "s"} de prueba gratis`
-        : "Plan Starter";
+      : isPendingPayment
+        ? "Estamos esperando la confirmación de tu pago con Mercado Pago"
+        : isDemo
+          ? `Te quedan ${days} día${days === 1 ? "" : "s"} de prueba gratis`
+          : "Plan Demo";
 
   return (
     <div
@@ -46,7 +54,7 @@ export function PlanBadge({
         variant === "sidebar" && "w-full justify-center",
         isActive
           ? "border-orange-300/60 bg-gradient-to-r from-orange-500 to-orange-600 text-white"
-          : trialExpired || subscriptionStatus === "expired"
+          : demoExpired || subscriptionStatus === "expired"
             ? "border-red-300/60 bg-red-50 text-red-700"
             : variant === "sidebar"
               ? "border-white/20 bg-white/5 text-white"

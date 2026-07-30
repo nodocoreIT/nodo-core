@@ -537,7 +537,12 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                 metrics={
                   <PlanBadge
                     subscriptionStatus={
-                      doctor.subscriptionStatus as "trial" | "active" | "expired" | undefined
+                      doctor.subscriptionStatus as
+                        | "demo"
+                        | "pending_payment"
+                        | "active"
+                        | "expired"
+                        | undefined
                     }
                     trialDaysRemaining={doctor.trialDaysRemaining}
                   />

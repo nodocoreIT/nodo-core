@@ -467,7 +467,7 @@ export const clinicApi = {
     plan: string;
     token: string;
     phone: string;
-  }): Promise<{ ok: boolean }> {
+  }): Promise<{ ok: boolean; checkoutUrl?: string; checkoutFailed?: boolean }> {
     const res = await fetch(`${BASE}/api/clinic/account/onboarding/medico`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -476,7 +476,7 @@ export const clinicApi = {
     });
     const resData = await parseJsonResponse(res);
     if (!res.ok) throw new Error(resData.error || "Error en onboarding");
-    return resData as { ok: boolean };
+    return resData as { ok: boolean; checkoutUrl?: string; checkoutFailed?: boolean };
   },
 
   async completeOnboardingPaciente(

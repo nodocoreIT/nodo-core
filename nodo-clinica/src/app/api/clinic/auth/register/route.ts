@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       specialty: specialty || "Medicina General",
       licenseNumber: licenseNumber || "Pendiente",
       subscriptionStatus: "active" as const,
-      subscriptionPlan: plan || "trial",
+      subscriptionPlan: plan || "demo",
       createdAt: new Date().toISOString(),
     };
 

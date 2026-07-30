@@ -12,7 +12,7 @@ function isActiveDoctor(d: { subscriptionStatus?: string }) {
   return (
     !d.subscriptionStatus ||
     d.subscriptionStatus === "active" ||
-    d.subscriptionStatus === "trial"
+    d.subscriptionStatus === "demo"
   );
 }
 

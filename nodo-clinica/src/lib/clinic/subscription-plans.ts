@@ -7,8 +7,8 @@ export interface SubscriptionPlan {
   features: string[];
 }
 
-export const TRIAL_PLAN: SubscriptionPlan = {
-  id: "trial",
+export const DEMO_PLAN: SubscriptionPlan = {
+  id: "demo",
   name: "Prueba gratis",
   amount: 0,
   currency: "ARS",
@@ -33,7 +33,7 @@ export const PAID_SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   },
 ];
 
-export const ONBOARDING_PLANS: SubscriptionPlan[] = [TRIAL_PLAN, ...PAID_SUBSCRIPTION_PLANS];
+export const ONBOARDING_PLANS: SubscriptionPlan[] = [DEMO_PLAN, ...PAID_SUBSCRIPTION_PLANS];
 
 export function findSubscriptionPlan(id: string): SubscriptionPlan | undefined {
   return PAID_SUBSCRIPTION_PLANS.find((p) => p.id === id);

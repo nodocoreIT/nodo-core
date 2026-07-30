@@ -9,7 +9,7 @@ import { createNodoCoreServiceClient } from "@/lib/supabase/server";
  * from the nodo-landing admin panel. Display-only: does NOT affect the plan
  * id submitted at onboarding, nor the checkout flow
  * (app/api/clinic/subscription/checkout/route.ts), which keep using their
- * own separate id space (trial/basico/profesional) untouched.
+ * own separate id space (demo/profesional) untouched.
  */
 export async function GET(): Promise<NextResponse> {
   try {

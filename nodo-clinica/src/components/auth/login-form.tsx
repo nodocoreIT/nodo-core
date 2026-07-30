@@ -96,7 +96,7 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
         password: form.password,
         specialty: form.specialty,
         licenseNumber: form.licenseNumber,
-        plan: "trial",
+        plan: "demo",
       });
       toast.success("¡Registro exitoso! Bienvenido/a.");
       window.location.href =

@@ -20,7 +20,7 @@ import { CLINIC_BRAND_LOGO_SRC } from "@/lib/clinic/brand";
  * today, so it keeps its static copy untouched.
  */
 const ONBOARDING_PLAN_DB_CODES: Record<string, string> = {
-  trial: "medico_demo",
+  demo: "medico_demo",
   profesional: "medico_pro",
 };
 
@@ -34,7 +34,8 @@ function OnboardingMedicoContent() {
 
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [plan, setPlan] = useState("trial");
+  const [checkoutFailed, setCheckoutFailed] = useState(false);
+  const [plan, setPlan] = useState("demo");
   const [form, setForm] = useState({
     fullName: "",
     specialty: "",
@@ -92,7 +93,7 @@ function OnboardingMedicoContent() {
     }
     setLoading(true);
     try {
-      await clinicApi.completeOnboardingMedico({
+      const result = await clinicApi.completeOnboardingMedico({
         fullName: form.fullName,
         specialty: form.specialty,
         licenseNumber: form.licenseNumber,
@@ -100,6 +101,11 @@ function OnboardingMedicoContent() {
         token,
         phone: phone.trim(),
       });
+      if (result.checkoutUrl) {
+        window.location.href = result.checkoutUrl;
+        return;
+      }
+      setCheckoutFailed(Boolean(result.checkoutFailed));
       setSubmitted(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al completar el registro");
@@ -234,7 +240,9 @@ function OnboardingMedicoContent() {
             </div>
             <h2 className="text-2xl font-bold text-slate-800">¡Registro completado!</h2>
             <p className="text-slate-500 text-sm leading-relaxed">
-              Pronto desde NODO activaremos tu cuenta. Una vez habilitada, vas a poder iniciar sesión con tu email y contraseña.
+              {checkoutFailed
+                ? "Tus datos quedaron guardados, pero no pudimos iniciar el pago con Mercado Pago en este momento. Vas a poder completarlo desde tu panel una vez que inicies sesión."
+                : "Pronto desde NODO activaremos tu cuenta. Una vez habilitada, vas a poder iniciar sesión con tu email y contraseña."}
             </p>
             <a
               href="/login"

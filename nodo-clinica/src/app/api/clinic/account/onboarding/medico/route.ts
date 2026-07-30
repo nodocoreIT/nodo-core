@@ -3,6 +3,9 @@ import { createServiceClient, createSharedServiceClient } from "@/lib/supabase/s
 import { normalizeArMobilePhone } from "@/lib/clinic/phone-utils";
 import { CLINIC_ORG_ID, syncClinicaAuthClaims } from "@/lib/clinic/clinic-org";
 import { upsertProfessionalOnboardingRecord } from "@/lib/clinic/db/professionals";
+import { findSubscriptionPlan } from "@/lib/clinic/subscription-plans";
+import { createNodoSubscriptionPreapproval } from "@/lib/mercadopago/nodo-subscription";
+import { appBaseUrl } from "@/lib/clinic/appointment-payment";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -119,6 +122,38 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     await syncClinicaAuthClaims(serviceClient, userId, "medico");
+
+    // Paid plans go straight to MercadoPago checkout instead of being left
+    // silently in "pending_payment" until someone activates them by hand.
+    const paidPlan = findSubscriptionPlan(plan);
+    if (paidPlan) {
+      const result = await createNodoSubscriptionPreapproval({
+        plan: paidPlan,
+        payerEmail: email,
+        externalReference: profResult.id,
+        backUrl: `${appBaseUrl()}/login`,
+      });
+
+      if (!result.ok) {
+        console.error("[onboarding/medico] checkout creation error", result.error);
+        return NextResponse.json({ ok: true, checkoutFailed: true });
+      }
+
+      const { error: updateError } = await serviceClient
+        .from("professionals")
+        .update({ mercadopago_preapproval_id: result.preapprovalId })
+        .eq("id", profResult.id);
+
+      if (updateError) {
+        console.error(
+          "[onboarding/medico] failed to persist preapproval id",
+          updateError,
+        );
+        return NextResponse.json({ ok: true, checkoutFailed: true });
+      }
+
+      return NextResponse.json({ ok: true, checkoutUrl: result.initPoint });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {

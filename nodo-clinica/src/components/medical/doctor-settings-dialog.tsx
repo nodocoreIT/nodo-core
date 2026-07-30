@@ -1113,14 +1113,16 @@ export function DoctorSettingsDialog({
                   ) : (
                     <div className="rounded-md border border-amber-200 bg-amber-50/70 p-3 space-y-3">
                       <p className="text-sm text-amber-900">
-                        {subscription?.status === "trial" &&
-                        !isTrialExpired(subscription.trialEndsAt)
-                          ? `Estás en prueba gratis: te quedan ${trialDaysRemaining(subscription.trialEndsAt)} día(s).`
-                          : subscription?.status === "expired" ||
-                              (subscription?.status === "trial" &&
-                                isTrialExpired(subscription.trialEndsAt))
-                            ? "Tu período de prueba venció. Suscribite para seguir usando Nodo Clínica."
-                            : "Todavía no tenés una suscripción paga a Nodocore."}
+                        {subscription?.status === "pending_payment"
+                          ? "Tu pago está pendiente de confirmación con Mercado Pago."
+                          : subscription?.status === "demo" &&
+                              !isTrialExpired(subscription.trialEndsAt)
+                            ? `Estás en prueba gratis: te quedan ${trialDaysRemaining(subscription.trialEndsAt)} día(s).`
+                            : subscription?.status === "expired" ||
+                                (subscription?.status === "demo" &&
+                                  isTrialExpired(subscription.trialEndsAt))
+                              ? "Tu período de prueba venció. Suscribite para seguir usando Nodo Clínica."
+                              : "Todavía no tenés una suscripción paga a Nodocore."}
                       </p>
                       {!choosingPlan ? (
                         <Button

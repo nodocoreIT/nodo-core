@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { isUnassignedSpecialty } from "@/lib/clinic/unassigned-specialty";
 import { computeTrialEndsAt, isSubscriptionActive } from "@/lib/clinic/trial";
+import { findSubscriptionPlan } from "@/lib/clinic/subscription-plans";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
@@ -30,11 +31,15 @@ export interface ProfessionalOnboardingInput {
 export async function upsertProfessionalOnboardingRecord(
   supabase: AnyClient,
   input: ProfessionalOnboardingInput,
-): Promise<{ ok: true } | { ok: false; error: string; code?: string }> {
+): Promise<{ ok: true; id: string } | { ok: false; error: string; code?: string }> {
   const email = input.email.toLowerCase().trim();
   const nameParts = input.fullName.trim().split(/\s+/);
   const firstName = nameParts[0];
   const lastName = nameParts.slice(1).join(" ") || firstName;
+
+  // Paid plans start "pending_payment" (activated by the MercadoPago webhook
+  // once paid); the free plan starts "demo" with a trial window.
+  const isPaidPlan = findSubscriptionPlan(input.plan) !== undefined;
 
   const basePayload: Record<string, unknown> = {
     user_id: input.userId,
@@ -46,9 +51,9 @@ export async function upsertProfessionalOnboardingRecord(
     specialty: input.specialty,
     specialties: [input.specialty],
     license_number: input.licenseNumber ?? null,
-    subscription_status: "trial",
+    subscription_status: isPaidPlan ? "pending_payment" : "demo",
     subscription_plan: input.plan,
-    trial_ends_at: computeTrialEndsAt(),
+    trial_ends_at: isPaidPlan ? null : computeTrialEndsAt(),
   };
 
   async function findExistingProfessionalId(): Promise<string | undefined> {
@@ -78,7 +83,7 @@ export async function upsertProfessionalOnboardingRecord(
 
   async function writePayload(
     payload: Record<string, unknown>,
-  ): Promise<{ ok: true } | { ok: false; error: string; code?: string }> {
+  ): Promise<{ ok: true; id: string } | { ok: false; error: string; code?: string }> {
     const existingId = await findExistingProfessionalId();
 
     if (existingId) {
@@ -87,12 +92,20 @@ export async function upsertProfessionalOnboardingRecord(
         .update(payload)
         .eq("id", existingId);
       if (error) return { ok: false, error: error.message, code: error.code };
-      return { ok: true };
+      return { ok: true, id: existingId };
     }
 
-    const { error: insertError } = await supabase.from("professionals").insert(payload);
+    const { data: inserted, error: insertError } = await supabase
+      .from("professionals")
+      .insert(payload)
+      .select("id")
+      .maybeSingle();
 
-    if (!insertError) return { ok: true };
+    if (!insertError) {
+      const insertedId = (inserted as { id: string } | null)?.id;
+      if (insertedId) return { ok: true, id: insertedId };
+      return { ok: false, error: "El perfil se creó pero no se pudo confirmar su id." };
+    }
 
     if (insertError.code === "23505") {
       const duplicateId = await findExistingProfessionalId();
@@ -104,7 +117,7 @@ export async function upsertProfessionalOnboardingRecord(
         if (updateError) {
           return { ok: false, error: updateError.message, code: updateError.code };
         }
-        return { ok: true };
+        return { ok: true, id: duplicateId };
       }
     }
 
@@ -119,7 +132,7 @@ export async function upsertProfessionalOnboardingRecord(
       ]
     : [basePayload];
 
-  let lastResult: { ok: true } | { ok: false; error: string; code?: string } = {
+  let lastResult: { ok: true; id: string } | { ok: false; error: string; code?: string } = {
     ok: false,
     error: "No se pudo crear el perfil profesional.",
   };
