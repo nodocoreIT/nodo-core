@@ -173,7 +173,14 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
     if (org.product === "clinica") {
       return product === "clinica" && org.role === clinicaRole;
     }
-    return org.org_id === currentOrgId;
+    // app_metadata.org_id is a single global field shared across every
+    // nodo on this auth.users row — it can equal a DIFFERENT product's
+    // org_id than the one currently on screen (e.g. its last-set value was
+    // Inmo's org while actually viewing Clínica/Autos). Without also
+    // checking product, that stale match made the entry look "already
+    // selected", so clicking it silently no-op'd via the early return
+    // above instead of switching.
+    return product === org.product && org.org_id === currentOrgId;
   }
 
   async function handleSwitch(org: OrgEntry) {
