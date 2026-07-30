@@ -6,6 +6,7 @@ import {
   type DoctorNotification as LocalDoctorNotification,
 } from "@/lib/clinic/local-db";
 import { createServiceClient } from "@/lib/supabase/server";
+import { currencySymbol } from "@/lib/clinic/currency";
 
 // The doctor_notifications table is not in the generated Supabase types yet.
 // We use an untyped client to avoid compilation errors that break the entire
@@ -213,7 +214,7 @@ export async function notifyDoctorMercadoPagoPayment(params: {
 
     const amountLabel =
       params.amount != null
-        ? `${params.currency ?? "$ "} ${params.amount.toLocaleString("es-AR")}`
+        ? `${currencySymbol(params.currency)} ${params.amount.toLocaleString("es-AR")}`
         : "honorario";
 
     const notification: LocalDoctorNotification = {
@@ -257,7 +258,7 @@ export async function notifyDoctorMercadoPagoPayment(params: {
 
   const amountLabel =
     params.amount != null
-      ? `${params.currency ?? "ARS"} ${params.amount.toLocaleString("es-AR")}`
+      ? `${currencySymbol(params.currency)} ${params.amount.toLocaleString("es-AR")}`
       : "honorario";
 
   const { data, error } = await supabase
