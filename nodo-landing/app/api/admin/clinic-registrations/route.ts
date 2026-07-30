@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
 import { sendAccountEnabledEmail } from "@/lib/mail";
+import { hasForeignMembership } from "@/lib/registration/auth-user-lookup";
+import { getDefaultClinicOrgId } from "@/lib/registration/clinica-provision";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -180,8 +182,18 @@ export async function POST(request: NextRequest) {
   // and confirm the email so the account can log in once the password is set.
   // Users created via the verify flow have no role in app_metadata — without this
   // they land in the patient portal and get kicked out of /medico/dashboard.
+  //
+  // Guard against foreign-node accounts: if this email already belongs to a
+  // DIFFERENT node's org (e.g. an Inmo admin), never overwrite its role —
+  // only attach Clínica's own membership. Same guard as provision.ts's
+  // ensureAutosAccess/ensureInmoAccess; this endpoint was missed originally.
+  const existingAppMetadata = linkData?.user?.app_metadata ?? null;
+  const foreign = hasForeignMembership(existingAppMetadata, getDefaultClinicOrgId());
+
   await nodoAdmin.auth.admin.updateUserById(authUserId, {
-    app_metadata: { role: reg.role }, // "medico" or "paciente"
+    ...(foreign
+      ? {}
+      : { app_metadata: { ...existingAppMetadata, role: reg.role } }), // "medico" or "paciente"
     email_confirm: true,
   });
 

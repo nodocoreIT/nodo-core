@@ -4,10 +4,6 @@ import {
   isClinicaUnitCode,
   softRevokeClinicaPortalAccess,
 } from "@/lib/registration/clinica-provision";
-import {
-  setNodoAuthSuspended,
-  setNodoAuthSuspendedForUnit,
-} from "@/lib/registration/nodo-access-suspend";
 import { authAdminForUnitCode, resolveAuthUserForUnit } from "@/lib/registration/client-unit-auth";
 
 type ClientUnitRow = {
@@ -18,7 +14,13 @@ type ClientUnitRow = {
   plan?: string | null;
 };
 
-/** Ban nodo auth user + remove clinica portal profile for one contracted unit. */
+/** Remove clinica portal profile link for one contracted unit.
+ *
+ * Does NOT ban the nodo auth user — all nodos share one Supabase project, so
+ * `banned_until` is global and would lock this email out of every other nodo
+ * too. Per-nodo revoke is fully handled by client_units.status (set by the
+ * caller) and checked by user_has_node_access/user_node_access_reason.
+ */
 export async function revokeClientUnitAccess(
   unit: ClientUnitRow,
 ): Promise<{ ok: true; userId?: string } | { ok: false; error: string }> {
@@ -33,15 +35,6 @@ export async function revokeClientUnitAccess(
     const authAdmin = authAdminForUnitCode(unit.unit_code);
     const resolved = await resolveAuthUserForUnit(authAdmin, unit);
     userId = resolved?.userId ?? null;
-  }
-
-  if (userId) {
-    const banned = await setNodoAuthSuspended(unit.unit_code, userId, "suspend");
-    if (!banned.ok) return banned;
-  } else if (unit.access_user) {
-    const banned = await setNodoAuthSuspendedForUnit(unit.unit_code, unit, "suspend");
-    if (!banned.ok) return banned;
-    userId = banned.userId ?? null;
   }
 
   if (isClinicaUnitCode(unit.unit_code)) {

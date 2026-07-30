@@ -1,7 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
 import { authAdminForUnitCode, resolveAuthUserForUnit } from "@/lib/registration/client-unit-auth";
-import { setNodoAuthSuspended } from "@/lib/registration/nodo-access-suspend";
 import { syncNodeEmailAccessForClient } from "@/lib/registration/client-unit-auth";
 import { getNodeMailLabelByCode } from "@/lib/nodes";
 import {
@@ -496,9 +495,12 @@ export async function revokeNodoUser(user: NodoUserRecord): Promise<{ ok: true }
         .maybeSingle();
 
       if (unit) {
-        if (authUserId || unit.provision_user_id) {
-          await setNodoAuthSuspended(unit.unit_code, authUserId ?? unit.provision_user_id!, "suspend");
-        }
+        // Do NOT ban the auth user here — all nodos share one Supabase
+        // project, so `banned_until` is global and would lock this email out
+        // of every other nodo too. Per-nodo revoke is fully handled by
+        // client_units.status/node_email_access.status, already checked by
+        // user_has_node_access/user_node_access_reason. Same reasoning as
+        // client-unit-status/route.ts.
         await landingAdmin.from("client_units").update({ status: "pausado" }).eq("id", unit.id);
         if (unit.client_id) await syncNodeEmailAccessForClient(landingAdmin, unit.client_id);
       }
@@ -510,10 +512,6 @@ export async function revokeNodoUser(user: NodoUserRecord): Promise<{ ok: true }
         userId: authUserId,
         portalRole: user.role === "medico" ? "medico" : user.role === "paciente" ? "paciente" : "both",
       });
-    }
-
-    if (authUserId) {
-      await setNodoAuthSuspended(user.unitCode, authUserId, "suspend");
     }
 
     await landingAdmin.from("node_email_access").delete().eq("email", email).eq("unit_code", user.unitCode);

@@ -135,9 +135,9 @@ export async function POST(request: NextRequest) {
       if (!revoked.ok) {
         return NextResponse.json({ error: revoked.error }, { status: 400 });
       }
-      if (authUserId) {
-        await setNodoAuthSuspended(unitCode, authUserId, "suspend");
-      }
+      // No auth ban here — banned_until is global across all nodos (one
+      // shared Supabase project). Revoking Clínica access must not lock
+      // this email out of the other nodos it may belong to.
       const landingAdmin = createAdminClient();
       await landingAdmin
         .from("node_email_access")
@@ -148,10 +148,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (unitCode && authUserId) {
-      const suspended = await setNodoAuthSuspended(unitCode, authUserId, "suspend");
-      if (!suspended.ok) {
-        return NextResponse.json({ error: suspended.error }, { status: 400 });
-      }
+      // No auth ban here — see comment above. This fallback (org_members-only
+      // team invites with no client_units row) has no per-nodo status field
+      // to flip either; revoking here is a no-op until that's designed.
       return NextResponse.json({ ok: true });
     }
 

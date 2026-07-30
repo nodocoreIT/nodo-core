@@ -7,7 +7,7 @@ import {
   provisionNodoAccessPendingPassword,
   createLandingAuthPendingPassword,
 } from "@/lib/registration/provision";
-import { sendAccountEnabledEmail, isMailConfigured } from "@/lib/mail";
+import { sendAccountEnabledEmail, sendNodeLinkedEmail, isMailConfigured } from "@/lib/mail";
 import { resolvePublicOriginFromRequest } from "@/lib/auth/public-origin";
 
 export async function POST(request: Request) {
@@ -87,6 +87,7 @@ export async function POST(request: Request) {
   const plan = unit.plan ?? "starter";
 
   let provisionUserId: string | null = unit.provision_user_id ?? null;
+  let existingGlobalUser = false;
 
   if (cfg?.provisionable) {
     const result = await provisionNodoAccessPendingPassword({
@@ -99,6 +100,7 @@ export async function POST(request: Request) {
       return Response.json({ error: result.error ?? "Error de provisionamiento." }, { status: 400 });
     }
     provisionUserId = result.user_id ?? provisionUserId;
+    existingGlobalUser = Boolean(result.existing);
   } else {
     provisionUserId =
       (await createLandingAuthPendingPassword(
@@ -139,41 +141,60 @@ export async function POST(request: Request) {
 
   // For provisionable nodes (own Supabase project), generate a Supabase recovery
   // link with the correct redirectTo so the user can set their password directly.
+  // Skipped for an existing global user — they already have a real password
+  // and a reset link would needlessly invite them to change it; see the
+  // sendNodeLinkedEmail branch below instead.
   if (cfg?.provisionable && provisionUserId) {
     const nodoAdmin = createNodoAdminClient(unit.unit_code);
     if (nodoAdmin) {
       // Lift any prior suspension ban — otherwise Supabase rejects the
       // recovery link verification with user_banned before the user ever
-      // reaches the app, even though access was just re-enabled.
+      // reaches the app, even though access was just re-enabled. Runs
+      // regardless of existingGlobalUser — unbanning is always safe.
       await nodoAdmin.auth.admin.updateUserById(provisionUserId, {
         ban_duration: "none",
       });
 
-      const project = nodoAuthProjectParam(unit.unit_code);
-      const next = `/${loginPathSlug}/login?mode=first-access`;
-      const confirmQuery = project
-        ? `project=${encodeURIComponent(project)}&next=${encodeURIComponent(next)}`
-        : `next=${encodeURIComponent(next)}`;
-      const redirectToUrl = `${origin}/auth/confirm?${confirmQuery}`;
-      const { data: linkData } = await nodoAdmin.auth.admin.generateLink({
-        type: "recovery",
-        email,
-        options: { redirectTo: redirectToUrl },
-      });
-      if (linkData?.properties?.action_link) {
-        loginUrl = linkData.properties.action_link;
+      if (!existingGlobalUser) {
+        const project = nodoAuthProjectParam(unit.unit_code);
+        const next = `/${loginPathSlug}/login?mode=first-access`;
+        const confirmQuery = project
+          ? `project=${encodeURIComponent(project)}&next=${encodeURIComponent(next)}`
+          : `next=${encodeURIComponent(next)}`;
+        const redirectToUrl = `${origin}/auth/confirm?${confirmQuery}`;
+        const { data: linkData } = await nodoAdmin.auth.admin.generateLink({
+          type: "recovery",
+          email,
+          options: { redirectTo: redirectToUrl },
+        });
+        if (linkData?.properties?.action_link) {
+          loginUrl = linkData.properties.action_link;
+        }
       }
     }
   }
 
   if (isMailConfigured()) {
-    await sendAccountEnabledEmail({
-      nombre: fullName,
-      email,
-      nodeLabel: cfg?.label ?? unit.unit_code,
-      loginUrl,
-      unitCode: unit.unit_code,
-    });
+    if (existingGlobalUser) {
+      // This email already has a real account on another nodo — tell them to
+      // reuse their existing credentials instead of sending a "set your
+      // password" link that implies a brand-new account.
+      await sendNodeLinkedEmail({
+        nombre: fullName,
+        email,
+        nodeLabel: cfg?.label ?? unit.unit_code,
+        confirmUrl: `${origin}/login`,
+        forgotPasswordUrl: `${origin}/${loginPathSlug}/login?mode=forgot`,
+      });
+    } else {
+      await sendAccountEnabledEmail({
+        nombre: fullName,
+        email,
+        nodeLabel: cfg?.label ?? unit.unit_code,
+        loginUrl,
+        unitCode: unit.unit_code,
+      });
+    }
   }
 
   return Response.json({ ok: true, status: "activo" });
