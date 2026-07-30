@@ -166,7 +166,7 @@ function getAssignableNodes(usedCodes: string[]): NodeDef[] {
   return getPanelAssignableNodes().filter((node) => !used.has(node.code));
 }
 
-function createFormUnit(unitCode: string, planes: NodePlan[]): FormUnit {
+function createFormUnit(unitCode: string, planes: NodePlan[], defaultEmail = ""): FormUnit {
   return {
     key: crypto.randomUUID(),
     unit_code: unitCode,
@@ -174,7 +174,10 @@ function createFormUnit(unitCode: string, planes: NodePlan[]): FormUnit {
     status: "activo",
     progress: "0",
     access_url: "",
-    access_user: "",
+    // Defaults to the client's own email — leaving this blank meant the new
+    // unit got created with no access_user at all, so it never showed up
+    // in Usuarios Nodo and no one could provision or log into it.
+    access_user: defaultEmail,
     access_password: "",
     provisioned_at: null,
     provision_user_id: null,
@@ -369,7 +372,7 @@ export default function ClientesPage() {
   }
 
   function addFormUnitWithCode(unitCode: string) {
-    const unit = createFormUnit(unitCode, planes);
+    const unit = createFormUnit(unitCode, planes, formEmail.trim());
     setFormUnits((prev) => [...prev, unit]);
     setActiveUnitKey(unit.key);
     setShowAddNodoPicker(false);

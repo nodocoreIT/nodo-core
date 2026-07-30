@@ -3,7 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePanelTeamMember } from "@/lib/panel/panel-api-auth";
 import { revokeClientUnitAccess } from "@/lib/registration/revoke-client-access";
 import { syncNodeEmailAccessForClient } from "@/lib/registration/client-unit-auth";
-import { provisionNodoAccess } from "@/lib/registration/provision";
+import { provisionNodoAccess, provisionNodoAccessPendingPassword } from "@/lib/registration/provision";
+import { sendActivationEmail, sendNodeLinkedEmail, isMailConfigured } from "@/lib/mail";
 import { NODES } from "@/lib/nodes";
 
 type UnitPayload = {
@@ -21,6 +22,8 @@ type UnitPayload = {
 export async function POST(request: NextRequest) {
   const auth = await requirePanelTeamMember();
   if (!auth.ok) return auth.response;
+
+  const origin = request.headers.get("origin") ?? request.nextUrl.origin;
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json(
@@ -124,19 +127,31 @@ export async function POST(request: NextRequest) {
       const nodeDef = NODES.find((node) => node.code === unit.unit_code);
       const accessUser = String(unit.access_user ?? "").trim();
       const accessPassword = String(unit.access_password ?? "").trim();
+      const plan = String(unit.plan ?? "").trim() || "starter";
 
       if (!nodeDef?.provisionable) continue;
-      if (!accessUser || !accessPassword) continue;
+      // An email with no manually-typed password is the normal case when
+      // adding a nodo to an existing client — fall back to a temp password +
+      // activation link instead of silently skipping provisioning (which
+      // used to leave the unit with no auth user and no way to log in).
+      if (!accessUser) continue;
       if (unit.status === "pausado") continue;
       if (unit.provision_user_id) continue;
 
-      const result = await provisionNodoAccess({
-        nodoCode: unit.unit_code,
-        clientName,
-        email: accessUser,
-        password: accessPassword,
-        plan: String(unit.plan ?? "").trim() || "starter",
-      });
+      const result = accessPassword
+        ? await provisionNodoAccess({
+            nodoCode: unit.unit_code,
+            clientName,
+            email: accessUser,
+            password: accessPassword,
+            plan,
+          })
+        : await provisionNodoAccessPendingPassword({
+            nodoCode: unit.unit_code,
+            clientName,
+            email: accessUser,
+            plan,
+          });
 
       if (result.ok && result.user_id) {
         await admin
@@ -149,6 +164,37 @@ export async function POST(request: NextRequest) {
 
         unit.provisioned_at = new Date().toISOString();
         unit.provision_user_id = result.user_id;
+
+        // This flow never sent any email before — the client_unit was
+        // created and (sometimes) provisioned with no way for the person to
+        // find out or log in. Send the same activation/link-existing-account
+        // email the other admin flows already use.
+        if (isMailConfigured()) {
+          const nodeLabel = unit.unit_code;
+          try {
+            if (result.existing) {
+              await sendNodeLinkedEmail({
+                nombre: clientName,
+                email: accessUser,
+                nodeLabel,
+                confirmUrl: `${origin}/login`,
+                forgotPasswordUrl: `${origin}/${unit.unit_code.toLowerCase()}/login?mode=forgot`,
+              });
+            } else if (!accessPassword) {
+              // Only the temp-password path needs an activation link — a
+              // manually-set password means the admin already gave it to
+              // the client out of band.
+              await sendActivationEmail({
+                nombre: clientName,
+                email: accessUser,
+                nodeLabel,
+                activationUrl: `${origin}/${unit.unit_code.toLowerCase()}/login?mode=activate-invite`,
+              });
+            }
+          } catch (mailErr) {
+            console.error("[save-client-units] email error", mailErr);
+          }
+        }
       }
 
       provisionResults.push({
