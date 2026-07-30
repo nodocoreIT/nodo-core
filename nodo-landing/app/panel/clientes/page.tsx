@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Fragment, type CSSProperties } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, Fragment, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, RotateCcw, Database, AlertTriangle, Loader2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
@@ -204,7 +204,8 @@ export default function ClientesPage() {
   const [error, setError] = useState("");
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
   const [statusMenuUnitId, setStatusMenuUnitId] = useState<string | null>(null);
-  const [statusMenuPos, setStatusMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [statusMenuAnchor, setStatusMenuAnchor] = useState<{ top: number; bottom: number; left: number } | null>(null);
+  const statusMenuRef = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ ids: string[]; label: string } | null>(null);
   const [activeUnitKey, setActiveUnitKey] = useState<string>("");
   const [resettingUnitKey, setResettingUnitKey] = useState<string | null>(null);
@@ -243,11 +244,27 @@ export default function ClientesPage() {
     if (!statusMenuUnitId) return;
     function onDocClick() {
       setStatusMenuUnitId(null);
-      setStatusMenuPos(null);
+      setStatusMenuAnchor(null);
     }
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
   }, [statusMenuUnitId]);
+
+  // Flip the status menu above its trigger when it wouldn't fit below —
+  // position:fixed anchored near the bottom of the viewport otherwise
+  // renders the menu off-screen, unreachable even by scrolling (fixed
+  // elements don't move with page scroll). Runs before paint so there's
+  // no visible flash of the "opens below" guess.
+  useLayoutEffect(() => {
+    if (!statusMenuUnitId || !statusMenuAnchor) return;
+    const el = statusMenuRef.current;
+    if (!el) return;
+    const menuHeight = el.getBoundingClientRect().height;
+    const spaceBelow = window.innerHeight - statusMenuAnchor.bottom;
+    if (spaceBelow < menuHeight + 8 && statusMenuAnchor.top > menuHeight + 8) {
+      el.style.top = `${statusMenuAnchor.top - menuHeight - 4}px`;
+    }
+  }, [statusMenuUnitId, statusMenuAnchor]);
 
   async function loadAll() {
     const supabase = createClient();
@@ -1031,11 +1048,11 @@ export default function ClientesPage() {
                                         e.stopPropagation();
                                         if (menuOpen) {
                                           setStatusMenuUnitId(null);
-                                          setStatusMenuPos(null);
+                                          setStatusMenuAnchor(null);
                                           return;
                                         }
                                         const rect = e.currentTarget.getBoundingClientRect();
-                                        setStatusMenuPos({ top: rect.bottom + 4, left: rect.left });
+                                        setStatusMenuAnchor({ top: rect.top, bottom: rect.bottom, left: rect.left });
                                         setStatusMenuUnitId(u.id);
                                       }}
                                       style={{
@@ -1059,12 +1076,13 @@ export default function ClientesPage() {
                                     {/* Portaled to <body> with fixed positioning — the table card
                                         wrapper uses overflow:hidden for its rounded corners, which
                                         clipped this dropdown whenever it popped near the card's edge. */}
-                                    {menuOpen && statusMenuPos && createPortal(
+                                    {menuOpen && statusMenuAnchor && createPortal(
                                       <div
+                                        ref={statusMenuRef}
                                         style={{
                                           position: "fixed",
-                                          top: statusMenuPos.top,
-                                          left: statusMenuPos.left,
+                                          top: statusMenuAnchor.bottom + 4,
+                                          left: statusMenuAnchor.left,
                                           background: "white",
                                           border: "1px solid var(--color-mist)",
                                           borderRadius: 8,
