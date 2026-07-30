@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, Fragment, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Copy, Plus, RotateCcw, Database, AlertTriangle, Loader2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
@@ -203,6 +204,7 @@ export default function ClientesPage() {
   const [error, setError] = useState("");
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
   const [statusMenuUnitId, setStatusMenuUnitId] = useState<string | null>(null);
+  const [statusMenuPos, setStatusMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ ids: string[]; label: string } | null>(null);
   const [activeUnitKey, setActiveUnitKey] = useState<string>("");
   const [resettingUnitKey, setResettingUnitKey] = useState<string | null>(null);
@@ -241,6 +243,7 @@ export default function ClientesPage() {
     if (!statusMenuUnitId) return;
     function onDocClick() {
       setStatusMenuUnitId(null);
+      setStatusMenuPos(null);
     }
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
@@ -1026,7 +1029,14 @@ export default function ClientesPage() {
                                       disabled={statusUpdating === u.id}
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setStatusMenuUnitId(menuOpen ? null : u.id);
+                                        if (menuOpen) {
+                                          setStatusMenuUnitId(null);
+                                          setStatusMenuPos(null);
+                                          return;
+                                        }
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        setStatusMenuPos({ top: rect.bottom + 4, left: rect.left });
+                                        setStatusMenuUnitId(u.id);
                                       }}
                                       style={{
                                         display: "inline-flex",
@@ -1046,18 +1056,20 @@ export default function ClientesPage() {
                                       <span style={{ fontSize: 10, opacity: 0.85 }}>{u.unit_code}</span>
                                       {statusUpdating === u.id ? "…" : st.label}
                                     </button>
-                                    {menuOpen && (
+                                    {/* Portaled to <body> with fixed positioning — the table card
+                                        wrapper uses overflow:hidden for its rounded corners, which
+                                        clipped this dropdown whenever it popped near the card's edge. */}
+                                    {menuOpen && statusMenuPos && createPortal(
                                       <div
                                         style={{
-                                          position: "absolute",
-                                          top: "100%",
-                                          left: 0,
-                                          marginTop: 4,
+                                          position: "fixed",
+                                          top: statusMenuPos.top,
+                                          left: statusMenuPos.left,
                                           background: "white",
                                           border: "1px solid var(--color-mist)",
                                           borderRadius: 8,
                                           boxShadow: "0 8px 24px rgba(18,30,47,.12)",
-                                          zIndex: 20,
+                                          zIndex: 200,
                                           minWidth: 180,
                                           padding: 4,
                                         }}
@@ -1087,7 +1099,8 @@ export default function ClientesPage() {
                                             </button>
                                           );
                                         })}
-                                      </div>
+                                      </div>,
+                                      document.body,
                                     )}
                                   </div>
                                 );
