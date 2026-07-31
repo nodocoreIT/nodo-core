@@ -8,6 +8,8 @@ import { useNotifications } from '@/hooks/use-notifications';
 import { usePresupuestos } from '@/hooks/use-presupuestos';
 import { formatearMoneda, formatearFecha } from '@/utils/formatters';
 import { normalizarCodigoRubro } from '@/utils/rubro-formatters';
+import { calcularEstadoPagoTarjetaMes, montoAdeudado } from '@/features/tarjetas/calcular-estado-pago-tarjeta';
+import { barraColor, textoColor } from '@/features/presupuestos/presupuesto-colors';
 
 const CARD_LABELS = {
   saldo: 'Saldo del Mes',
@@ -54,7 +56,7 @@ export function DashboardPage() {
   const finanzas = useFinanzas();
   const { tarjetas, consumosTarjetas } = finanzas;
   const { notifications } = useNotifications();
-  const presupuestos = usePresupuestos();
+  const { presupuestos } = usePresupuestos();
 
   const [mostrarPersonalizar, setMostrarPersonalizar] = useState(false);
   const [resumenAbierto, setResumenAbierto] = useState(false);
@@ -123,26 +125,21 @@ export function DashboardPage() {
     )
     .reduce((s, p) => s + (p.importeCuota ?? 0), 0);
 
-  // Consumos del mes de fechaVencimiento de cada tarjeta (mismo criterio que
-  // notificaciones / pantalla de tarjetas). El pago se busca en ese mes o en el
-  // mes calendario actual (se suele pagar el resumen antes o en el vencimiento).
+  // Lo que se debe este mes calendario, tarjeta por tarjeta — mismo cálculo
+  // que la pantalla de Tarjetas (calcularEstadoPagoTarjetaMes), no el mes de
+  // fechaVencimiento de cada tarjeta (que puede no ser el mes actual y dejaba
+  // el total desalineado con lo que se ve en Tarjetas, incluyendo tarjetas ya
+  // pagas sin descontarlas).
   const totalTarjetas = tarjetas
-    .filter((t) => t.activa && t.fechaVencimiento)
-    .reduce((sum, tarjeta) => {
-      const mesVto = tarjeta.fechaVencimiento!.slice(0, 7);
-      const periodoMonto = consumosTarjetas
-        .filter((c) => c.tarjetaId === tarjeta.id && c.fecha.startsWith(mesVto))
-        .reduce((s, c) => s + (c.importeARS ?? 0), 0);
-
-      const gastoPago = finanzas.gastosDiarios.find(
-        (g) =>
-          g.pagoTarjetaId === tarjeta.id &&
-          (g.fecha.startsWith(mesVto) || g.fecha.startsWith(mesActualStr)),
-      );
-      if (!gastoPago) return sum + periodoMonto;
-      if (!gastoPago.pagoParcial) return sum; // fully paid — card contributes 0
-      return sum + Math.max(0, periodoMonto - gastoPago.monto); // partial — deduct paid amount
-    }, 0);
+    .filter((t) => t.activa)
+    .reduce(
+      (sum, tarjeta) =>
+        sum +
+        montoAdeudado(
+          calcularEstadoPagoTarjetaMes(tarjeta, consumosTarjetas, finanzas.gastosDiarios, mesActualStr),
+        ),
+      0,
+    );
 
   // Account balances for quick-view cards
   const cuentaMercadoPago = finanzas.cuentas
@@ -187,6 +184,12 @@ export function DashboardPage() {
 
   // presupuestos ya viene ordenado por porcentaje de consumo descendente
   const totalPresupuestado = presupuestos.reduce((s, p) => s + p.presupuesto, 0);
+
+  // Los avisos de presupuesto ahora tienen su propia card ("Presupuesto") —
+  // no deben duplicarse acá, que es específicamente para vencimientos con
+  // fecha (tarjetas, préstamos, planes de ahorro). El bell del header sí
+  // sigue mostrando avisos de presupuesto (centro de alertas transversal).
+  const vencimientos = notifications.filter((n) => n.tipo !== 'presupuesto');
 
   return (
     <div className="space-y-6">
@@ -386,7 +389,7 @@ export function DashboardPage() {
 
       {/* Three-column layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        <Card title="Últimos Gastos">
+        <Card title="Últimos Gastos" className="hidden md:block">
           {ultimosGastos.length === 0 ? (
             <p className="text-sm text-slate2 text-center py-6">Sin gastos registrados</p>
           ) : (
@@ -417,7 +420,7 @@ export function DashboardPage() {
                 <span className="text-xs font-semibold text-slate2">Total asignado</span>
                 <span className="text-sm font-bold text-ink">{formatearMoneda(totalPresupuestado)}</span>
               </button>
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {presupuestos.slice(0, 5).map(({ rubro, gastado, presupuesto, porcentaje, excedido }) => (
                   <button
                     key={rubro.id}
@@ -429,13 +432,13 @@ export function DashboardPage() {
                       <p className="text-sm font-semibold text-ink truncate">
                         {rubro.emoji} {normalizarCodigoRubro(rubro.nombre)}
                       </p>
-                      <p className={`text-xs font-medium shrink-0 ${excedido ? 'text-red-600' : 'text-slate2'}`}>
+                      <p className={`text-xs font-medium shrink-0 ${textoColor(porcentaje, excedido)}`}>
                         {formatearMoneda(gastado)} / {formatearMoneda(presupuesto)}
                       </p>
                     </div>
                     <div className="h-1.5 rounded-full bg-mist overflow-hidden mt-1">
                       <div
-                        className={`h-1.5 rounded-full ${excedido ? 'bg-red-500' : porcentaje >= 80 ? 'bg-amber-500' : 'bg-brand'}`}
+                        className={`h-1.5 rounded-full ${barraColor(porcentaje, excedido)}`}
                         style={{ width: `${Math.min(porcentaje, 100)}%` }}
                       />
                     </div>
@@ -447,7 +450,7 @@ export function DashboardPage() {
         </Card>
 
         <Card title="Próximos Vencimientos">
-          {notifications.length === 0 ? (
+          {vencimientos.length === 0 ? (
             <div className="flex flex-col items-center py-8 gap-2">
               <CheckCircle className="h-8 w-8 text-brand opacity-60" />
               <p className="text-sm font-semibold text-ink">Todo al día</p>
@@ -455,19 +458,15 @@ export function DashboardPage() {
             </div>
           ) : (
             <div className="space-y-2 mt-3">
-              {notifications.slice(0, 5).map((n) => {
+              {vencimientos.slice(0, 5).map((n) => {
                 const s = urgenciaStyle[n.urgencia];
                 const diffDays = Math.ceil((new Date(n.fecha + 'T00:00:00').getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
                 const diasLabel =
-                  n.tipo === 'presupuesto'
-                    ? n.urgencia === 'alta'
-                      ? 'excedido'
-                      : 'cerca del tope'
-                    : diffDays <= 0
-                      ? 'vence hoy'
-                      : diffDays === 1
-                        ? 'vence mañana'
-                        : `vence en ${diffDays} días`;
+                  diffDays <= 0
+                    ? 'vence hoy'
+                    : diffDays === 1
+                      ? 'vence mañana'
+                      : `vence en ${diffDays} días`;
                 return (
                   <button
                     key={n.id}
@@ -476,8 +475,6 @@ export function DashboardPage() {
                         navigate(`/admin/tarjetas/${n.entityId}`);
                       } else if (n.tipo === 'prestamo') {
                         navigate('/admin/prestamos', { state: { openId: n.entityId } });
-                      } else if (n.tipo === 'presupuesto') {
-                        navigate('/admin/presupuestos');
                       } else {
                         navigate('/admin/planes-ahorro', { state: { openId: n.entityId } });
                       }
