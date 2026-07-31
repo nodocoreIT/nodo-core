@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
   canAccessAsRole,
+  isRolePaused,
   lookupClinicMembership,
   parseClinicDbRole,
   resolveRoleForContext,
   type ClinicDbRole,
 } from "@/lib/clinic/resolve-clinic-role";
 import { CLINIC_ORG_ID } from "@/lib/clinic/clinic-org";
+import { portalPausedMessage } from "@/lib/clinic/portal-login-eligibility";
 
 /**
  * POST /api/clinic/account/ensure-role
@@ -104,6 +106,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const resolved = resolveRoleForContext(membership, effectiveRole);
   const role: ClinicDbRole = resolved.role;
+
+  if (isRolePaused(membership, role)) {
+    return NextResponse.json({ error: portalPausedMessage(role) }, { status: 403 });
+  }
 
   if (resolved.patientId && !resolved.patientProfileId) {
     await service

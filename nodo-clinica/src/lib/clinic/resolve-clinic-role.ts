@@ -5,8 +5,10 @@ export type ClinicDbRole = "medico" | "paciente";
 export interface ClinicMembership {
   professionalId: string | null;
   professionalUserId: string | null;
+  professionalPausedAt: string | null;
   patientId: string | null;
   patientProfileId: string | null;
+  patientPausedAt: string | null;
 }
 
 export interface ResolvedClinicRole extends ClinicMembership {
@@ -33,12 +35,12 @@ export async function lookupClinicMembershipByEmail(
   const [{ data: professional }, { data: patient }] = await Promise.all([
     service
       .from("professionals")
-      .select("id, user_id, email")
+      .select("id, user_id, email, paused_at")
       .ilike("email", normalized)
       .maybeSingle(),
     service
       .from("patients")
-      .select("id, profile_id, email")
+      .select("id, profile_id, email, paused_at")
       .ilike("email", normalized)
       .maybeSingle(),
   ]);
@@ -46,8 +48,10 @@ export async function lookupClinicMembershipByEmail(
   let membership: ClinicMembership = {
     professionalId: professional?.id ?? null,
     professionalUserId: professional?.user_id ?? null,
+    professionalPausedAt: professional?.paused_at ?? null,
     patientId: patient?.id ?? null,
     patientProfileId: patient?.profile_id ?? null,
+    patientPausedAt: patient?.paused_at ?? null,
   };
 
   // Same auth account can hold both portals — link the sibling profile by user id.
@@ -58,7 +62,7 @@ export async function lookupClinicMembershipByEmail(
     if (!membership.professionalId) {
       const { data: profByUser } = await service
         .from("professionals")
-        .select("id, user_id")
+        .select("id, user_id, paused_at")
         .eq("user_id", authUserId)
         .maybeSingle();
       if (profByUser?.id) {
@@ -66,6 +70,7 @@ export async function lookupClinicMembershipByEmail(
           ...membership,
           professionalId: profByUser.id,
           professionalUserId: profByUser.user_id ?? authUserId,
+          professionalPausedAt: profByUser.paused_at ?? null,
         };
       }
     }
@@ -73,7 +78,7 @@ export async function lookupClinicMembershipByEmail(
     if (!membership.patientId) {
       const { data: patientByProfile } = await service
         .from("patients")
-        .select("id, profile_id")
+        .select("id, profile_id, paused_at")
         .eq("profile_id", authUserId)
         .maybeSingle();
       if (patientByProfile?.id) {
@@ -81,6 +86,7 @@ export async function lookupClinicMembershipByEmail(
           ...membership,
           patientId: patientByProfile.id,
           patientProfileId: patientByProfile.profile_id ?? authUserId,
+          patientPausedAt: patientByProfile.paused_at ?? null,
         };
       }
     }
@@ -97,8 +103,14 @@ function mergeClinicMembership(
     professionalId: primary.professionalId ?? secondary.professionalId,
     professionalUserId:
       primary.professionalUserId ?? secondary.professionalUserId,
+    professionalPausedAt:
+      primary.professionalId != null
+        ? primary.professionalPausedAt
+        : secondary.professionalPausedAt,
     patientId: primary.patientId ?? secondary.patientId,
     patientProfileId: primary.patientProfileId ?? secondary.patientProfileId,
+    patientPausedAt:
+      primary.patientId != null ? primary.patientPausedAt : secondary.patientPausedAt,
   };
 }
 
@@ -110,8 +122,10 @@ export async function lookupClinicMembership(
   const empty: ClinicMembership = {
     professionalId: null,
     professionalUserId: null,
+    professionalPausedAt: null,
     patientId: null,
     patientProfileId: null,
+    patientPausedAt: null,
   };
 
   let membership = empty;
@@ -140,12 +154,12 @@ export async function lookupClinicMembershipByAuthUserId(
   const [{ data: professional }, { data: patientByProfile }] = await Promise.all([
     service
       .from("professionals")
-      .select("id, user_id")
+      .select("id, user_id, paused_at")
       .eq("user_id", authUserId)
       .maybeSingle(),
     service
       .from("patients")
-      .select("id, profile_id")
+      .select("id, profile_id, paused_at")
       .eq("profile_id", authUserId)
       .maybeSingle(),
   ]);
@@ -153,8 +167,10 @@ export async function lookupClinicMembershipByAuthUserId(
   let membership: ClinicMembership = {
     professionalId: professional?.id ?? null,
     professionalUserId: professional?.user_id ?? null,
+    professionalPausedAt: professional?.paused_at ?? null,
     patientId: patientByProfile?.id ?? null,
     patientProfileId: patientByProfile?.profile_id ?? null,
+    patientPausedAt: patientByProfile?.paused_at ?? null,
   };
 
   // Always merge email lookup — a mistaken professionals row (e.g. platform-sync)
@@ -175,6 +191,19 @@ export function canAccessAsRole(
 ): boolean {
   if (role === "medico") return !!membership.professionalId;
   return !!membership.patientId;
+}
+
+/**
+ * paused_at es un gate independiente del vínculo user_id/profile_id — ese
+ * vínculo se re-establece solo en cada login (linkClinicMembershipProfiles),
+ * así que desvincular para "pausar" no alcanza. Chequeado explícitamente acá.
+ */
+export function isRolePaused(
+  membership: ClinicMembership,
+  role: ClinicDbRole,
+): boolean {
+  if (role === "medico") return !!membership.professionalPausedAt;
+  return !!membership.patientPausedAt;
 }
 
 /** Pick portal role; when dual account, honour intended tab/flow role. */

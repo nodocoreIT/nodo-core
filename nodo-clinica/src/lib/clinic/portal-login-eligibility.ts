@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   canAccessAsRole,
+  isRolePaused,
   lookupClinicMembershipByEmail,
   parseClinicDbRole,
   sessionRoleToDbRole,
@@ -20,6 +21,12 @@ export function portalNotRegisteredMessage(role: ClinicDbRole): string {
   return role === "medico"
     ? DOCTOR_NOT_REGISTERED_MESSAGE
     : PATIENT_NOT_REGISTERED_MESSAGE;
+}
+
+export function portalPausedMessage(role: ClinicDbRole): string {
+  return role === "medico"
+    ? "Tu acceso como médico está pausado temporalmente. Contactá a soporte para reactivarlo."
+    : "Tu acceso como paciente está pausado temporalmente. Contactá a soporte para reactivarlo.";
 }
 
 export function parsePortalLoginRole(
@@ -44,12 +51,19 @@ export async function checkPortalLoginEligibility(
       : role;
 
   const membership = await lookupClinicMembershipByEmail(service, normalized);
-  if (canAccessAsRole(membership, dbRole)) {
-    return { eligible: true };
+  if (!canAccessAsRole(membership, dbRole)) {
+    return {
+      eligible: false,
+      message: portalNotRegisteredMessage(dbRole),
+    };
   }
 
-  return {
-    eligible: false,
-    message: portalNotRegisteredMessage(dbRole),
-  };
+  if (isRolePaused(membership, dbRole)) {
+    return {
+      eligible: false,
+      message: portalPausedMessage(dbRole),
+    };
+  }
+
+  return { eligible: true };
 }
