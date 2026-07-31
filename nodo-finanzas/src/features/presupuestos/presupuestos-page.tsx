@@ -7,9 +7,9 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { Spinner } from '@/components/ui/spinner';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { usePresupuestos } from '@/hooks/use-presupuestos';
-import { useRubros } from '@/hooks/use-rubros';
 import { formatearMoneda } from '@/utils/formatters';
 import { normalizarCodigoRubro } from '@/utils/rubro-formatters';
+import { barraColor, textoColor } from './presupuesto-colors';
 import type { Rubro } from '@/types';
 
 function mesActualLabel(): string {
@@ -18,21 +18,8 @@ function mesActualLabel(): string {
     .replace(/^\w/, (c) => c.toUpperCase());
 }
 
-function barraColor(porcentaje: number, excedido: boolean): string {
-  if (excedido) return 'bg-red-500';
-  if (porcentaje >= 80) return 'bg-amber-500';
-  return 'bg-brand';
-}
-
-function textoColor(porcentaje: number, excedido: boolean): string {
-  if (excedido) return 'text-red-600';
-  if (porcentaje >= 80) return 'text-amber-600';
-  return 'text-brand';
-}
-
 export function PresupuestosPage() {
-  const presupuestos = usePresupuestos();
-  const { loading, actualizarRubro } = useRubros();
+  const { presupuestos, loading, actualizarPresupuesto } = usePresupuestos();
   const totalAsignado = presupuestos.reduce((sum, p) => sum + p.presupuesto, 0);
 
   const [formAbierto, setFormAbierto] = useState(false);
@@ -73,7 +60,7 @@ export function PresupuestosPage() {
     }
 
     setGuardando(true);
-    const ok = await actualizarRubro(rubroSeleccionado.id, { presupuestoMensual: monto });
+    const ok = await actualizarPresupuesto(rubroSeleccionado.id, monto);
     setGuardando(false);
 
     if (ok) {
@@ -89,7 +76,7 @@ export function PresupuestosPage() {
   }
 
   async function handleQuitar(rubro: Rubro) {
-    const ok = await actualizarRubro(rubro.id, { presupuestoMensual: null });
+    const ok = await actualizarPresupuesto(rubro.id, null);
     if (ok) {
       toast.success('Presupuesto eliminado');
       if (editandoId === rubro.id) cerrarForm();

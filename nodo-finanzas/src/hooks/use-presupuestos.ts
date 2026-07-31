@@ -12,18 +12,36 @@ export interface PresupuestoConGasto {
   excedido: boolean;
 }
 
+export interface UsePresupuestosResult {
+  presupuestos: PresupuestoConGasto[];
+  loading: boolean;
+  /** Asigna (o quita, con monto null) el presupuesto mensual de un rubro. */
+  actualizarPresupuesto: (rubroId: string, monto: number | null) => Promise<boolean>;
+}
+
 /**
  * Presupuesto mensual por rubro vs. lo efectivamente gastado este mes
  * calendario (gastos diarios con fecha en el mes + gastos fijos activos no
  * excluidos del resumen, que se consideran vigentes todos los meses).
  * Recurrente por diseño: no hay que "resetear" nada — cambia el mes actual
- * y el cálculo solo. */
-export function usePresupuestos(): PresupuestoConGasto[] {
+ * y el cálculo solo.
+ *
+ * `useRubros()` guarda su estado en un useState local a cada instancia —
+ * montarlo dos veces (acá y aparte en el componente que llama
+ * actualizarRubro) hacía que la mutación de una instancia nunca se viera
+ * reflejada en el array derivado de la otra hasta recargar la página. Por
+ * eso esta es la ÚNICA instancia de useRubros para este flujo, y expone
+ * actualizarPresupuesto para que cualquier consumidor mute a través de ella.
+ */
+export function usePresupuestos(): UsePresupuestosResult {
   const { gastosDiarios, gastosFijos } = useFinanzas();
-  const { rubrosActivos } = useRubros();
+  const { rubrosActivos, loading, actualizarRubro } = useRubros();
   const dolar = useDolar();
 
-  return useMemo(() => {
+  const actualizarPresupuesto = (rubroId: string, monto: number | null) =>
+    actualizarRubro(rubroId, { presupuestoMensual: monto });
+
+  const presupuestos = useMemo(() => {
     const hoy = new Date();
     const mesActual = hoy.getMonth();
     const anioActual = hoy.getFullYear();
@@ -62,4 +80,6 @@ export function usePresupuestos(): PresupuestoConGasto[] {
       };
     }).sort((a, b) => b.porcentaje - a.porcentaje);
   }, [gastosDiarios, gastosFijos, rubrosActivos, dolar]);
+
+  return { presupuestos, loading, actualizarPresupuesto };
 }
