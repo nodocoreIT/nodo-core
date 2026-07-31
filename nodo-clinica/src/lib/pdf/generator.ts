@@ -3,6 +3,44 @@ import type { Medication, Profile } from "@/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
+/**
+ * Firma + nombre + matrícula, todos centrados sobre un mismo eje vertical
+ * ubicado hacia la derecha del documento (no en el margen izquierdo).
+ */
+function drawSignatureBlock(
+  doc: jsPDF,
+  opts: {
+    signatureText?: string;
+    signatureImageData?: string;
+    doctorFullName: string;
+    licenseNumber?: string;
+    y: number;
+  },
+) {
+  const { signatureText, signatureImageData, doctorFullName, licenseNumber, y } = opts;
+  const axisX = 160; // centro del bloque — 30mm del margen derecho (190)
+  const imageWidth = 40;
+  const imageHeight = 18;
+
+  let sigY = y + 6;
+
+  if (signatureImageData?.startsWith("data:image")) {
+    try {
+      doc.addImage(signatureImageData, "PNG", axisX - imageWidth / 2, y, imageWidth, imageHeight);
+      sigY = y + imageHeight + 4;
+    } catch {
+      /* ignore invalid image */
+    }
+  }
+
+  doc.setFontSize(11);
+  doc.setTextColor(30, 64, 110);
+  doc.text(signatureText || `Dr/a. ${doctorFullName}`, axisX, sigY, { align: "center" });
+  if (licenseNumber) {
+    doc.text(`Mat. ${licenseNumber}`, axisX, sigY + 7, { align: "center" });
+  }
+}
+
 interface PrescriptionPdfOptions {
   doctor: Pick<Profile, "full_name" | "specialty" | "license_number">;
   patientName: string;
@@ -71,24 +109,13 @@ export function generatePrescriptionPdf(options: PrescriptionPdfOptions): jsPDF 
   doc.setDrawColor(203, 213, 225);
   doc.line(20, 240, 190, 240);
 
-  doc.setFontSize(10);
-  doc.setTextColor(100, 116, 139);
-
-  if (signatureImageData?.startsWith("data:image")) {
-    try {
-      doc.addImage(signatureImageData, "PNG", 20, 250, 40, 18);
-    } catch {
-      /* ignore invalid image */
-    }
-  }
-
-  doc.setFontSize(11);
-  doc.setTextColor(30, 64, 110);
-  const sigY = signatureImageData ? 272 : 256;
-  doc.text(signatureText || `Dr/a. ${doctor.full_name}`, 20, sigY);
-  if (doctor.license_number) {
-    doc.text(`Mat. ${doctor.license_number}`, 20, sigY + 7);
-  }
+  drawSignatureBlock(doc, {
+    signatureText,
+    signatureImageData,
+    doctorFullName: doctor.full_name,
+    licenseNumber: doctor.license_number ?? undefined,
+    y: 250,
+  });
 
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
@@ -175,24 +202,14 @@ export function generateStudyOrderPdf(options: StudyOrderPdfOptions): jsPDF {
 
   doc.setDrawColor(203, 213, 225);
   doc.line(20, 240, 190, 240);
-  doc.setFontSize(10);
-  doc.setTextColor(100, 116, 139);
 
-  if (signatureImageData?.startsWith("data:image")) {
-    try {
-      doc.addImage(signatureImageData, "PNG", 20, 250, 40, 18);
-    } catch {
-      /* ignore invalid image */
-    }
-  }
-
-  doc.setFontSize(11);
-  doc.setTextColor(30, 64, 110);
-  const sigY = signatureImageData ? 272 : 256;
-  doc.text(signatureText || `Dr/a. ${doctor.full_name}`, 20, sigY);
-  if (doctor.license_number) {
-    doc.text(`Mat. ${doctor.license_number}`, 20, sigY + 7);
-  }
+  drawSignatureBlock(doc, {
+    signatureText,
+    signatureImageData,
+    doctorFullName: doctor.full_name,
+    licenseNumber: doctor.license_number ?? undefined,
+    y: 250,
+  });
 
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
@@ -299,24 +316,14 @@ export function generateClinicalReportPdf(
 
   doc.setDrawColor(203, 213, 225);
   doc.line(20, 240, 190, 240);
-  doc.setFontSize(10);
-  doc.setTextColor(100, 116, 139);
 
-  if (signatureImageData?.startsWith("data:image")) {
-    try {
-      doc.addImage(signatureImageData, "PNG", 20, 250, 40, 18);
-    } catch {
-      /* ignore */
-    }
-  }
-
-  doc.setFontSize(11);
-  doc.setTextColor(30, 64, 110);
-  const sigY = signatureImageData ? 272 : 256;
-  doc.text(signatureText || `Dr/a. ${doctor.full_name}`, 20, sigY);
-  if (doctor.license_number) {
-    doc.text(`Mat. ${doctor.license_number}`, 20, sigY + 7);
-  }
+  drawSignatureBlock(doc, {
+    signatureText,
+    signatureImageData,
+    doctorFullName: doctor.full_name,
+    licenseNumber: doctor.license_number ?? undefined,
+    y: 250,
+  });
 
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
