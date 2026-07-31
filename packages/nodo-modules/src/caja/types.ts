@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 export type CashMovementType = "income" | "expense";
 
 export interface CashMovementRow {
@@ -35,4 +37,6 @@ export interface CajaModuleContextValue {
   profitsLinkLabel?: string;
   emptyMessage?: string;
   createConcepto?: (name: string) => Promise<void>;
+  /** Contenido opcional (p. ej. un banner promocional) renderizado arriba de todo. */
+  banner?: ReactNode;
 }

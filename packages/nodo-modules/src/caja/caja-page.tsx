@@ -61,6 +61,7 @@ export function CajaPage() {
     profitsLinkLabel = "Ganancias",
     emptyMessage = "Todavía no hay movimientos. Los cobros generan ingresos automáticamente.",
     createConcepto,
+    banner,
   } = useCajaModule();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -215,6 +216,7 @@ export function CajaPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {banner}
       <div className="flex items-center justify-between gap-3">
         {profitsHref ? (
           <p className="text-sm text-slate2">

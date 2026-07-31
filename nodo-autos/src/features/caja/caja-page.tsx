@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Coins, X } from "lucide-react";
 import {
   CajaModuleProvider,
   CajaPage,
@@ -11,6 +12,51 @@ import {
   autosConceptosHooks,
   autosCashAccountsHooks,
 } from "@/shared/lib/autos-module-hooks";
+
+const NODO_LANDING_URL =
+  (import.meta.env.VITE_NODO_LANDING_URL as string | undefined)?.replace(/\/$/, "") ||
+  "https://nodocore.com.ar";
+
+const FINANZAS_BANNER_DISMISSED_KEY = "autos_finanzas_banner_dismissed";
+
+function FinanzasBanner() {
+  const [dismissed, setDismissed] = useState(true);
+
+  useEffect(() => {
+    setDismissed(localStorage.getItem(FINANZAS_BANNER_DISMISSED_KEY) === "1");
+  }, []);
+
+  if (dismissed) return null;
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-2.5 text-sm text-emerald-900">
+      <Coins className="h-4 w-4 shrink-0 text-emerald-600" />
+      <p className="flex-1">
+        Ya tenés Nodo Autos — ¿te gustaría anexar{" "}
+        <a
+          href={`${NODO_LANDING_URL}/nodo-finanzas`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium underline underline-offset-2 hover:text-emerald-700"
+        >
+          Nodo Finanzas
+        </a>{" "}
+        para llevar el control de tus ingresos?
+      </p>
+      <button
+        type="button"
+        onClick={() => {
+          localStorage.setItem(FINANZAS_BANNER_DISMISSED_KEY, "1");
+          setDismissed(true);
+        }}
+        aria-label="Cerrar"
+        className="shrink-0 rounded p-1 text-emerald-500 hover:bg-emerald-100 hover:text-emerald-700"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
 
 function formatMoney(amount: number, currency: "ARS" | "USD"): string {
   const prefix = currency === "USD" ? "US$" : "$";
@@ -77,6 +123,7 @@ export function AutosCajaPage() {
       sourceLabels: { manual: "Manual" },
       emptyMessage: "Todavía no hay movimientos. Registrá ingresos y egresos manualmente.",
       createConcepto: (name) => createConceptoMutation.mutateAsync(name).then(() => undefined),
+      banner: <FinanzasBanner />,
     };
   }, [
     movements,
