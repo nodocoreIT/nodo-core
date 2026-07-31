@@ -155,7 +155,7 @@ export default function ActualizarContrasenaPage() {
       const resolvedEmail = (setPwData.email as string | undefined) ?? userEmail;
       const resolvedUserId = (setPwData.userId as string | undefined) ?? authUserId;
 
-      let redirectPath = intendedRole === "medico" ? "/medico/dashboard" : "/paciente";
+      let redirectPath = intendedRole === "medico" ? "/medico/dashboard" : "/paciente/inicio";
       let loginRole: "doctor" | "patient" =
         intendedRole === "medico" ? "doctor" : "patient";
       if (resolvedEmail || resolvedUserId) {
@@ -179,7 +179,7 @@ export default function ActualizarContrasenaPage() {
           redirectPath = "/medico/dashboard";
           loginRole = "doctor";
         } else {
-          redirectPath = "/paciente";
+          redirectPath = "/paciente/inicio";
           loginRole = "patient";
         }
       }
@@ -255,8 +255,7 @@ export default function ActualizarContrasenaPage() {
           className="max-w-[34em] text-[14.5px] leading-relaxed"
           style={{ color: "rgba(234,240,247,.72)" }}
         >
-          Telemedicina profesional: agenda, videoconsultas, historial clínico
-          e informes con IA para médicos y pacientes.
+          Telemedicina profesional: Agenda, videoconsultas, historial clínico, informes y estudios medicos.
         </p>
         <p className="mt-8 text-[13px]" style={{ color: "rgba(234,240,247,.48)" }}>
           © 2026 Nodo Core · Transparencia tecnológica

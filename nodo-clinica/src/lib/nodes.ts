@@ -66,7 +66,7 @@ export const NODES: NodeDef[] = [
     slug: "salud",
     label: "Nodo Salud",
     description:
-      "Telemedicina profesional: agenda, videoconsultas, historial clínico e informes con IA.",
+      "Telemedicina profesional: Agenda, videoconsultas, historial clínico, informes y estudios medicos.",
     Icon: Stethoscope,
   },
   {

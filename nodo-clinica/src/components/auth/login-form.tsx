@@ -43,7 +43,7 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
       if (session.role === "doctor" && isDoctor) {
         window.location.replace("/medico/dashboard");
       } else if (session.role === "patient" && !isDoctor) {
-        window.location.replace("/paciente");
+        window.location.replace("/paciente/inicio");
       }
     });
   }, [isDoctor, unified]);
@@ -69,7 +69,7 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
         form.password,
         defaultRole,
       );
-      window.location.replace(isDoctor ? "/medico/dashboard" : "/paciente");
+      window.location.replace(isDoctor ? "/medico/dashboard" : "/paciente/inicio");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al ingresar";
       setGeneralError(msg);
@@ -100,7 +100,7 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
       });
       toast.success("¡Registro exitoso! Bienvenido/a.");
       window.location.href =
-        registerRole === "doctor" ? "/medico/dashboard" : "/paciente";
+        registerRole === "doctor" ? "/medico/dashboard" : "/paciente/inicio";
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al registrarse";
       setGeneralError(msg);
@@ -172,8 +172,8 @@ export function LoginForm({ defaultRole, unified = false }: LoginFormProps) {
               className="text-[14.5px] leading-relaxed mt-4 max-w-[32em]"
               style={{ color: "rgba(234,240,247,.7)" }}
             >
-              Telemedicina profesional: agenda, videoconsultas, historial clínico
-              e informes con IA para médicos y pacientes.
+                  Telemedicina profesional: Agenda, videoconsultas, historial clínico, informes y estudios medicos.
+
             </p>
           </div>
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Home,
   Stethoscope,
   FileText,
   Clock,
@@ -24,6 +25,7 @@ import { isBrowserSupabaseEnabled } from "@/lib/clinic/config";
 import { isPlatformMode } from "@/lib/clinic/platform-config";
 
 const NAV_ITEMS = [
+  { href: "/paciente/inicio", label: "Inicio", icon: Home },
   { href: "/paciente", label: "Buscar médico", icon: Stethoscope },
   { href: "/paciente/estudios", label: "Mis estudios", icon: FileText },
   { href: "/paciente/historial", label: "Historial", icon: FileText },
@@ -31,7 +33,8 @@ const NAV_ITEMS = [
 ];
 
 const ROUTE_TITLES: Record<string, string> = {
-  "/paciente": "Inicio",
+  "/paciente/inicio": "Inicio",
+  "/paciente": "Buscar médico",
   "/paciente/estudios": "Mis estudios",
   "/paciente/historial": "Historial clínico",
   "/paciente/turnos": "Mis turnos",

@@ -532,6 +532,57 @@ export const clinicApi = {
     return data;
   },
 
+  async getPharmacyOnCallSchedule(year: number, month: number) {
+    const res = await fetch(
+      `${BASE}/api/clinic/pharmacy-on-call?year=${year}&month=${month}`,
+      { credentials: "include", cache: "no-store" },
+    );
+    const data = await parseJsonResponse(res);
+    if (!res.ok) {
+      throw new Error(
+        (data as { error?: string }).error || "Error al cargar el turnero de farmacias",
+      );
+    }
+    return data as {
+      schedule: {
+        city: string;
+        year: number;
+        month: number;
+        dayLetters: Record<string, string>;
+        letterPharmacies: Record<
+          string,
+          Array<{ name: string; address: string; phones: string[]; lat?: number; lon?: number }>
+        >;
+        sourcePdfUrl: string;
+        fetchedAt: string;
+      } | null;
+    };
+  },
+
+  async getMedicalDirectory(category: string) {
+    const res = await fetch(
+      `${BASE}/api/clinic/medical-directory?category=${encodeURIComponent(category)}`,
+      { credentials: "include", cache: "no-store" },
+    );
+    const data = await parseJsonResponse(res);
+    if (!res.ok) {
+      throw new Error(
+        (data as { error?: string }).error || "Error al cargar el directorio",
+      );
+    }
+    return data as {
+      entries: Array<{
+        placeId: string;
+        name: string;
+        address: string | null;
+        phone: string | null;
+        website: string | null;
+        lat: number | null;
+        lon: number | null;
+      }>;
+    };
+  },
+
   async getDoctorForBooking(doctorId: string) {
     const res = await fetch(
       `${BASE}/api/clinic/doctors?doctorId=${encodeURIComponent(doctorId)}`,

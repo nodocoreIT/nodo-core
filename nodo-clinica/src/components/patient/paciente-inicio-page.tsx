@@ -234,7 +234,7 @@ export function PacienteInicioPage() {
     <div className="max-w-4xl space-y-6">
       <section>
         <div className="mb-3">
-        
+
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative w-full sm:w-56">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />

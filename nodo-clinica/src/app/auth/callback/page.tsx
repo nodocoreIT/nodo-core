@@ -63,7 +63,7 @@ export default function AuthCallbackPage() {
         const res = await fetch("/api/clinic/account/session", { credentials: "include" });
         if (res.ok) {
           const data = (await res.json()) as { session?: { role?: string } };
-          window.location.replace(data.session?.role === "doctor" ? "/medico/dashboard" : "/paciente");
+          window.location.replace(data.session?.role === "doctor" ? "/medico/dashboard" : "/paciente/inicio");
           return;
         }
       } catch {

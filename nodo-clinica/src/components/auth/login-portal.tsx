@@ -327,7 +327,7 @@ export function LoginPortal() {
             ? patientNext
             : isDoctor
               ? "/medico/dashboard"
-              : "/paciente",
+              : "/paciente/inicio",
         );
       }, 1500);
     } catch (e) {
@@ -563,8 +563,8 @@ export function LoginPortal() {
               className="max-w-[34em] text-[14.5px] leading-relaxed"
               style={{ color: "rgba(234,240,247,.72)" }}
             >
-              Telemedicina profesional: agenda, videoconsultas, historial clínico
-              e informes con IA para médicos y pacientes.
+               Telemedicina profesional: Agenda, videoconsultas, historial clínico, informes y estudios medicos.
+
             </p>
             <p
               className="mt-8 text-[13px]"
