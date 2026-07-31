@@ -287,6 +287,73 @@ export async function softRevokeClinicaPortalAccess(params: {
   return { ok: true };
 }
 
+/**
+ * Pausa (o reactiva) el acceso a un rol de Clínica sin tocar el vínculo
+ * user_id/profile_id. Desvincular no alcanza para pausar: el login normal
+ * (linkClinicMembershipProfiles en nodo-clinica) revincula automáticamente
+ * por email en cada inicio de sesión — paused_at es un gate independiente
+ * que nodo-clinica chequea explícitamente antes de conceder acceso.
+ */
+export async function setClinicaPortalPaused(params: {
+  email?: string | null;
+  userId?: string | null;
+  portalRole?: ClinicaPortalRole;
+  paused: boolean;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const admin = createNodoAdminClient("clinica");
+  if (!admin) {
+    return { ok: false, error: "Nodo Clínica no configurado." };
+  }
+
+  const db = admin.schema("nodo_clinica");
+  const email = params.email?.trim().toLowerCase() ?? null;
+  let userId = params.userId ?? null;
+  const role = params.portalRole ?? "both";
+  const affectPatients = role === "both" || role === "paciente";
+  const affectProfessionals = role === "both" || role === "medico";
+  const pausedAt = params.paused ? new Date().toISOString() : null;
+
+  if (!userId && email) {
+    const { data: listData } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const found = listData?.users?.find((u) => String(u.email ?? "").toLowerCase() === email);
+    userId = found?.id ?? null;
+  }
+
+  if (affectPatients) {
+    const ids = new Set<string>();
+    if (userId) {
+      const { data } = await db.from("patients").select("id").eq("profile_id", userId);
+      for (const row of data ?? []) ids.add(row.id as string);
+    }
+    if (email) {
+      const { data } = await db.from("patients").select("id").ilike("email", email);
+      for (const row of data ?? []) ids.add(row.id as string);
+    }
+    for (const id of ids) {
+      const { error } = await db.from("patients").update({ paused_at: pausedAt }).eq("id", id);
+      if (error) return { ok: false, error: error.message };
+    }
+  }
+
+  if (affectProfessionals) {
+    const ids = new Set<string>();
+    if (userId) {
+      const { data } = await db.from("professionals").select("id").eq("user_id", userId);
+      for (const row of data ?? []) ids.add(row.id as string);
+    }
+    if (email) {
+      const { data } = await db.from("professionals").select("id").ilike("email", email);
+      for (const row of data ?? []) ids.add(row.id as string);
+    }
+    for (const id of ids) {
+      const { error } = await db.from("professionals").update({ paused_at: pausedAt }).eq("id", id);
+      if (error) return { ok: false, error: error.message };
+    }
+  }
+
+  return { ok: true };
+}
+
 /** Restores portal profile link after auth reactivation (panel reactivate / unban). */
 export async function reactivateClinicaPortalAccess(params: {
   email: string;

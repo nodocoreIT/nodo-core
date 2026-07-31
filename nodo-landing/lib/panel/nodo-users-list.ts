@@ -212,12 +212,14 @@ async function listFromClinicaProfiles(existingKeys: Set<string>): Promise<NodoU
   const [{ data: patients }, { data: professionals }] = await Promise.all([
     clinicDb
       .from("patients")
-      .select("id, full_name, email, profile_id, subscription_plan, created_at")
+      .select("id, full_name, email, profile_id, subscription_plan, created_at, paused_at")
       .order("created_at", { ascending: false })
       .limit(500),
     clinicDb
       .from("professionals")
-      .select("id, full_name, email, user_id, specialty, subscription_status, subscription_plan, created_at")
+      .select(
+        "id, full_name, email, user_id, specialty, subscription_status, subscription_plan, created_at, paused_at",
+      )
       .order("created_at", { ascending: false })
       .limit(500),
   ]);
@@ -227,8 +229,7 @@ async function listFromClinicaProfiles(existingKeys: Set<string>): Promise<NodoU
     if (!email || email.includes("@deleted.local")) continue;
 
     const profileKey = clinicProfileKey(email, unitCode, "paciente");
-    const accessKey = userKey(email, unitCode);
-    if (existingKeys.has(profileKey) || existingKeys.has(accessKey)) continue;
+    if (existingKeys.has(profileKey)) continue;
     existingKeys.add(profileKey);
 
     rows.push({
@@ -239,7 +240,7 @@ async function listFromClinicaProfiles(existingKeys: Set<string>): Promise<NodoU
       unitLabel: unitLabel(unitCode),
       role: "paciente",
       accessType: "registro_gratuito",
-      status: "activo",
+      status: p.paused_at ? "pausado" : "activo",
       clientId: null,
       clientUnitId: null,
       authUserId: (p.profile_id as string) ?? null,
@@ -267,7 +268,7 @@ async function listFromClinicaProfiles(existingKeys: Set<string>): Promise<NodoU
       unitLabel: unitLabel(unitCode),
       role: "medico",
       accessType: inferAccessType((prof.subscription_plan as string) ?? null, unitCode),
-      status: String(prof.subscription_status ?? "activo"),
+      status: prof.paused_at ? "pausado" : String(prof.subscription_status ?? "activo"),
       clientId: null,
       clientUnitId: null,
       authUserId: (prof.user_id as string) ?? null,

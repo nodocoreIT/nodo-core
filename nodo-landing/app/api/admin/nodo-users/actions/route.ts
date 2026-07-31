@@ -12,6 +12,7 @@ import { revokeClientUnitAccess } from "@/lib/registration/revoke-client-access"
 import {
   isClinicaUnitCode,
   reactivateClinicaPortalAccess,
+  setClinicaPortalPaused,
   softRevokeClinicaPortalAccess,
 } from "@/lib/registration/clinica-provision";
 import {
@@ -212,8 +213,8 @@ export async function POST(request: NextRequest) {
     const unitCode = String(body.unit_code ?? "").trim();
     const authUserId = String(body.auth_user_id ?? "").trim();
     const email = String(body.email ?? "").trim().toLowerCase();
-    const clinicRowId = String(body.clinic_row_id ?? "").trim() || null;
-    const portalRole = body.portal_role ?? "both";
+    const portalRole =
+      body.portal_role === "medico" || body.portal_role === "paciente" ? body.portal_role : "both";
     if (!unitCode || !authUserId) {
       return NextResponse.json(
         { error: "unit_code y auth_user_id son obligatorios." },
@@ -221,22 +222,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Clínica: auth.users es una sola cuenta compartida entre médico y
+    // paciente para el mismo email — banear la cuenta global pausaría los
+    // dos roles a la vez, y desvincular tampoco alcanza (el login normal
+    // revincula solo por email en cada inicio de sesión). paused_at es un
+    // gate explícito que nodo-clinica chequea antes de conceder acceso a
+    // ESE rol puntual, sin tocar el vínculo ni el auth global.
+    if (isClinicaUnitCode(unitCode) && email) {
+      const result = await setClinicaPortalPaused({
+        email,
+        userId: authUserId,
+        portalRole,
+        paused: action === "suspend_auth",
+      });
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      return NextResponse.json({ ok: true });
+    }
+
     const suspendAction = action === "suspend_auth" ? "suspend" : "reactivate";
     const result = await setNodoAuthSuspended(unitCode, authUserId, suspendAction);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
-    }
-
-    if (action === "reactivate_auth" && isClinicaUnitCode(unitCode) && email) {
-      const restored = await reactivateClinicaPortalAccess({
-        email,
-        userId: authUserId,
-        portalRole: portalRole === "medico" || portalRole === "paciente" ? portalRole : "both",
-        clinicRowId,
-      });
-      if (!restored.ok) {
-        return NextResponse.json({ error: restored.error }, { status: 400 });
-      }
     }
 
     return NextResponse.json({ ok: true });
