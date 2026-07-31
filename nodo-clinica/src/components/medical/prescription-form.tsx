@@ -131,12 +131,13 @@ export function PrescriptionForm({
   const [isGenerating, setIsGenerating] = useState(false);
   const [signatureText, setSignatureText] = useState("");
   const [signatureImageData, setSignatureImageData] = useState("");
+  const [signatureLoaded, setSignatureLoaded] = useState(false);
 
   useEffect(() => {
     clinicApi.getDoctorSchedule(doctorId).then((data) => {
       if (data.signatureText) setSignatureText(data.signatureText);
       if (data.signatureImageData) setSignatureImageData(data.signatureImageData);
-    }).catch(() => undefined);
+    }).catch(() => undefined).finally(() => setSignatureLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -204,6 +205,22 @@ export function PrescriptionForm({
 
     setIsGenerating(true);
     try {
+      // Vuelve a pedir la firma justo antes de generar el PDF — si el
+      // médico la cargó hace un momento, el estado local puede estar
+      // desactualizado todavía (la primera carga es asíncrona) y el PDF
+      // saldría sin la imagen de la firma.
+      let latestSignatureText = signatureText;
+      let latestSignatureImageData = signatureImageData;
+      try {
+        const fresh = await clinicApi.getDoctorSchedule(doctorId);
+        if (fresh.signatureText) latestSignatureText = fresh.signatureText;
+        if (fresh.signatureImageData) latestSignatureImageData = fresh.signatureImageData;
+        setSignatureText(latestSignatureText);
+        setSignatureImageData(latestSignatureImageData);
+      } catch {
+        /* usa lo que ya había en estado */
+      }
+
       const doc = generatePrescriptionPdf({
         doctor: {
           full_name: doctorName,
@@ -212,8 +229,8 @@ export function PrescriptionForm({
         },
         patientName,
         medications: medicationsToSave,
-        signatureText: signatureText || `Dr/a. ${doctorName}`,
-        signatureImageData,
+        signatureText: latestSignatureText || `Dr/a. ${doctorName}`,
+        signatureImageData: latestSignatureImageData,
       });
 
       await clinicApi.savePrescription({
@@ -332,7 +349,7 @@ export function PrescriptionForm({
           Agregar medicamento
         </Button>
 
-        {!signatureText && !signatureImageData && (
+        {signatureLoaded && !signatureText && !signatureImageData && (
           <p className="text-xs text-amber-700">
             Configurá tu firma en Consultorio → Perfil para que aparezca en recetas y órdenes.
           </p>

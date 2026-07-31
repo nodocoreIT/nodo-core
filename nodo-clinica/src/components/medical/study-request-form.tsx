@@ -44,6 +44,7 @@ export function StudyRequestForm({
   const [isGenerating, setIsGenerating] = useState(false);
   const [signatureText, setSignatureText] = useState("");
   const [signatureImageData, setSignatureImageData] = useState("");
+  const [signatureLoaded, setSignatureLoaded] = useState(false);
   const [customLabels, setCustomLabels] = useState<string[]>([]);
 
   useEffect(() => {
@@ -56,7 +57,8 @@ export function StudyRequestForm({
           setCustomLabels(data.customStudyLabels);
         }
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setSignatureLoaded(true));
   }, [doctorId]);
 
   useEffect(() => {
@@ -126,6 +128,22 @@ export function StudyRequestForm({
 
     setIsGenerating(true);
     try {
+      // Vuelve a pedir la firma justo antes de generar el PDF — si el
+      // médico la cargó hace un momento, el estado local puede estar
+      // desactualizado todavía (la primera carga es asíncrona) y el PDF
+      // saldría sin la imagen de la firma.
+      let latestSignatureText = signatureText;
+      let latestSignatureImageData = signatureImageData;
+      try {
+        const fresh = await clinicApi.getDoctorSchedule(doctorId);
+        if (fresh.signatureText) latestSignatureText = fresh.signatureText;
+        if (fresh.signatureImageData) latestSignatureImageData = fresh.signatureImageData;
+        setSignatureText(latestSignatureText);
+        setSignatureImageData(latestSignatureImageData);
+      } catch {
+        /* usa lo que ya había en estado */
+      }
+
       const doc = generateStudyOrderPdf({
         doctor: {
           full_name: doctorName,
@@ -135,8 +153,8 @@ export function StudyRequestForm({
         patientName,
         studies: selected,
         notes: notes || undefined,
-        signatureText: signatureText || `Dr/a. ${doctorName}`,
-        signatureImageData,
+        signatureText: latestSignatureText || `Dr/a. ${doctorName}`,
+        signatureImageData: latestSignatureImageData,
       });
 
       const newStudyLabels = selected.filter(
@@ -259,7 +277,7 @@ export function StudyRequestForm({
           />
         </div>
 
-        {!signatureText && !signatureImageData && (
+        {signatureLoaded && !signatureText && !signatureImageData && (
           <p className="text-xs text-amber-700">
             Configurá tu firma en Consultorio → Perfil para que aparezca en documentos PDF.
           </p>

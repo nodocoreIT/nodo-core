@@ -73,7 +73,6 @@ export function generatePrescriptionPdf(options: PrescriptionPdfOptions): jsPDF 
 
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
-  doc.text("Firma en documentos del profesional:", 20, 248);
 
   if (signatureImageData?.startsWith("data:image")) {
     try {
@@ -94,7 +93,7 @@ export function generatePrescriptionPdf(options: PrescriptionPdfOptions): jsPDF 
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    "Documento generado electrónicamente — Clínica Virtual",
+    "Documento generado electrónicamente — NODO | Clínica",
     105,
     285,
     { align: "center" }
@@ -178,7 +177,6 @@ export function generateStudyOrderPdf(options: StudyOrderPdfOptions): jsPDF {
   doc.line(20, 240, 190, 240);
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
-  doc.text("Firma en documentos del profesional:", 20, 248);
 
   if (signatureImageData?.startsWith("data:image")) {
     try {
@@ -199,7 +197,7 @@ export function generateStudyOrderPdf(options: StudyOrderPdfOptions): jsPDF {
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    "Documento generado electrónicamente — Clínica Virtual",
+    "Documento generado electrónicamente — NODO | Clínica",
     105,
     285,
     { align: "center" }
@@ -303,7 +301,6 @@ export function generateClinicalReportPdf(
   doc.line(20, 240, 190, 240);
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
-  doc.text("Firma en documentos del profesional:", 20, 248);
 
   if (signatureImageData?.startsWith("data:image")) {
     try {
@@ -324,7 +321,7 @@ export function generateClinicalReportPdf(
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    "Documento generado electrónicamente — Clínica Virtual",
+    "Documento generado electrónicamente — NODO | Clínica",
     105,
     285,
     { align: "center" },

@@ -45,17 +45,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const [{ data: patient }, { data: professional }] = await Promise.all([
+  const [{ data: patient }, { data: professionalRow }] = await Promise.all([
     supabase.from("patients").select("*").eq("id", record.patient_id).maybeSingle(),
-    supabase.from("professionals").select("*, office_settings(*)").eq("id", record.doctor_id).maybeSingle(),
+    supabase.from("professionals").select("*").eq("id", record.doctor_id).maybeSingle(),
   ]);
 
-  if (!patient || !professional) {
+  if (!patient || !professionalRow) {
     return NextResponse.json({ error: "Datos incompletos" }, { status: 404 });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const officeSettings = (professional as any).office_settings;
+  const professional = professionalRow as any;
+
   const doctorProfile = {
     full_name: professional.full_name,
     specialty: professional.specialty ?? "",
@@ -78,8 +79,8 @@ export async function GET(request: NextRequest) {
       patientName: patient.full_name,
       medications,
       signatureText:
-        officeSettings?.signature_text || `Dr/a. ${professional.full_name}`,
-      signatureImageData: officeSettings?.signature_image_data,
+        professional.signature_text || `Dr/a. ${professional.full_name}`,
+      signatureImageData: professional.signature_image_url,
     });
     fileName = `receta-${patient.full_name.replace(/\s+/g, "-")}.pdf`;
   } else if (record.record_type === "estudio") {
@@ -95,8 +96,8 @@ export async function GET(request: NextRequest) {
       studies: studyLines.length ? studyLines : [record.content.slice(0, 200)],
       notes: notesMatch?.[1]?.trim(),
       signatureText:
-        officeSettings?.signature_text || `Dr/a. ${professional.full_name}`,
-      signatureImageData: officeSettings?.signature_image_data,
+        professional.signature_text || `Dr/a. ${professional.full_name}`,
+      signatureImageData: professional.signature_image_url,
     });
     fileName = `orden-estudios-${patient.full_name.replace(/\s+/g, "-")}.pdf`;
   } else if (record.record_type === "informe") {
@@ -105,8 +106,8 @@ export async function GET(request: NextRequest) {
       patientName: patient.full_name,
       reportMarkdown: record.content,
       signatureText:
-        officeSettings?.signature_text || `Dr/a. ${professional.full_name}`,
-      signatureImageData: officeSettings?.signature_image_data,
+        professional.signature_text || `Dr/a. ${professional.full_name}`,
+      signatureImageData: professional.signature_image_url,
     });
     fileName = `informe-${patient.full_name.replace(/\s+/g, "-")}.pdf`;
   } else {

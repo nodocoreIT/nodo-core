@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/supabase/auth-guard";
+import { createServiceClient } from "@/lib/supabase/server";
 import { getRecords, createRecord, deleteRecord } from "@/lib/clinic/db/clinical-records";
 
 export async function POST(request: NextRequest) {
@@ -128,7 +129,7 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
-  const { user, supabase } = authResult;
+  const { user } = authResult;
 
   if (user.role !== "doctor") {
     return NextResponse.json({ error: "Solo médicos" }, { status: 403 });
@@ -144,7 +145,13 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "org_id requerido" }, { status: 403 });
   }
 
-  const { error } = await deleteRecord(supabase, id, user.org_id);
+  // clinical_records solo tiene policy de DELETE para super_admin — con el
+  // cliente de sesión del médico, RLS filtra el WHERE a 0 filas sin tirar
+  // error, así que la fila nunca se borra de verdad aunque la API responda
+  // ok. El service role bypassa RLS; el scope por org_id ya lo hace deleteRecord.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const serviceClient = (await createServiceClient()) as any;
+  const { error } = await deleteRecord(serviceClient, id, user.org_id);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

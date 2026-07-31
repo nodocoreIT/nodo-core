@@ -133,7 +133,7 @@ export function ClinicalHistoryViewer({
       )}
 
       <Dialog open={!!viewingId} onOpenChange={(open) => !open && setViewingId(null)}>
-        <DialogContent className="max-w-6xl w-[95vw] h-[92vh] flex flex-col p-2">
+        <DialogContent className="max-w-6xl sm:max-w-6xl w-[95vw] h-[92vh] flex flex-col p-2">
           <DialogTitle className="sr-only">Documento PDF</DialogTitle>
           {viewingId && (
             <iframe
