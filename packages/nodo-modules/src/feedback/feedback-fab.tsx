@@ -1,0 +1,576 @@
+"use client";
+
+import { useState, useRef } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  Lightbulb,
+  Trash2,
+  ShieldAlert,
+  Mic,
+  Square,
+  CheckCircle2,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  Button,
+  Textarea,
+} from "@nodocore/shared-components";
+
+type FeedbackCategory = "bug" | "idea" | "bloat";
+
+// No global `declare` on purpose: apps that already ship a native
+// SpeechRecognition DOM type (newer TS/lib.dom targets, e.g. Next.js apps)
+// would collide with a re-declared ambient Window augmentation. Reading
+// through a loose structural cast sidesteps that entirely and works the
+// same regardless of what each consumer's lib.dom already knows.
+interface SpeechRecognitionLike extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onresult: ((event: any) => void) | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onerror: ((event: any) => void) | null;
+  onend: (() => void) | null;
+}
+
+function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    SpeechRecognition?: new () => SpeechRecognitionLike;
+    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+  };
+  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+}
+
+export interface FeedbackFABProps {
+  /** Cliente Supabase ya autenticado de la app (cada nodo arma el suyo). */
+  supabase: SupabaseClient;
+  /** Identifica el nodo de origen en shared.feedback / notificaciones a nodo-landing. */
+  sourceNode: string;
+  /** Ruta del isotipo blanco de Nodo — cada app lo sirve desde su propio /public/brand. */
+  imgSrc?: string;
+}
+
+interface FeedbackDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  supabase: SupabaseClient;
+  sourceNode: string;
+}
+
+/**
+ * "Nodito flotante" de feedback (bug / idea / algo de más) — un único
+ * componente compartido por todos los nodos en vez de una copia por app.
+ * Cada app le pasa su propio cliente Supabase (mismo proyecto, `shared`
+ * schema) y su `sourceNode`.
+ */
+export function FeedbackFAB({
+  supabase,
+  sourceNode,
+  imgSrc = "/brand/nodo-mark-white.png",
+}: FeedbackFABProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+
+  const dragStart = useRef({ x: 0, y: 0 });
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const touchActive = useRef(false);
+  const wasDragging = useRef(false);
+  const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleMouseEnter() {
+    if (collapseTimer.current) {
+      clearTimeout(collapseTimer.current);
+      collapseTimer.current = null;
+    }
+    setIsExpanded(true);
+  }
+
+  function handleMouseLeave() {
+    collapseTimer.current = setTimeout(() => setIsExpanded(false), 200);
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    dragStart.current = { x: touch.clientX, y: touch.clientY };
+    dragOffset.current = { ...position };
+    touchActive.current = true;
+    setIsDragging(false);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchActive.current) return;
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - dragStart.current.x;
+    const deltaY = touch.clientY - dragStart.current.y;
+
+    if (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8) {
+      setIsDragging(true);
+      wasDragging.current = true;
+    }
+
+    setPosition({
+      x: dragOffset.current.x + deltaX,
+      y: dragOffset.current.y + deltaY,
+    });
+  };
+
+  const handleTouchEnd = () => {
+    touchActive.current = false;
+    setTimeout(() => {
+      setIsDragging(false);
+      wasDragging.current = false;
+    }, 100);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Left click only
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    dragOffset.current = { ...position };
+    setIsDragging(false);
+    wasDragging.current = false;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - dragStart.current.x;
+      const deltaY = moveEvent.clientY - dragStart.current.y;
+
+      if (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8) {
+        setIsDragging(true);
+        wasDragging.current = true;
+      }
+
+      setPosition({
+        x: dragOffset.current.x + deltaX,
+        y: dragOffset.current.y + deltaY,
+      });
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      setTimeout(() => {
+        setIsDragging(false);
+        wasDragging.current = false;
+      }, 100);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (wasDragging.current || isDragging) {
+      e.preventDefault();
+      return;
+    }
+    setIsOpen(true);
+  };
+
+  if (isDismissed) return null;
+
+  return (
+    <>
+      <div
+        className="fixed z-40 flex touch-none items-center justify-center max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:right-4 sm:bottom-6 sm:right-6"
+        style={{
+          transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
+        }}
+      >
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsDismissed(true);
+          }}
+          className="absolute -right-1 -top-1 z-50 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-white shadow-md hover:bg-rose-700 active:scale-90 sm:-right-1.5 sm:-top-1.5"
+          title="Ocultar sugerencia"
+        >
+          <span className="text-sm font-bold leading-none">×</span>
+        </button>
+
+        <button
+          onClick={handleClick}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onMouseDown={handleMouseDown}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          className={[
+            "flex h-12 w-12 items-center justify-center rounded-full text-white shadow-lg transition-all duration-300 hover:brightness-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#111E2F] sm:h-14",
+            isExpanded ? "sm:w-auto sm:gap-3 sm:px-6" : "sm:w-14 sm:gap-0 sm:px-0",
+            isExpanded ? "max-sm:w-12 max-sm:gap-0 max-sm:px-0" : "",
+            isDragging ? "cursor-grabbing" : "cursor-grab",
+          ].join(" ")}
+          style={{ backgroundColor: "#111E2F" }}
+        >
+          <img
+            src={imgSrc}
+            alt="Nodo"
+            className="h-7 w-7 shrink-0 select-none pointer-events-none sm:h-8 sm:w-8"
+          />
+          <span
+            className={[
+              "overflow-hidden whitespace-nowrap font-display text-sm font-semibold tracking-wide transition-all duration-300 ease-in-out select-none pointer-events-none max-sm:hidden",
+              isExpanded ? "max-w-xs opacity-100 pr-1" : "max-w-0 opacity-0",
+            ].join(" ")}
+          >
+            ¿Cómo mejorar este Nodo?
+          </span>
+        </button>
+      </div>
+
+      <FeedbackDialog
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        supabase={supabase}
+        sourceNode={sourceNode}
+      />
+    </>
+  );
+}
+
+function FeedbackDialog({ isOpen, onClose, supabase, sourceNode }: FeedbackDialogProps) {
+  const [category, setCategory] = useState<FeedbackCategory>("idea");
+  const [pendingCategory, setPendingCategory] = useState<FeedbackCategory | null>(null);
+  const [content, setContent] = useState("");
+  const [isDictating, setIsDictating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [recognitionError, setRecognitionError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+  function handleCategoryClick(next: FeedbackCategory) {
+    if (next === category) return;
+    if (content.trim()) {
+      setPendingCategory(next);
+    } else {
+      setCategory(next);
+    }
+  }
+
+  function confirmCategorySwitch() {
+    if (!pendingCategory) return;
+    if (isDictating) recognitionRef.current?.stop();
+    setContent("");
+    setCategory(pendingCategory);
+    setPendingCategory(null);
+  }
+
+  function cancelCategorySwitch() {
+    setPendingCategory(null);
+  }
+
+  function ensureRecognition(): SpeechRecognitionLike | null {
+    if (recognitionRef.current) return recognitionRef.current;
+    const Ctor = getSpeechRecognitionCtor();
+    if (!Ctor) return null;
+
+    const rec = new Ctor();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = "es-AR";
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (event: any) => {
+      let finalTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        }
+      }
+      if (finalTranscript) {
+        setContent((prev) => prev + (prev ? " " : "") + finalTranscript);
+      }
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onerror = (event: any) => {
+      setRecognitionError(event?.error ?? "unknown");
+      setIsDictating(false);
+    };
+
+    rec.onend = () => {
+      setIsDictating(false);
+    };
+
+    recognitionRef.current = rec;
+    return rec;
+  }
+
+  const handleToggleDictation = () => {
+    const rec = ensureRecognition();
+    if (!rec) {
+      setRecognitionError("not-supported");
+      return;
+    }
+
+    if (isDictating) {
+      rec.stop();
+      setIsDictating(false);
+    } else {
+      setRecognitionError(null);
+      try {
+        rec.start();
+        setIsDictating(true);
+      } catch {
+        // Ya estaba corriendo o el navegador rechazó el permiso — onerror lo reporta.
+      }
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!content.trim()) return;
+
+    if (isDictating) recognitionRef.current?.stop();
+
+    setSubmitError(null);
+    setIsSubmitting(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      // El schema "shared" (cross-node) no siempre está declarado en el
+      // Database type local de cada app — chequeo de tipos best-effort,
+      // funciona igual en runtime (mismo proyecto Supabase para todos los nodos).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: memberData } = await (supabase as any)
+        .schema("shared")
+        .from("org_members")
+        .select("org_id")
+        .eq("user_id", user?.id ?? "")
+        .limit(1)
+        .maybeSingle();
+
+      const { error } = await supabase.functions.invoke("submit-feedback", {
+        body: {
+          category,
+          content: content.trim(),
+          orgId: memberData?.org_id ?? null,
+          redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+          sourceNode,
+        },
+      });
+
+      if (error) throw error;
+
+      setSubmitSuccess(true);
+      setTimeout(() => {
+        setSubmitSuccess(false);
+        setContent("");
+        onClose();
+      }, 2000);
+    } catch (err) {
+      console.error("Error submitting feedback:", err);
+      setSubmitError("No se pudo enviar el feedback. Intentá de nuevo.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open: boolean) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[460px] rounded-md border p-6 shadow-lg">
+        {submitSuccess ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <CheckCircle2 className="h-16 w-16 text-emerald-500 animate-bounce" />
+            <h3 className="mt-4 font-display text-xl font-bold">
+              ¡Muchas gracias, por tu Feedback!
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Recibimos tu feedback para seguir evolucionando este Nodo.
+            </p>
+          </div>
+        ) : (
+          <>
+            <DialogHeader className="text-left">
+              <DialogTitle className="font-display text-lg font-bold">
+                💡 Mejora tu Nodo
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground">
+                Contanos qué le falta, qué está fallando, o qué sentís que está
+                de más.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleSubmit} className="mt-4 space-y-5">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  ¿De qué se trata?
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCategoryClick("bug")}
+                    className={[
+                      "flex flex-col items-center gap-1.5 rounded-sm border p-3 text-xs font-medium transition-all hover:bg-accent",
+                      category === "bug"
+                        ? "border-rose-500/30 bg-rose-500/5 text-rose-600 font-semibold"
+                        : "border-border",
+                    ].join(" ")}
+                  >
+                    <ShieldAlert
+                      className={`h-4 w-4 ${category === "bug" ? "text-rose-500" : "text-muted-foreground"}`}
+                    />
+                    <span>Un error</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCategoryClick("idea")}
+                    className={[
+                      "flex flex-col items-center gap-1.5 rounded-sm border p-3 text-xs font-medium transition-all hover:bg-accent",
+                      category === "idea"
+                        ? "border-brand/30 bg-brand/5 text-brand font-semibold"
+                        : "border-border",
+                    ].join(" ")}
+                  >
+                    <Lightbulb
+                      className={`h-4 w-4 ${category === "idea" ? "text-brand" : "text-muted-foreground"}`}
+                    />
+                    <span>Una idea</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCategoryClick("bloat")}
+                    className={[
+                      "flex flex-col items-center gap-1.5 rounded-sm border p-3 text-xs font-medium transition-all hover:bg-accent",
+                      category === "bloat"
+                        ? "border-amber-500/30 bg-amber-500/5 text-amber-600 font-semibold"
+                        : "border-border",
+                    ].join(" ")}
+                  >
+                    <Trash2
+                      className={`h-4 w-4 ${category === "bloat" ? "text-amber-500" : "text-muted-foreground"}`}
+                    />
+                    <span>Está de más</span>
+                  </button>
+                </div>
+              </div>
+
+              {pendingCategory !== null && (
+                <div className="flex flex-col gap-2 rounded-sm border border-amber-300 bg-amber-50 px-4 py-3 text-sm">
+                  <p className="font-medium text-amber-800">
+                    Ya tenés un mensaje grabado. ¿Cancelarlo y grabar uno nuevo?
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={confirmCategorySwitch}
+                      className="rounded px-3 py-1 text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+                    >
+                      Sí, cancelar y grabar nuevo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelCategorySwitch}
+                      className="rounded px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 transition-colors"
+                    >
+                      Seguir editando
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col items-center justify-center rounded-sm bg-muted p-5 border border-border">
+                <button
+                  type="button"
+                  onClick={handleToggleDictation}
+                  className={[
+                    "relative flex h-20 w-20 items-center justify-center rounded-full transition-all duration-300 shadow-md",
+                    isDictating
+                      ? "bg-rose-500 hover:bg-rose-600 animate-pulse text-white"
+                      : "bg-gradient-to-r from-brand to-brand-600 text-white hover:scale-105",
+                  ].join(" ")}
+                >
+                  {isDictating ? (
+                    <Square className="h-8 w-8" />
+                  ) : (
+                    <Mic className="h-8 w-8" />
+                  )}
+                  {isDictating && (
+                    <span className="absolute -inset-2 rounded-full border-2 border-rose-500 animate-ping opacity-75" />
+                  )}
+                </button>
+
+                <p className="mt-3 text-xs font-medium">
+                  {isDictating ? (
+                    <span className="text-rose-500 font-semibold animate-pulse">
+                      Te escucho... Hablá ahora
+                    </span>
+                  ) : (
+                    "Dictar mensaje por voz"
+                  )}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {isDictating
+                    ? "Hacé clic para detener el dictado"
+                    : "Hacé clic para empezar a dictar"}
+                </p>
+                {recognitionError === "not-supported" && (
+                  <p className="text-[10px] text-rose-500 mt-1">
+                    El dictado por voz no es compatible con este navegador. Probá con Chrome o Edge.
+                  </p>
+                )}
+                {recognitionError && recognitionError !== "not-supported" && (
+                  <p className="text-[10px] text-rose-500 mt-1">
+                    Error de dictado o permiso denegado.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Mensaje escrito
+                </label>
+                <Textarea
+                  value={content}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setContent(e.target.value)}
+                  placeholder="El texto dictado aparecerá acá, también podés editarlo o escribir directamente..."
+                  className="min-h-[100px]"
+                />
+              </div>
+
+              {submitError && (
+                <p className="text-xs text-rose-600">{submitError}</p>
+              )}
+
+              <div className="flex justify-end gap-2 border-t border-border pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || !content.trim()}
+                  className="bg-brand text-white hover:bg-brand-600"
+                >
+                  {isSubmitting ? "Enviando..." : "Enviar feedback"}
+                </Button>
+              </div>
+            </form>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
