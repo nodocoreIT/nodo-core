@@ -848,8 +848,17 @@ export function DoctorDashboard({
           />
         </div>
 
-        {/* Centro: ficha del paciente / video consulta */}
-        <div className="col-span-12 lg:col-span-6 min-h-[500px] flex flex-col gap-4">
+        {/* Centro: ficha del paciente / video consulta.
+            Widens into the right column's slot during an active call — that
+            slot used to duplicate the same Acción Inmediata panel already
+            embedded here (see below the video), just squeezed narrower. */}
+        <div
+          className={`col-span-12 min-h-[500px] flex flex-col gap-4 ${
+            dataSource !== "local" && hasActiveSession() && activeAppointment
+              ? "lg:col-span-9"
+              : "lg:col-span-6"
+          }`}
+        >
           {hasActiveSession() && activeAppointment ? (
             <>
               <ClinicalAlertsBanner
@@ -1042,36 +1051,26 @@ export function DoctorDashboard({
           )}
         </div>
 
-        {/* Derecha: Mi consultorio + calendario */}
-        <div className="col-span-12 lg:col-span-3 min-h-[500px]">
-          {dataSource === "local" ? (
-            <DoctorOfficeSidebar
-              queue={queue}
-              googleCalendarId={googleCalendarId}
-            />
-          ) : hasActiveSession() && activeAppointment ? (
-            <ImmediateActionPanel
-              appointmentId={activeAppointment.id}
-              doctorId={doctorId}
-              patientId={activeAppointment.patient_id}
-              patientName={patientProfile?.profile?.full_name || "Paciente"}
-              patientEmail={patientProfile?.profile?.email}
-              doctorName={doctorName}
-              doctorSpecialty={doctorSpecialty}
-              doctorLicense={doctorLicense}
-              dataSource={dataSource}
-              onReportSaved={() =>
-                loadClinicalHistory(activeAppointment.patient_id)
-              }
-            />
-          ) : (
-            <ImmediateActionPanel
-              appointmentId=""
-              doctorId={doctorId}
-              dataSource={dataSource}
-            />
-          )}
-        </div>
+        {/* Derecha: Mi consultorio + calendario.
+            Hidden during an active call — the center column takes this
+            space instead, since its own Acción Inmediata (under the video)
+            already covers the same panel. */}
+        {!(dataSource !== "local" && hasActiveSession() && activeAppointment) && (
+          <div className="col-span-12 lg:col-span-3 min-h-[500px]">
+            {dataSource === "local" ? (
+              <DoctorOfficeSidebar
+                queue={queue}
+                googleCalendarId={googleCalendarId}
+              />
+            ) : (
+              <ImmediateActionPanel
+                appointmentId=""
+                doctorId={doctorId}
+                dataSource={dataSource}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       <DoctorAssignAppointmentDialog
