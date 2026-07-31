@@ -32,7 +32,7 @@ function fechaHoyIso(): string {
 
 export const useNotifications = () => {
   const { tarjetas, prestamos, planesAhorro, gastosDiarios, consumosTarjetas } = useFinanzas();
-  const presupuestos = usePresupuestos();
+  const { presupuestos } = usePresupuestos();
 
   const notifications = useMemo(() => {
     const list: Notification[] = [];
@@ -60,7 +60,9 @@ export const useNotifications = () => {
     // 1. Tarjetas
     tarjetas.forEach((tarjeta: Tarjeta) => {
       if (!tarjeta.activa || !tarjeta.fechaVencimiento) return;
-      if (estaPagado('tarjeta', tarjeta.id)) return;
+      // estaPagado solo mira gastosDiarios (pago real) — una tarjeta marcada
+      // pagada "a mano" (checkbox, sin gasto) también debe dejar de avisar.
+      if (estaPagado('tarjeta', tarjeta.id) || tarjeta.ultimoPagoMes === mesActualStr) return;
 
       const vtoStr = tarjeta.fechaVencimiento;
       const id = `TARJETA-${tarjeta.id}-${vtoStr.substring(0, 7)}`;

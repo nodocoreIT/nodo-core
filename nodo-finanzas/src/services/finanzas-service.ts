@@ -1283,7 +1283,12 @@ export class FinanzasService {
       dia_cierre: tarjeta.diaCierre,
       dia_vencimiento: tarjeta.diaVencimiento,
       pagada: tarjeta.pagada,
-      ultimo_pago_mes: tarjeta.ultimoPagoMes,
+      // 'in' check so that explicitly passing undefined clears the column in
+      // DB (sends null) instead of being silently skipped — same fix as
+      // mapearPrestamoParaDB's ultimo_pago_mes, needed here too so
+      // "desmarcar tarjeta pagada" actually clears the stale month instead
+      // of leaving it looking paid forever.
+      ...('ultimoPagoMes' in tarjeta ? { ultimo_pago_mes: tarjeta.ultimoPagoMes ?? null } : {}),
     };
   }
 

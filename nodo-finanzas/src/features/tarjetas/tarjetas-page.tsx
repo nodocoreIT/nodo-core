@@ -19,6 +19,7 @@ import { getFechaHoy } from '@/utils/formatters';
 import { ResumenTarjetas } from './resumen-tarjetas';
 import { RegistroConsumo } from './registro-consumo';
 import { ModalPagarTarjeta } from './modal-pagar-tarjeta';
+import { calcularEstadoPagoTarjetaMes } from './calcular-estado-pago-tarjeta';
 import type { Tarjeta, RubroConsumo } from '@/types';
 
 type Vista = 'resumen' | 'registro';
@@ -73,8 +74,13 @@ export function TarjetasPage() {
       return c.tarjetaId === tarjeta.id && anioMes === filtroMes;
     });
 
-    const totalARS = consumosDelMes.reduce((a, c) => a + (c.importeARS || 0), 0);
-    const totalUSD = consumosDelMes.reduce((a, c) => a + (c.importeUSD || 0), 0);
+    const estado = calcularEstadoPagoTarjetaMes(
+      tarjeta,
+      finanzas.consumosTarjetas,
+      finanzas.gastosDiarios,
+      filtroMes,
+    );
+    const { totalARS, totalUSD, pagada, pagoParcial, montoPagado, restanteARS, marcadaSinGasto } = estado;
     const totalEnARS = totalARS + totalUSD * 1300;
 
     const consumosPorRubro = consumosDelMes.reduce(
@@ -89,12 +95,6 @@ export function TarjetasPage() {
 
     const limiteParaProgreso = tarjeta.limiteRecomendado || tarjeta.limiteCredito;
 
-    const gastoPago = finanzas.gastosDiarios.find((g) => {
-      const matchId = g.pagoTarjetaId === tarjeta.id;
-      const matchFecha = g.fecha.startsWith(filtroMes);
-      return matchId && matchFecha;
-    });
-
     return {
       tarjeta,
       consumosDelMes,
@@ -105,11 +105,12 @@ export function TarjetasPage() {
       cantidadTransacciones: consumosDelMes.length,
       porcentajeUsado: limiteParaProgreso ? (totalEnARS / limiteParaProgreso) * 100 : 0,
       limiteParaProgreso,
-      pagada: !!gastoPago && !gastoPago.pagoParcial,
-      pagoParcial: !!gastoPago && !!gastoPago.pagoParcial,
-      montoPagado: gastoPago?.monto || 0,
-      restanteARS: !!gastoPago ? Math.max(0, totalARS - (gastoPago.monto || 0)) : totalARS,
+      pagada,
+      pagoParcial,
+      montoPagado,
+      restanteARS,
       restanteUSD: totalUSD,
+      marcadaSinGasto,
     };
   });
 
@@ -235,6 +236,12 @@ export function TarjetasPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (resumen.marcadaSinGasto) {
+                          finanzas
+                            .actualizarTarjeta(resumen.tarjeta.id, { pagada: false, ultimoPagoMes: undefined })
+                            .then(() => finanzas.recargarDatos(true));
+                          return;
+                        }
                         const gastoPago = finanzas.gastosDiarios.find(
                           g => g.pagoTarjetaId === resumen.tarjeta.id && g.fecha.startsWith(filtroMes)
                         );
@@ -252,7 +259,7 @@ export function TarjetasPage() {
                   <div className="bg-orange-500 text-white px-5 py-2 -mx-5 -mt-5 mb-4 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4" />
-                      <span className="text-xs font-bold uppercase tracking-widest">Pago Parcial</span>
+                      <span className="text-xs font-bold uppercase tracking-widest">Pagada Parcialmente</span>
                     </div>
                     <button
                       onClick={(e) => {
@@ -268,6 +275,31 @@ export function TarjetasPage() {
                       <Undo2 className="w-3.5 h-3.5" />
                       Deshacer
                     </button>
+                  </div>
+                )}
+                {!resumen.pagada && !resumen.pagoParcial && (
+                  <div className="bg-slate-500 text-white px-5 py-2 -mx-5 -mt-5 mb-4 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4" />
+                      <span className="text-xs font-bold uppercase tracking-widest">Tarjeta Sin Pagar</span>
+                    </div>
+                    <label
+                      className="flex items-center gap-1.5 text-xs text-white/90 hover:text-white cursor-pointer"
+                      onClick={(e) => e.stopPropagation()}
+                      title="Marcar como pagada sin registrar un gasto"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={false}
+                        onChange={() => {
+                          finanzas
+                            .actualizarTarjeta(resumen.tarjeta.id, { pagada: true, ultimoPagoMes: filtroMes })
+                            .then(() => finanzas.recargarDatos(true));
+                        }}
+                        className="h-3.5 w-3.5 accent-white cursor-pointer"
+                      />
+                      Marcar pagada
+                    </label>
                   </div>
                 )}
 

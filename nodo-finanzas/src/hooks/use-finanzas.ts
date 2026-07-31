@@ -905,10 +905,19 @@ export const useFinanzas = () => {
 
       if (success && gastoAEliminar) {
         if (gastoAEliminar.pagoTarjetaId) {
-          console.log('[useFinanzas] Revirtiendo estado de tarjeta PAGADA:', gastoAEliminar.pagoTarjetaId);
-          await actualizarTarjeta(gastoAEliminar.pagoTarjetaId, {
-            pagada: false
-          });
+          const tarjetaAfectada = estado.tarjetas.find(t => t.id === gastoAEliminar.pagoTarjetaId);
+          const mesDelGastoBorrado = (gastoAEliminar.fecha || '').slice(0, 7);
+          // Solo revertir si el gasto borrado es el mismo mes que ultimoPagoMes
+          // refleja hoy — si el usuario borra un pago viejo (ej. junio) mientras
+          // julio ya quedó marcado pagado por otro medio, no hay que pisar el
+          // estado de julio con el mes que se acaba de borrar.
+          if (tarjetaAfectada?.ultimoPagoMes === mesDelGastoBorrado) {
+            console.log('[useFinanzas] Revirtiendo estado de tarjeta PAGADA:', gastoAEliminar.pagoTarjetaId);
+            await actualizarTarjeta(gastoAEliminar.pagoTarjetaId, {
+              pagada: false,
+              ultimoPagoMes: undefined,
+            });
+          }
         }
 
         if (gastoAEliminar.formaPago !== 'TARJETA') {
