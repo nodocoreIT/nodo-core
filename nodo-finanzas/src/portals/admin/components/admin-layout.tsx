@@ -187,7 +187,9 @@ export function AdminLayout() {
         {/* Sidebar */}
         <aside
           className={cn(
-            "fixed bottom-0 top-0 left-0 z-50 flex h-screen w-60 flex-shrink-0 flex-col bg-navy text-white transition-transform duration-300 ease-in-out border-r border-navy-700 md:static md:z-auto md:translate-x-0 md:flex",
+            // h-svh (not h-screen/100vh) so iOS Safari's address-bar-visible
+            // viewport doesn't clip the footer — see mobile user block below.
+            "fixed bottom-0 top-0 left-0 z-50 flex h-svh max-h-svh w-60 flex-shrink-0 flex-col bg-navy text-white transition-transform duration-300 ease-in-out border-r border-navy-700 md:static md:z-auto md:translate-x-0 md:flex",
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
           )}
         >
@@ -208,8 +210,48 @@ export function AdminLayout() {
             </button>
           </div>
 
+          {/* Mobile-only: user + settings + logout, pinned right below the
+              logo instead of at the bottom — on mobile the footer depended
+              on how much space the nav menu left, and iOS Safari's dynamic
+              toolbar could push it off-screen entirely. Desktop keeps the
+              original bottom-pinned footer below, unchanged. */}
+          <div className="md:hidden flex-shrink-0 border-b border-navy-700 px-4 pb-3">
+            <div className="flex items-center gap-3 py-1">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
+                {initials(displayName)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-white">{displayName}</p>
+                {fullName && (
+                  <p className="truncate text-xs text-white/60">{email}</p>
+                )}
+              </div>
+              {isSuperAdmin && (
+                <button
+                  type="button"
+                  aria-label="Administración"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setSettingsOpen(true);
+                  }}
+                  className="flex-shrink-0 rounded-md p-1.5 text-white/60 transition-colors hover:text-brand"
+                >
+                  <Settings className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                type="button"
+                aria-label="Cerrar sesión"
+                onClick={() => void handleSignOut()}
+                className="flex-shrink-0 rounded-md p-1.5 text-white/60 transition-colors hover:text-brand"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
           {/* Nav */}
-          <nav className="flex-1 overflow-y-auto px-3 py-4">
+          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
             <div className="flex flex-col gap-1">
               {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
                 <NavLink
@@ -276,8 +318,8 @@ export function AdminLayout() {
             <SidebarCommandPaletteHint className="mx-0 border-navy-700" />
           </nav>
 
-          {/* Bottom: user + settings + logout */}
-          <div className="flex-shrink-0 border-t border-navy-700 p-3">
+          {/* Bottom: user + settings + logout (desktop only, see mobile block above) */}
+          <div className="hidden md:block flex-shrink-0 border-t border-navy-700 p-3">
             <div className="flex items-center gap-3 px-1 py-1 mb-2">
               <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
                 {initials(displayName)}
@@ -315,7 +357,7 @@ export function AdminLayout() {
         </aside>
 
         {/* Main */}
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {/* Header */}
           <header className="flex min-h-16 flex-col gap-3 border-b border-border bg-[#EEF3F8] px-4 py-3 shadow-sm flex-shrink-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
             <div className="flex items-center justify-between gap-3 sm:justify-start">
@@ -348,7 +390,7 @@ export function AdminLayout() {
           </header>
 
           {/* Content */}
-          <main className="flex-1 overflow-auto p-6">
+          <main className="min-h-0 flex-1 overflow-auto p-6">
             {billingGate.shouldRedirect ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
                 <Lock className="h-10 w-10 text-slate2" />
