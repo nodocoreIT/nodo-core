@@ -243,7 +243,52 @@ interface ClinicalReportPdfOptions {
   signatureImageData?: string;
 }
 
-/** Convierte markdown simple (## títulos) a líneas PDF. */
+/** Bullet "- Etiqueta: detalle" → guion + etiqueta en negrita real + detalle normal. */
+function renderBulletLine(
+  doc: jsPDF,
+  line: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+): number {
+  const match = line.match(/^-\s+([A-ZÁÉÍÓÚÑ][^:\d]{1,40}):\s+(.+)$/);
+  if (!match) {
+    const wrapped = doc.splitTextToSize(line, maxWidth);
+    doc.text(wrapped, x, y);
+    return y + wrapped.length * 5 + 2;
+  }
+
+  const [, label, rest] = match;
+  const prefix = "- ";
+  const boldLabel = `${label}:`;
+
+  doc.setFont("helvetica", "normal");
+  const prefixWidth = doc.getTextWidth(prefix);
+  doc.setFont("helvetica", "bold");
+  const labelWidth = doc.getTextWidth(boldLabel);
+  doc.setFont("helvetica", "normal");
+  const restLead = ` ${rest}`;
+  const restLeadWidth = doc.getTextWidth(restLead);
+
+  if (prefixWidth + labelWidth + restLeadWidth <= maxWidth) {
+    doc.text(prefix, x, y);
+    doc.setFont("helvetica", "bold");
+    doc.text(boldLabel, x + prefixWidth, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(restLead, x + prefixWidth + labelWidth, y);
+    return y + 5 + 2;
+  }
+
+  doc.text(prefix, x, y);
+  doc.setFont("helvetica", "bold");
+  doc.text(boldLabel, x + prefixWidth, y);
+  doc.setFont("helvetica", "normal");
+  const wrapped = doc.splitTextToSize(rest, maxWidth - 4);
+  doc.text(wrapped, x + 4, y + 5);
+  return y + 5 + wrapped.length * 5 + 2;
+}
+
+/** Convierte markdown simple (## títulos, viñetas "- Etiqueta: detalle") a líneas PDF. */
 function markdownToPdfLines(doc: jsPDF, text: string, x: number, startY: number, maxWidth: number) {
   let y = startY;
   const lines = text.split("\n");
@@ -259,16 +304,16 @@ function markdownToPdfLines(doc: jsPDF, text: string, x: number, startY: number,
     }
     if (trimmed.startsWith("## ")) {
       doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 64, 110);
       doc.text(trimmed.slice(3), x, y);
+      doc.setFont("helvetica", "normal");
       y += 8;
       continue;
     }
     doc.setFontSize(10);
     doc.setTextColor(51, 65, 85);
-    const wrapped = doc.splitTextToSize(trimmed, maxWidth);
-    doc.text(wrapped, x, y);
-    y += wrapped.length * 5 + 2;
+    y = renderBulletLine(doc, trimmed, x, y, maxWidth);
   }
   return y;
 }

@@ -24,6 +24,7 @@ import {
   downloadPdf,
   generateClinicalReportPdf,
 } from "@/lib/pdf/generator";
+import { ReportEditorDialog } from "./report-editor-dialog";
 
 interface MedicalReportPanelProps {
   appointmentId?: string;
@@ -66,6 +67,7 @@ export function MedicalReportPanel({
   const [interimDictation, setInterimDictation] = useState("");
   const [signatureText, setSignatureText] = useState("");
   const [signatureImageData, setSignatureImageData] = useState("");
+  const [reportModalOpen, setReportModalOpen] = useState(false);
 
   useEffect(() => {
     clinicApi
@@ -108,6 +110,7 @@ export function MedicalReportPanel({
         doctorLicense,
       });
       setReport(data.report);
+      setReportModalOpen(true);
       if (data.quotaFallback) {
         toast.warning(
           "Se generó un borrador local (límite de Gemini alcanzado). Revisalo y guardalo.",
@@ -139,6 +142,7 @@ export function MedicalReportPanel({
         title: `Informe clínico — ${patientName} — ${new Date().toLocaleDateString("es-AR")}`,
       });
       toast.success("Informe guardado en el historial del paciente");
+      setReportModalOpen(false);
       onSaved?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al guardar");
@@ -274,7 +278,7 @@ export function MedicalReportPanel({
         <>
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-medium text-slate-600">
-              Informe generado — editable
+              {isGenerating ? "Generando informe…" : "Informe generado"}
             </p>
             {clinicalNotes && (
               <Badge variant="outline" className="text-[10px]">
@@ -282,61 +286,94 @@ export function MedicalReportPanel({
               </Badge>
             )}
           </div>
-          <Textarea
-            value={report}
-            onChange={(e) => setReport(e.target.value)}
-            placeholder="El informe aparecerá aquí. Podés editarlo libremente."
-            className={`text-sm ${compact ? "min-h-[160px]" : "min-h-[220px]"}`}
-            disabled={isGenerating}
-          />
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={isSaving || !report.trim()}
-              className="bg-blue-700 hover:bg-blue-800 flex-1 min-w-[120px]"
-            >
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-1" />
-                  Guardar en historial
-                </>
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownload}
-              disabled={!report.trim()}
-            >
-              <Download className="h-4 w-4 mr-1" />
-              PDF firmado
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 min-w-[120px]"
-              onClick={handleSendEmail}
-              disabled={!patientEmail || !report.trim()}
-            >
-              <Mail className="h-4 w-4 mr-1" />
-              Email
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 min-w-[120px] border-emerald-200 text-emerald-700"
-              onClick={handleSendWhatsApp}
-              disabled={!report.trim()}
-            >
-              <MessageCircle className="h-4 w-4 mr-1" />
-              WhatsApp
-            </Button>
-          </div>
+          {isGenerating ? (
+            <div className="flex items-center justify-center rounded-md border border-dashed border-slate-200 py-8 text-slate-400">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setReportModalOpen(true)}
+                className="w-full rounded-md border border-slate-200 bg-slate-50/60 p-3 text-left text-xs text-slate-500 line-clamp-3 hover:border-blue-300 hover:bg-blue-50/40 transition-colors"
+              >
+                {report.replace(/##\s*/g, "").slice(0, 240) || "Sin contenido"}
+              </button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setReportModalOpen(true)}
+                  className="flex-1 min-w-[140px]"
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  Ver y editar informe
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={isSaving || !report.trim()}
+                  className="bg-blue-700 hover:bg-blue-800 flex-1 min-w-[120px]"
+                >
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-1" />
+                      Guardar en historial
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownload}
+                  disabled={!report.trim()}
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  PDF firmado
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 min-w-[120px]"
+                  onClick={handleSendEmail}
+                  disabled={!patientEmail || !report.trim()}
+                >
+                  <Mail className="h-4 w-4 mr-1" />
+                  Email
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 min-w-[120px] border-emerald-200 text-emerald-700"
+                  onClick={handleSendWhatsApp}
+                  disabled={!report.trim()}
+                >
+                  <MessageCircle className="h-4 w-4 mr-1" />
+                  WhatsApp
+                </Button>
+              </div>
+            </>
+          )}
         </>
       )}
+
+      <ReportEditorDialog
+        open={reportModalOpen}
+        onOpenChange={setReportModalOpen}
+        report={report}
+        onChange={setReport}
+        patientName={patientName}
+        doctorName={doctorName}
+        doctorSpecialty={doctorSpecialty}
+        doctorLicense={doctorLicense}
+        signatureText={signatureText}
+        signatureImageData={signatureImageData}
+        onSave={handleSave}
+        onDownload={handleDownload}
+        isSaving={isSaving}
+      />
     </div>
   );
 

@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(result);
-  } catch {
+  } catch (err) {
+    console.error("[clinical-report/generate] Error:", err);
     return NextResponse.json(
       { error: "No se pudo generar el informe. Reintentá en unos minutos." },
       { status: 500 },

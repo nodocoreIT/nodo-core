@@ -8,6 +8,7 @@ import { ClinicalHistoryViewer } from "./clinical-history-viewer";
 import { ClinicalNotesEditor } from "./clinical-notes-editor";
 import { PatientDocumentsPanel } from "@/components/medical/patient-documents-panel";
 import { MedicalReportPanel } from "@/components/medical/medical-report-panel";
+import { parseReportSections } from "@/components/medical/report-editor-dialog";
 import { useConsultationStore } from "@/store/consultation-store";
 
 interface ImmediateActionPanelProps {
@@ -73,6 +74,20 @@ export function ImmediateActionPanel({
   const canReport =
     dataSource === "local" && patientId && patientName && doctorName;
 
+  // Fuera del modo demo, el informe se genera/edita desde el acordeón de la
+  // columna derecha (ConsultationToolsSidebar) — este tab muestra el último
+  // guardado para ESTA consulta, en solo lectura, así queda visible acá
+  // también y no solo en Historial.
+  const savedReport = clinicalHistory
+    .filter(
+      (r) =>
+        r.record_type === "informe" &&
+        (!appointmentId || r.appointment_id === appointmentId),
+    )
+    .sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )[0];
+
   return (
     <Card className="border-slate-200 h-full shadow-sm">
       <CardHeader className="py-3 px-4 bg-gradient-to-r from-blue-50 to-slate-50 border-b border-slate-100">
@@ -134,9 +149,24 @@ export function ImmediateActionPanel({
                 compact
                 onSaved={onReportSaved}
               />
+            ) : savedReport ? (
+              <div className="space-y-4">
+                {parseReportSections(savedReport.content).map((section, index) => (
+                  <div key={index} className="space-y-1">
+                    {section.title && (
+                      <h3 className="text-xs font-semibold text-[#1e406e]">
+                        {section.title}
+                      </h3>
+                    )}
+                    <p className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">
+                      {section.body}
+                    </p>
+                  </div>
+                ))}
+              </div>
             ) : (
               <p className="text-xs text-slate-400 text-center py-6">
-                Informes disponibles en modo local
+                Todavía no se guardó un informe para esta consulta.
               </p>
             )}
           </TabsContent>

@@ -1,5 +1,12 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Google no publica una tabla fija de "qué modelo es gratis" — es específico
+// de cada cuenta/proyecto y cambia con el tiempo (gemini-2.0-flash y
+// gemini-2.5-flash-lite ya quedaron fuera para cuentas nuevas). Verificá en
+// https://aistudio.google.com/apikey qué modelos figuran "Free of charge"
+// para TU key, y seteá GEMINI_MODEL con ese id exacto si este default falla.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+
 export interface SoapResult {
   subjective: string;
   objective: string;
@@ -18,7 +25,7 @@ export async function generateSoapSummary(
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
   const prompt = `Eres un médico especialista en documentación clínica. A partir de la siguiente transcripción de consulta médica y notas del profesional, genera un resumen estructurado en formato SOAP (Subjetivo, Objetivo, Análisis, Plan) siguiendo estándares de historia clínica.
 
@@ -78,6 +85,15 @@ function isGeminiQuotaError(err: unknown): boolean {
   return /429|quota|RESOURCE_EXHAUSTED|Too Many Requests/i.test(msg);
 }
 
+/** Red de seguridad: el prompt ya pide texto plano, pero si el modelo igual
+ * devuelve markdown, esto evita que le queden asteriscos crudos al médico —
+ * ni el editor (textarea plano) ni el PDF interpretan **negrita**. */
+function cleanMarkdownArtifacts(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/^\s*\*\s+/gm, "- ");
+}
+
 export interface ClinicalReportResult {
   report: string;
   quotaFallback?: boolean;
@@ -106,14 +122,18 @@ export async function generateClinicalReport(
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
+    console.error(
+      "[generateClinicalReport] GEMINI_API_KEY no configurada — devolviendo borrador local. " +
+        "Agregá GEMINI_API_KEY en .env.local (o en las env vars del deploy) y reiniciá el server.",
+    );
     return {
-      report: buildMockClinicalReport(input, source),
+      report: buildMockClinicalReport(source),
       quotaFallback: true,
     };
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
   const prompt = `Eres un médico especialista redactando un informe clínico formal en español (Argentina).
 A partir del dictado del profesional, la transcripción de la consulta y las notas clínicas, redactá un informe médico completo, claro y profesional.
@@ -133,15 +153,18 @@ Redactá el informe con estas secciones en markdown (usá ## para títulos):
 ## Observaciones
 
 Usá terminología médica apropiada. Sé conciso pero completo. No inventes datos que no estén en el contenido clínico.
+No agregues firma, despedida ni el nombre del médico al final — esos datos ya se muestran aparte, junto a la firma del profesional.
+No uses negrita con asteriscos dobles (**texto**) ni cursiva con asteriscos simples — el texto se muestra tal cual, sin interpretar markdown. Para sub-ítems dentro de una sección, usá una línea por ítem con guion y etiqueta en texto plano, así: "- Antecedentes quirúrgicos: apendicectomía en la infancia".
 Respondé ÚNICAMENTE con el texto del informe en markdown, sin explicaciones adicionales.`;
 
   try {
     const result = await model.generateContent(prompt);
-    return { report: result.response.text().trim() };
+    return { report: cleanMarkdownArtifacts(result.response.text().trim()) };
   } catch (err) {
+    console.error("[generateClinicalReport] Gemini call failed:", err);
     if (isGeminiQuotaError(err)) {
       return {
-        report: buildMockClinicalReport(input, source),
+        report: buildMockClinicalReport(source),
         quotaFallback: true,
       };
     }
@@ -149,10 +172,7 @@ Respondé ÚNICAMENTE con el texto del informe en markdown, sin explicaciones ad
   }
 }
 
-function buildMockClinicalReport(
-  input: ClinicalReportInput,
-  source: string
-): string {
+function buildMockClinicalReport(source: string): string {
   const excerpt = source.slice(0, 400) || "Consulta por telemedicina.";
   return `## Motivo de consulta
 ${excerpt.split("\n")[0] || "Evaluación clínica solicitada por el paciente."}
@@ -173,8 +193,5 @@ Evaluación clínica basada en entrevista y exploración virtual. Correlacionar 
 
 ## Observaciones
 Consulta realizada por telemedicina.
-Informe generado asistido por IA — revisar y validar antes de firmar.
-
----
-Dr/a. ${input.doctorName}${input.doctorLicense ? ` — ${input.doctorLicense}` : ""}`;
+Informe generado asistido por IA — revisar y validar antes de firmar.`;
 }
