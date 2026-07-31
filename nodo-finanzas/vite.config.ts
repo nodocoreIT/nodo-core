@@ -40,6 +40,10 @@ export default defineConfig({
         "packages/shared-components/src/styles",
       ),
       // Subpaths before package root (otherwise /notifications resolves inside index.ts).
+      "@nodocore/nodo-modules/feedback": resolve(
+        monorepoRoot,
+        "packages/nodo-modules/src/feedback/index.ts",
+      ),
       "@nodocore/nodo-modules/notifications": resolve(
         monorepoRoot,
         "packages/nodo-modules/src/notifications/index.ts",

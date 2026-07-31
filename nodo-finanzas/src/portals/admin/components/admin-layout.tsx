@@ -37,6 +37,8 @@ import { NotificationBell } from "@/components/ui/notification-bell";
 import { FinanzasSettingsModuleProvider } from "@/shared/lib/finanzas-settings-module";
 import { OpenSettingsContext } from "@/shared/hooks/use-open-settings";
 import { AiSettingsContext, useAiSettingsProvider } from "@/hooks/use-ai-settings";
+import { FeedbackFAB } from "@nodocore/nodo-modules/feedback";
+import { supabase } from "@/shared/lib/supabase";
 
 interface NavItem {
   to: string;
@@ -408,6 +410,10 @@ export function AdminLayout() {
             )}
           </main>
         </div>
+
+        {pathname === "/admin/dashboard" && (
+          <FeedbackFAB supabase={supabase} sourceNode="finanzas" />
+        )}
 
         <SettingsDialog
           open={settingsOpen}
