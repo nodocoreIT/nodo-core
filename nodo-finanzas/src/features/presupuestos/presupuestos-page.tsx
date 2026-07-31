@@ -33,6 +33,7 @@ function textoColor(porcentaje: number, excedido: boolean): string {
 export function PresupuestosPage() {
   const presupuestos = usePresupuestos();
   const { loading, actualizarRubro } = useRubros();
+  const totalAsignado = presupuestos.reduce((sum, p) => sum + p.presupuesto, 0);
 
   const [formAbierto, setFormAbierto] = useState(false);
   const [rubroSeleccionado, setRubroSeleccionado] = useState<Rubro | null>(null);
@@ -112,6 +113,12 @@ export function PresupuestosPage() {
           <p className="text-sm text-slate2">
             Tope de gasto por rubro · {mesActualLabel()}
           </p>
+          {presupuestos.length > 0 && (
+            <p className="text-sm mt-1">
+              <span className="text-slate2">Total asignado: </span>
+              <span className="font-bold text-ink">{formatearMoneda(totalAsignado)}</span>
+            </p>
+          )}
         </div>
         {!formAbierto && (
           <Button onClick={abrirNuevo} className="gap-2 self-start sm:self-auto">

@@ -5,7 +5,9 @@ import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { useNotifications } from '@/hooks/use-notifications';
+import { usePresupuestos } from '@/hooks/use-presupuestos';
 import { formatearMoneda, formatearFecha } from '@/utils/formatters';
+import { normalizarCodigoRubro } from '@/utils/rubro-formatters';
 
 const CARD_LABELS = {
   saldo: 'Saldo del Mes',
@@ -52,6 +54,7 @@ export function DashboardPage() {
   const finanzas = useFinanzas();
   const { tarjetas, consumosTarjetas } = finanzas;
   const { notifications } = useNotifications();
+  const presupuestos = usePresupuestos();
 
   const [mostrarPersonalizar, setMostrarPersonalizar] = useState(false);
   const [resumenAbierto, setResumenAbierto] = useState(false);
@@ -181,6 +184,9 @@ export function DashboardPage() {
   };
 
   const visibleCount = Object.values(visibility).filter(Boolean).length;
+
+  // presupuestos ya viene ordenado por porcentaje de consumo descendente
+  const totalPresupuestado = presupuestos.reduce((s, p) => s + p.presupuesto, 0);
 
   return (
     <div className="space-y-6">
@@ -378,8 +384,8 @@ export function DashboardPage() {
         </>
       )}
 
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Three-column layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         <Card title="Últimos Gastos">
           {ultimosGastos.length === 0 ? (
             <p className="text-sm text-slate2 text-center py-6">Sin gastos registrados</p>
@@ -394,6 +400,48 @@ export function DashboardPage() {
                   <p className="text-sm font-bold text-ink ml-3">{formatearMoneda(g.monto)}</p>
                 </div>
               ))}
+            </div>
+          )}
+        </Card>
+
+        <Card title="Presupuesto">
+          {presupuestos.length === 0 ? (
+            <p className="text-sm text-slate2 text-center py-6">Sin presupuestos asignados</p>
+          ) : (
+            <div>
+              <button
+                type="button"
+                onClick={() => navigate('/admin/presupuestos')}
+                className="w-full flex items-center justify-between pb-3 mb-2 border-b border-mist text-left hover:opacity-80"
+              >
+                <span className="text-xs font-semibold text-slate2">Total asignado</span>
+                <span className="text-sm font-bold text-ink">{formatearMoneda(totalPresupuestado)}</span>
+              </button>
+              <div className="space-y-2">
+                {presupuestos.slice(0, 5).map(({ rubro, gastado, presupuesto, porcentaje, excedido }) => (
+                  <button
+                    key={rubro.id}
+                    type="button"
+                    onClick={() => navigate('/admin/presupuestos')}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-ink truncate">
+                        {rubro.emoji} {normalizarCodigoRubro(rubro.nombre)}
+                      </p>
+                      <p className={`text-xs font-medium shrink-0 ${excedido ? 'text-red-600' : 'text-slate2'}`}>
+                        {formatearMoneda(gastado)} / {formatearMoneda(presupuesto)}
+                      </p>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-mist overflow-hidden mt-1">
+                      <div
+                        className={`h-1.5 rounded-full ${excedido ? 'bg-red-500' : porcentaje >= 80 ? 'bg-amber-500' : 'bg-brand'}`}
+                        style={{ width: `${Math.min(porcentaje, 100)}%` }}
+                      />
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </Card>
