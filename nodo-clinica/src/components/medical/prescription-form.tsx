@@ -346,7 +346,7 @@ export function PrescriptionForm({
             size="sm"
           >
             <Download className="h-4 w-4 mr-1" />
-            PDF + historial
+            PDF + Historial
           </Button>
           {patientEmail && (
             <Button
