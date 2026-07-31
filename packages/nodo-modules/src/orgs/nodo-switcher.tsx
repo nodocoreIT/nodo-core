@@ -488,9 +488,13 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
           style={{
             position: "fixed",
             top: dropdownPos.top,
-            ...(isMobile
-              ? { left: 12, right: 12 }
-              : { right: dropdownPos.right, minWidth: 260 }),
+            // Right-anchored under the trigger on both mobile and desktop —
+            // mobile previously stretched edge-to-edge (left:12, right:12),
+            // reading as an oversized card instead of a compact dropdown.
+            right: Math.max(12, dropdownPos.right),
+            width: isMobile ? 300 : undefined,
+            maxWidth: "calc(100vw - 24px)",
+            minWidth: isMobile ? undefined : 260,
             maxHeight: 400,
             overflowY: "auto",
             background: "white",

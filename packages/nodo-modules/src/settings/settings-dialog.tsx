@@ -37,7 +37,7 @@ import { z } from "zod";
 import { useSettingsModule } from "./context";
 import { AgencyProfileForm } from "./agency-profile-form";
 import { BankAccountsSection } from "./bank-accounts-section";
-import type { SettingsTabId, StaffUser, AiProvider } from "./types";
+import type { SettingsTabId, StaffUser, AiProvider, ThemeSettings } from "./types";
 
 const profileSchema = z
   .object({
@@ -556,6 +556,82 @@ function AiProGate() {
   );
 }
 
+type ThemePresetColors = Pick<
+  ThemeSettings,
+  "primaryColor" | "secondaryColor" | "sidebarTextColor" | "fontColor" | "buttonFontColor" | "backgroundColor"
+>;
+
+/** Combinaciones de color listas para usar — solo tocan campos de color, no
+ * brandText/logoType/fontFamily/borderRadius (identidad/layout, no "tema"). */
+const THEME_PRESETS: { name: string; colors: ThemePresetColors }[] = [
+  {
+    name: "Clásico",
+    colors: {
+      primaryColor: "#059669",
+      secondaryColor: "#0d1f2d",
+      sidebarTextColor: "#9dbdb4",
+      fontColor: "#0a1a14",
+      buttonFontColor: "#ffffff",
+      backgroundColor: "#f5f8fc",
+    },
+  },
+  {
+    name: "Océano",
+    colors: {
+      primaryColor: "#2dd4bf",
+      secondaryColor: "#0f172a",
+      sidebarTextColor: "#94a3b8",
+      fontColor: "#0f172a",
+      buttonFontColor: "#0f172a",
+      backgroundColor: "#f0fdfa",
+    },
+  },
+  {
+    name: "Medianoche",
+    colors: {
+      primaryColor: "#a3e635",
+      secondaryColor: "#1e293b",
+      sidebarTextColor: "#cbd5e1",
+      fontColor: "#0f172a",
+      buttonFontColor: "#1e293b",
+      backgroundColor: "#f8fafc",
+    },
+  },
+  {
+    name: "Bosque",
+    colors: {
+      primaryColor: "#84cc16",
+      secondaryColor: "#052e16",
+      sidebarTextColor: "#86efac",
+      fontColor: "#052e16",
+      buttonFontColor: "#052e16",
+      backgroundColor: "#f0fdf4",
+    },
+  },
+  {
+    name: "Amanecer",
+    colors: {
+      primaryColor: "#da5a0e",
+      secondaryColor: "#121e2f",
+      sidebarTextColor: "#9dacbe",
+      fontColor: "#1a1a1a",
+      buttonFontColor: "#ffffff",
+      backgroundColor: "#fff7ed",
+    },
+  },
+  {
+    name: "Violeta",
+    colors: {
+      primaryColor: "#7c3aed",
+      secondaryColor: "#1e1b4b",
+      sidebarTextColor: "#c4b5fd",
+      fontColor: "#1e1b4b",
+      buttonFontColor: "#ffffff",
+      backgroundColor: "#faf5ff",
+    },
+  },
+];
+
 const ALL_SETTINGS_TABS: SettingsSectionNavItem<SettingsTabId>[] = [
   { id: "profile", label: "Mi Perfil", icon: User, mobileLabel: "Perfil" },
   { id: "company", label: "Datos de Empresa", icon: Building2, mobileLabel: "Empresa" },
@@ -990,6 +1066,47 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
           {/* TAB 2: Personalización del Panel */}
           {activeTab === "customization" && (
             <div className="space-y-6">
+              {/* Temas predefinidos */}
+              <div className="space-y-2">
+                <Label className="text-base font-bold text-navy">
+                  Temas predefinidos
+                </Label>
+                <p className="text-xs text-slate2">
+                  Aplicá una combinación de colores lista para usar. Después
+                  podés seguir ajustando cada color por separado más abajo.
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {THEME_PRESETS.map((preset) => {
+                    const isActive =
+                      settings.primaryColor.toLowerCase() === preset.colors.primaryColor.toLowerCase() &&
+                      settings.secondaryColor.toLowerCase() === preset.colors.secondaryColor.toLowerCase();
+                    return (
+                      <button
+                        key={preset.name}
+                        type="button"
+                        onClick={() => setSettings(preset.colors)}
+                        className={`relative flex flex-col gap-2 rounded-lg border p-3 text-left transition-colors hover:border-brand ${
+                          isActive ? "border-brand ring-1 ring-brand" : "border-border"
+                        }`}
+                      >
+                        {isActive && (
+                          <CheckCircle2 className="absolute top-2 right-2 h-4 w-4 text-brand" />
+                        )}
+                        <div className="flex overflow-hidden rounded-md h-8">
+                          <span className="flex-1" style={{ backgroundColor: preset.colors.secondaryColor }} />
+                          <span className="flex-1" style={{ backgroundColor: preset.colors.primaryColor }} />
+                          <span
+                            className="flex-1 border-l border-border/50"
+                            style={{ backgroundColor: preset.colors.backgroundColor }}
+                          />
+                        </div>
+                        <span className="text-xs font-semibold text-navy">{preset.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Color Primario */}
               <div className="space-y-2">
                 <Label className="text-base font-bold text-navy">
