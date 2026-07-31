@@ -25,6 +25,7 @@ function mapLocalDocument(doc: LocalDocument, accessToken?: string) {
     fileName: doc.fileName,
     mimeType: doc.mimeType,
     uploadedAt: doc.uploadedAt,
+    documentType: doc.documentType ?? "study",
     downloadUrl: `/api/clinic/documents?${q.toString()}`,
   };
 }
@@ -35,6 +36,7 @@ export async function attachLocalDocument(opts: {
   fileName: string;
   mimeType: string;
   buffer: Buffer;
+  documentType?: "payment_receipt" | "study";
 }): Promise<LocalDocument> {
   if (!ALLOWED_MIME.includes(opts.mimeType as (typeof ALLOWED_MIME)[number])) {
     throw new Error("Formato no permitido (PDF, JPG, PNG)");
@@ -60,6 +62,7 @@ export async function attachLocalDocument(opts: {
     filePath: path.join(opts.appointmentId, storedName),
     mimeType: opts.mimeType,
     uploadedAt: new Date().toISOString(),
+    documentType: opts.documentType ?? "study",
     // Keep a copy in JSON so downloads still work if the file is cleaned up.
     inlineDataBase64: opts.buffer.toString("base64"),
   };
@@ -169,6 +172,9 @@ export async function handleDocumentsPostLocal(request: NextRequest) {
   const file = formData.get("file");
   const accessToken = formData.get("accessToken")?.toString();
   const appointmentIdParam = formData.get("appointmentId")?.toString();
+  const documentTypeParam = formData.get("documentType")?.toString();
+  const documentType: "payment_receipt" | "study" =
+    documentTypeParam === "payment_receipt" ? "payment_receipt" : "study";
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Archivo requerido" }, { status: 400 });
@@ -224,6 +230,7 @@ export async function handleDocumentsPostLocal(request: NextRequest) {
     fileName: file.name,
     mimeType: file.type,
     buffer,
+    documentType,
   });
 
   return NextResponse.json(mapLocalDocument(doc, accessToken ?? appointment.accessToken));

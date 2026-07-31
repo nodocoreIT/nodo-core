@@ -22,6 +22,7 @@ function mapDocument(doc: {
   mime_type: string;
   uploaded_at: string;
   file_path: string;
+  document_type?: string;
   extra?: { doctorName?: string; scheduledAt?: string };
 }) {
   return {
@@ -31,6 +32,7 @@ function mapDocument(doc: {
     fileName: doc.file_name,
     mimeType: doc.mime_type,
     uploadedAt: doc.uploaded_at,
+    documentType: doc.document_type ?? "study",
     downloadUrl: `/api/clinic/documents?id=${doc.id}&download=1`,
     ...(doc.extra ?? {}),
   };
@@ -212,6 +214,7 @@ async function uploadReceiptForAppointment(
   appointment: UploadableAppointment,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
+  documentType: "payment_receipt" | "study" = "study",
 ) {
   if (!["scheduled", "waiting", "in_consultation"].includes(appointment.status)) {
     return NextResponse.json(
@@ -248,6 +251,7 @@ async function uploadReceiptForAppointment(
       file_name: file.name,
       file_path: storagePath,
       mime_type: file.type,
+      document_type: documentType,
     },
   );
 
@@ -260,7 +264,7 @@ async function uploadReceiptForAppointment(
     );
   }
 
-  if (appointment.payment_status === "pending") {
+  if (documentType === "payment_receipt" && appointment.payment_status === "pending") {
     await markTransferReceiptPendingReview(appointment as never, {
       fileName: file.name,
     });
@@ -275,6 +279,7 @@ async function uploadReceiptForAppointment(
       mime_type: doc.mime_type,
       uploaded_at: doc.uploaded_at,
       file_path: doc.file_path,
+      document_type: doc.document_type,
     }),
   );
 }
@@ -288,6 +293,9 @@ export async function POST(request: NextRequest) {
   const file = formData.get("file");
   const accessToken = formData.get("accessToken")?.toString();
   const appointmentIdParam = formData.get("appointmentId")?.toString();
+  const documentTypeParam = formData.get("documentType")?.toString();
+  const documentType: "payment_receipt" | "study" =
+    documentTypeParam === "payment_receipt" ? "payment_receipt" : "study";
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Archivo requerido" }, { status: 400 });
@@ -318,6 +326,7 @@ export async function POST(request: NextRequest) {
         file,
         publicApt as UploadableAppointment,
         await createServiceClient(),
+        documentType,
       );
     }
   }
@@ -375,7 +384,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return uploadReceiptForAppointment(file, appointment, supabase);
+  return uploadReceiptForAppointment(file, appointment, supabase, documentType);
 }
 
 // ── DELETE ────────────────────────────────────────────────────────────────────

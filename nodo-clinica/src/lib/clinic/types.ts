@@ -184,6 +184,10 @@ export interface LocalDocument {
   filePath: string;
   mimeType: string;
   uploadedAt: string;
+  /** Distingue el comprobante de pago de un estudio médico adjuntado —
+   * sin este campo, ambos flujos de subida caían en la misma lista y el
+   * primer archivo (sea cual sea) terminaba mostrado como "comprobante". */
+  documentType?: "payment_receipt" | "study";
   /** En Vercel el disco /tmp no persiste — guardamos el archivo en JSON/Blob. */
   inlineDataBase64?: string;
 }

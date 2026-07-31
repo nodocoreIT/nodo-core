@@ -91,7 +91,13 @@ export function WaitingRoom({
   const [queuePosition, setQueuePosition] = useState(0);
   const [totalWaiting, setTotalWaiting] = useState(0);
   const [uploadedFiles, setUploadedFiles] = useState<
-    { id?: string; name: string; uploadedAt: string; downloadUrl?: string }[]
+    {
+      id?: string;
+      name: string;
+      uploadedAt: string;
+      downloadUrl?: string;
+      documentType?: "payment_receipt" | "study";
+    }[]
   >([]);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
@@ -217,11 +223,13 @@ export function WaitingRoom({
                 fileName: string;
                 uploadedAt: string;
                 downloadUrl?: string;
+                documentType?: "payment_receipt" | "study";
               }) => ({
                 id: d.id,
                 name: d.fileName,
                 uploadedAt: d.uploadedAt,
                 downloadUrl: d.downloadUrl,
+                documentType: d.documentType,
               })
             )
           );
@@ -309,7 +317,7 @@ export function WaitingRoom({
           continue;
         }
         try {
-          const doc = await clinicApi.uploadDocument(file, accessToken);
+          const doc = await clinicApi.uploadDocument(file, accessToken, "study");
           setUploadedFiles((prev) => [
             ...prev,
             {
@@ -317,6 +325,7 @@ export function WaitingRoom({
               name: doc.fileName,
               uploadedAt: doc.uploadedAt,
               downloadUrl: doc.downloadUrl,
+              documentType: "study",
             },
           ]);
           toast.success(`${file.name} subido correctamente`);
@@ -352,17 +361,32 @@ export function WaitingRoom({
         continue;
       }
 
-      await supabase.from("patient_documents").insert({
-        patient_id: appointment.patient_id,
-        appointment_id: appointment.id,
-        file_name: file.name,
-        file_path: path,
-        mime_type: file.type,
-      });
+      const { data: inserted, error: insertError } = await supabase
+        .from("patient_documents")
+        .insert({
+          patient_id: appointment.patient_id,
+          appointment_id: appointment.id,
+          file_name: file.name,
+          file_path: path,
+          mime_type: file.type,
+          document_type: "study",
+        })
+        .select("id, file_name, uploaded_at")
+        .single();
+
+      if (insertError || !inserted) {
+        toast.error(`Error al registrar ${file.name}`);
+        continue;
+      }
 
       setUploadedFiles((prev) => [
         ...prev,
-        { name: file.name, uploadedAt: new Date().toISOString() },
+        {
+          id: inserted.id,
+          name: inserted.file_name,
+          uploadedAt: inserted.uploaded_at,
+          documentType: "study",
+        },
       ]);
       toast.success(`${file.name} subido correctamente`);
     }
@@ -638,7 +662,8 @@ export function WaitingRoom({
   }
 
   const receiptAlreadySubmitted =
-    !!paymentReceiptAudit || uploadedFiles.length > 0;
+    !!paymentReceiptAudit ||
+    uploadedFiles.some((f) => f.documentType === "payment_receipt");
 
   if (paymentStatus === "pending" && receiptAlreadySubmitted) {
     return (
@@ -808,6 +833,7 @@ export function WaitingRoom({
                       const doc = await clinicApi.uploadDocument(
                         file,
                         accessToken,
+                        "payment_receipt",
                       );
                       setUploadedFiles((prev) => [
                         ...prev,
@@ -816,6 +842,7 @@ export function WaitingRoom({
                           name: doc.fileName,
                           uploadedAt: doc.uploadedAt,
                           downloadUrl: doc.downloadUrl,
+                          documentType: "payment_receipt",
                         },
                       ]);
                       toast.success("Comprobante subido");
@@ -831,7 +858,9 @@ export function WaitingRoom({
                     className="w-full mt-3 bg-violet-700 hover:bg-violet-800"
                     disabled={validatingReceipt}
                     onClick={async () => {
-                      const receipt = uploadedFiles.find((f) => f.id);
+                      const receipt = uploadedFiles.find(
+                        (f) => f.documentType === "payment_receipt",
+                      );
                       if (!receipt?.id) return;
                       setValidatingReceipt(true);
                       try {

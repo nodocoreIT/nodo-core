@@ -119,6 +119,7 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
           fileName: d.fileName,
           uploadedAt: d.uploadedAt,
           mimeType: d.mimeType,
+          documentType: d.documentType ?? "study",
           downloadUrl: `/api/clinic/documents?id=${d.id}&download=1&token=${encodeURIComponent(apt.accessToken)}`,
         })),
     });
@@ -149,7 +150,9 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
             typeof apt.paymentReceiptAudit?.rejectionReason === "string",
           needsReview: appointmentNeedsDoctorPaymentReview(apt, {
             receiptDocumentCount: db.documents.filter(
-              (d) => d.appointmentId === apt.id,
+              (d) =>
+                d.appointmentId === apt.id &&
+                d.documentType === "payment_receipt",
             ).length,
           }),
           doctor: doctor
@@ -189,7 +192,11 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
         .slice(0, 100)
         .map((apt) => {
           const patient = db.patients.find((p) => p.id === apt.patientId);
-          const docs = db.documents.filter((d) => d.appointmentId === apt.id);
+          const docs = db.documents.filter(
+            (d) =>
+              d.appointmentId === apt.id &&
+              d.documentType === "payment_receipt",
+          );
           const audit = apt.paymentReceiptAudit;
           const receipt = resolveCobroReceiptFields(apt);
           return {
@@ -232,7 +239,9 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
               a.paymentStatus === "confirmed" ||
               appointmentNeedsDoctorPaymentReview(a, {
                 receiptDocumentCount: db.documents.filter(
-                  (d) => d.appointmentId === a.id,
+                  (d) =>
+                    d.appointmentId === a.id &&
+                    d.documentType === "payment_receipt",
                 ).length,
               })),
         )
@@ -247,7 +256,11 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
         .slice(0, 50)
         .map((apt) => {
           const patient = db.patients.find((p) => p.id === apt.patientId);
-          const docs = db.documents.filter((d) => d.appointmentId === apt.id);
+          const docs = db.documents.filter(
+            (d) =>
+              d.appointmentId === apt.id &&
+              d.documentType === "payment_receipt",
+          );
           return {
             id: apt.id,
             scheduledAt: apt.scheduledAt,
@@ -272,7 +285,8 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
       const pending = db.appointments
         .filter((a) => {
           const docCount = db.documents.filter(
-            (d) => d.appointmentId === a.id,
+            (d) =>
+              d.appointmentId === a.id && d.documentType === "payment_receipt",
           ).length;
           return (
             a.doctorId === doctorId &&
@@ -287,7 +301,11 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
         )
         .map((apt) => {
           const patient = db.patients.find((p) => p.id === apt.patientId);
-          const docs = db.documents.filter((d) => d.appointmentId === apt.id);
+          const docs = db.documents.filter(
+            (d) =>
+              d.appointmentId === apt.id &&
+              d.documentType === "payment_receipt",
+          );
           return {
             id: apt.id,
             scheduledAt: apt.scheduledAt,

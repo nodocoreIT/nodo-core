@@ -226,6 +226,7 @@ export async function GET(request: NextRequest) {
         fileName: d.file_name,
         uploadedAt: d.uploaded_at,
         mimeType: d.mime_type,
+        documentType: d.document_type ?? "study",
         downloadUrl: `/api/clinic/documents?id=${d.id}&download=1&token=${encodeURIComponent(apt.access_token)}`,
       })),
     });
@@ -308,9 +309,10 @@ export async function GET(request: NextRequest) {
           cancelledBy: (apt as any).cancelled_by ?? null,
           paymentRejected: typeof audit?.rejectionReason === "string",
           needsReview: appointmentNeedsDoctorPaymentReviewFromDbRow(apt as never, {
-            receiptDocumentCount:
+            receiptDocumentCount: (
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              ((apt as any).patient_documents ?? []).length,
+              ((apt as any).patient_documents ?? []) as Array<{ document_type?: string }>
+            ).filter((d) => d.document_type === "payment_receipt").length,
           }),
           doctor: professional
             ? {
@@ -378,11 +380,15 @@ export async function GET(request: NextRequest) {
             apt.created_at,
           ),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          documents: ((apt as any).patient_documents ?? []).map((d: any) => ({
-            id: d.id,
-            fileName: d.file_name,
-            downloadUrl: `/api/clinic/documents?id=${d.id}&download=1`,
-          })),
+          documents: ((apt as any).patient_documents ?? [])
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .filter((d: any) => d.document_type === "payment_receipt")
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .map((d: any) => ({
+              id: d.id,
+              fileName: d.file_name,
+              downloadUrl: `/api/clinic/documents?id=${d.id}&download=1`,
+            })),
         };
       });
 
@@ -404,8 +410,10 @@ export async function GET(request: NextRequest) {
       const entries = (ledger ?? [])
         .filter((apt) =>
           appointmentNeedsDoctorPaymentReviewFromDbRow(apt as never, {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            receiptDocumentCount: ((apt as any).patient_documents ?? []).length,
+            receiptDocumentCount: (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ((apt as any).patient_documents ?? []) as Array<{ document_type?: string }>
+            ).filter((d) => d.document_type === "payment_receipt").length,
           }) ||
           apt.payment_status === "confirmed" ||
           apt.payment_receipt_audit,
@@ -423,15 +431,21 @@ export async function GET(request: NextRequest) {
           paymentProvider: apt.payment_provider,
           audit: apt.payment_receipt_audit,
           needsReview: appointmentNeedsDoctorPaymentReviewFromDbRow(apt as never, {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            receiptDocumentCount: ((apt as any).patient_documents ?? []).length,
+            receiptDocumentCount: (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ((apt as any).patient_documents ?? []) as Array<{ document_type?: string }>
+            ).filter((d) => d.document_type === "payment_receipt").length,
           }),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          documents: ((apt as any).patient_documents ?? []).map((d: any) => ({
-            id: d.id,
-            fileName: d.file_name,
-            downloadUrl: `/api/clinic/documents?id=${d.id}&download=1`,
-          })),
+          documents: ((apt as any).patient_documents ?? [])
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .filter((d: any) => d.document_type === "payment_receipt")
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .map((d: any) => ({
+              id: d.id,
+              fileName: d.file_name,
+              downloadUrl: `/api/clinic/documents?id=${d.id}&download=1`,
+            })),
         }));
 
       return NextResponse.json({ entries });
@@ -448,35 +462,43 @@ export async function GET(request: NextRequest) {
       const pending = (all ?? [])
         .filter((apt) =>
           appointmentNeedsDoctorPaymentReviewFromDbRow(apt as never, {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            receiptDocumentCount: ((apt as any).patient_documents ?? []).length,
+            receiptDocumentCount: (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ((apt as any).patient_documents ?? []) as Array<{ document_type?: string }>
+            ).filter((d) => d.document_type === "payment_receipt").length,
           }),
         )
-        .map((apt) => ({
-          id: apt.id,
-          scheduledAt: apt.scheduled_at,
-          status: apt.status,
-          paymentStatus: apt.payment_status,
-          paymentProvider: apt.payment_provider,
-          paymentReceiptAudit: apt.payment_receipt_audit,
-          intakeReason: apt.intake_reason,
+        .map((apt) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          patient: (apt as any).patients
-            ? {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                fullName: (apt as any).patients.full_name,
-              }
-            : undefined,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          documentCount: ((apt as any).patient_documents ?? []).length,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          documents: ((apt as any).patient_documents ?? []).map((d: any) => ({
-            id: d.id,
-            fileName: d.file_name,
-            uploadedAt: d.uploaded_at,
-            downloadUrl: `/api/clinic/documents?id=${d.id}&download=1`,
-          })),
-        }));
+          const receiptDocs = ((apt as any).patient_documents ?? []).filter(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (d: any) => d.document_type === "payment_receipt",
+          );
+          return {
+            id: apt.id,
+            scheduledAt: apt.scheduled_at,
+            status: apt.status,
+            paymentStatus: apt.payment_status,
+            paymentProvider: apt.payment_provider,
+            paymentReceiptAudit: apt.payment_receipt_audit,
+            intakeReason: apt.intake_reason,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            patient: (apt as any).patients
+              ? {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  fullName: (apt as any).patients.full_name,
+                }
+              : undefined,
+            documentCount: receiptDocs.length,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            documents: receiptDocs.map((d: any) => ({
+              id: d.id,
+              fileName: d.file_name,
+              uploadedAt: d.uploaded_at,
+              downloadUrl: `/api/clinic/documents?id=${d.id}&download=1`,
+            })),
+          };
+        });
 
       return NextResponse.json(pending);
     }

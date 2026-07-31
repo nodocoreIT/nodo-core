@@ -175,6 +175,7 @@ export interface LocalDocument {
   filePath: string;
   mimeType: string;
   uploadedAt: string;
+  documentType?: "payment_receipt" | "study";
   /** En Vercel el disco /tmp no persiste — guardamos el archivo en JSON/Blob. */
   inlineDataBase64?: string;
 }
@@ -505,6 +506,14 @@ function normalizeDb(db: ClinicDatabase): ClinicDatabase {
   if (!db.nodoChatReadAt) db.nodoChatReadAt = {};
   if (!db.doctorTasks) db.doctorTasks = [];
   if (!db.doctorNotifications) db.doctorNotifications = [];
+  // Documents saved before document_type existed predate the "Estudios
+  // previos" flow — treat them as payment receipts to preserve today's
+  // Cobros view instead of silently hiding them.
+  if (db.documents) {
+    db.documents = db.documents.map((d) =>
+      d.documentType ? d : { ...d, documentType: "payment_receipt" },
+    );
+  }
   ensureExtraDemoDoctors(db);
   ensureDemoPatients(db);
   return db;
