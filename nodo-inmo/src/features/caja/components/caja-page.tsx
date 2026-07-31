@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Plus, ArrowUpRight, ArrowDownRight, Pencil, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, ArrowUpRight, ArrowDownRight, Pencil, Trash2, Coins, X } from "lucide-react";
 import { PaginationControls, FormSelect } from "@nodocore/shared-components";
 import { Button } from "@nodocore/shared-components";
 import {
@@ -32,6 +32,51 @@ const SOURCE_LABELS: Record<string, string> = {
   commission: "Comisión",
   owner_payout: "Liquidación",
 };
+
+const NODO_LANDING_URL =
+  (import.meta.env.VITE_NODO_LANDING_URL as string | undefined)?.replace(/\/$/, "") ||
+  "https://nodocore.com.ar";
+
+const FINANZAS_BANNER_DISMISSED_KEY = "inmo_finanzas_banner_dismissed";
+
+function FinanzasBanner() {
+  const [dismissed, setDismissed] = useState(true);
+
+  useEffect(() => {
+    setDismissed(localStorage.getItem(FINANZAS_BANNER_DISMISSED_KEY) === "1");
+  }, []);
+
+  if (dismissed) return null;
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-2.5 text-sm text-emerald-900">
+      <Coins className="h-4 w-4 shrink-0 text-emerald-600" />
+      <p className="flex-1">
+        Ya tenés Nodo Inmo — ¿te gustaría anexar{" "}
+        <a
+          href={`${NODO_LANDING_URL}/nodo-finanzas`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium underline underline-offset-2 hover:text-emerald-700"
+        >
+          Nodo Finanzas
+        </a>{" "}
+        para llevar el control de tus ingresos?
+      </p>
+      <button
+        type="button"
+        onClick={() => {
+          localStorage.setItem(FINANZAS_BANNER_DISMISSED_KEY, "1");
+          setDismissed(true);
+        }}
+        aria-label="Cerrar"
+        className="shrink-0 rounded p-1 text-emerald-500 hover:bg-emerald-100 hover:text-emerald-700"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
 
 type SortKey = "date" | "concept" | "source" | "category" | "amount";
 type SortDir = "asc" | "desc";
@@ -114,6 +159,7 @@ export function CajaPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <FinanzasBanner />
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate2">
           Los totales e historial detallado están en{" "}
