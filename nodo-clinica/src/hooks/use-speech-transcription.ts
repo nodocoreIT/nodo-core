@@ -44,6 +44,11 @@ export function useSpeechTranscription({
   const onSegmentRef = useRef(onSegment);
   const onInterimRef = useRef(onInterim);
   const onErrorRef = useRef(onError);
+  // Última transcripción provisoria (aún no confirmada como "final" por el
+  // motor de reconocimiento — eso puede tardar 1-3s después de dejar de
+  // hablar). Si el usuario detiene el dictado antes de esa confirmación,
+  // se vuelca acá para no perderla.
+  const pendingInterimRef = useRef("");
   const [isSupported] = useState(() => getSpeechRecognitionCtor() != null);
 
   enabledRef.current = enabled;
@@ -52,11 +57,27 @@ export function useSpeechTranscription({
   onInterimRef.current = onInterim;
   onErrorRef.current = onError;
 
+  function flushPendingInterim() {
+    const pending = pendingInterimRef.current.trim();
+    pendingInterimRef.current = "";
+    if (!pending) return;
+    const segment: TranscriptionSegment = {
+      speaker: "unknown",
+      text: pending,
+      timestamp: new Date().toISOString(),
+    };
+    if (syncToStoreRef.current) {
+      useConsultationStore.getState().appendTranscription(segment);
+    }
+    onSegmentRef.current?.(segment);
+    onInterimRef.current?.("");
+  }
+
   useEffect(() => {
     if (!enabled) {
       stopRecognitionInstance(recognitionRef.current);
       recognitionRef.current = null;
-      onInterimRef.current?.("");
+      flushPendingInterim();
       if (syncToStoreRef.current) {
         const { isTranscribing, setIsTranscribing } =
           useConsultationStore.getState();
@@ -91,9 +112,11 @@ export function useSpeechTranscription({
         }
       }
 
+      pendingInterimRef.current = interim.trim();
       onInterimRef.current?.(interim.trim());
 
       if (finalTranscript.trim()) {
+        pendingInterimRef.current = "";
         onInterimRef.current?.("");
         const segment: TranscriptionSegment = {
           speaker: "unknown",
@@ -114,7 +137,7 @@ export function useSpeechTranscription({
       if (syncToStoreRef.current) {
         useConsultationStore.getState().setIsTranscribing(false);
       }
-      onInterimRef.current?.("");
+      flushPendingInterim();
     };
 
     recognition.onend = () => {
@@ -125,7 +148,7 @@ export function useSpeechTranscription({
         if (syncToStoreRef.current) {
           useConsultationStore.getState().setIsTranscribing(false);
         }
-        onInterimRef.current?.("");
+        flushPendingInterim();
       }
     };
 
@@ -145,7 +168,7 @@ export function useSpeechTranscription({
       if (recognitionRef.current === recognition) {
         recognitionRef.current = null;
       }
-      onInterimRef.current?.("");
+      flushPendingInterim();
     };
   }, [enabled]);
 
