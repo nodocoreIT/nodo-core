@@ -509,7 +509,11 @@ export default function DashboardShell({ user, nombreCompleto, children, enabled
         )}
 
         {pathname === "/dashboard" && (
-          <FeedbackFAB supabase={supabase} sourceNode="ecommerce" />
+          <FeedbackFAB
+            supabase={supabase}
+            sourceNode="ecommerce"
+            imgSrc="/ecommerce/brand/nodo-mark-white.png"
+          />
         )}
       </div>
     </div>

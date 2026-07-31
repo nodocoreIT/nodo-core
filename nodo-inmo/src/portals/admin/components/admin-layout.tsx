@@ -744,7 +744,11 @@ function AdminLayoutShell({
 
       {/* Floating feedback node (only on Dashboard/Inicio) */}
       {pathname === "/admin/dashboard" && (
-        <FeedbackFAB supabase={supabase} sourceNode="inmo" />
+        <FeedbackFAB
+          supabase={supabase}
+          sourceNode="inmo"
+          imgSrc={`${import.meta.env.BASE_URL}brand/nodo-mark-white.png`}
+        />
       )}
     </div>
     </InmoSettingsModuleProvider>

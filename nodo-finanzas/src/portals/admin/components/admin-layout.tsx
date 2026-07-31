@@ -412,7 +412,11 @@ export function AdminLayout() {
         </div>
 
         {pathname === "/admin/dashboard" && (
-          <FeedbackFAB supabase={supabase} sourceNode="finanzas" />
+          <FeedbackFAB
+            supabase={supabase}
+            sourceNode="finanzas"
+            imgSrc={`${import.meta.env.BASE_URL}brand/nodo-mark-white.png`}
+          />
         )}
 
         <SettingsDialog
