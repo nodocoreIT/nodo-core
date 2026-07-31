@@ -33,7 +33,7 @@ import type { PendingRefundItem } from "@/components/dashboard/day-appointments-
 import { clinicApi } from "@/lib/clinic/client-api";
 import { currencySymbol } from "@/lib/clinic/currency";
 import type { PaymentReceiptAudit } from "@/lib/clinic/local-db";
-import { format, isToday } from "date-fns";
+import { addDays, format, isSameDay, isToday } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -175,6 +175,7 @@ export function DoctorCobrosList({
   const [statusFilter, setStatusFilter] = useState<"all" | RowStatus>("all");
   const [monthFilter, setMonthFilter] = useState<string>("all");
   const [page, setPage] = useState(0);
+  const [dayOffset, setDayOffset] = useState(0);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -218,8 +219,7 @@ export function DoctorCobrosList({
   // "Pendientes" haría que el total muestre $0, que no tiene sentido: el
   // objetivo es siempre ver el dinero real que entró, sin importar qué
   // subconjunto de filas se esté mirando en la tabla.
-  const { todayTotal, approvedTotal } = useMemo(() => {
-    let today = 0;
+  const approvedTotal = useMemo(() => {
     let approved = 0;
     for (const row of rows) {
       if (monthFilter !== "all" && monthKeyOf(row) !== monthFilter) continue;
@@ -227,13 +227,27 @@ export function DoctorCobrosList({
       const amt = rowAmount(row) ?? 0;
       if (amt <= 0) continue;
       approved += amt;
+    }
+    return approved;
+  }, [rows, monthFilter]);
+
+  // Independiente del filtro de mes: el selector de día deja navegar
+  // cualquier fecha, sin importar qué mes esté filtrado en la tabla.
+  const selectedDay = useMemo(() => addDays(new Date(), dayOffset), [dayOffset]);
+
+  const selectedDayTotal = useMemo(() => {
+    let total = 0;
+    for (const row of rows) {
+      if (rowStatus(row) !== "approved") continue;
+      const amt = rowAmount(row) ?? 0;
+      if (amt <= 0) continue;
       const refDate = row.createdAt ? new Date(row.createdAt) : new Date(row.scheduledAt);
-      if (!Number.isNaN(refDate.getTime()) && isToday(refDate)) {
-        today += amt;
+      if (!Number.isNaN(refDate.getTime()) && isSameDay(refDate, selectedDay)) {
+        total += amt;
       }
     }
-    return { todayTotal: today, approvedTotal: approved };
-  }, [rows, monthFilter]);
+    return total;
+  }, [rows, selectedDay]);
 
   const handleConfirm = async (appointmentId: string) => {
     setActingId(appointmentId);
@@ -338,15 +352,6 @@ export function DoctorCobrosList({
 
   return (
     <div className="space-y-3">
-      {todayTotal > 0 && (
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="text-slate-600">
-            Hoy:{" "}
-            <strong className="text-emerald-800">{formatMoney(todayTotal)}</strong>
-          </span>
-        </div>
-      )}
-
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap gap-1.5">
@@ -601,6 +606,39 @@ export function DoctorCobrosList({
               </div>
             </div>
           )}
+
+          {/* Total del día seleccionado — navegable con flechas */}
+          <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3">
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 text-emerald-700 hover:bg-emerald-100"
+                onClick={() => setDayOffset((o) => o - 1)}
+                aria-label="Día anterior"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="min-w-[92px] text-center text-sm font-medium text-emerald-900">
+                {isToday(selectedDay)
+                  ? "Hoy"
+                  : format(selectedDay, "dd/MM/yyyy", { locale: es })}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 text-emerald-700 hover:bg-emerald-100 disabled:opacity-30"
+                disabled={dayOffset >= 0}
+                onClick={() => setDayOffset((o) => o + 1)}
+                aria-label="Día siguiente"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <span className="text-lg font-bold text-emerald-800 tabular-nums">
+              {formatMoney(selectedDayTotal)}
+            </span>
+          </div>
 
           {/* Total aprobados — dinero real que ingresó a la cuenta */}
           <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3">
