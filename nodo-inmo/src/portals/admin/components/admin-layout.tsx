@@ -55,7 +55,8 @@ import { cn } from "@/shared/lib/utils";
 import { SettingsDialog, type SettingsTabId } from "@nodocore/nodo-modules/settings";
 import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { InmoSettingsModuleProvider } from "@/shared/lib/inmo-settings-module";
-import { FeedbackFAB } from "@/features/feedback/components/feedback-node";
+import { FeedbackFAB } from "@nodocore/nodo-modules/feedback";
+import { supabase } from "@/shared/lib/supabase";
 import { NotificationsBell } from "@/features/dashboard/components/notifications-bell";
 import { IndicesBadge } from "@/features/ipc/components/IndicesBadge";
 import { PlanBadge } from "@/features/plan/components/plan-badge";
@@ -742,7 +743,9 @@ function AdminLayoutShell({
       />
 
       {/* Floating feedback node (only on Dashboard/Inicio) */}
-      {pathname === "/admin/dashboard" && <FeedbackFAB />}
+      {pathname === "/admin/dashboard" && (
+        <FeedbackFAB supabase={supabase} sourceNode="inmo" />
+      )}
     </div>
     </InmoSettingsModuleProvider>
   );

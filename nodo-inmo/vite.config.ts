@@ -42,6 +42,10 @@ export default defineConfig({
         monorepoRoot,
         "packages/nodo-modules/src/caja/index.ts",
       ),
+      "@nodocore/nodo-modules/feedback": resolve(
+        monorepoRoot,
+        "packages/nodo-modules/src/feedback/index.ts",
+      ),
       "@nodocore/nodo-modules/notifications": resolve(
         monorepoRoot,
         "packages/nodo-modules/src/notifications/index.ts",

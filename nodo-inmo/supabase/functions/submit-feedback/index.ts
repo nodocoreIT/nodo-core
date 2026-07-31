@@ -9,6 +9,7 @@ type FeedbackBody = {
   content: string;
   orgId?: string | null;
   redirectTo?: string;
+  sourceNode?: string;
 };
 
 Deno.serve(async (req) => {
@@ -39,7 +40,7 @@ Deno.serve(async (req) => {
     return json({ error: "Invalid JSON body" }, 400);
   }
 
-  const { category, content, orgId, redirectTo } = body;
+  const { category, content, orgId, redirectTo, sourceNode = "inmo" } = body;
 
   if (!category || !content?.trim()) {
     return json({ error: "category and content are required" }, 400);
@@ -62,7 +63,7 @@ Deno.serve(async (req) => {
       content: content.trim(),
       metadata: {
         dictated: false,
-        source_node: "inmo",
+        source_node: sourceNode,
       },
     });
 
@@ -76,7 +77,7 @@ Deno.serve(async (req) => {
   const notify = await notifyFeedbackToLanding(landingRedirectTo, {
     category,
     content: content.trim(),
-    sourceNode: "inmo",
+    sourceNode,
     userEmail: user.email,
   });
 
