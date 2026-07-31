@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { FeedbackFAB } from "@nodocore/nodo-modules/feedback";
 import {
   Package,
   UserCircle,
@@ -505,6 +506,10 @@ export default function DashboardShell({ user, nombreCompleto, children, enabled
               </div>
             </div>
           </div>
+        )}
+
+        {pathname === "/dashboard" && (
+          <FeedbackFAB supabase={supabase} sourceNode="ecommerce" />
         )}
       </div>
     </div>
