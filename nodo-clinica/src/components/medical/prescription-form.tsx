@@ -332,7 +332,7 @@ export function PrescriptionForm({
           Agregar medicamento
         </Button>
 
-        {!signatureText && (
+        {!signatureText && !signatureImageData && (
           <p className="text-xs text-amber-700">
             Configurá tu firma en Consultorio → Perfil para que aparezca en recetas y órdenes.
           </p>
