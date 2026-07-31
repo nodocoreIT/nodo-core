@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/supabase/auth-guard";
-import { getRecords, createRecord } from "@/lib/clinic/db/clinical-records";
+import { getRecords, createRecord, deleteRecord } from "@/lib/clinic/db/clinical-records";
 
 export async function POST(request: NextRequest) {
   const authResult = await requireAuth(request);
@@ -123,4 +123,31 @@ export async function GET(request: NextRequest) {
         : undefined,
     })),
   );
+}
+
+export async function DELETE(request: NextRequest) {
+  const authResult = await requireAuth(request);
+  if (authResult instanceof NextResponse) return authResult;
+  const { user, supabase } = authResult;
+
+  if (user.role !== "doctor") {
+    return NextResponse.json({ error: "Solo médicos" }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "id requerido" }, { status: 400 });
+  }
+
+  if (!user.org_id) {
+    return NextResponse.json({ error: "org_id requerido" }, { status: 403 });
+  }
+
+  const { error } = await deleteRecord(supabase, id, user.org_id);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
 }

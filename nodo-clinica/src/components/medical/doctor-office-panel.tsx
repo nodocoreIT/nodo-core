@@ -288,6 +288,17 @@ export function DoctorOfficePanel({
       if (result.office) {
         loadGen.current += 1;
         applyOfficeData(result.office);
+        window.dispatchEvent(
+          new CustomEvent("nodo:signature-updated", {
+            detail: {
+              signatureText:
+                (result.office.signatureText as string | undefined) ?? signatureText,
+              signatureImageData:
+                (result.office.signatureImageData as string | undefined) ??
+                signatureImageData,
+            },
+          }),
+        );
       }
       hydrateSettings(themeSettings);
       // Persist theme directly to Supabase (best-effort; API route is the primary path).

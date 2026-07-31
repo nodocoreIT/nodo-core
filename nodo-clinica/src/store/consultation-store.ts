@@ -22,6 +22,7 @@ interface ConsultationState {
   isSavingNotes: boolean;
   lastSavedAt: Date | null;
   notesEditorFocusRequest: number;
+  reportFocusRequest: number;
   notifications: AppNotification[];
 
   setDoctorId: (id: string) => void;
@@ -39,6 +40,7 @@ interface ConsultationState {
   setIsSavingNotes: (value: boolean) => void;
   setLastSavedAt: (date: Date | null) => void;
   requestNotesEditorFocus: () => void;
+  requestReportFocus: () => void;
   addNotification: (notification: Omit<AppNotification, "id" | "read" | "createdAt">) => void;
   markNotificationRead: (id: string) => void;
   clearNotifications: () => void;
@@ -70,6 +72,7 @@ export const useConsultationStore = create<ConsultationState>((set, get) => ({
   isSavingNotes: false,
   lastSavedAt: null,
   notesEditorFocusRequest: 0,
+  reportFocusRequest: 0,
   notifications: [],
 
   setDoctorId: (id) => set({ doctorId: id }),
@@ -138,6 +141,11 @@ export const useConsultationStore = create<ConsultationState>((set, get) => ({
   requestNotesEditorFocus: () =>
     set((state) => ({
       notesEditorFocusRequest: state.notesEditorFocusRequest + 1,
+    })),
+
+  requestReportFocus: () =>
+    set((state) => ({
+      reportFocusRequest: state.reportFocusRequest + 1,
     })),
 
   addNotification: (notification) =>

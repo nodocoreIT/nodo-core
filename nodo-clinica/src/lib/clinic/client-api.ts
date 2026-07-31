@@ -1056,6 +1056,16 @@ export const clinicApi = {
     return res.json();
   },
 
+  async deleteClinicalRecord(id: string) {
+    const res = await fetch(
+      `${BASE}/api/clinic/clinical-records?id=${id}`,
+      { ...clinicFetchOpts(), method: "DELETE" },
+    );
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "Error al eliminar registro");
+    return data as { ok: boolean };
+  },
+
   async saveNotes(
     appointmentId: string,
     doctorId: string,
@@ -1147,10 +1157,15 @@ export const clinicApi = {
     return this.saveDoctorOffice(payload);
   },
 
-  async uploadDocument(file: File, accessToken: string) {
+  async uploadDocument(
+    file: File,
+    accessToken: string,
+    documentType: "payment_receipt" | "study" = "study",
+  ) {
     const form = new FormData();
     form.append("file", file);
     form.append("accessToken", accessToken);
+    form.append("documentType", documentType);
     const res = await fetch(`${BASE}/api/clinic/documents`, {
       method: "POST",
       credentials: "include",
@@ -1163,6 +1178,7 @@ export const clinicApi = {
       fileName: string;
       uploadedAt: string;
       downloadUrl?: string;
+      documentType?: "payment_receipt" | "study";
     };
   },
 

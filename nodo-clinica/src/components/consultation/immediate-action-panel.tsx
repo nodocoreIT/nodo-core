@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Zap, History, Mic, FileEdit, Paperclip, FileText } from "lucide-react";
+import { Zap, History, FileEdit, Paperclip, FileText } from "lucide-react";
 import { ClinicalHistoryViewer } from "./clinical-history-viewer";
-import { TranscriptionPanel } from "./transcription-panel";
 import { ClinicalNotesEditor } from "./clinical-notes-editor";
 import { PatientDocumentsPanel } from "@/components/medical/patient-documents-panel";
 import { MedicalReportPanel } from "@/components/medical/medical-report-panel";
@@ -38,8 +37,13 @@ export function ImmediateActionPanel({
   dataSource = "supabase",
   onReportSaved,
 }: ImmediateActionPanelProps) {
-  const { clinicalHistory, hasActiveSession, notesEditorFocusRequest } =
-    useConsultationStore();
+  const {
+    clinicalHistory,
+    setClinicalHistory,
+    hasActiveSession,
+    notesEditorFocusRequest,
+    reportFocusRequest,
+  } = useConsultationStore();
   const [activeTab, setActiveTab] = useState("files");
 
   useEffect(() => {
@@ -47,6 +51,12 @@ export function ImmediateActionPanel({
       setActiveTab("notes");
     }
   }, [notesEditorFocusRequest]);
+
+  useEffect(() => {
+    if (reportFocusRequest > 0 && dataSource === "local") {
+      setActiveTab("report");
+    }
+  }, [reportFocusRequest, dataSource]);
 
   if (!hasActiveSession()) {
     return (
@@ -73,24 +83,20 @@ export function ImmediateActionPanel({
       </CardHeader>
       <CardContent className="p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 bg-slate-100">
-            <TabsTrigger value="files" className="text-xs gap-1">
+          <TabsList className="flex w-full flex-wrap gap-3 bg-slate-100">
+            <TabsTrigger value="files" className="flex-none text-xs gap-1">
               <Paperclip className="h-3.5 w-3.5" />
               Archivos
             </TabsTrigger>
-            <TabsTrigger value="history" className="text-xs gap-1">
+            <TabsTrigger value="history" className="flex-none text-xs gap-1">
               <History className="h-3.5 w-3.5" />
               Historial
             </TabsTrigger>
-            <TabsTrigger value="report" className="text-xs gap-1">
+            <TabsTrigger value="report" className="flex-none text-xs gap-1">
               <FileText className="h-3.5 w-3.5" />
               Informe
             </TabsTrigger>
-            <TabsTrigger value="transcription" className="text-xs gap-1">
-              <Mic className="h-3.5 w-3.5" />
-              Voz
-            </TabsTrigger>
-            <TabsTrigger value="notes" className="text-xs gap-1">
+            <TabsTrigger value="notes" className="flex-none text-xs gap-1">
               <FileEdit className="h-3.5 w-3.5" />
               Notas
             </TabsTrigger>
@@ -108,6 +114,9 @@ export function ImmediateActionPanel({
             <ClinicalHistoryViewer
               records={clinicalHistory}
               onGenerateReport={canReport ? () => setActiveTab("report") : undefined}
+              onDeleted={(id) =>
+                setClinicalHistory(clinicalHistory.filter((r) => r.id !== id))
+              }
             />
           </TabsContent>
           <TabsContent value="report" className="mt-3">
@@ -130,9 +139,6 @@ export function ImmediateActionPanel({
                 Informes disponibles en modo local
               </p>
             )}
-          </TabsContent>
-          <TabsContent value="transcription" className="mt-3">
-            <TranscriptionPanel />
           </TabsContent>
           <TabsContent value="notes" className="mt-3">
             <ClinicalNotesEditor

@@ -3,17 +3,15 @@
 import { useEffect, useCallback, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Stethoscope, Pill, FlaskConical, LogOut, CheckCircle, Settings, CalendarPlus } from "lucide-react";
+import { Stethoscope, LogOut, CheckCircle, Settings, CalendarPlus } from "lucide-react";
 // import { Brain } from "lucide-react"; // SOAP tab disabled, see below
 import { PatientQueue } from "@/components/dashboard/patient-queue";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { JitsiMeet } from "@/components/consultation/jitsi-meet";
 import { ConsultationEndScreen } from "@/components/consultation/consultation-end-screen";
 import { ImmediateActionPanel } from "@/components/consultation/immediate-action-panel";
-import { PrescriptionForm } from "@/components/medical/prescription-form";
-import { StudyRequestForm } from "@/components/medical/study-request-form";
+import { ConsultationToolsSidebar } from "@/components/consultation/consultation-tools-sidebar";
 // import { SoapSummaryPanel } from "@/components/medical/soap-summary-panel"; // SOAP tab disabled, see below
 import { DoctorOfficeSidebar } from "@/components/dashboard/doctor-office-sidebar";
 import { DoctorPendingPaymentsPanel } from "@/components/dashboard/doctor-pending-payments-panel";
@@ -129,7 +127,6 @@ export function DoctorDashboard({
     patientPhone?: string;
     postConsult?: boolean;
   } | null>(null);
-  const [consultationToolsTab, setConsultationToolsTab] = useState("prescription");
   const [activeHealthProfile, setActiveHealthProfile] =
     useState<PatientHealthProfile | null>(null);
   const [videoSessionKey, setVideoSessionKey] = useState(0);
@@ -496,7 +493,7 @@ export function DoctorDashboard({
       patientPhone?: string;
     }) => {
       if (useConsultationStore.getState().hasActiveSession()) {
-        setConsultationToolsTab("report");
+        useConsultationStore.getState().requestReportFocus();
         return;
       }
       setInlineReport(ctx);
@@ -848,17 +845,11 @@ export function DoctorDashboard({
           />
         </div>
 
-        {/* Centro: ficha del paciente / video consulta.
-            Widens into the right column's slot during an active call — that
-            slot used to duplicate the same Acción Inmediata panel already
-            embedded here (see below the video), just squeezed narrower. */}
-        <div
-          className={`col-span-12 min-h-[500px] flex flex-col gap-4 ${
-            dataSource !== "local" && hasActiveSession() && activeAppointment
-              ? "lg:col-span-9"
-              : "lg:col-span-6"
-          }`}
-        >
+        {/* Centro: ficha del paciente / video consulta. Receta/Estudios/
+            Informe/Notas ya no viven acá debajo del video (obligaban a
+            scrollear en plena llamada) — ver la tercera columna a la
+            derecha, ConsultationToolsSidebar. */}
+        <div className="col-span-12 lg:col-span-6 min-h-[500px] flex flex-col gap-4">
           {hasActiveSession() && activeAppointment ? (
             <>
               <ClinicalAlertsBanner
@@ -896,113 +887,27 @@ export function DoctorDashboard({
                 }
               />
 
-              <Tabs
-                value={consultationToolsTab}
-                onValueChange={setConsultationToolsTab}
-                className="w-full"
-              >
-                <TabsList className="grid w-full grid-cols-3 bg-white border border-slate-200">
-                  <TabsTrigger value="prescription" className="text-xs gap-1">
-                    <Pill className="h-3.5 w-3.5" />
-                    Receta
-                  </TabsTrigger>
-                  <TabsTrigger value="studies" className="text-xs gap-1">
-                    <FlaskConical className="h-3.5 w-3.5" />
-                    Estudios
-                  </TabsTrigger>
-                  {/* SOAP tab disabled for now — future feature, see TabsContent below
-                  <TabsTrigger value="soap" className="text-xs gap-1">
-                    <Brain className="h-3.5 w-3.5" />
-                    SOAP
-                  </TabsTrigger>
-                  */}
-                  <TabsTrigger value="report" className="text-xs gap-1">
-                    <Stethoscope className="h-3.5 w-3.5" />
-                    Informe
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="prescription">
-                  <PrescriptionForm
+              {/* En modo local, Acción Inmediata sigue debajo del video —
+                  en modo clínica real (no local) se movió a la columna
+                  derecha, debajo del acordeón de herramientas. */}
+              {dataSource === "local" && (
+                <div className="flex-1 min-h-0">
+                  <ImmediateActionPanel
                     appointmentId={activeAppointment.id}
                     doctorId={doctorId}
                     patientId={activeAppointment.patient_id}
-                    patientName={
-                      patientProfile?.profile?.full_name || "Paciente"
-                    }
-                    doctorName={doctorName}
-                    doctorSpecialty={doctorSpecialty}
-                    doctorLicense={doctorLicense}
+                    patientName={patientProfile?.profile?.full_name || "Paciente"}
                     patientEmail={patientProfile?.profile?.email}
-                    onSaved={() =>
-                      loadClinicalHistory(activeAppointment.patient_id)
-                    }
-                  />
-                </TabsContent>
-                <TabsContent value="studies">
-                  <StudyRequestForm
-                    appointmentId={activeAppointment.id}
-                    doctorId={doctorId}
-                    patientId={activeAppointment.patient_id}
-                    patientName={
-                      patientProfile?.profile?.full_name || "Paciente"
-                    }
                     doctorName={doctorName}
                     doctorSpecialty={doctorSpecialty}
                     doctorLicense={doctorLicense}
-                    onSaved={() =>
-                      loadClinicalHistory(activeAppointment.patient_id)
-                    }
-                  />
-                </TabsContent>
-                {/* SOAP tab disabled for now — future feature, see TabsList above
-                <TabsContent value="soap">
-                  <SoapSummaryPanel
-                    appointmentId={activeAppointment.id}
-                    doctorId={doctorId}
                     dataSource={dataSource}
-                    onConsultationEnd={() =>
-                      finishConsultation(activeAppointment.id)
+                    onReportSaved={() =>
+                      loadClinicalHistory(activeAppointment.patient_id)
                     }
                   />
-                </TabsContent>
-                */}
-                <TabsContent value="report">
-                  <MedicalReportPanel
-                    appointmentId={activeAppointment.id}
-                    patientId={activeAppointment.patient_id}
-                    patientName={
-                      patientProfile?.profile?.full_name || "Paciente"
-                    }
-                    patientEmail={patientProfile?.profile?.email}
-                    doctorId={doctorId}
-                    doctorName={doctorName}
-                    doctorSpecialty={doctorSpecialty}
-                    doctorLicense={doctorLicense}
-                    onSaved={() => loadClinicalHistory(activeAppointment.patient_id)}
-                  />
-                </TabsContent>
-              </Tabs>
-
-              {/* flex-1: stretches to match the left/right columns' grid-stretched
-                  height instead of only sizing to its own tab content — this
-                  parent is a flex column now, not plain block flow, so h-full
-                  on the panel's own Card has something definite to fill. */}
-              <div className="flex-1 min-h-0">
-                <ImmediateActionPanel
-                  appointmentId={activeAppointment.id}
-                  doctorId={doctorId}
-                  patientId={activeAppointment.patient_id}
-                  patientName={patientProfile?.profile?.full_name || "Paciente"}
-                  patientEmail={patientProfile?.profile?.email}
-                  doctorName={doctorName}
-                  doctorSpecialty={doctorSpecialty}
-                  doctorLicense={doctorLicense}
-                  dataSource={dataSource}
-                  onReportSaved={() =>
-                    loadClinicalHistory(activeAppointment.patient_id)
-                  }
-                />
-              </div>
+                </div>
+              )}
             </>
           ) : (
             inlineReport ? (
@@ -1051,26 +956,58 @@ export function DoctorDashboard({
           )}
         </div>
 
-        {/* Derecha: Mi consultorio + calendario.
-            Hidden during an active call — the center column takes this
-            space instead, since its own Acción Inmediata (under the video)
-            already covers the same panel. */}
-        {!(dataSource !== "local" && hasActiveSession() && activeAppointment) && (
-          <div className="col-span-12 lg:col-span-3 min-h-[500px]">
-            {dataSource === "local" ? (
-              <DoctorOfficeSidebar
-                queue={queue}
-                googleCalendarId={googleCalendarId}
-              />
-            ) : (
-              <ImmediateActionPanel
-                appointmentId=""
+        {/* Derecha: Mi consultorio + calendario en modo local; durante una
+            consulta activa (no local) pasa a ser el acordeón de Receta/
+            Estudios/Informe/Notas + Acción Inmediata debajo, siempre
+            visible al lado del video sin necesidad de scrollear. */}
+        <div className="col-span-12 lg:col-span-3 min-h-[500px]">
+          {dataSource === "local" ? (
+            <DoctorOfficeSidebar
+              queue={queue}
+              googleCalendarId={googleCalendarId}
+            />
+          ) : hasActiveSession() && activeAppointment ? (
+            <div className="flex flex-col gap-4">
+              <ConsultationToolsSidebar
+                appointmentId={activeAppointment.id}
                 doctorId={doctorId}
+                patientId={activeAppointment.patient_id}
+                patientName={patientProfile?.profile?.full_name || "Paciente"}
+                patientEmail={patientProfile?.profile?.email}
+                doctorName={doctorName}
+                doctorSpecialty={doctorSpecialty}
+                doctorLicense={doctorLicense}
                 dataSource={dataSource}
+                onSaved={() =>
+                  loadClinicalHistory(activeAppointment.patient_id)
+                }
               />
-            )}
-          </div>
-        )}
+
+              <hr className="border-t border-slate-200" />
+
+              <ImmediateActionPanel
+                appointmentId={activeAppointment.id}
+                doctorId={doctorId}
+                patientId={activeAppointment.patient_id}
+                patientName={patientProfile?.profile?.full_name || "Paciente"}
+                patientEmail={patientProfile?.profile?.email}
+                doctorName={doctorName}
+                doctorSpecialty={doctorSpecialty}
+                doctorLicense={doctorLicense}
+                dataSource={dataSource}
+                onReportSaved={() =>
+                  loadClinicalHistory(activeAppointment.patient_id)
+                }
+              />
+            </div>
+          ) : (
+            <ImmediateActionPanel
+              appointmentId=""
+              doctorId={doctorId}
+              dataSource={dataSource}
+            />
+          )}
+        </div>
       </div>
 
       <DoctorAssignAppointmentDialog

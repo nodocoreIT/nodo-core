@@ -238,7 +238,7 @@ export function MedicalReportPanel({
           ) : (
             <>
               <Mic className="h-4 w-4 mr-1" />
-              Dictar por micrófono
+              Dictar por voz
             </>
           )}
         </Button>

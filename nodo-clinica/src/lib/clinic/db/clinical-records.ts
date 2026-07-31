@@ -51,6 +51,19 @@ export async function createRecord(
   return supabase.from("clinical_records").insert(data).select().single();
 }
 
+/** Deletes a clinical record by id, scoped to the org. */
+export async function deleteRecord(
+  supabase: AnyClient,
+  id: string,
+  orgId: string,
+) {
+  return supabase
+    .from("clinical_records")
+    .delete()
+    .eq("id", id)
+    .eq("org_id", orgId);
+}
+
 // ── Clinical Notes ────────────────────────────────────────────────────────────
 
 export interface ClinicalNoteUpsert {
@@ -225,6 +238,7 @@ export interface PatientDocumentInsert {
   file_name: string;
   file_path: string;
   mime_type: string;
+  document_type?: "payment_receipt" | "study";
 }
 
 /** Returns patient documents for a given appointment. */

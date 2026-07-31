@@ -1,16 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Pill, Plus, Trash2, Download, Mail, Search } from "lucide-react";
+import { Plus, Trash2, FilePlus2, Mail, Search } from "lucide-react";
 import { toast } from "sonner";
 import type { Medication } from "@/types";
 import {
   generatePrescriptionPdf,
-  downloadPdf,
   pdfToBase64,
 } from "@/lib/pdf/generator";
 import { clinicApi } from "@/lib/clinic/client-api";
@@ -141,6 +139,17 @@ export function PrescriptionForm({
     }).catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ signatureText?: string; signatureImageData?: string }>).detail;
+      if (!detail) return;
+      if (detail.signatureText !== undefined) setSignatureText(detail.signatureText);
+      if (detail.signatureImageData !== undefined) setSignatureImageData(detail.signatureImageData);
+    };
+    window.addEventListener("nodo:signature-updated", handler);
+    return () => window.removeEventListener("nodo:signature-updated", handler);
+  }, []);
+
   const updateMedication = (
     index: number,
     field: keyof Medication,
@@ -207,8 +216,6 @@ export function PrescriptionForm({
         signatureImageData,
       });
 
-      downloadPdf(doc, `receta-${patientName.replace(/\s/g, "-")}.pdf`);
-
       await clinicApi.savePrescription({
         appointmentId,
         doctorId,
@@ -242,14 +249,7 @@ export function PrescriptionForm({
   };
 
   return (
-    <Card className="border-slate-200">
-      <CardHeader className="py-3 px-4 bg-slate-50 border-b">
-        <CardTitle className="text-sm font-medium flex items-center gap-2 text-slate-700">
-          <Pill className="h-4 w-4 text-blue-600" />
-          Recetario Digital
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-4 space-y-4">
+    <div className="space-y-4">
         {medications.map((med, index) => (
           <div
             key={index}
@@ -345,8 +345,8 @@ export function PrescriptionForm({
             className="flex-1 bg-blue-700 hover:bg-blue-800"
             size="sm"
           >
-            <Download className="h-4 w-4 mr-1" />
-            PDF + Historial
+            <FilePlus2 className="h-4 w-4 mr-1" />
+            Recetar
           </Button>
           {patientEmail && (
             <Button
@@ -361,7 +361,6 @@ export function PrescriptionForm({
             </Button>
           )}
         </div>
-      </CardContent>
-    </Card>
+    </div>
   );
 }

@@ -391,6 +391,17 @@ export function DoctorSettingsDialog({
             },
           }),
         );
+        window.dispatchEvent(
+          new CustomEvent("nodo:signature-updated", {
+            detail: {
+              signatureText:
+                (result.office.signatureText as string | undefined) ?? signatureText,
+              signatureImageData:
+                (result.office.signatureImageData as string | undefined) ??
+                signatureImageData,
+            },
+          }),
+        );
       }
       hydrateSettings(themeSettings);
       toast.success("Guardado exitoso");

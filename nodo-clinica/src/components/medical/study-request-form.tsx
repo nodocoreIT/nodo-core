@@ -1,17 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { FlaskConical, Search, Download, Check, Plus } from "lucide-react";
+import { Search, FilePlus2, Check, Plus } from "lucide-react";
 import { MEDICAL_EXAMS } from "@/lib/constants";
 import {
   generateStudyOrderPdf,
-  downloadPdf,
   pdfToBase64,
 } from "@/lib/pdf/generator";
 import { clinicApi } from "@/lib/clinic/client-api";
@@ -60,6 +58,17 @@ export function StudyRequestForm({
       })
       .catch(() => undefined);
   }, [doctorId]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ signatureText?: string; signatureImageData?: string }>).detail;
+      if (!detail) return;
+      if (detail.signatureText !== undefined) setSignatureText(detail.signatureText);
+      if (detail.signatureImageData !== undefined) setSignatureImageData(detail.signatureImageData);
+    };
+    window.addEventListener("nodo:signature-updated", handler);
+    return () => window.removeEventListener("nodo:signature-updated", handler);
+  }, []);
 
   const allExams = useMemo((): ExamOption[] => {
     const base = MEDICAL_EXAMS.map((e) => ({
@@ -130,8 +139,6 @@ export function StudyRequestForm({
         signatureImageData,
       });
 
-      downloadPdf(doc, `orden-estudios-${patientName.replace(/\s/g, "-")}.pdf`);
-
       const newStudyLabels = selected.filter(
         (s) =>
           !MEDICAL_EXAMS.some((e) => e.name.toLowerCase() === s.toLowerCase()) &&
@@ -164,14 +171,7 @@ export function StudyRequestForm({
   const categories = [...new Set(filteredExams.map((e) => e.category))];
 
   return (
-    <Card className="border-slate-200">
-      <CardHeader className="py-3 px-4 bg-slate-50 border-b">
-        <CardTitle className="text-sm font-medium flex items-center gap-2 text-slate-700">
-          <FlaskConical className="h-4 w-4 text-blue-600" />
-          Solicitud de Estudios
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-4 space-y-3">
+    <div className="space-y-3">
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
           <Input
@@ -271,10 +271,9 @@ export function StudyRequestForm({
           className="w-full bg-blue-700 hover:bg-blue-800"
           size="sm"
         >
-          <Download className="h-4 w-4 mr-1" />
-          PDF + Historial ({selected.length})
+          <FilePlus2 className="h-4 w-4 mr-1" />
+          Agregar al historial ({selected.length})
         </Button>
-      </CardContent>
-    </Card>
+    </div>
   );
 }
