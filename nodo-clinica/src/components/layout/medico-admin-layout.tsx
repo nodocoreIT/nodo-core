@@ -17,6 +17,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 import { BrandMark } from "@/components/nodo/brand-mark";
 import { NodoChatBell } from "@/components/nodo-chat/nodo-chat-bell";
 import { clinicApi } from "@/lib/clinic/client-api";
@@ -34,6 +35,7 @@ import {
   type AdminCommandPaletteItem,
 } from "@nodocore/shared-components";
 import { NodoSwitcher } from "@nodocore/nodo-modules";
+import { FeedbackFAB } from "@nodocore/nodo-modules/feedback";
 import { RoleSwitcher } from "@/components/nodo/role-switcher";
 import { MedicoDoctorProvider } from "@/contexts/medico-doctor-context";
 import { DoctorSettingsDialog, type SectionId } from "@/components/medical/doctor-settings-dialog";
@@ -567,6 +569,14 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
             )}
           </main>
         </div>
+
+        {/* Mismo "nodito flotante" de feedback que el resto de los nodos
+            (paquete compartido @nodocore/nodo-modules/feedback) — solo en
+            el dashboard principal, y solo en modo plataforma (requiere
+            sesión real de Supabase Auth para invocar la Edge Function). */}
+        {doctor && pathname === "/medico/dashboard" && isPlatformMode() && isBrowserSupabaseEnabled() && (
+          <FeedbackFAB supabase={createClient()} sourceNode="clinica" />
+        )}
 
         {doctor && (
           <DoctorSettingsDialog
