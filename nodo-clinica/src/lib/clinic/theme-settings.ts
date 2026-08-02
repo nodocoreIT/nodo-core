@@ -19,7 +19,7 @@ export const DEFAULT_THEME_SETTINGS: DoctorThemeSettings = {
   borderRadius: "md",
   fontFamily: "Inter",
   logoType: "default",
-  brandText: "nodo salud",
+  brandText: "NODO Clínica",
 };
 
 /** Tema fijo del portal paciente — no hereda colores del médico. */
@@ -31,7 +31,7 @@ export const PATIENT_THEME_SETTINGS: DoctorThemeSettings = {
   buttonFontColor: "#ffffff",
   borderRadius: "md",
   fontFamily: "Inter",
-  logoType: "text",
+  logoType: "default",
   brandText: "NODO Clínica",
 };
 

@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { BrandMark } from "@/components/nodo/brand-mark";
 import { NodoChatBell } from "@/components/nodo-chat/nodo-chat-bell";
-import { clinicApi } from "@/lib/clinic/client-api";
+import { clinicApi, invalidateClinicApiCache } from "@/lib/clinic/client-api";
 import { isBrowserSupabaseEnabled } from "@/lib/clinic/config";
 import { isPlatformMode } from "@/lib/clinic/platform-config";
 import { useConsultorioStore, useConsultorioTheme } from "@/hooks/use-consultorio-theme";
@@ -159,14 +159,17 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   }, [doctor]);
 
   useEffect(() => {
-    clinicApi.getSession().then(async ({ session, user }) => {
-      if (!session || session.role !== "doctor") {
-        setChecking(false);
-        router.push("/login?role=medico");
-        return;
-      }
-
+    async function bootstrapMedicoSession() {
       try {
+        let { session, user } = await clinicApi.getSession();
+        if (!session) {
+          setChecking(false);
+          router.push("/login?role=medico");
+          return;
+        }
+
+        // Dual-role accounts may still have a stale patient cookie — verify
+        // médico access first and refresh clinica_session before rejecting.
         const verifyRes = await fetch("/api/clinic/account/verify-portal", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -179,6 +182,15 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
           router.push("/login?role=medico");
           return;
         }
+
+        invalidateClinicApiCache("session");
+        ({ session, user } = await clinicApi.getSession());
+        if (!session || session.role !== "doctor" || !user) {
+          setChecking(false);
+          router.push("/login?role=medico");
+          return;
+        }
+
         const verifyData = (await verifyRes.json()) as {
           professionalId?: string;
         };
@@ -187,8 +199,8 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
         setCanSwitchToPatient(Boolean(user.canSwitchToPatient));
         setDoctor({
           id: professionalId,
-          fullName: user.fullName,
-          email: user.email ?? session.email,
+          fullName: user.fullName ?? "",
+          email: user.email ?? session.email ?? "",
           subscriptionPlan: user.subscriptionPlan,
           subscriptionStatus: user.subscriptionStatus,
           trialDaysRemaining: user.trialDaysRemaining,
@@ -230,7 +242,9 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
         setChecking(false);
         router.push("/login?role=medico");
       }
-    });
+    }
+
+    void bootstrapMedicoSession();
   }, [router]);
 
   const title = ROUTE_TITLES[pathname] ?? "Gestión";
@@ -519,8 +533,10 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                 <Settings className="h-6 w-6" />
               </button>
               <div className="min-w-0">
-                <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate2">
-                  Nodo Clínica · Profesionales
+                <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
+                  <span className="text-navy">NODO</span>
+                  <span className="text-[var(--color-primary)]"> Clínica</span>
+                  <span className="text-slate2"> · Profesionales</span>
                 </p>
                 <h1 className="truncate text-base sm:text-xl font-bold text-navy font-display">
                   {title}

@@ -76,6 +76,28 @@ interface NodoSwitcherProps {
   clinicaRole?: "medico" | "paciente";
 }
 
+function orgEntryKey(org: OrgEntry): string {
+  return `${org.product}::${org.org_id}::${org.role}`;
+}
+
+/** Cross-nodo targets and Clínica roles show the product name, not the DB org label. */
+function displayOrgTitle(org: OrgEntry, isCrossNodo: boolean): string {
+  if (org.product === "clinica") {
+    return PRODUCT_META.clinica?.label ?? org.org_name;
+  }
+  // Inmo can have multiple agencies — keep the org/tenant name when active in Inmo.
+  if (org.product === "inmo" && !isCrossNodo) {
+    return org.org_name;
+  }
+  return PRODUCT_META[org.product]?.label ?? org.org_name;
+}
+
+function displayCurrentOrgTrigger(org: OrgEntry | undefined): string {
+  if (!org) return "Organización";
+  if (org.product === "inmo") return org.org_name;
+  return PRODUCT_META[org.product]?.label ?? org.org_name;
+}
+
 export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
   const supabase = useSupabase();
   const { orgs: allOrgs, loading } = useMyOrgs();
@@ -187,7 +209,7 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
     if (isEntryCurrent(org) || switching) return;
     setOpen(false);
     setSwitching(true);
-    setSwitchingTo(org.org_name);
+    setSwitchingTo(displayOrgTitle(org, product != null && org.product !== product));
     setSwitchError(null);
 
     const targetIsClinica = org.product === "clinica";
@@ -366,9 +388,10 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
 
   function renderOrgButton(org: OrgEntry, isCrossNodo = false) {
     const isCurrent = isEntryCurrent(org) && !isCrossNodo;
+    const title = displayOrgTitle(org, isCrossNodo);
     return (
       <button
-        key={org.org_id}
+        key={orgEntryKey(org)}
         type="button"
         role="option"
         aria-selected={isCurrent}
@@ -401,7 +424,7 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
               whiteSpace: "nowrap",
             }}
           >
-            {org.org_name}
+            {title}
           </p>
           <p
             style={{
@@ -468,8 +491,8 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
           {switching
             ? "Cambiando..."
             : isMobile
-              ? (currentOrg?.org_name?.split(/\s+/)[0] ?? "Org")
-              : (currentOrg?.org_name ?? "Organización")}
+              ? (displayCurrentOrgTrigger(currentOrg).split(/\s+/)[0] ?? "Org")
+              : displayCurrentOrgTrigger(currentOrg)}
         </span>
         <ChevronDown
           size={13}

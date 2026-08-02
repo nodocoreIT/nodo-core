@@ -39,7 +39,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       }
 
       let sessionRole: "doctor" | "patient";
-      if (clinicSession?.role === "patient" && canPatient) {
+      if (clinicSession?.role === "doctor" && canDoctor) {
+        sessionRole = "doctor";
+      } else if (clinicSession?.role === "patient" && canPatient) {
         sessionRole = "patient";
       } else if (canDoctor) {
         sessionRole = "doctor";

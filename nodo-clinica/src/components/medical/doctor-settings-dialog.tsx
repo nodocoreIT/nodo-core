@@ -69,7 +69,7 @@ export type SectionId =
   | "perfil"
   | "cobros"
   | "suscripcion"
-  | "avisos"
+  // | "avisos"
   | "libres"
   | "apariencia";
 
@@ -77,10 +77,11 @@ const SECTIONS: { id: SectionId; label: string; icon: React.ElementType }[] = [
   { id: "agenda", label: "Agenda", icon: CalendarClock },
   { id: "perfil", label: "Perfil", icon: User },
   { id: "cobros", label: "Cobros", icon: CreditCard },
-  { id: "suscripcion", label: "Suscripción", icon: Receipt },
-  { id: "avisos", label: "Recordatorios", icon: Bell },
+  //{ id: "avisos", label: "Recordatorios", icon: Bell },
   { id: "libres", label: "Días libres", icon: CalendarOff },
   { id: "apariencia", label: "Apariencia", icon: Palette },
+  { id: "suscripcion", label: "Suscripción", icon: Receipt },
+
 ];
 
 const CLINICA_SETTINGS_NAV: SettingsSectionNavItem<SectionId>[] = SECTIONS.map(
@@ -91,8 +92,8 @@ const CLINICA_SETTINGS_NAV: SettingsSectionNavItem<SectionId>[] = SECTIONS.map(
     mobileLabel:
       id === "suscripcion"
         ? "Plan"
-        : id === "avisos"
-          ? "Avisos"
+      //  : id === "avisos"
+        //  ? "Avisos"
           : id === "libres"
             ? "Libres"
             : id === "apariencia"
@@ -1205,7 +1206,7 @@ export function DoctorSettingsDialog({
               )}
 
               {/* ── Recordatorios ── */}
-              {activeSection === "avisos" && (
+             {/*  {activeSection === "avisos" && (
                 <>
                   <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
                     <Bell className="h-4 w-4 text-blue-600" />
@@ -1264,7 +1265,7 @@ export function DoctorSettingsDialog({
                     </Button>
                   </div>
                 </>
-              )}
+              )} */}
 
               {/* ── Días libres ── */}
               {activeSection === "libres" && (

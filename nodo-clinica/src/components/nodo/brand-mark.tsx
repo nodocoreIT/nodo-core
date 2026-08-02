@@ -33,7 +33,7 @@ function renderCustomBrandText(
       <span
         style={
           onDark
-            ? { color: settings.sidebarTextColor || "#ffffff" }
+            ? { color: "#ffffff" }
             : { color: settings.secondaryColor }
         }
       >
@@ -91,9 +91,9 @@ export function BrandMark({ onDark, className, iconClassName }: BrandMarkProps) 
           className={onDark ? "text-white" : ""}
           style={onDark ? undefined : { color: settings.secondaryColor }}
         >
-          nodo
+          NODO
         </span>
-        <span style={{ color: settings.primaryColor }}>salud</span>
+        <span style={{ color: settings.primaryColor }}> Clínica</span>
       </span>
     </span>
   );

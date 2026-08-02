@@ -30,11 +30,24 @@ const persistMedicoLocal = (settings: DoctorThemeSettings) => {
   }
 };
 
+function normalizeMedicoThemeSettings(
+  stored: Partial<DoctorThemeSettings>,
+): DoctorThemeSettings {
+  const merged = mergeThemeSettings(stored);
+  const isStandardClinicText =
+    merged.logoType === "text" &&
+    merged.brandText.trim().toLowerCase() === "nodo clínica".toLowerCase();
+  if (isStandardClinicText) {
+    return mergeThemeSettings({ ...merged, logoType: "default" });
+  }
+  return merged;
+}
+
 const getMedicoStoredSettings = (): DoctorThemeSettings | null => {
   if (typeof window === "undefined") return null;
   try {
     const stored = localStorage.getItem(MEDICO_THEME_STORAGE_KEY);
-    if (stored) return mergeThemeSettings(JSON.parse(stored));
+    if (stored) return normalizeMedicoThemeSettings(JSON.parse(stored));
   } catch {
     /* ignore */
   }

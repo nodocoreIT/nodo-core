@@ -10,7 +10,7 @@ import {
   isSamePasswordAuthError,
   usePasswordRecoveryBootstrap,
 } from "@nodocore/shared-components";
-import { clinicApi } from "@/lib/clinic/client-api";
+import { clinicApi, invalidateClinicApiCache } from "@/lib/clinic/client-api";
 import { safePatientNextPath } from "@/lib/clinic/patient-login-redirect";
 import {
   CLINICA_REGISTRATION_URL,
@@ -320,6 +320,24 @@ export function LoginPortal() {
       }
 
       await clinicApi.login(form.email.trim(), form.password, role);
+
+      const verifyRes = await fetch("/api/clinic/account/verify-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ role: isDoctor ? "medico" : "paciente" }),
+      });
+      if (!verifyRes.ok) {
+        await clinicApi.logout();
+        const verifyData = await verifyRes.json().catch(() => ({}));
+        setGeneralError(
+          (verifyData as { error?: string }).error ??
+            "No se pudo confirmar el acceso al portal.",
+        );
+        return;
+      }
+      invalidateClinicApiCache("session");
+
       setShowTransition(true);
       setTimeout(() => {
         window.location.replace(

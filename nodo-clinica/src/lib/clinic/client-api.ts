@@ -198,6 +198,12 @@ async function fetchSessionUncached(): Promise<ClinicSessionResult> {
         let profilePhotoUrl: string | undefined;
         let resolvedId: string = authUser.id;
 
+        let subscriptionPlan: string | undefined;
+        let subscriptionStatus: string | undefined;
+        let trialDaysRemaining: number | undefined;
+        let canSwitchToDoctor: boolean | undefined;
+        let canSwitchToPatient: boolean | undefined;
+
         try {
           const sessionRes = await fetch(`${BASE}/api/clinic/account/session`, {
             ...clinicFetchOpts(),
@@ -221,22 +227,34 @@ async function fetchSessionUncached(): Promise<ClinicSessionResult> {
           if (sessionData.user?.id) {
             resolvedId = sessionData.user.id;
           }
+          subscriptionPlan = sessionData.user?.subscriptionPlan;
+          subscriptionStatus = sessionData.user?.subscriptionStatus;
+          trialDaysRemaining = sessionData.user?.trialDaysRemaining;
+          canSwitchToDoctor = sessionData.user?.canSwitchToDoctor;
+          canSwitchToPatient = sessionData.user?.canSwitchToPatient;
         } catch {
           return { session: null, user: null };
         }
 
         const stored = getClientSession();
-        const effectiveRole: "doctor" | "patient" =
+        if (
           stored?.userId === authUser.id &&
-          stored?.role === "patient" &&
-          dbRole === "doctor"
-            ? "patient"
-            : dbRole;
+          stored.role !== dbRole
+        ) {
+          saveClientSession({
+            userId: authUser.id,
+            role: dbRole,
+            email: authUser.email ?? stored.email,
+            fullName: fullName || stored.fullName,
+            profilePhotoUrl: profilePhotoUrl ?? stored.profilePhotoUrl,
+          });
+        }
+
         return {
           session: {
             userId: authUser.id,
             email: authUser.email,
-            role: effectiveRole,
+            role: dbRole,
             org_id: appMeta.org_id ?? null,
           },
           user: {
@@ -244,9 +262,14 @@ async function fetchSessionUncached(): Promise<ClinicSessionResult> {
             email: authUser.email,
             fullName,
             profilePhotoUrl,
-            role: effectiveRole,
-            subscriptionPlan: appMeta.plan ?? appMeta.subscription_plan ?? undefined,
+            role: dbRole,
+            subscriptionPlan:
+              subscriptionPlan ?? appMeta.plan ?? appMeta.subscription_plan ?? undefined,
+            subscriptionStatus,
+            trialDaysRemaining,
             org_id: appMeta.org_id ?? null,
+            canSwitchToDoctor,
+            canSwitchToPatient,
           },
         };
       }
