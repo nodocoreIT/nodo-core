@@ -8,6 +8,7 @@ import {
   DEFAULT_ALERT_SETTINGS,
   DEFAULT_AI_SETTINGS,
 } from "@nodocore/nodo-modules/settings";
+import { SubscriptionPlanUpgradePanel } from "@nodocore/nodo-modules/billing";
 import { useThemeSettings } from "@/shared/hooks/use-theme-settings";
 import { useAutosStaff } from "@/shared/hooks/use-autos-staff";
 import { useAutosBankAccounts } from "@/shared/hooks/use-autos-bank-accounts";
@@ -125,11 +126,23 @@ export function AutosSettingsModuleProvider({ children }: { children: React.Reac
         isRemoving: bankAccounts.isRemoving,
       },
       subscriptionContent: (
-        <SubscriptionStatusCard
-          subscription={billingSubscription.subscription}
-          isLoading={billingSubscription.isLoading}
-          nodeLabel="NODO Autos"
-        />
+        <div className="space-y-4">
+          <SubscriptionStatusCard
+            subscription={billingSubscription.subscription}
+            isLoading={billingSubscription.isLoading}
+            nodeLabel="NODO Autos"
+          />
+          <SubscriptionPlanUpgradePanel
+            supabase={supabase}
+            unitCode="Autos"
+            nodeLabel="NODO Autos"
+            backUrl={
+              typeof window !== "undefined"
+                ? `${window.location.origin}${window.location.pathname}`
+                : ""
+            }
+          />
+        </div>
       ),
     };
   }, [

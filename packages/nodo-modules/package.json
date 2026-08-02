@@ -9,7 +9,8 @@
     "./caja": "./src/caja/index.ts",
     "./feedback": "./src/feedback/index.ts",
     "./notifications": "./src/notifications/index.ts",
-    "./settings": "./src/settings/index.ts"
+    "./settings": "./src/settings/index.ts",
+    "./billing": "./src/billing/index.ts"
   },
   "peerDependencies": {
     "@hookform/resolvers": ">=3.0.0",

@@ -791,6 +791,18 @@ export const clinicApi = {
     return data as { initPoint: string };
   },
 
+  async startPatientSubscriptionCheckout(planId: string) {
+    const res = await fetch(`${BASE}/api/clinic/patient-subscription/checkout`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ planId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al iniciar la suscripción");
+    return data as { initPoint: string };
+  },
+
   async testMercadoPagoConnection() {
     const res = await fetch(`${BASE}/api/clinic/mercadopago/test/connection`, {
       credentials: "include",
@@ -1450,6 +1462,7 @@ export const clinicApi = {
       medications: string;
       emergencyContactName: string;
       emergencyContactPhone: string;
+      subscriptionPlan: string | null;
     };
   },
 

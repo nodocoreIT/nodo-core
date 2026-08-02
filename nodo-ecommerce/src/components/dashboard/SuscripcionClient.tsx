@@ -2,6 +2,8 @@
 
 import { Lock } from "lucide-react";
 import { useBillingSubscription } from "@/hooks/use-billing-subscription";
+import { SubscriptionPlanUpgradePanel } from "@nodocore/nodo-modules/billing";
+import { createClient } from "@/lib/supabase/client";
 
 const ESTADO_LABELS: Record<string, { label: string; className: string }> = {
   activo: { label: "Al día", className: "bg-gold/10 text-gold" },
@@ -26,6 +28,7 @@ function formatFecha(iso: string): string {
 
 export default function SuscripcionClient() {
   const { subscription, isLoading } = useBillingSubscription();
+  const supabase = createClient();
 
   return (
     <>
@@ -93,6 +96,19 @@ export default function SuscripcionClient() {
           )}
         </div>
       )}
+
+      <div className="mt-6 max-w-2xl">
+        <SubscriptionPlanUpgradePanel
+          supabase={supabase}
+          unitCode="Ecommerce"
+          nodeLabel="NODO Ecommerce"
+          backUrl={
+            typeof window !== "undefined"
+              ? `${window.location.origin}/dashboard/configuracion?tab=suscripcion`
+              : ""
+          }
+        />
+      </div>
     </>
   );
 }

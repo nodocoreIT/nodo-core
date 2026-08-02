@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Home,
   Stethoscope,
@@ -23,6 +23,25 @@ import { RoleSwitcher } from "@/components/nodo/role-switcher";
 import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { isBrowserSupabaseEnabled } from "@/lib/clinic/config";
 import { isPlatformMode } from "@/lib/clinic/platform-config";
+import {
+  PatientSettingsDialog,
+  type PatientSettingsSectionId,
+} from "@/components/patient/patient-settings-dialog";
+
+const PATIENT_SETTINGS_SECTIONS = new Set<PatientSettingsSectionId>([
+  "perfil",
+  "salud",
+  "personalizacion",
+  "integraciones",
+  "suscripcion",
+]);
+
+function parseSettingsSection(value: string | null): PatientSettingsSectionId | undefined {
+  if (!value || !PATIENT_SETTINGS_SECTIONS.has(value as PatientSettingsSectionId)) {
+    return undefined;
+  }
+  return value as PatientSettingsSectionId;
+}
 
 const NAV_ITEMS = [
   { href: "/paciente/inicio", label: "Inicio", icon: Home },
@@ -38,14 +57,18 @@ const ROUTE_TITLES: Record<string, string> = {
   "/paciente/estudios": "Mis estudios",
   "/paciente/historial": "Historial clínico",
   "/paciente/turnos": "Mis turnos",
-  "/paciente/perfil": "Mi perfil",
 };
 
 export function PacienteAdminLayout({ children }: { children: React.ReactNode }) {
   usePatientTheme();
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<
+    PatientSettingsSectionId | undefined
+  >(undefined);
   const [patient, setPatient] = useState<{
     id: string;
     fullName: string;
@@ -110,6 +133,22 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
     }
     void check();
   }, [router]);
+
+  const openSettings = (section?: PatientSettingsSectionId) => {
+    setSettingsSection(section ?? "perfil");
+    setSettingsOpen(true);
+  };
+
+  useEffect(() => {
+    if (checking) return;
+
+    const settingsTab = parseSettingsSection(searchParams.get("settings"));
+    if (settingsTab) {
+      setSettingsSection(settingsTab);
+      setSettingsOpen(true);
+      router.replace(pathname, { scroll: false });
+    }
+  }, [checking, searchParams, router, pathname]);
 
   const title = ROUTE_TITLES[pathname] ?? "Portal del paciente";
 
@@ -176,14 +215,14 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
             </div>
             <button
               type="button"
-              aria-label="Mi perfil"
+              aria-label="Configuración"
               onClick={() => {
                 setMobileMenuOpen(false);
-                router.push("/paciente/perfil");
+                openSettings("perfil");
               }}
               className={cn(
                 "flex-shrink-0 rounded-md p-1.5 transition-colors",
-                pathname === "/paciente/perfil"
+                settingsOpen
                   ? "text-emerald-400"
                   : "text-[var(--color-sidebar-text)] hover:text-emerald-400",
               )}
@@ -250,14 +289,14 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
             </div>
             <button
               type="button"
-              aria-label="Mi perfil"
+              aria-label="Configuración"
               onClick={() => {
                 setMobileMenuOpen(false);
-                router.push("/paciente/perfil");
+                openSettings("perfil");
               }}
               className={cn(
                 "rounded-md p-1.5 transition-colors",
-                pathname === "/paciente/perfil"
+                settingsOpen
                   ? "text-emerald-400"
                   : "text-[var(--color-sidebar-text)] hover:text-emerald-400",
               )}
@@ -306,6 +345,15 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
 
         <main className="flex-1 overflow-auto py-4 pl-3 pr-4 sm:py-6 sm:pl-4 sm:pr-6">{children}</main>
       </div>
+
+      <PatientSettingsDialog
+        open={settingsOpen}
+        onOpenChange={(open) => {
+          setSettingsOpen(open);
+          if (!open) setSettingsSection(undefined);
+        }}
+        initialSection={settingsSection ?? "perfil"}
+      />
     </div>
   );
 }

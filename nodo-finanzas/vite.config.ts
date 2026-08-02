@@ -52,6 +52,10 @@ export default defineConfig({
         monorepoRoot,
         "packages/nodo-modules/src/settings/index.ts",
       ),
+      "@nodocore/nodo-modules/billing": resolve(
+        monorepoRoot,
+        "packages/nodo-modules/src/billing/index.ts",
+      ),
       "@nodocore/nodo-modules": resolve(monorepoRoot, "packages/nodo-modules/src/index.ts"),
       "@nodocore/shared-components": resolve(
         monorepoRoot,

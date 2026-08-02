@@ -6,6 +6,8 @@ import { es } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBillingSubscription } from "@/shared/hooks/use-billing-subscription";
 import { currencySymbol, formatThousands } from "@/lib/clinic/currency";
+import { SubscriptionPlanUpgradePanel } from "@nodocore/nodo-modules/billing";
+import { createClient } from "@/lib/supabase/client";
 
 const ESTADO_LABELS: Record<string, { label: string; className: string }> = {
   activo: { label: "Al día", className: "bg-mist text-brand" },
@@ -22,6 +24,7 @@ const ESTADO_LABELS: Record<string, { label: string; className: string }> = {
  */
 export function PlatformSubscriptionPanel() {
   const { subscription, isLoading } = useBillingSubscription();
+  const supabase = createClient();
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -97,6 +100,17 @@ export function PlatformSubscriptionPanel() {
           </CardContent>
         </Card>
       )}
+
+      <SubscriptionPlanUpgradePanel
+        supabase={supabase}
+        unitCode="Clínica"
+        nodeLabel="NODO Clínica"
+        backUrl={
+          typeof window !== "undefined"
+            ? `${window.location.origin}/medico/suscripcion-plataforma`
+            : ""
+        }
+      />
     </div>
   );
 }

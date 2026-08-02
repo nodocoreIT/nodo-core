@@ -10,23 +10,9 @@ import { clinicApi, OnboardingSubmitError } from "@/lib/clinic/client-api";
 import { CLINIC_BRAND_LOGO_SRC } from "@/lib/clinic/brand";
 import { NeuralNodesBackground } from "@/components/ui/neural-nodes-background";
 import { PhoneField } from "@/components/onboarding/phone-field";
+import { PATIENT_SUBSCRIPTION_PLANS } from "@/lib/clinic/patient-subscription-plans";
 
-const PLANS = [
-  {
-    id: "gratuito",
-    name: "Gratuito",
-    price: "$0",
-    period: "siempre",
-    features: ["Historial básico", "Videoconsulta"],
-  },
-  {
-    id: "pago",
-    name: "Pago",
-    price: "$4.900",
-    period: "/mes",
-    features: ["Historial completo", "Prioridad de atención", "Carga de Estudios"],
-  },
-];
+const PLANS = PATIENT_SUBSCRIPTION_PLANS;
 
 const inputClass =
   "mt-1 w-full rounded-lg px-3 py-2.5 text-sm bg-white border border-slate-200 text-navy placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/25 focus:border-teal-500 transition-shadow [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_#ffffff] [&:-webkit-autofill]:[-webkit-text-fill-color:#1e293b]";

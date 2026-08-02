@@ -18,7 +18,9 @@ export async function GET(request: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: patientRow, error: patientError } = await (supabase as any)
     .from("patients")
-    .select("id, first_name, last_name, full_name, email, phone, profile_photo_url, dni, address")
+    .select(
+      "id, first_name, last_name, full_name, email, phone, profile_photo_url, dni, address, subscription_plan",
+    )
     .eq("profile_id", user.id)
     .maybeSingle() as {
       data: {
@@ -31,6 +33,7 @@ export async function GET(request: NextRequest) {
         profile_photo_url: string | null;
         dni: string | null;
         address: string | null;
+        subscription_plan: string | null;
       } | null;
       error: unknown;
     };
@@ -60,6 +63,7 @@ export async function GET(request: NextRequest) {
       medications: "",
       emergencyContactName: "",
       emergencyContactPhone: "",
+      subscriptionPlan: null,
     });
   }
 
@@ -85,5 +89,6 @@ export async function GET(request: NextRequest) {
     medications: hp?.medications ?? "",
     emergencyContactName: hp?.emergency_contact_name ?? "",
     emergencyContactPhone: hp?.emergency_contact_phone ?? "",
+    subscriptionPlan: patientRow.subscription_plan ?? null,
   });
 }

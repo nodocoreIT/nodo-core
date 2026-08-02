@@ -1,15 +1,14 @@
 import { useMemo } from "react";
 import {
   SettingsModuleProvider,
-  SubscriptionStatusCard,
   type AlertSettings,
   type AiSettings,
   type SettingsModuleContextValue,
   DEFAULT_ALERT_SETTINGS,
   DEFAULT_AI_SETTINGS,
 } from "@nodocore/nodo-modules/settings";
+import { SubscriptionPlanUpgradePanel } from "@nodocore/nodo-modules/billing";
 import { MetaSettingsForm } from "@/features/redes-sociales/components/meta-settings-form";
-import { useBillingSubscription } from "@/shared/hooks/use-billing-subscription";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useThemeSettings } from "@/shared/hooks/use-theme-settings";
 import type { Json } from "@/shared/types/database";
@@ -46,7 +45,6 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
   const updateProfileMutation = useUpdateProfile();
   const cashAccounts = useCashAccounts();
   const queryClient = useQueryClient();
-  const billingSubscription = useBillingSubscription();
 
   const ipcMutation = useMutation({
     mutationFn: async (val: number) => {
@@ -165,10 +163,15 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
       isSavingManualIcl: iclMutation.isPending,
       metaSettingsContent: <MetaSettingsForm />,
       subscriptionContent: (
-        <SubscriptionStatusCard
-          subscription={billingSubscription.subscription}
-          isLoading={billingSubscription.isLoading}
+        <SubscriptionPlanUpgradePanel
+          supabase={supabase}
+          unitCode="Inmo"
           nodeLabel="NODO Inmo"
+          backUrl={
+            typeof window !== "undefined"
+              ? `${window.location.origin}${window.location.pathname}`
+              : ""
+          }
           impagoWarning="No pudimos procesar el último cobro. Mientras el pago esté pendiente, el acceso para todos los usuarios de esta inmobiliaria (staff, propietarios e inquilinos) queda limitado."
         />
       ),
@@ -191,7 +194,6 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
     ipcMutation.isPending,
     iclMutation.isPending,
     alertSettings,
-    billingSubscription,
   ]);
 
   return <SettingsModuleProvider value={value}>{children}</SettingsModuleProvider>;

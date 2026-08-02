@@ -23,20 +23,38 @@ export async function processMercadoPagoPreapprovalId(
     .eq("mercadopago_preapproval_id", preapprovalId)
     .maybeSingle();
 
-  if (!professional) {
-    return { ok: true, skipped: "professional_not_matched" };
+  if (professional) {
+    const subscriptionStatus =
+      preapproval.status === "authorized" ? "active" : "expired";
+
+    await supabase
+      .from("professionals")
+      .update({
+        subscription_status: subscriptionStatus,
+        subscription_next_payment_at: preapproval.next_payment_date ?? null,
+      })
+      .eq("id", professional.id);
+
+    return { ok: true, professionalId: professional.id };
   }
 
-  const subscriptionStatus =
-    preapproval.status === "authorized" ? "active" : "expired";
+  const { data: patient } = await supabase
+    .from("patients")
+    .select("id")
+    .eq("mercadopago_preapproval_id", preapprovalId)
+    .maybeSingle();
+
+  if (!patient) {
+    return { ok: true, skipped: "account_not_matched" };
+  }
+
+  const patientPlan =
+    preapproval.status === "authorized" ? "pago" : "gratuito";
 
   await supabase
-    .from("professionals")
-    .update({
-      subscription_status: subscriptionStatus,
-      subscription_next_payment_at: preapproval.next_payment_date ?? null,
-    })
-    .eq("id", professional.id);
+    .from("patients")
+    .update({ subscription_plan: patientPlan })
+    .eq("id", patient.id);
 
-  return { ok: true, professionalId: professional.id };
+  return { ok: true, patientId: patient.id };
 }

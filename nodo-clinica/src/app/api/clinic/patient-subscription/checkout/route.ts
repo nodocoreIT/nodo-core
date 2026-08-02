@@ -1,0 +1,125 @@
+export const dynamic = "force-dynamic";
+
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/supabase/auth-guard";
+import { createServiceClient } from "@/lib/supabase/server";
+import { appBaseUrl } from "@/lib/clinic/appointment-payment";
+import { createPreapproval } from "@/lib/mercadopago/client";
+import {
+  getPatientPaidCheckoutPlan,
+  isPatientPaidPlan,
+} from "@/lib/clinic/patient-subscription-plans";
+
+/** GET — current patient subscription plan (for settings UI). */
+export async function GET(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  if (auth.user.role !== "patient") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const svc = (await createServiceClient()) as any;
+  const { data } = await svc
+    .from("patients")
+    .select("subscription_plan, mercadopago_preapproval_id")
+    .eq("profile_id", auth.user.id)
+    .maybeSingle();
+
+  return NextResponse.json({
+    plan: data?.subscription_plan ?? "gratuito",
+    hasPreapproval: Boolean(data?.mercadopago_preapproval_id),
+  });
+}
+
+/** POST — starts Mercado Pago checkout for the patient paid plan. */
+export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  if (auth.user.role !== "patient") {
+    return NextResponse.json({ error: "Debés iniciar sesión como paciente" }, { status: 403 });
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const planId = String(body.planId ?? "pago").trim();
+  if (!isPatientPaidPlan(planId)) {
+    return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
+  }
+
+  const plan = getPatientPaidCheckoutPlan();
+  const nodoAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim();
+  if (!nodoAccessToken) {
+    return NextResponse.json(
+      { error: "Falta configurar MERCADOPAGO_ACCESS_TOKEN en el servidor." },
+      { status: 503 },
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const svc = (await createServiceClient()) as any;
+  const { data: patient, error: patientError } = await svc
+    .from("patients")
+    .select("id, email, subscription_plan")
+    .eq("profile_id", auth.user.id)
+    .maybeSingle();
+
+  if (patientError || !patient?.id) {
+    return NextResponse.json({ error: "Paciente no encontrado" }, { status: 404 });
+  }
+
+  const payerEmail = (patient.email as string | null) ?? auth.user.email ?? "";
+  if (!payerEmail) {
+    return NextResponse.json({ error: "Tu cuenta no tiene email para facturar." }, { status: 400 });
+  }
+
+  if (patient.subscription_plan === planId) {
+    return NextResponse.json({ error: "Ya tenés activo este plan." }, { status: 400 });
+  }
+
+  let preapproval;
+  try {
+    preapproval = await createPreapproval({
+      accessToken: nodoAccessToken,
+      reason: `Suscripción ${plan.name} — Nodo Clínica Pacientes`,
+      payerEmail,
+      externalReference: patient.id as string,
+      amount: plan.amount,
+      currency: plan.currency,
+      backUrl: `${appBaseUrl()}/paciente/inicio?settings=suscripcion`,
+    });
+  } catch (err) {
+    return NextResponse.json(
+      {
+        error:
+          err instanceof Error
+            ? err.message
+            : "Error al iniciar la suscripción con Mercado Pago",
+      },
+      { status: 502 },
+    );
+  }
+
+  if (!preapproval.initPoint) {
+    return NextResponse.json(
+      { error: "Mercado Pago no devolvió un link de pago." },
+      { status: 502 },
+    );
+  }
+
+  const { error: updateError } = await svc
+    .from("patients")
+    .update({
+      mercadopago_preapproval_id: preapproval.id,
+    })
+    .eq("id", patient.id);
+
+  if (updateError) {
+    console.error("[patient-subscription/checkout] failed to persist preapproval id", updateError);
+    return NextResponse.json(
+      { error: "No se pudo guardar la suscripción. Reintentá en unos minutos." },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ initPoint: preapproval.initPoint });
+}
