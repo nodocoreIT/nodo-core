@@ -37,7 +37,7 @@ import { NotificationBell } from "@/components/ui/notification-bell";
 import { FinanzasSettingsModuleProvider } from "@/shared/lib/finanzas-settings-module";
 import { OpenSettingsContext } from "@/shared/hooks/use-open-settings";
 import { AiSettingsContext, useAiSettingsProvider } from "@/hooks/use-ai-settings";
-import { FeedbackFAB } from "@nodocore/nodo-modules/feedback";
+import { FeedbackFAB, nodoBrandMarkUrl } from "@nodocore/nodo-modules/feedback";
 import { supabase } from "@/shared/lib/supabase";
 
 interface NavItem {
@@ -415,7 +415,7 @@ export function AdminLayout() {
           <FeedbackFAB
             supabase={supabase}
             sourceNode="finanzas"
-            imgSrc={`${import.meta.env.BASE_URL}brand/nodo-mark-white.png`}
+            imgSrc={nodoBrandMarkUrl("brand/nodo-mark-white.png", import.meta.env.BASE_URL)}
           />
         )}
 

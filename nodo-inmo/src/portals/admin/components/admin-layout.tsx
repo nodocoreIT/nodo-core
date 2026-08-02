@@ -55,7 +55,7 @@ import { cn } from "@/shared/lib/utils";
 import { SettingsDialog, type SettingsTabId } from "@nodocore/nodo-modules/settings";
 import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { InmoSettingsModuleProvider } from "@/shared/lib/inmo-settings-module";
-import { FeedbackFAB } from "@nodocore/nodo-modules/feedback";
+import { FeedbackFAB, nodoBrandMarkUrl } from "@nodocore/nodo-modules/feedback";
 import { supabase } from "@/shared/lib/supabase";
 import { NotificationsBell } from "@/features/dashboard/components/notifications-bell";
 import { IndicesBadge } from "@/features/ipc/components/IndicesBadge";
@@ -747,7 +747,7 @@ function AdminLayoutShell({
         <FeedbackFAB
           supabase={supabase}
           sourceNode="inmo"
-          imgSrc={`${import.meta.env.BASE_URL}brand/nodo-mark-white.png`}
+          imgSrc={nodoBrandMarkUrl("brand/nodo-mark-white.png", import.meta.env.BASE_URL)}
         />
       )}
     </div>

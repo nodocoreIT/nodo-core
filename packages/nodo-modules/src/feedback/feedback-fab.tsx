@@ -49,6 +49,15 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
+/** Vite apps use base `/inmo` or `/autos` — ensure `/` before `brand/…`. */
+export function nodoBrandMarkUrl(
+  assetPath = "brand/nodo-mark-white.png",
+  baseUrl = "/",
+): string {
+  const base = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  return `${base}${assetPath.replace(/^\//, "")}`;
+}
+
 export interface FeedbackFABProps {
   /** Cliente Supabase ya autenticado de la app (cada nodo arma el suyo). */
   supabase: SupabaseClient;

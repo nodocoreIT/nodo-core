@@ -33,7 +33,7 @@ import { NotificationsBell } from "@/features/notifications/notifications-bell";
 import { SettingsDialog, type SettingsTabId } from "@nodocore/nodo-modules/settings";
 import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { AutosSettingsModuleProvider } from "@/shared/lib/autos-settings-module";
-import { FeedbackFAB } from "@nodocore/nodo-modules/feedback";
+import { FeedbackFAB, nodoBrandMarkUrl } from "@nodocore/nodo-modules/feedback";
 import { supabase } from "@/shared/lib/supabase";
 
 interface NavItem {
@@ -428,7 +428,7 @@ export function AdminLayout() {
         <FeedbackFAB
           supabase={supabase}
           sourceNode="autos"
-          imgSrc={`${import.meta.env.BASE_URL}brand/nodo-mark-white.png`}
+          imgSrc={nodoBrandMarkUrl("brand/nodo-mark-white.png", import.meta.env.BASE_URL)}
         />
       )}
 

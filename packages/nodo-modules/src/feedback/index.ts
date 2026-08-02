@@ -1,1 +1,1 @@
-export { FeedbackFAB, type FeedbackFABProps } from "./feedback-fab";
+export { FeedbackFAB, nodoBrandMarkUrl, type FeedbackFABProps } from "./feedback-fab";
