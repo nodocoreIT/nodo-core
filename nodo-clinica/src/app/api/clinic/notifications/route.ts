@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
 import { createServiceClient } from "@/lib/supabase/server";
-import { appointmentNeedsDoctorPaymentReviewFromDbRow } from "@/lib/clinic/payment";
+import { appointmentNeedsDoctorPaymentReviewFromDbRow, isAppointmentAwaitingPatientPayment } from "@/lib/clinic/payment";
 import {
   countUnreadDoctorNotifications,
   listDoctorNotifications,
@@ -25,6 +25,7 @@ async function countPendingCobros(professionalId: string): Promise<number> {
     .eq("doctor_id", professionalId);
 
   return (data ?? []).filter((apt) =>
+    isAppointmentAwaitingPatientPayment(apt as never) ||
     appointmentNeedsDoctorPaymentReviewFromDbRow(apt as never, {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       receiptDocumentCount: ((apt as any).patient_documents ?? []).length,

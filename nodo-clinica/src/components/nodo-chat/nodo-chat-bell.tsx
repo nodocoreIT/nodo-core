@@ -12,6 +12,7 @@ interface NodoChatBellProps {
   chatEmbedded?: boolean;
   /** Videoconsulta activa: un clic abre el popup flotante sin navegar */
   inVideoConsultation?: boolean;
+  className?: string;
 }
 
 function formatPreviewTime(iso: string) {
@@ -25,6 +26,7 @@ export function NodoChatBell({
   onOpenChat,
   chatEmbedded = false,
   inVideoConsultation = false,
+  className,
 }: NodoChatBellProps) {
   const router = useRouter();
   const [count, setCount] = useState(0);
@@ -73,17 +75,26 @@ export function NodoChatBell({
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [open]);
 
-  const openChatWithPeer = async (peerId?: string, peerName?: string) => {
+  const markReadInBackground = () => {
+    void clinicApi.markNodoChatRead().then(() => {
+      window.dispatchEvent(new CustomEvent("nodo-chat-read"));
+      setCount(0);
+      setItems([]);
+    });
+  };
+
+  const openChatWithPeer = (peerId?: string, peerName?: string) => {
     setOpen(false);
-    await clinicApi.markNodoChatRead();
-    window.dispatchEvent(new CustomEvent("nodo-chat-read"));
-    setCount(0);
-    setItems([]);
-    if (chatEmbedded) return;
-    if (onOpenChat) {
-      onOpenChat(peerId, peerName);
+    if (chatEmbedded) {
+      markReadInBackground();
       return;
     }
+    if (onOpenChat) {
+      onOpenChat(peerId, peerName);
+      markReadInBackground();
+      return;
+    }
+    markReadInBackground();
     if (!peerId) {
       router.push("/medico/interconsultas");
       return;
@@ -94,7 +105,7 @@ export function NodoChatBell({
 
   const handleBellClick = () => {
     if (inVideoConsultation && onOpenChat) {
-      void openChatWithPeer(items[0]?.fromDoctorId, items[0]?.fromDoctorName);
+      openChatWithPeer(items[0]?.fromDoctorId, items[0]?.fromDoctorName);
       return;
     }
     setOpen((v) => !v);
@@ -104,7 +115,7 @@ export function NodoChatBell({
     openChatWithPeer(items[0]?.fromDoctorId, items[0]?.fromDoctorName);
 
   return (
-    <div className="relative" ref={panelRef}>
+    <div className={cn("relative", className)} ref={panelRef}>
       <button
         type="button"
         onClick={handleBellClick}

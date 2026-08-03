@@ -31,9 +31,11 @@ import { JitsiMeet } from "@/components/consultation/jitsi-meet";
 import { ConsultationEndScreen } from "@/components/consultation/consultation-end-screen";
 
 import { ConsultationPaymentPanel } from "@/components/patient/consultation-payment-panel";
+import { ConsultationSessionDocumentsCard } from "@/components/patient/consultation-session-documents-card";
 import { WaitingRoomIntake } from "@/components/patient/waiting-room-intake";
 import { ReceiptValidationCard } from "@/components/patient/receipt-validation-card";
 import { clinicApi } from "@/lib/clinic/client-api";
+import type { SessionClinicalDocument } from "@/lib/clinic/session-clinical-documents";
 import { clinicTimeLabelFromIso, formatDateKeyLabel, localDateKeyFromIso } from "@/lib/clinic/schedule";
 import type { PaymentReceiptAudit } from "@/lib/clinic/types";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -133,6 +135,10 @@ export function WaitingRoom({
   const [intakeReason, setIntakeReason] = useState("");
   const [videoEnded, setVideoEnded] = useState(false);
   const [videoSessionKey, setVideoSessionKey] = useState(0);
+  const [sessionDocuments, setSessionDocuments] = useState<
+    SessionClinicalDocument[]
+  >([]);
+  const sessionDocsCountRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastStatusRef = useRef<string | null>(null);
   const notifiedConsultationRef = useRef(false);
@@ -140,6 +146,23 @@ export function WaitingRoom({
   const searchParams = useSearchParams();
 
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const applySessionDocuments = useCallback((docs: SessionClinicalDocument[]) => {
+    if (docs.length > sessionDocsCountRef.current && sessionDocsCountRef.current > 0) {
+      toast.success("El médico emitió un nuevo documento para esta consulta");
+    }
+    sessionDocsCountRef.current = docs.length;
+    setSessionDocuments(docs);
+  }, []);
+
+  const refreshSessionDocuments = useCallback(async () => {
+    try {
+      const data = await clinicApi.getAppointmentByToken(accessToken);
+      applySessionDocuments(data.sessionDocuments ?? []);
+    } catch {
+      /* ignore */
+    }
+  }, [accessToken, applySessionDocuments]);
 
   const isTokenValid = (apt: {
     tokenExpiresAt: string;
@@ -234,6 +257,7 @@ export function WaitingRoom({
             )
           );
         }
+        applySessionDocuments(data.sessionDocuments ?? []);
       } catch (e) {
         setLoadError(
           e instanceof Error ? e.message : "No se pudo cargar el turno"
@@ -298,7 +322,8 @@ export function WaitingRoom({
 
     setTotalWaiting(total || 0);
     setIsLoading(false);
-  }, [accessToken, dataSource]);
+    await refreshSessionDocuments();
+  }, [accessToken, dataSource, applySessionDocuments, refreshSessionDocuments]);
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || !appointment) return;
@@ -500,6 +525,7 @@ export function WaitingRoom({
               )
             );
           }
+          applySessionDocuments(data.sessionDocuments ?? []);
         } catch {
           /* ignore poll errors */
         }
@@ -538,7 +564,44 @@ export function WaitingRoom({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [accessToken, appointment, dataSource]);
+  }, [accessToken, appointment, dataSource, applySessionDocuments]);
+
+  useEffect(() => {
+    if (!appointment) return;
+    if (!["in_consultation", "completed"].includes(appointment.status)) return;
+
+    void refreshSessionDocuments();
+    const interval = setInterval(() => {
+      void refreshSessionDocuments();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [appointment?.id, appointment?.status, refreshSessionDocuments]);
+
+  useEffect(() => {
+    if (!appointment || dataSource !== "supabase") return;
+    if (!["in_consultation", "completed"].includes(appointment.status)) return;
+
+    const supabase = createClient();
+    const recordsChannel = supabase
+      .channel(`clinical-records-${appointment.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "nodo_clinica",
+          table: "clinical_records",
+          filter: `appointment_id=eq.${appointment.id}`,
+        },
+        () => {
+          void refreshSessionDocuments();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(recordsChannel);
+    };
+  }, [appointment?.id, appointment?.status, dataSource, refreshSessionDocuments]);
 
   if (isLoading) {
     return (
@@ -993,7 +1056,7 @@ export function WaitingRoom({
   if (isInConsultation && videoEnded) {
     return (
       <div className={outerClass("bg-slate-900")}>
-        <div className={embedded ? "" : "max-w-4xl mx-auto"}>
+        <div className={embedded ? "space-y-4" : "max-w-4xl mx-auto space-y-4"}>
           {backLink}
           <ConsultationEndScreen
             role="patient"
@@ -1004,6 +1067,10 @@ export function WaitingRoom({
               setVideoSessionKey((k) => k + 1);
             }}
           />
+          <ConsultationSessionDocumentsCard
+            documents={sessionDocuments}
+            variant="dark"
+          />
         </div>
       </div>
     );
@@ -1012,7 +1079,7 @@ export function WaitingRoom({
   if (isInConsultation && !videoEnded) {
     return (
       <div className={outerClass("bg-slate-900")}>
-        <div className={embedded ? "" : "max-w-4xl mx-auto"}>
+        <div className={embedded ? "space-y-4" : "max-w-4xl mx-auto space-y-4"}>
           {backLink}
           <div className="text-center mb-4">
             <Badge className="bg-emerald-600 text-white">
@@ -1042,6 +1109,10 @@ export function WaitingRoom({
               />
             }
           />
+          <ConsultationSessionDocumentsCard
+            documents={sessionDocuments}
+            variant="dark"
+          />
         </div>
       </div>
     );
@@ -1049,8 +1120,8 @@ export function WaitingRoom({
 
   if (isCompleted) {
     return (
-      <div className={embedded ? "" : "min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4"}>
-        <div className={embedded ? "" : "max-w-md w-full"}>
+      <div className={embedded ? "space-y-4" : "min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4"}>
+        <div className={embedded ? "space-y-4" : "max-w-md w-full space-y-4"}>
           {backLink}
           <Card className="text-center">
             <CardContent className="pt-8 pb-6">
@@ -1080,6 +1151,7 @@ export function WaitingRoom({
               )}
             </CardContent>
           </Card>
+          <ConsultationSessionDocumentsCard documents={sessionDocuments} />
         </div>
       </div>
     );

@@ -11,6 +11,7 @@ import {
   Inbox,
   Circle,
   Lock,
+  GripHorizontal,
 } from "lucide-react";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { cn } from "@/lib/utils";
@@ -58,6 +59,51 @@ const NODE_BADGE: Record<string, string> = {
   obra: "bg-amber-100 text-amber-800",
 };
 
+const FLOATING_WIDTH = {
+  default: 380,
+  consultation: 320,
+} as const;
+
+const FLOATING_HEIGHT = {
+  default: 560,
+  consultation: 540,
+} as const;
+
+function clampPanelPosition(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): { x: number; y: number } {
+  const margin = 8;
+  const maxX = Math.max(margin, window.innerWidth - width - margin);
+  const maxY = Math.max(margin, window.innerHeight - height - margin);
+  return {
+    x: Math.min(Math.max(margin, x), maxX),
+    y: Math.min(Math.max(margin, y), maxY),
+  };
+}
+
+function defaultFloatingPosition(variant: "default" | "consultation") {
+  const width = Math.min(
+    window.innerWidth - (variant === "consultation" ? 24 : 32),
+    FLOATING_WIDTH[variant],
+  );
+  const height = Math.min(
+    window.innerHeight * (variant === "consultation" ? 0.56 : 0.78),
+    FLOATING_HEIGHT[variant],
+  );
+  const x =
+    window.innerWidth -
+    width -
+    (variant === "consultation" ? (window.innerWidth >= 640 ? 16 : 12) : 16);
+  const y =
+    variant === "consultation"
+      ? 76
+      : window.innerHeight - height - 80;
+  return clampPanelPosition(x, y, width, height);
+}
+
 export function NodoChatWidget({
   doctorId,
   doctorName,
@@ -94,6 +140,94 @@ export function NodoChatWidget({
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const dragOriginRef = useRef<{
+    pointerX: number;
+    pointerY: number;
+    panelX: number;
+    panelY: number;
+  } | null>(null);
+
+  const isFloating = !embedded;
+  const floatingWidthClass =
+    floatingVariant === "consultation"
+      ? "w-[min(calc(100vw-1.5rem),320px)]"
+      : "w-[min(100vw-2rem,380px)]";
+  const floatingHeightClass =
+    floatingVariant === "consultation"
+      ? "h-[min(56vh,540px)]"
+      : "h-[min(78vh,560px)]";
+
+  useEffect(() => {
+    if (!isFloating || !open) {
+      setPanelPos(null);
+      return;
+    }
+    setPanelPos(defaultFloatingPosition(floatingVariant));
+  }, [isFloating, open, floatingVariant]);
+
+  useEffect(() => {
+    if (!isFloating || !open) return;
+    const handleResize = () => {
+      setPanelPos((current) => {
+        if (!current) return defaultFloatingPosition(floatingVariant);
+        const width = panelRef.current?.offsetWidth ?? FLOATING_WIDTH[floatingVariant];
+        const height =
+          panelRef.current?.offsetHeight ?? FLOATING_HEIGHT[floatingVariant];
+        return clampPanelPosition(current.x, current.y, width, height);
+      });
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isFloating, open, floatingVariant]);
+
+  const handlePanelDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!isFloating || event.button !== 0) return;
+    if ((event.target as HTMLElement).closest("button")) return;
+
+    const current = panelPos ?? defaultFloatingPosition(floatingVariant);
+    const headerEl = event.currentTarget;
+    dragOriginRef.current = {
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      panelX: current.x,
+      panelY: current.y,
+    };
+    headerEl.setPointerCapture(event.pointerId);
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      const origin = dragOriginRef.current;
+      if (!origin) return;
+      const width = panelRef.current?.offsetWidth ?? FLOATING_WIDTH[floatingVariant];
+      const height =
+        panelRef.current?.offsetHeight ?? FLOATING_HEIGHT[floatingVariant];
+      setPanelPos(
+        clampPanelPosition(
+          origin.panelX + (moveEvent.clientX - origin.pointerX),
+          origin.panelY + (moveEvent.clientY - origin.pointerY),
+          width,
+          height,
+        ),
+      );
+    };
+
+    const handleUp = (upEvent: PointerEvent) => {
+      dragOriginRef.current = null;
+      if (headerEl.hasPointerCapture(upEvent.pointerId)) {
+        headerEl.releasePointerCapture(upEvent.pointerId);
+      }
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleUp);
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    window.addEventListener("pointercancel", handleUp);
+  };
 
   const firstName = (doctorName ?? "").trim().split(/\s+/)[0] || "Colega";
 
@@ -239,17 +373,37 @@ export function NodoChatWidget({
 
   const panel = (
     <div
+      ref={panelRef}
+      style={
+        isFloating && panelPos
+          ? { left: panelPos.x, top: panelPos.y }
+          : undefined
+      }
       className={cn(
         "flex flex-col overflow-hidden bg-white shadow-2xl border border-mist",
         embedded
           ? "h-[calc(100vh-8rem)] min-h-[520px] rounded-md"
-          : floatingVariant === "consultation"
-            ? "fixed top-[4.75rem] right-3 sm:right-4 z-[110] w-[min(calc(100vw-1.5rem),320px)] h-[min(42vh,440px)] rounded-xl shadow-2xl"
-            : "fixed bottom-20 right-4 z-[100] w-[min(100vw-2rem,380px)] h-[min(78vh,560px)] rounded-xl",
+          : cn(
+              "fixed z-[110] rounded-xl shadow-2xl",
+              floatingWidthClass,
+              floatingHeightClass,
+            ),
       )}
     >
-      {/* Header estilo Santander / Nodo */}
-      <div className="flex items-center gap-3 bg-navy-900 text-white px-4 py-3 shrink-0">
+      {/* Header estilo Santander / Nodo — arrastrable en modo flotante */}
+      <div
+        className={cn(
+          "flex items-center gap-3 bg-navy-900 text-white px-4 py-3 shrink-0",
+          isFloating && "cursor-grab active:cursor-grabbing touch-none select-none",
+        )}
+        onPointerDown={isFloating ? handlePanelDragStart : undefined}
+      >
+        {isFloating && (
+          <GripHorizontal
+            className="h-4 w-4 shrink-0 text-white/45"
+            aria-hidden
+          />
+        )}
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-sm font-bold shrink-0">
           {initials("Nodo Chat")}
         </div>
@@ -258,6 +412,9 @@ export function NodoChatWidget({
           <p className="text-[11px] text-white/70 flex items-center gap-1">
             <Circle className="h-2 w-2 fill-emerald-400 text-emerald-400" />
             Ecosistema Pro · en línea
+            {isFloating && (
+              <span className="hidden sm:inline text-white/45">· arrastrá para mover</span>
+            )}
           </p>
         </div>
         {!embedded && (
@@ -265,7 +422,7 @@ export function NodoChatWidget({
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="p-1.5 rounded-md hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-md hover:bg-white/10 transition-colors cursor-pointer"
               aria-label="Minimizar"
             >
               <Minus className="h-4 w-4" />
@@ -276,7 +433,7 @@ export function NodoChatWidget({
                 setOpen(false);
                 goMenu();
               }}
-              className="p-1.5 rounded-md hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-md hover:bg-white/10 transition-colors cursor-pointer"
               aria-label="Cerrar"
             >
               <X className="h-4 w-4" />

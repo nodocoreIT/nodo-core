@@ -56,6 +56,39 @@ export function patientUsesMercadoPago(payment?: {
   return patientCanPayWithMercadoPago(payment);
 }
 
+/** Turno asignado/reservado con honorario exigido y pago aún no acreditado. */
+export function isAppointmentAwaitingPatientPayment(apt: {
+  status: string;
+  paymentStatus?: PaymentStatus;
+  payment_status?: PaymentStatus;
+}): boolean {
+  const status = apt.status;
+  const paymentStatus = apt.paymentStatus ?? apt.payment_status;
+  if (status === "cancelled" || status === "completed") return false;
+  return paymentStatus === "pending";
+}
+
+/** Rows visible in médico → Cobros (ledger). */
+export function appointmentIncludedInPaymentLedger(
+  apt: {
+    status: string;
+    payment_status?: PaymentStatus;
+    payment_receipt_audit?: PaymentReceiptAudit | null;
+  },
+  opts?: { receiptDocumentCount?: number },
+): boolean {
+  if (apt.status === "cancelled") {
+    return !!apt.payment_receipt_audit;
+  }
+  if (apt.payment_status === "confirmed" || apt.payment_receipt_audit) {
+    return true;
+  }
+  if (isAppointmentAwaitingPatientPayment({ status: apt.status, payment_status: apt.payment_status })) {
+    return true;
+  }
+  return appointmentNeedsDoctorPaymentReviewFromDbRow(apt, opts);
+}
+
 /** Turno con comprobante que requiere OK manual del médico. */
 export function appointmentNeedsDoctorPaymentReview(
   apt: {

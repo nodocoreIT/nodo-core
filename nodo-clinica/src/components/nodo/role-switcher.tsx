@@ -8,6 +8,8 @@ import { clinicApi } from "@/lib/clinic/client-api";
 interface RoleSwitcherProps {
   currentRole: "doctor" | "patient";
   canSwitchToOther: boolean;
+  disabled?: boolean;
+  onDisabledClick?: () => void;
 }
 
 const OTHER_ROLE_META = {
@@ -16,7 +18,12 @@ const OTHER_ROLE_META = {
 };
 
 /** Shown only for dual patient+doctor accounts — flips the active portal role. */
-export function RoleSwitcher({ currentRole, canSwitchToOther }: RoleSwitcherProps) {
+export function RoleSwitcher({
+  currentRole,
+  canSwitchToOther,
+  disabled = false,
+  onDisabledClick,
+}: RoleSwitcherProps) {
   const router = useRouter();
   const [switching, setSwitching] = useState(false);
 
@@ -26,6 +33,10 @@ export function RoleSwitcher({ currentRole, canSwitchToOther }: RoleSwitcherProp
   const meta = OTHER_ROLE_META[otherRole];
 
   async function handleSwitch() {
+    if (disabled) {
+      onDisabledClick?.();
+      return;
+    }
     setSwitching(true);
     try {
       await clinicApi.switchRole(otherRole);
@@ -40,7 +51,7 @@ export function RoleSwitcher({ currentRole, canSwitchToOther }: RoleSwitcherProp
     <button
       type="button"
       onClick={() => void handleSwitch()}
-      disabled={switching}
+      disabled={switching || disabled}
       className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-semibold text-navy shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-60"
     >
       {switching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <meta.Icon className="h-3.5 w-3.5" />}

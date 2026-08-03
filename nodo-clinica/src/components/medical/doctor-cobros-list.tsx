@@ -78,6 +78,7 @@ function rowStatus(row: CobroRow): RowStatus {
   if (row.status === "cancelled" && row.audit) return "rejected";
   if (row.audit?.valid || row.paymentStatus === "confirmed") return "approved";
   if (row.audit && !row.audit.valid) return "rejected";
+  if (row.paymentStatus === "pending") return "pending";
   return "other";
 }
 
@@ -99,6 +100,13 @@ function validationLabel(row: CobroRow): {
   if (row.needsReview) {
     return {
       text: "Pendiente",
+      className: "bg-amber-100 text-amber-900 border-amber-200",
+      icon: "pending",
+    };
+  }
+  if (row.paymentStatus === "pending") {
+    return {
+      text: "Pendiente de pago",
       className: "bg-amber-100 text-amber-900 border-amber-200",
       icon: "pending",
     };

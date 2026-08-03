@@ -49,9 +49,13 @@ import {
 import { buildPaymentReceiptAudit } from "@/lib/clinic/payment-receipt-audit";
 import { getBookableProfessional } from "@/lib/clinic/db/professionals";
 import { attachDocumentToAppointment } from "@/lib/clinic/appointment-documents";
-import { appointmentNeedsDoctorPaymentReviewFromDbRow } from "@/lib/clinic/payment";
+import {
+  appointmentNeedsDoctorPaymentReviewFromDbRow,
+  appointmentIncludedInPaymentLedger,
+} from "@/lib/clinic/payment";
 import { isLocalMode } from "@/lib/clinic/config";
 import { resolveAppointmentByAccessToken } from "@/lib/clinic/appointment-token-auth";
+import { mapSessionClinicalDocuments } from "@/lib/clinic/session-clinical-documents";
 import { handleAppointmentsGetLocal } from "@/lib/clinic/appointments-local-get";
 import { handleAppointmentsPostLocal } from "@/lib/clinic/appointments-local-post";
 import { handleAppointmentsPatchLocal } from "@/lib/clinic/appointments-local-patch";
@@ -127,7 +131,7 @@ export async function GET(request: NextRequest) {
       apt.status = "waiting";
     }
 
-    const [{ data: patient }, { data: professional }, { data: doctorQueueApts }, { data: docs }] =
+    const [{ data: patient }, { data: professional }, { data: doctorQueueApts }, { data: docs }, { data: clinicalRecords }] =
       await Promise.all([
         supabase.from("patients").select("*").eq("id", apt.patient_id).maybeSingle(),
         supabase
@@ -144,6 +148,12 @@ export async function GET(request: NextRequest) {
           .from("patient_documents")
           .select("*")
           .eq("appointment_id", apt.id),
+        supabase
+          .from("clinical_records")
+          .select("id, title, record_type, created_at")
+          .eq("appointment_id", apt.id)
+          .in("record_type", ["receta", "estudio"])
+          .order("created_at", { ascending: true }),
       ]);
 
     // Queue order follows appointment time (same day as this turno), not
@@ -228,6 +238,10 @@ export async function GET(request: NextRequest) {
         documentType: d.document_type ?? "study",
         downloadUrl: `/api/clinic/documents?id=${d.id}&download=1&token=${encodeURIComponent(apt.access_token)}`,
       })),
+      sessionDocuments: mapSessionClinicalDocuments(
+        clinicalRecords ?? [],
+        apt.access_token,
+      ),
     });
   }
 
@@ -408,14 +422,12 @@ export async function GET(request: NextRequest) {
 
       const entries = (ledger ?? [])
         .filter((apt) =>
-          appointmentNeedsDoctorPaymentReviewFromDbRow(apt as never, {
+          appointmentIncludedInPaymentLedger(apt as never, {
             receiptDocumentCount: (
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ((apt as any).patient_documents ?? []) as Array<{ document_type?: string }>
             ).filter((d) => d.document_type === "payment_receipt").length,
-          }) ||
-          apt.payment_status === "confirmed" ||
-          apt.payment_receipt_audit,
+          }),
         )
         .map((apt) => ({
           id: apt.id,

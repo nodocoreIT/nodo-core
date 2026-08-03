@@ -21,12 +21,14 @@ import {
 import {
   isPaymentConfirmed,
   appointmentNeedsDoctorPaymentReview,
+  appointmentIncludedInPaymentLedger,
 } from "@/lib/clinic/payment";
 import { isStrictPaymentValidation } from "@/lib/clinic/payment-validation";
 import {
   receiptDateOlderThanBooking,
   resolveCobroReceiptFields,
 } from "@/lib/clinic/cobros-receipt";
+import { mapSessionClinicalDocuments } from "@/lib/clinic/session-clinical-documents";
 
 const APPOINTMENT_STATUS_PRIORITY: Record<string, number> = {
   in_consultation: 0,
@@ -122,6 +124,21 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
           documentType: d.documentType ?? "study",
           downloadUrl: `/api/clinic/documents?id=${d.id}&download=1&token=${encodeURIComponent(apt.accessToken)}`,
         })),
+      sessionDocuments: mapSessionClinicalDocuments(
+        db.clinicalRecords
+          .filter(
+            (r) =>
+              r.appointmentId === apt.id &&
+              (r.recordType === "receta" || r.recordType === "estudio"),
+          )
+          .map((r) => ({
+            id: r.id,
+            title: r.title,
+            recordType: r.recordType,
+            createdAt: r.createdAt,
+          })),
+        apt.accessToken,
+      ),
     });
   }
 
@@ -234,16 +251,20 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
         .filter(
           (a) =>
             a.doctorId === doctorId &&
-            a.status !== "cancelled" &&
-            (a.paymentReceiptAudit ||
-              a.paymentStatus === "confirmed" ||
-              appointmentNeedsDoctorPaymentReview(a, {
+            appointmentIncludedInPaymentLedger(
+              {
+                status: a.status,
+                payment_status: a.paymentStatus,
+                payment_receipt_audit: a.paymentReceiptAudit,
+              },
+              {
                 receiptDocumentCount: db.documents.filter(
                   (d) =>
                     d.appointmentId === a.id &&
                     d.documentType === "payment_receipt",
                 ).length,
-              })),
+              },
+            ),
         )
         .sort((a, b) => {
           const aReview = appointmentNeedsDoctorPaymentReview(a) ? 1 : 0;
@@ -263,8 +284,11 @@ export async function handleAppointmentsGetLocal(request: NextRequest) {
           );
           return {
             id: apt.id,
+            status: apt.status,
             scheduledAt: apt.scheduledAt,
+            createdAt: apt.createdAt,
             patientName: patient?.fullName ?? "Paciente",
+            patientPhone: patient?.phone,
             paymentStatus: apt.paymentStatus,
             paymentProvider: apt.paymentProvider,
             audit: apt.paymentReceiptAudit,

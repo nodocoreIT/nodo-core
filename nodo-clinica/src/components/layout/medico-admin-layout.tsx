@@ -34,6 +34,7 @@ import {
   SidebarNavGroup,
   SidebarCommandPaletteHint,
   PortalHeaderActions,
+  PortalHeaderMobileActions,
   type AdminCommandPaletteItem,
 } from "@nodocore/shared-components";
 import { NodoSwitcher } from "@nodocore/nodo-modules";
@@ -124,9 +125,9 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const mpCallbackHandled = useRef(false);
 
   const chatEmbedded = pathname === "/medico/interconsultas";
-  const hasActiveConsultation = useConsultationStore((s) => s.hasActiveSession());
+  const activeAppointment = useConsultationStore((s) => s.activeAppointment);
   const inVideoConsultation =
-    pathname === "/medico/consultorio" && hasActiveConsultation;
+    pathname === "/medico/consultorio" && !!activeAppointment;
   const [chatFloatingOpen, setChatFloatingOpen] = useState(false);
   const [chatSessionKey, setChatSessionKey] = useState(0);
   const [chatInitialPeer, setChatInitialPeer] = useState<{
@@ -139,6 +140,21 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
     setChatSessionKey((k) => k + 1);
     setChatFloatingOpen(true);
   }, []);
+
+  const warnNavigationBlocked = useCallback(() => {
+    toast.message(
+      "Estás en videoconsulta. Usá «Finalizar consulta» antes de cambiar de sección.",
+    );
+  }, []);
+
+  const handleBlockedNavClick = useCallback(
+    (event: React.MouseEvent) => {
+      if (!inVideoConsultation) return;
+      event.preventDefault();
+      warnNavigationBlocked();
+    },
+    [inVideoConsultation, warnNavigationBlocked],
+  );
 
   const refreshCobrosUnread = useCallback(async () => {
     try {
@@ -333,11 +349,28 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
 
   const handleCommandSelect = useCallback(
     (item: AdminCommandPaletteItem) => {
+      if (inVideoConsultation) {
+        warnNavigationBlocked();
+        return;
+      }
       router.push(item.href);
       setMobileMenuOpen(false);
     },
-    [router],
+    [router, inVideoConsultation, warnNavigationBlocked],
   );
+
+  useEffect(() => {
+    if (!inVideoConsultation) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isModifier = event.metaKey || event.ctrlKey;
+      if (!isModifier || event.key.toLowerCase() !== "k") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      warnNavigationBlocked();
+    };
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [inVideoConsultation, warnNavigationBlocked]);
 
   if (checking || !doctor) {
     return (
@@ -411,18 +444,34 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                 type="button"
                 aria-label="Configuración"
                 onClick={() => {
+                  if (inVideoConsultation) {
+                    warnNavigationBlocked();
+                    return;
+                  }
                   setMobileMenuOpen(false);
                   setSettingsOpen(true);
                 }}
-                className="flex-shrink-0 rounded-md p-1.5 transition-colors text-[var(--color-sidebar-text)] hover:text-[var(--sidebar-accent-foreground)]"
+                className={cn(
+                  "flex-shrink-0 rounded-md p-1.5 transition-colors text-[var(--color-sidebar-text)] hover:text-[var(--sidebar-accent-foreground)]",
+                  inVideoConsultation && "opacity-40 cursor-not-allowed",
+                )}
               >
                 <Settings className="h-4 w-4" />
               </button>
               <button
                 type="button"
                 aria-label="Cerrar sesión"
-                onClick={handleLogout}
-                className="flex-shrink-0 rounded-md p-1.5 transition-colors text-[var(--color-sidebar-text)] hover:text-[var(--sidebar-accent-foreground)]"
+                onClick={() => {
+                  if (inVideoConsultation) {
+                    warnNavigationBlocked();
+                    return;
+                  }
+                  void handleLogout();
+                }}
+                className={cn(
+                  "flex-shrink-0 rounded-md p-1.5 transition-colors text-[var(--color-sidebar-text)] hover:text-[var(--sidebar-accent-foreground)]",
+                  inVideoConsultation && "opacity-40 cursor-not-allowed",
+                )}
               >
                 <LogOut className="h-4 w-4" />
               </button>
@@ -430,7 +479,10 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav
-            className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+            className={cn(
+              "flex-1 min-h-0 overflow-y-auto px-3 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]",
+              inVideoConsultation && "opacity-60",
+            )}
             aria-label="Navegación principal"
           >
             <SidebarNavAccordionProvider itemCount={NAV_ITEMS.length}>
@@ -454,12 +506,22 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                     <Link
                       key={href}
                       href={href}
-                      onClick={() => setMobileMenuOpen(false)}
+                      onClick={(event) => {
+                        if (inVideoConsultation) {
+                          handleBlockedNavClick(event);
+                          return;
+                        }
+                        setMobileMenuOpen(false);
+                      }}
+                      aria-disabled={inVideoConsultation}
+                      tabIndex={inVideoConsultation ? -1 : undefined}
                       className={cn(
                         "flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors",
                         isActive
                           ? "bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)]"
                           : "text-[var(--color-sidebar-text)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]",
+                        inVideoConsultation &&
+                          "cursor-not-allowed hover:bg-transparent hover:text-[var(--color-sidebar-text)]",
                       )}
                     >
                       <Icon className="h-4 w-4 flex-shrink-0" />
@@ -508,10 +570,17 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                 type="button"
                 aria-label="Configuración"
                 onClick={() => {
+                  if (inVideoConsultation) {
+                    warnNavigationBlocked();
+                    return;
+                  }
                   setMobileMenuOpen(false);
                   setSettingsOpen(true);
                 }}
-                className="flex-shrink-0 rounded-md p-1.5 transition-colors text-[var(--color-sidebar-text)] hover:text-[var(--sidebar-accent-foreground)]"
+                className={cn(
+                  "flex-shrink-0 rounded-md p-1.5 transition-colors text-[var(--color-sidebar-text)] hover:text-[var(--sidebar-accent-foreground)]",
+                  inVideoConsultation && "opacity-40 cursor-not-allowed",
+                )}
               >
                 <Settings className="h-4 w-4" />
               </button>
@@ -519,8 +588,15 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
 
             <Button
               variant="outline"
-              onClick={handleLogout}
-              className="mt-2 w-full justify-center gap-2 border-[var(--color-sidebar-border)] bg-transparent text-[var(--color-sidebar-text)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] hover:border-[var(--sidebar-primary)]"
+              onClick={() => {
+                if (inVideoConsultation) {
+                  warnNavigationBlocked();
+                  return;
+                }
+                void handleLogout();
+              }}
+              disabled={inVideoConsultation}
+              className="mt-2 w-full justify-center gap-2 border-[var(--color-sidebar-border)] bg-transparent text-[var(--color-sidebar-text)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] hover:border-[var(--sidebar-primary)] disabled:opacity-40"
             >
               <LogOut className="h-4 w-4" />
               Cerrar sesión
@@ -529,42 +605,121 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
         </aside>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <header className="flex min-h-16 flex-shrink-0 items-center justify-between gap-4 border-b border-border bg-[#EEF3F8] px-4 py-3 shadow-sm sm:px-6">
-            <div className="flex items-center gap-2 min-w-0">
-              <button
-                type="button"
-                className="block md:hidden text-[var(--color-navy)] hover:text-[var(--color-primary)]"
-                onClick={() => setMobileMenuOpen(true)}
-                aria-label="Abrir menú"
-              >
-                <Menu className="h-6 w-6" />
-              </button>
-              <button
-                type="button"
-                className="block md:hidden rounded-md p-1 text-[var(--color-navy)] hover:text-[var(--color-primary)]"
-                onClick={() => setSettingsOpen(true)}
-                aria-label="Configuración"
-              >
-                <Settings className="h-6 w-6" />
-              </button>
-              <div className="min-w-0">
-                <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
-                  <span className="text-navy">NODO</span>
-                  <span className="text-[var(--color-primary)]"> Clínica</span>
-                  <span className="text-slate2"> · Profesionales</span>
-                </p>
-                <h1 className="truncate text-base sm:text-xl font-bold text-navy font-display">
-                  {title}
-                </h1>
+          <header className="flex min-h-16 flex-shrink-0 flex-col gap-3 border-b border-border bg-[#EEF3F8] px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
+            <div className="flex items-center justify-between gap-2 min-w-0 sm:justify-start">
+              <div className="flex items-center gap-2 min-w-0">
+                <button
+                  type="button"
+                  className="block md:hidden text-[var(--color-navy)] hover:text-[var(--color-primary)]"
+                  onClick={() => setMobileMenuOpen(true)}
+                  aria-label="Abrir menú"
+                >
+                  <Menu className="h-6 w-6" />
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "block md:hidden rounded-md p-1 text-[var(--color-navy)] hover:text-[var(--color-primary)]",
+                    inVideoConsultation && "opacity-40 cursor-not-allowed",
+                  )}
+                  onClick={() => {
+                    if (inVideoConsultation) {
+                      warnNavigationBlocked();
+                      return;
+                    }
+                    setSettingsOpen(true);
+                  }}
+                  aria-label="Configuración"
+                >
+                  <Settings className="h-6 w-6" />
+                </button>
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
+                    <span className="text-navy">NODO</span>
+                    <span className="text-[var(--color-primary)]"> Clínica</span>
+                    <span className="text-slate2"> · Profesionales</span>
+                  </p>
+                  <h1 className="truncate text-base sm:text-xl font-bold text-navy font-display">
+                    {title}
+                  </h1>
+                </div>
               </div>
+
+              {doctor && (
+                <PortalHeaderMobileActions
+                  metrics={
+                    <PlanBadge
+                      subscriptionStatus={
+                        doctor.subscriptionStatus as
+                          | "demo"
+                          | "pending_payment"
+                          | "active"
+                          | "expired"
+                          | undefined
+                      }
+                      trialDaysRemaining={doctor.trialDaysRemaining}
+                    />
+                  }
+                  notifications={
+                    <div className="flex items-center gap-0.5">
+                      <div
+                        className={cn(
+                          inVideoConsultation && "pointer-events-none opacity-50",
+                        )}
+                      >
+                        <ClinicNotificationsBell
+                          doctorId={doctor.id}
+                          navigationDisabled={inVideoConsultation}
+                          onNavigationBlocked={warnNavigationBlocked}
+                        />
+                      </div>
+                      <NodoChatBell
+                        className="relative z-[120]"
+                        chatEmbedded={chatEmbedded}
+                        inVideoConsultation={inVideoConsultation}
+                        onOpenChat={chatEmbedded ? undefined : openFloatingChat}
+                      />
+                    </div>
+                  }
+                  trailing={
+                    <div
+                      className={cn(
+                        "flex items-center gap-2",
+                        inVideoConsultation && "pointer-events-none opacity-50",
+                      )}
+                    >
+                      <RoleSwitcher
+                        currentRole="doctor"
+                        canSwitchToOther={canSwitchToPatient}
+                        disabled={inVideoConsultation}
+                        onDisabledClick={warnNavigationBlocked}
+                      />
+                      {isPlatformMode() && isBrowserSupabaseEnabled() ? (
+                        <NodoSwitcher product="clinica" clinicaRole="medico" />
+                      ) : null}
+                    </div>
+                  }
+                />
+              )}
             </div>
 
             {doctor && (
               <PortalHeaderActions
                 notifications={
                   <div className="flex items-center gap-0.5">
-                    <ClinicNotificationsBell doctorId={doctor.id} />
+                    <div
+                      className={cn(
+                        inVideoConsultation && "pointer-events-none opacity-50",
+                      )}
+                    >
+                      <ClinicNotificationsBell
+                        doctorId={doctor.id}
+                        navigationDisabled={inVideoConsultation}
+                        onNavigationBlocked={warnNavigationBlocked}
+                      />
+                    </div>
                     <NodoChatBell
+                      className="relative z-[120]"
                       chatEmbedded={chatEmbedded}
                       inVideoConsultation={inVideoConsultation}
                       onOpenChat={chatEmbedded ? undefined : openFloatingChat}
@@ -585,8 +740,18 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                   />
                 }
                 trailing={
-                  <div className="flex items-center gap-2">
-                    <RoleSwitcher currentRole="doctor" canSwitchToOther={canSwitchToPatient} />
+                  <div
+                    className={cn(
+                      "flex items-center gap-2",
+                      inVideoConsultation && "pointer-events-none opacity-50",
+                    )}
+                  >
+                    <RoleSwitcher
+                      currentRole="doctor"
+                      canSwitchToOther={canSwitchToPatient}
+                      disabled={inVideoConsultation}
+                      onDisabledClick={warnNavigationBlocked}
+                    />
                     {isPlatformMode() && isBrowserSupabaseEnabled() ? (
                       <NodoSwitcher product="clinica" clinicaRole="medico" />
                     ) : null}

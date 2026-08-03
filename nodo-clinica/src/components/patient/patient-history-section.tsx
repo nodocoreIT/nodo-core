@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import {
   History,
   FileText,
-  Download,
   Stethoscope,
   Loader2,
   Pill,
@@ -15,6 +14,7 @@ import {
   Brain,
   Calendar,
   Filter,
+  Eye,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -23,6 +23,7 @@ import type {
   TimelineItemKind,
 } from "@/lib/clinic/patient-timeline";
 import { timelineKindLabel } from "@/lib/clinic/patient-timeline";
+import { ClinicalDocumentPreviewDialog } from "@/components/patient/clinical-document-preview-dialog";
 
 interface PatientHistorySectionProps {
   patientId: string;
@@ -74,7 +75,9 @@ const STATUS_LABEL: Record<string, string> = {
 function TimelineEntry({ item }: { item: PatientTimelineItem }) {
   const Icon = KIND_ICONS[item.kind];
   const [expanded, setExpanded] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const hasContent = !!item.content?.trim();
+  const hasPdf = !!item.downloadUrl && (item.kind === "receta" || item.kind === "estudio" || item.kind === "informe");
 
   return (
     <div className="relative pl-8 pb-6 last:pb-0">
@@ -109,19 +112,16 @@ function TimelineEntry({ item }: { item: PatientTimelineItem }) {
             </p>
           </div>
 
-          {item.downloadUrl && (
-            <a
-              href={item.downloadUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+          {hasPdf && (
+            <button
+              type="button"
+              onClick={() => setPreviewUrl(item.downloadUrl!)}
               className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              title="Descargar PDF"
+              title="Ver documento"
             >
-              <Download className="h-3.5 w-3.5" />
-              {item.kind === "receta" || item.kind === "estudio"
-                ? "Ver PDF"
-                : "Descargar"}
-            </a>
+              <Eye className="h-3.5 w-3.5" />
+              Ver PDF
+            </button>
           )}
         </div>
 
@@ -147,7 +147,142 @@ function TimelineEntry({ item }: { item: PatientTimelineItem }) {
           </div>
         )}
       </div>
+
+      <ClinicalDocumentPreviewDialog
+        open={!!previewUrl}
+        title={item.title}
+        pdfUrl={previewUrl ?? undefined}
+        onOpenChange={(open) => !open && setPreviewUrl(null)}
+      />
     </div>
+  );
+}
+
+type SessionTimelineGroup = {
+  appointmentId: string;
+  date: string;
+  doctorName?: string;
+  items: PatientTimelineItem[];
+};
+
+function SessionDocumentsTimelineEntry({ group }: { group: SessionTimelineGroup }) {
+  const [preview, setPreview] = useState<PatientTimelineItem | null>(null);
+
+  return (
+    <div className="relative pl-8 pb-6 last:pb-0">
+      <span className="absolute left-[11px] top-0 bottom-0 w-px bg-slate-200 last:hidden" />
+      <span className="absolute left-0 top-1 flex h-6 w-6 items-center justify-center rounded-full border bg-emerald-100 text-emerald-700 border-emerald-200">
+        <FileText className="h-3.5 w-3.5" />
+      </span>
+
+      <div className="rounded-lg border border-slate-100 bg-white p-3 shadow-sm space-y-2">
+        <div>
+          <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
+            Documentos de la consulta
+          </Badge>
+          <p className="font-medium text-sm text-slate-800 mt-1">
+            Recetas y estudios de esta sesión
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {format(new Date(group.date), "dd MMM yyyy · HH:mm", { locale: es })}
+            {group.doctorName && ` · Dr/a. ${group.doctorName}`}
+          </p>
+        </div>
+
+        {group.items.map((item) => {
+          const Icon = item.kind === "receta" ? Pill : FlaskConical;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => item.downloadUrl && setPreview(item)}
+              className="flex w-full items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-left hover:border-emerald-200 hover:bg-emerald-50/40 transition-colors"
+            >
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                  item.kind === "receta"
+                    ? "bg-indigo-100 text-indigo-700"
+                    : "bg-cyan-100 text-cyan-700"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-slate-800 truncate">
+                  {item.title}
+                </span>
+                <span className="block text-[11px] text-slate-500">
+                  {timelineKindLabel(item.kind)}
+                </span>
+              </span>
+              {item.downloadUrl ? (
+                <Eye className="h-4 w-4 shrink-0 text-emerald-700" />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      <ClinicalDocumentPreviewDialog
+        open={!!preview}
+        title={preview?.title}
+        pdfUrl={preview?.downloadUrl}
+        onOpenChange={(open) => !open && setPreview(null)}
+      />
+    </div>
+  );
+}
+
+function buildDisplayEntries(items: PatientTimelineItem[]) {
+  const sessionGroups = new Map<string, PatientTimelineItem[]>();
+  const otherItems: PatientTimelineItem[] = [];
+
+  for (const item of items) {
+    if (
+      (item.kind === "receta" || item.kind === "estudio") &&
+      item.appointmentId
+    ) {
+      const list = sessionGroups.get(item.appointmentId) ?? [];
+      list.push(item);
+      sessionGroups.set(item.appointmentId, list);
+      continue;
+    }
+    otherItems.push(item);
+  }
+
+  const groupedSessions: SessionTimelineGroup[] = [...sessionGroups.entries()].map(
+    ([appointmentId, groupItems]) => {
+      const sorted = [...groupItems].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+      );
+      return {
+        appointmentId,
+        date: sorted[sorted.length - 1]?.date ?? sorted[0].date,
+        doctorName: sorted[0]?.doctorName,
+        items: sorted,
+      };
+    },
+  );
+
+  type DisplayEntry =
+    | { type: "item"; item: PatientTimelineItem; sortDate: string }
+    | { type: "session"; group: SessionTimelineGroup; sortDate: string };
+
+  const entries: DisplayEntry[] = [
+    ...otherItems.map((item) => ({
+      type: "item" as const,
+      item,
+      sortDate: item.date,
+    })),
+    ...groupedSessions.map((group) => ({
+      type: "session" as const,
+      group,
+      sortDate: group.date,
+    })),
+  ];
+
+  return entries.sort(
+    (a, b) => new Date(b.sortDate).getTime() - new Date(a.sortDate).getTime(),
   );
 }
 
@@ -162,6 +297,11 @@ export function PatientHistorySection({
     if (filter === "all") return items;
     return items.filter((item) => item.kind === filter);
   }, [timeline, filter]);
+
+  const displayEntries = useMemo(
+    () => buildDisplayEntries(filtered),
+    [filtered],
+  );
 
   if (loading) {
     return (
@@ -204,7 +344,7 @@ export function PatientHistorySection({
           ))}
         </div>
 
-        {filtered.length === 0 ? (
+        {displayEntries.length === 0 ? (
           <p className="text-sm text-slate-400 text-center py-10">
             {filter === "all"
               ? "Todavía no hay eventos en tu historial clínico"
@@ -212,9 +352,16 @@ export function PatientHistorySection({
           </p>
         ) : (
           <div className="mt-2">
-            {filtered.map((item) => (
-              <TimelineEntry key={item.id} item={item} />
-            ))}
+            {displayEntries.map((entry) =>
+              entry.type === "session" ? (
+                <SessionDocumentsTimelineEntry
+                  key={`session-${entry.group.appointmentId}`}
+                  group={entry.group}
+                />
+              ) : (
+                <TimelineEntry key={entry.item.id} item={entry.item} />
+              ),
+            )}
           </div>
         )}
       </CardContent>

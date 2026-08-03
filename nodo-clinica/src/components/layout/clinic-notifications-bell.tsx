@@ -27,9 +27,16 @@ const KIND_STYLES: Record<string, NotificationKindStyle> = {
 
 interface ClinicNotificationsBellProps {
   doctorId: string;
+  /** Durante videoconsulta: no navegar (cortaría la sesión). */
+  navigationDisabled?: boolean;
+  onNavigationBlocked?: () => void;
 }
 
-export function ClinicNotificationsBell({ doctorId }: ClinicNotificationsBellProps) {
+export function ClinicNotificationsBell({
+  doctorId,
+  navigationDisabled = false,
+  onNavigationBlocked,
+}: ClinicNotificationsBellProps) {
   const router = useRouter();
   const { items, loading, error, markMercadoPagoPaymentRead } =
     useClinicNotifications(doctorId);
@@ -46,7 +53,13 @@ export function ClinicNotificationsBell({ doctorId }: ClinicNotificationsBellPro
       loading={loading}
       error={error ? "No se pudieron cargar las notificaciones." : null}
       kindStyles={KIND_STYLES}
-      onNavigate={(href) => router.push(href)}
+      onNavigate={(href) => {
+        if (navigationDisabled) {
+          onNavigationBlocked?.();
+          return;
+        }
+        router.push(href);
+      }}
       onDismiss={consumeIfMpPayment}
       headerRingClass="ring-[#EEF3F8]"
       storageKey="clinica"
