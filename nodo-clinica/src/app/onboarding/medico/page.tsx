@@ -37,6 +37,7 @@ function OnboardingMedicoContent() {
   const [submitted, setSubmitted] = useState(false);
   const [checkoutFailed, setCheckoutFailed] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const [plan, setPlan] = useState("demo");
   const [form, setForm] = useState({
     fullName: "",
@@ -83,20 +84,7 @@ function OnboardingMedicoContent() {
     );
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.fullName || !form.specialty) {
-      toast.error("El nombre completo y la especialidad son requeridos.");
-      return;
-    }
-    if (!phoneValid) {
-      toast.error("Ingresá un número de celular con formato válido.");
-      return;
-    }
-    if (!termsAccepted) {
-      toast.error("Debés aceptar los términos y condiciones para continuar.");
-      return;
-    }
+  const submitRegistration = async () => {
     setLoading(true);
     try {
       const result = await clinicApi.completeOnboardingMedico({
@@ -119,13 +107,37 @@ function OnboardingMedicoContent() {
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.fullName || !form.specialty) {
+      toast.error("El nombre completo y la especialidad son requeridos.");
+      return;
+    }
+    if (!phoneValid) {
+      toast.error("Ingresá un número de celular con formato válido.");
+      return;
+    }
+    if (!termsAccepted) {
+      setShowTermsModal(true);
+      return;
+    }
+    await submitRegistration();
+  };
+
   return (
     <div className="relative min-h-screen py-10 px-4">
       <TermsAcceptanceModal
-        open={!termsAccepted}
+        open={showTermsModal}
         role="medico"
         token={token}
-        onAccept={() => setTermsAccepted(true)}
+        fullName={form.fullName}
+        documentNumber={form.licenseNumber}
+        onAccept={() => {
+          setTermsAccepted(true);
+          setShowTermsModal(false);
+          void submitRegistration();
+        }}
+        onClose={() => setShowTermsModal(false)}
       />
       <NeuralNodesBackground />
       <div className="relative z-10 mx-auto w-full max-w-5xl">

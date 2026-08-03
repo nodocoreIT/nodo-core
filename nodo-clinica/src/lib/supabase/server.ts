@@ -57,7 +57,7 @@ export async function createSharedServiceClient() {
   );
 }
 
-/** Read-only access to the cross-nodo commercial catalog (nodo_core.planes and friends). */
+/** Access to nodo_core (cross-nodo commercial catalog, terms_acceptances, and friends). */
 export async function createNodoCoreServiceClient() {
   const { createClient: createSupabaseClient } = await import(
     "@supabase/supabase-js"

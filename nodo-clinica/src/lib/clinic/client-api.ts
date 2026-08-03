@@ -486,6 +486,8 @@ export const clinicApi = {
   async acceptOnboardingTerms(data: {
     token: string;
     role: "medico" | "paciente";
+    fullName: string;
+    documentNumber?: string;
   }): Promise<{ ok: boolean }> {
     const res = await fetch(`${BASE}/api/clinic/account/onboarding/aceptar-terminos`, {
       method: "POST",

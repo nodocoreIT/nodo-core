@@ -13,14 +13,20 @@ interface TermsAcceptanceModalProps {
   open: boolean;
   role: "medico" | "paciente";
   token: string;
+  fullName: string;
+  documentNumber?: string;
   onAccept: () => void;
+  onClose: () => void;
 }
 
 export function TermsAcceptanceModal({
   open,
   role,
   token,
+  fullName,
+  documentNumber,
   onAccept,
+  onClose,
 }: TermsAcceptanceModalProps) {
   const [checked, setChecked] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -30,7 +36,7 @@ export function TermsAcceptanceModal({
     setLoading(true);
     setError(null);
     try {
-      await clinicApi.acceptOnboardingTerms({ token, role });
+      await clinicApi.acceptOnboardingTerms({ token, role, fullName, documentNumber });
       onAccept();
     } catch (err) {
       setError(
@@ -42,12 +48,12 @@ export function TermsAcceptanceModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={() => {}} modal>
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()} modal>
       <DialogContent
-        showCloseButton={false}
-        className="grid max-h-[85vh] w-full max-w-2xl grid-rows-[auto_1fr_auto] gap-0 p-0"
+        showCloseButton
+        className="grid max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl sm:max-w-3xl grid-rows-[auto_1fr_auto] gap-0 p-0"
       >
-        <div className="border-b border-border p-6">
+        <div className="border-b border-border p-6 pr-10">
           <h2 className="font-heading text-base font-semibold">
             Términos y Condiciones de Uso — Nodo Clínica
           </h2>

@@ -70,6 +70,7 @@ function OnboardingPacienteContent() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const [plan, setPlan] = useState("gratuito");
   const [form, setForm] = useState({
     fullName: "",
@@ -99,12 +100,7 @@ function OnboardingPacienteContent() {
     );
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.fullName) { toast.error("El nombre completo es requerido."); return; }
-    if (!form.dni.trim()) { toast.error("El número de DNI es requerido."); return; }
-    if (!phoneValid) { toast.error("Ingresá un número de celular con formato válido."); return; }
-    if (!termsAccepted) { toast.error("Debés aceptar los términos y condiciones para continuar."); return; }
+  const submitRegistration = async () => {
     setLoading(true);
     try {
       const formData = new FormData();
@@ -129,13 +125,32 @@ function OnboardingPacienteContent() {
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.fullName) { toast.error("El nombre completo es requerido."); return; }
+    if (!form.dni.trim()) { toast.error("El número de DNI es requerido."); return; }
+    if (!phoneValid) { toast.error("Ingresá un número de celular con formato válido."); return; }
+    if (!termsAccepted) {
+      setShowTermsModal(true);
+      return;
+    }
+    await submitRegistration();
+  };
+
   return (
     <div className="relative min-h-screen py-10 px-4">
       <TermsAcceptanceModal
-        open={!termsAccepted}
+        open={showTermsModal}
         role="paciente"
         token={token}
-        onAccept={() => setTermsAccepted(true)}
+        fullName={form.fullName}
+        documentNumber={form.dni}
+        onAccept={() => {
+          setTermsAccepted(true);
+          setShowTermsModal(false);
+          void submitRegistration();
+        }}
+        onClose={() => setShowTermsModal(false)}
       />
       <NeuralNodesBackground />
       <div className="relative z-10 mx-auto w-full max-w-5xl">

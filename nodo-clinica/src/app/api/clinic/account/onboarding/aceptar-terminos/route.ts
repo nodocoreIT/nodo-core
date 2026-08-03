@@ -1,16 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createServiceClient, createNodoCoreServiceClient } from "@/lib/supabase/server";
 import { extractClientIp, isValidIp } from "@/lib/clinic/request-ip";
 import { TERMS_CONTENT, TERMS_VERSION } from "@/lib/clinic/terms-content";
+
+/** Must match nodo_core.client_units/planes.unit_code exactly (case/accent-sensitive). */
+const UNIT_CODE = "Clínica";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
-    const { token, role } = body as { token?: string; role?: string };
+    const { token, role, fullName, documentNumber } = body as {
+      token?: string;
+      role?: string;
+      fullName?: string;
+      documentNumber?: string;
+    };
 
     if (!token || (role !== "medico" && role !== "paciente")) {
       return NextResponse.json(
         { error: "Token y rol de onboarding requeridos." },
+        { status: 400 },
+      );
+    }
+
+    if (!fullName?.trim()) {
+      return NextResponse.json(
+        { error: "Nombre completo requerido." },
         { status: 400 },
       );
     }
@@ -67,18 +82,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const { error: insertError } = await serviceClient
+    const nodoCoreClient = await createNodoCoreServiceClient();
+    const { error: insertError } = await nodoCoreClient
       .from("terms_acceptances")
       .upsert(
         {
-          pending_registration_id: pending.id,
+          unit_code: UNIT_CODE,
           user_id: authUser.id,
           role,
+          full_name: fullName.trim(),
+          document_number: documentNumber?.trim() || null,
+          email,
           terms_version: TERMS_VERSION,
           terms_content: TERMS_CONTENT,
           ip_address: clientIp,
         },
-        { onConflict: "pending_registration_id", ignoreDuplicates: true },
+        { onConflict: "unit_code,user_id,terms_version", ignoreDuplicates: true },
       );
 
     if (insertError) {
