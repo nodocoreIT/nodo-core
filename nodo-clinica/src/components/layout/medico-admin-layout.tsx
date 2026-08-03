@@ -19,6 +19,9 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { BrandMark } from "@/components/nodo/brand-mark";
 import { NodoChatBell } from "@/components/nodo-chat/nodo-chat-bell";
+import { NodoChatWidget } from "@/components/nodo-chat/nodo-chat-widget";
+import { isProPlan } from "@/lib/nodo-chat/is-pro-plan";
+import { useConsultationStore } from "@/store/consultation-store";
 import { clinicApi, invalidateClinicApiCache } from "@/lib/clinic/client-api";
 import { isBrowserSupabaseEnabled } from "@/lib/clinic/config";
 import { isPlatformMode } from "@/lib/clinic/platform-config";
@@ -121,6 +124,20 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const mpCallbackHandled = useRef(false);
 
   const chatEmbedded = pathname === "/medico/interconsultas";
+  const inVideoConsultation =
+    pathname === "/medico/consultorio" && useConsultationStore((s) => s.hasActiveSession());
+  const [chatFloatingOpen, setChatFloatingOpen] = useState(false);
+  const [chatSessionKey, setChatSessionKey] = useState(0);
+  const [chatInitialPeer, setChatInitialPeer] = useState<{
+    id?: string;
+    name?: string;
+  }>({});
+
+  const openFloatingChat = useCallback((peerId?: string, peerName?: string) => {
+    setChatInitialPeer({ id: peerId, name: peerName });
+    setChatSessionKey((k) => k + 1);
+    setChatFloatingOpen(true);
+  }, []);
 
   const refreshCobrosUnread = useCallback(async () => {
     try {
@@ -546,7 +563,11 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                 notifications={
                   <div className="flex items-center gap-0.5">
                     <ClinicNotificationsBell doctorId={doctor.id} />
-                    <NodoChatBell chatEmbedded={chatEmbedded} />
+                    <NodoChatBell
+                      chatEmbedded={chatEmbedded}
+                      inVideoConsultation={inVideoConsultation}
+                      onOpenChat={chatEmbedded ? undefined : openFloatingChat}
+                    />
                   </div>
                 }
                 metrics={
@@ -611,6 +632,20 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
           <DoctorSpecialtySetupModal
             open={specialtySetupOpen}
             onComplete={() => setSpecialtySetupOpen(false)}
+          />
+        )}
+        {doctor && !chatEmbedded && isProPlan(doctor.subscriptionPlan) && (
+          <NodoChatWidget
+            key={chatSessionKey}
+            doctorId={doctor.id}
+            doctorName={doctor.fullName}
+            isPro
+            open={chatFloatingOpen}
+            onOpenChange={setChatFloatingOpen}
+            hideLauncher
+            floatingVariant={inVideoConsultation ? "consultation" : "default"}
+            initialPeerId={chatInitialPeer.id ?? null}
+            initialPeerName={chatInitialPeer.name ?? null}
           />
         )}
       </div>

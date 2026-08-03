@@ -16,6 +16,7 @@ import {
   type EditableGroup,
   type EditablePlan,
 } from "@/lib/panel/plan-admin";
+import { getFeatureMatrixPlans } from "@/lib/panel/unit-feature-matrix";
 import type { NodeDef } from "@/lib/nodes";
 
 const PLAN_HEADER_COLORS = [
@@ -491,7 +492,8 @@ export function UnitPlanEditor({ node }: UnitPlanEditorProps) {
                     Funcionalidades por plan
                   </h3>
                   <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--color-slate2)" }}>
-                    Marcá qué incluye cada plan. Las columnas siguen el orden de los planes activos.
+                    Marcá qué incluye cada plan. Las columnas se ajustan al nodo y a la audiencia
+                    (pacientes, médicos, etc.).
                   </p>
                 </div>
                 <button
@@ -530,6 +532,11 @@ export function UnitPlanEditor({ node }: UnitPlanEditorProps) {
                     const groupFeatures = features
                       .filter((feature) => feature.group_id === group.id)
                       .sort((a, b) => a.sort_order - b.sort_order);
+                    const matrixPlans = getFeatureMatrixPlans(
+                      unitCode,
+                      group.label,
+                      activePlanes,
+                    );
 
                     return (
                       <div
@@ -611,7 +618,7 @@ export function UnitPlanEditor({ node }: UnitPlanEditorProps) {
                           <thead>
                             <tr>
                               <th style={{ ...thStyle, minWidth: 280 }}>Funcionalidad</th>
-                              {activePlanes.map((plan, index) => (
+                              {matrixPlans.map((plan, index) => (
                                 <th
                                   key={plan.id}
                                   style={{
@@ -631,10 +638,20 @@ export function UnitPlanEditor({ node }: UnitPlanEditorProps) {
                             {groupFeatures.length === 0 ? (
                               <tr>
                                 <td
-                                  colSpan={activePlanes.length + 2}
+                                  colSpan={matrixPlans.length + 2}
                                   style={{ ...tdStyle, color: "var(--color-slate2)" }}
                                 >
                                   Sin funcionalidades en esta categoría.
+                                </td>
+                              </tr>
+                            ) : matrixPlans.length === 0 ? (
+                              <tr>
+                                <td
+                                  colSpan={2}
+                                  style={{ ...tdStyle, color: "var(--color-slate2)" }}
+                                >
+                                  No hay planes activos que correspondan a esta categoría. Revisá los
+                                  códigos de plan (demo/pro, gratis/pro, starter/pro, etc.).
                                 </td>
                               </tr>
                             ) : (
@@ -656,7 +673,7 @@ export function UnitPlanEditor({ node }: UnitPlanEditorProps) {
                                       placeholder="Descripción de la funcionalidad"
                                     />
                                   </td>
-                                  {activePlanes.map((plan) => (
+                                  {matrixPlans.map((plan) => (
                                     <td key={plan.id} style={{ ...tdStyle, textAlign: "center" }}>
                                       <input
                                         type="checkbox"

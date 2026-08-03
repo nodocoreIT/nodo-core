@@ -7,9 +7,11 @@ import { clinicApi } from "@/lib/clinic/client-api";
 import { cn } from "@/lib/utils";
 
 interface NodoChatBellProps {
-  onOpenChat?: () => void;
+  onOpenChat?: (peerId?: string, peerName?: string) => void;
   /** En /medico/interconsultas el chat ya está visible en pantalla */
   chatEmbedded?: boolean;
+  /** Videoconsulta activa: un clic abre el popup flotante sin navegar */
+  inVideoConsultation?: boolean;
 }
 
 function formatPreviewTime(iso: string) {
@@ -22,6 +24,7 @@ function formatPreviewTime(iso: string) {
 export function NodoChatBell({
   onOpenChat,
   chatEmbedded = false,
+  inVideoConsultation = false,
 }: NodoChatBellProps) {
   const router = useRouter();
   const [count, setCount] = useState(0);
@@ -76,19 +79,25 @@ export function NodoChatBell({
     window.dispatchEvent(new CustomEvent("nodo-chat-read"));
     setCount(0);
     setItems([]);
+    if (chatEmbedded) return;
+    if (onOpenChat) {
+      onOpenChat(peerId, peerName);
+      return;
+    }
     if (!peerId) {
-      if (chatEmbedded) return;
-      if (onOpenChat) {
-        onOpenChat();
-        return;
-      }
       router.push("/medico/interconsultas");
       return;
     }
-    // Con peer específico: navegar siempre (incluso ya estando en /medico/interconsultas),
-    // así el widget detecta el cambio de peerId y abre esa conversación puntual.
     const params = `?peerId=${encodeURIComponent(peerId)}&peerName=${encodeURIComponent(peerName ?? "")}`;
     router.push(`/medico/interconsultas${params}`);
+  };
+
+  const handleBellClick = () => {
+    if (inVideoConsultation && onOpenChat) {
+      void openChatWithPeer(items[0]?.fromDoctorId, items[0]?.fromDoctorName);
+      return;
+    }
+    setOpen((v) => !v);
   };
 
   const handleOpenChat = () =>
@@ -98,7 +107,7 @@ export function NodoChatBell({
     <div className="relative" ref={panelRef}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleBellClick}
         className={cn(
           "relative inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center overflow-visible rounded-full text-navy transition-colors hover:bg-navy/5 hover:text-brand focus:outline-none",
           open && "text-brand",
@@ -164,7 +173,11 @@ export function NodoChatBell({
               className="flex w-full items-center justify-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand-600 transition-colors"
             >
               <MessageSquare className="h-4 w-4" />
-              {chatEmbedded ? "Marcar como leído" : "Abrir chat"}
+              {chatEmbedded
+                ? "Marcar como leído"
+                : inVideoConsultation
+                  ? "Abrir chat flotante"
+                  : "Abrir chat"}
             </button>
           </div>
         </div>

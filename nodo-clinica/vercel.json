@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/pharmacy-on-call",
-      "schedule": "0 6 1 * *"
+      "schedule": "0 9 1-10 * *"
     },
     {
       "path": "/api/cron/medical-directory",

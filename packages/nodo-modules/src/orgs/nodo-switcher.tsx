@@ -31,11 +31,14 @@ const ROLE_LABELS: Record<string, string> = {
   paciente: "Paciente",
 };
 
-const PRODUCT_META: Record<string, { label: string; color: string; Icon: LucideIcon }> = {
-  inmo: { label: "Nodo Inmo", color: "#da5a0e", Icon: Building2 },
-  autos: { label: "Nodo Autos", color: "#C41E3A", Icon: Car },
-  finanzas: { label: "Nodo Finanzas", color: "#059669", Icon: Coins },
-  clinica: { label: "Nodo Clínica", color: "#0D9488", Icon: Stethoscope },
+const PRODUCT_META: Record<
+  string,
+  { label: string; color: string; lightBg: string; Icon: LucideIcon }
+> = {
+  inmo: { label: "Nodo Inmo", color: "#da5a0e", lightBg: "#FEF0E6", Icon: Building2 },
+  autos: { label: "Nodo Autos", color: "#C41E3A", lightBg: "#FCE8EC", Icon: Car },
+  finanzas: { label: "Nodo Finanzas", color: "#059669", lightBg: "#E7F7F0", Icon: Coins },
+  clinica: { label: "Nodo Clínica", color: "#0D9488", lightBg: "#E6F7F5", Icon: Stethoscope },
 };
 
 function getProductIcon(product?: string): LucideIcon {
@@ -47,6 +50,60 @@ const PRODUCT_PATHS: Record<string, string> = {
   autos: "/autos/admin/dashboard",
   finanzas: "/finanzas/admin/dashboard",
 };
+
+const PENDING_ORG_SWITCH_KEY = "nodo-org-switch-pending";
+
+type PendingOrgSwitch = {
+  targetOrgId: string;
+  targetProduct: string;
+  targetRole: string;
+  targetName: string;
+};
+
+function readPendingOrgSwitch(): PendingOrgSwitch | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(PENDING_ORG_SWITCH_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as PendingOrgSwitch;
+  } catch {
+    return null;
+  }
+}
+
+function markPendingOrgSwitch(org: OrgEntry, targetName: string) {
+  try {
+    const payload: PendingOrgSwitch = {
+      targetOrgId: org.org_id,
+      targetProduct: org.product,
+      targetRole: org.role,
+      targetName,
+    };
+    sessionStorage.setItem(PENDING_ORG_SWITCH_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore
+  }
+}
+
+function clearPendingOrgSwitch() {
+  try {
+    sessionStorage.removeItem(PENDING_ORG_SWITCH_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function isOrgSwitchComplete(
+  pending: PendingOrgSwitch,
+  product: string | undefined,
+  clinicaRole: string | undefined,
+  currentOrgId: string | null,
+): boolean {
+  if (pending.targetProduct === "clinica") {
+    return product === "clinica" && pending.targetRole === clinicaRole;
+  }
+  return product === pending.targetProduct && currentOrgId === pending.targetOrgId;
+}
 
 /**
  * Inmo/Autos/Finanzas/Ecommerce are Next.js Multi-Zone apps under the same
@@ -80,37 +137,40 @@ function orgEntryKey(org: OrgEntry): string {
   return `${org.product}::${org.org_id}::${org.role}`;
 }
 
-/** Cross-nodo targets and Clínica roles show the product name, not the DB org label. */
-function displayOrgTitle(org: OrgEntry, isCrossNodo: boolean): string {
-  if (org.product === "clinica") {
-    return PRODUCT_META.clinica?.label ?? org.org_name;
-  }
-  // Inmo can have multiple agencies — keep the org/tenant name when active in Inmo.
-  if (org.product === "inmo" && !isCrossNodo) {
-    return org.org_name;
-  }
-  return PRODUCT_META[org.product]?.label ?? org.org_name;
+/** Razón social / nombre de la org — no el nombre comercial del nodo. */
+function displayOrgName(org: OrgEntry | undefined): string {
+  if (!org) return "Organización";
+  const name = org.org_name?.trim();
+  if (name) return name;
+  return PRODUCT_META[org.product]?.label ?? "Organización";
 }
 
-function displayCurrentOrgTrigger(org: OrgEntry | undefined): string {
-  if (!org) return "Organización";
-  if (org.product === "inmo") return org.org_name;
-  return PRODUCT_META[org.product]?.label ?? org.org_name;
+function productMeta(product?: string) {
+  return PRODUCT_META[product ?? ""] ?? {
+    label: "Nodo",
+    color: "var(--color-navy, #121e2f)",
+    lightBg: "var(--color-paper, #f8fafc)",
+    Icon: Building2,
+  };
 }
 
 export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
   const supabase = useSupabase();
   const { orgs: allOrgs, loading } = useMyOrgs();
   const [open, setOpen] = useState(false);
-  const [switching, setSwitching] = useState(false);
-  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
+  const [switching, setSwitching] = useState(() => readPendingOrgSwitch() != null);
+  const [switchingTo, setSwitchingTo] = useState<string | null>(
+    () => readPendingOrgSwitch()?.targetName ?? null,
+  );
   const [switchError, setSwitchError] = useState<string | null>(null);
+  const [hoveredEntryKey, setHoveredEntryKey] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
 
   // Detect current org from JWT claims.
   const [currentOrgId, setCurrentOrgId] = useState<string | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -118,8 +178,33 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
         | Record<string, string>
         | undefined;
       setCurrentOrgId(meta?.org_id ?? null);
+      setSessionChecked(true);
     });
   }, [supabase]);
+
+  // Tras navegar entre nodos/orgs, el loader persiste hasta confirmar destino.
+  useEffect(() => {
+    if (!sessionChecked || loading) return;
+    const pending = readPendingOrgSwitch();
+    if (!pending) return;
+
+    if (isOrgSwitchComplete(pending, product, clinicaRole, currentOrgId)) {
+      clearPendingOrgSwitch();
+      setSwitching(false);
+      setSwitchingTo(null);
+      return;
+    }
+
+    setSwitching(true);
+    setSwitchingTo(pending.targetName);
+  }, [sessionChecked, loading, product, clinicaRole, currentOrgId]);
+
+  function finishSwitchWithError(message: string) {
+    clearPendingOrgSwitch();
+    setSwitchError(message);
+    setSwitching(false);
+    setSwitchingTo(null);
+  }
 
   // Close dropdown when clicking outside trigger or dropdown.
   useEffect(() => {
@@ -157,8 +242,8 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  // Hide when user belongs to only one org (or still loading).
-  if (loading || allOrgs.length <= 1) return null;
+  // Hide when user belongs to only one org (or still loading), salvo switch en curso.
+  if ((loading || allOrgs.length <= 1) && !switching) return null;
 
   // Split orgs: current product first, then other products.
   const sameProduct = allOrgs
@@ -208,8 +293,9 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
   async function handleSwitch(org: OrgEntry) {
     if (isEntryCurrent(org) || switching) return;
     setOpen(false);
+    markPendingOrgSwitch(org, displayOrgName(org));
     setSwitching(true);
-    setSwitchingTo(displayOrgTitle(org, product != null && org.product !== product));
+    setSwitchingTo(displayOrgName(org));
     setSwitchError(null);
 
     const targetIsClinica = org.product === "clinica";
@@ -227,14 +313,12 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
         });
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string };
-          setSwitchError(body.error ?? "No se pudo cambiar de rol");
-          setSwitching(false);
+          finishSwitchWithError(body.error ?? "No se pudo cambiar de rol");
           return;
         }
         window.location.href = org.role === "medico" ? "/medico/dashboard" : "/paciente";
       } catch (err) {
-        setSwitchError(err instanceof Error ? err.message : "No se pudo cambiar de rol");
-        setSwitching(false);
+        finishSwitchWithError(err instanceof Error ? err.message : "No se pudo cambiar de rol");
       }
       return;
     }
@@ -249,14 +333,12 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
         const accessToken = data.session?.access_token;
         const refreshToken = data.session?.refresh_token;
         if (!accessToken || !refreshToken) {
-          setSwitchError("No se pudo resolver la sesión actual.");
-          setSwitching(false);
+          finishSwitchWithError("No se pudo resolver la sesión actual.");
           return;
         }
         window.location.href = crossOriginCallbackUrl(org.product, accessToken, refreshToken);
       } catch (err) {
-        setSwitchError(err instanceof Error ? err.message : "No se pudo cambiar de nodo");
-        setSwitching(false);
+        finishSwitchWithError(err instanceof Error ? err.message : "No se pudo cambiar de nodo");
       }
       return;
     }
@@ -278,35 +360,30 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
         } catch {
           // ignore
         }
-        setSwitchError(detail);
-        setSwitching(false);
+        finishSwitchWithError(detail);
         return;
       }
 
       // Refresh session so the JWT reflects the new org.
-      // Retry once if the first refresh still has the old org_id.
       const { data: refreshed } = await supabase.auth.refreshSession();
-      const newOrgId = refreshed?.session?.user?.app_metadata?.org_id;
+      let newOrgId = refreshed?.session?.user?.app_metadata?.org_id as string | undefined;
       if (newOrgId !== org.org_id) {
         await new Promise((r) => setTimeout(r, 500));
-        await supabase.auth.refreshSession();
+        const { data: retryRefreshed } = await supabase.auth.refreshSession();
+        newOrgId = retryRefreshed?.session?.user?.app_metadata?.org_id as string | undefined;
+      }
+
+      if (newOrgId !== org.org_id) {
+        finishSwitchWithError("No se pudo confirmar el cambio de organización.");
+        return;
       }
 
       if (isCrossNodo) {
-        // Skip splash screens on the target nodo.
         try {
           sessionStorage.setItem(`nodo-${org.product}-skip-splash`, "1");
         } catch {
           // ignore
         }
-        // Even though Inmo/Autos/Finanzas share an origin, each keeps its own
-        // independent Supabase session under a per-nodo localStorage key
-        // (nodoAuthStorageKey — see create-nodo-auth-client.ts). Navigating
-        // straight to the target's dashboard left it with no session under
-        // ITS key, since refreshSession() above only updated the CURRENT
-        // nodo's key. Relay the just-refreshed tokens through the target's
-        // own /auth/callback (same mechanism already used for Clínica) so it
-        // calls setSession() itself and populates its own storage key.
         const relayAccessToken = refreshed?.session?.access_token;
         const relayRefreshToken = refreshed?.session?.refresh_token;
         if (relayAccessToken && relayRefreshToken) {
@@ -315,25 +392,18 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
           const targetPath = PRODUCT_PATHS[org.product] ?? `/${org.product}/admin/dashboard`;
           window.location.href = targetPath;
         }
-        // Reset state in case the navigation takes a moment.
-        setSwitching(false);
-        setSwitchingTo(null);
         return;
       }
 
-      // Same-nodo: update state and invalidate cache.
-      setCurrentOrgId(org.org_id);
-      window.dispatchEvent(new CustomEvent("nodo:org-switched"));
-      await new Promise((r) => setTimeout(r, 600));
-      setSwitching(false);
-      setSwitchingTo(null);
+      window.location.reload();
     } catch (err) {
-      setSwitchError(err instanceof Error ? err.message : "No se pudo cambiar de organización");
-      setSwitching(false);
+      finishSwitchWithError(
+        err instanceof Error ? err.message : "No se pudo cambiar de organización",
+      );
     }
   }
 
-  const switchOverlay = switching && switchingTo
+  const switchOverlay = switching
     ? createPortal(
         <div
           style={{
@@ -365,37 +435,46 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
               margin: 0,
             }}
           >
-            Cambiando a la organización de
+            Cambiando de organización
           </p>
-          <p
-            style={{
-              fontSize: 20,
-              fontWeight: 700,
-              color: "var(--color-brand, #da5a0e)",
-              textAlign: "center",
-              margin: 0,
-            }}
-          >
-            {switchingTo}
-          </p>
+          {switchingTo ? (
+            <p
+              style={{
+                fontSize: 20,
+                fontWeight: 700,
+                color: "var(--color-brand, #da5a0e)",
+                textAlign: "center",
+                margin: 0,
+                maxWidth: "min(90vw, 420px)",
+              }}
+            >
+              {switchingTo}
+            </p>
+          ) : null}
         </div>,
         document.body,
       )
     : null;
 
   const CurrentProductIcon = getProductIcon(product);
-  const currentProductColor = PRODUCT_META[product ?? ""]?.color ?? "var(--color-navy)";
+  const currentMeta = productMeta(product);
 
   function renderOrgButton(org: OrgEntry, isCrossNodo = false) {
     const isCurrent = isEntryCurrent(org) && !isCrossNodo;
-    const title = displayOrgTitle(org, isCrossNodo);
+    const title = displayOrgName(org);
+    const meta = productMeta(org.product);
+    const entryKey = orgEntryKey(org);
+    const isHovered = hoveredEntryKey === entryKey;
+    const highlight = isCurrent || isHovered;
     return (
       <button
-        key={orgEntryKey(org)}
+        key={entryKey}
         type="button"
         role="option"
         aria-selected={isCurrent}
         onClick={() => handleSwitch(org)}
+        onMouseEnter={() => setHoveredEntryKey(entryKey)}
+        onMouseLeave={() => setHoveredEntryKey((k) => (k === entryKey ? null : k))}
         style={{
           display: "flex",
           alignItems: "center",
@@ -403,11 +482,12 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
           width: "100%",
           textAlign: "left",
           border: "none",
-          background: isCurrent ? "var(--color-paper)" : "transparent",
+          background: highlight ? meta.lightBg : "transparent",
           padding: "9px 10px",
           borderRadius: 6,
           cursor: isCurrent ? "default" : "pointer",
           gap: 8,
+          transition: "background 0.12s ease",
         }}
       >
         <div style={{ minWidth: 0, flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
@@ -438,7 +518,7 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
           </div>
         </div>
         {isCurrent && (
-          <Check size={14} color="var(--color-brand)" style={{ flexShrink: 0 }} />
+          <Check size={14} color={meta.color} style={{ flexShrink: 0 }} />
         )}
         {isCrossNodo && (
           <ExternalLink size={12} color="var(--color-slate2)" style={{ flexShrink: 0 }} />
@@ -480,7 +560,7 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <CurrentProductIcon size={14} color={currentProductColor} style={{ flexShrink: 0 }} />
+        <CurrentProductIcon size={14} color={currentMeta.color} style={{ flexShrink: 0 }} />
         <span
           style={{
             overflow: "hidden",
@@ -491,8 +571,8 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
           {switching
             ? "Cambiando..."
             : isMobile
-              ? (displayCurrentOrgTrigger(currentOrg).split(/\s+/)[0] ?? "Org")
-              : displayCurrentOrgTrigger(currentOrg)}
+              ? (displayOrgName(currentOrg).split(/\s+/)[0] ?? "Org")
+              : displayOrgName(currentOrg)}
         </span>
         <ChevronDown
           size={13}
@@ -561,7 +641,7 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
               }}
             >
               {Object.entries(otherByProduct).map(([prod, prodOrgs]) => {
-                const meta = PRODUCT_META[prod];
+                const meta = productMeta(prod);
                 return (
                   <div key={prod}>
                     <p

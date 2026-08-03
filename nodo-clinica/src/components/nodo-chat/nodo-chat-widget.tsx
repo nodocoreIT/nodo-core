@@ -31,6 +31,10 @@ interface NodoChatWidgetProps {
   /** Abre directamente el chat con este colega (desde la campanita de notificaciones) */
   initialPeerId?: string | null;
   initialPeerName?: string | null;
+  /** Sin botón flotante inferior — el header abre el chat */
+  hideLauncher?: boolean;
+  /** Tamaño/posición durante videoconsulta (no tapa el Jitsi central) */
+  floatingVariant?: "default" | "consultation";
 }
 
 function formatTime(iso: string) {
@@ -64,6 +68,8 @@ export function NodoChatWidget({
   onMarkRead,
   initialPeerId,
   initialPeerName,
+  hideLauncher = false,
+  floatingVariant = "default",
 }: NodoChatWidgetProps) {
   const [internalOpen, setInternalOpen] = useState(embedded);
   const open = controlledOpen ?? internalOpen;
@@ -237,7 +243,9 @@ export function NodoChatWidget({
         "flex flex-col overflow-hidden bg-white shadow-2xl border border-mist",
         embedded
           ? "h-[calc(100vh-8rem)] min-h-[520px] rounded-md"
-          : "fixed bottom-20 right-4 z-[100] w-[min(100vw-2rem,380px)] h-[min(78vh,560px)] rounded-xl",
+          : floatingVariant === "consultation"
+            ? "fixed top-[4.75rem] right-3 sm:right-4 z-[110] w-[min(calc(100vw-1.5rem),320px)] h-[min(42vh,440px)] rounded-xl shadow-2xl"
+            : "fixed bottom-20 right-4 z-[100] w-[min(100vw-2rem,380px)] h-[min(78vh,560px)] rounded-xl",
       )}
     >
       {/* Header estilo Santander / Nodo */}
@@ -567,7 +575,7 @@ export function NodoChatWidget({
   return (
     <>
       {open && panel}
-      {!open && (
+      {!open && !hideLauncher && (
         <button
           type="button"
           onClick={() => {

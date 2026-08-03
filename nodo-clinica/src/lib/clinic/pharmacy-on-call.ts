@@ -42,10 +42,89 @@ export interface PharmacySchedule {
   fetchedAt: string;
 }
 
-function buildPdfUrl(year: number, month: number): string {
+const COLFAR_SANTA_ROSA_PAGE =
+  "https://colfarlp.org.ar/farmacias-de-turno-santa-rosa/";
+
+function buildPdfUrlCandidates(year: number, month: number): string[] {
   const mesNombre = MESES_ES[month - 1];
   const mm = String(month).padStart(2, "0");
-  return `https://colfarlp.org.ar/wp-content/uploads/${year}/${mm}/${mm}-Farmacias-de-Turno-Santa-Rosa-${mesNombre}-${year}.pdf`;
+  const base = `https://colfarlp.org.ar/wp-content/uploads/${year}/${mm}/${mm}-Farmacias-de-Turno-Santa-Rosa-${mesNombre}-${year}`;
+  // Colfar cambió el nombre en algunos meses (ej. ago 2026 usa "-QR.pdf").
+  return [`${base}-QR.pdf`, `${base}.pdf`];
+}
+
+async function pdfUrlExists(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { method: "HEAD", redirect: "follow" });
+    if (res.ok) return true;
+    // Algunos hosts no responden bien a HEAD — probamos GET parcial.
+    if (res.status === 405 || res.status === 403) {
+      const getRes = await fetch(url, { method: "GET", redirect: "follow" });
+      return getRes.ok;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/** Extrae el link al PDF de Santa Rosa desde la página oficial de Colfar. */
+async function fetchSantaRosaPdfUrlFromPage(): Promise<string | null> {
+  try {
+    const res = await fetch(COLFAR_SANTA_ROSA_PAGE, {
+      headers: {
+        "User-Agent": "NodoClinica/1.0 (farmacia-de-turno; +https://nodocore.com)",
+      },
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const match = html.match(
+      /href="(https:\/\/colfarlp\.org\.ar\/wp-content\/uploads\/[^"]*Santa-Rosa[^"]*\.pdf)"/i,
+    );
+    return match?.[1] ?? null;
+  } catch (err) {
+    console.error("[pharmacy-on-call] failed to scrape Colfar page:", err);
+    return null;
+  }
+}
+
+/** Resuelve la URL del PDF probando patrones conocidos y, si hace falta, la página web. */
+export async function resolvePdfUrl(year: number, month: number): Promise<string | null> {
+  for (const candidate of buildPdfUrlCandidates(year, month)) {
+    if (await pdfUrlExists(candidate)) return candidate;
+  }
+
+  const now = new Date();
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
+  if (!isCurrentMonth) return null;
+
+  const fromPage = await fetchSantaRosaPdfUrlFromPage();
+  if (fromPage && (await pdfUrlExists(fromPage))) return fromPage;
+
+  return null;
+}
+
+/** Primeros N días hábiles del mes (lun–vie) — cuando Colfar suele publicar el turnero. */
+export function isWithinMonthlyIngestWindow(
+  date: Date = new Date(),
+  maxBusinessDays = 5,
+): boolean {
+  const dayOfMonth = date.getDate();
+  if (dayOfMonth > 10) return false;
+
+  let businessDaysSeen = 0;
+  for (let d = 1; d <= dayOfMonth; d++) {
+    const dow = new Date(date.getFullYear(), date.getMonth(), d).getDay();
+    if (dow !== 0 && dow !== 6) businessDaysSeen++;
+  }
+  return businessDaysSeen <= maxBusinessDays;
+}
+
+export function shouldRunScheduledIngest(now: Date = new Date()): boolean {
+  const dow = now.getDay();
+  if (dow === 0 || dow === 6) return false;
+  return isWithinMonthlyIngestWindow(now);
 }
 
 function daysInMonth(year: number, month: number): number {
@@ -135,11 +214,15 @@ export async function ingestPharmacyScheduleForMonth(
   year: number,
   month: number,
 ): Promise<IngestResult> {
-  const sourcePdfUrl = buildPdfUrl(year, month);
+  const sourcePdfUrl = await resolvePdfUrl(year, month);
+  if (!sourcePdfUrl) {
+    const guessed = buildPdfUrlCandidates(year, month).join(" | ");
+    return { ok: false, error: `PDF no encontrado en Colfar (${guessed})` };
+  }
 
   const pdfRes = await fetch(sourcePdfUrl);
   if (!pdfRes.ok) {
-    return { ok: false, error: `PDF no encontrado (${pdfRes.status}): ${sourcePdfUrl}` };
+    return { ok: false, error: `PDF no descargable (${pdfRes.status}): ${sourcePdfUrl}` };
   }
   const buffer = Buffer.from(await pdfRes.arrayBuffer());
   const base64 = buffer.toString("base64");

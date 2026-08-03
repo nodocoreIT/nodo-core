@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ingestPharmacyScheduleForMonth } from "@/lib/clinic/pharmacy-on-call";
+import {
+  getPharmacySchedule,
+  ingestPharmacyScheduleForMonth,
+  shouldRunScheduledIngest,
+} from "@/lib/clinic/pharmacy-on-call";
 
 // El geocoding de cada farmacia (Nominatim, 1 req/seg) puede sumar 30-40s.
 export const maxDuration = 60;
 
-/** Corre el día 1 de cada mes (ver vercel.json) — trae el turnero de farmacias del mes actual. */
+/** Reintenta traer el turnero en los primeros días hábiles del mes si aún no está cargado. */
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
@@ -15,10 +19,19 @@ export async function GET(request: NextRequest) {
   }
 
   const now = new Date();
-  const result = await ingestPharmacyScheduleForMonth(
-    now.getFullYear(),
-    now.getMonth() + 1,
-  );
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  const existing = await getPharmacySchedule(year, month);
+  if (existing) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "already_loaded" });
+  }
+
+  if (!shouldRunScheduledIngest(now)) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "outside_business_day_window" });
+  }
+
+  const result = await ingestPharmacyScheduleForMonth(year, month);
 
   if (!result.ok) {
     console.error("[cron/pharmacy-on-call]", result.error);

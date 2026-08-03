@@ -32,8 +32,11 @@ export function useUpsertOrgProfile() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ORG_PROFILE_QUERY_KEY });
+      if (variables.legal_name?.trim()) {
+        window.dispatchEvent(new CustomEvent("nodo:org-switched"));
+      }
     },
   });
 }
