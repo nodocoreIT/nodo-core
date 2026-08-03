@@ -29,7 +29,7 @@ existing `nodo_core.planes` catalog (USD) — do NOT build a second plans table.
 | 6 | reason transport | **New** RPC `user_node_access_reason`; leave `user_has_node_access` DDL byte-for-byte unchanged | Modify existing RPC to return reason | Existing RPC is the drift-scarred, all-nodo critical path — never touch its body |
 | 7 | Lockout gate | Shared provider exposes `accessReason`/`billingLocked` + whitelist matcher (state only, no redirect); each nodo owns screen + redirect wiring | Central redirect | Screen is per-nodo; central redirect can't know each nodo's routes |
 | 8 | Drift CI | Grep non-landing `supabase/migrations/*.sql` for `function public.user_has_node_access`, allowlisting the 2 grandfathered inmo files | Fail on any match | Two inmo migrations legitimately still contain it |
-| 9 | FX (USD→ARS) | Snapshot ARS = USD price × "dólar tarjeta" rate on debit day; new `fx_rates` source + fallback | Charge USD directly / hardcode ARS | Catalog is USD; MP debits ARS at card-dollar rate; no FX source exists in repo today |
+| 9 | FX (USD→ARS) | Snapshot ARS = USD price × "dólar oficial" rate on debit day; new `fx_rates` source + fallback | Charge USD directly / hardcode ARS | Catalog is USD; MP debits ARS at official-dollar (sell) rate; no FX source exists in repo today |
 | 10 | Rollout | Phased, not big-bang | All nodos in one PR | Blast radius + 400-line budget + validate on Finanzas first |
 
 ## New schema (nodo_core)
@@ -50,7 +50,7 @@ subscription_payments  (idempotent ledger)
   created_at timestamptz. UNIQUE (subscription_id, cycle_key, attempt_no).
 ```
 `billing_amount`/`billing_currency` snapshot the actual ARS debited: at each cycle the
-value = `planes.price_monthly` (USD) × dólar-tarjeta rate on debit day, written when the
+value = `planes.price_monthly` (USD) × dólar oficial rate on debit day, written when the
 Preapproval is created/renewed. `subscription_payments` mirrors MP invoice/payment status
 (no self-initiated charges); the ledger is a reconciliation record, not a charge queue.
 
@@ -59,10 +59,10 @@ Preapproval is created/renewed. `subscription_payments` mirrors MP invoice/payme
 | Dependency | Use | Fallback |
 |-----------|-----|----------|
 | MP Preapproval `auto_recurring` + webhooks (NODO token) | recurring charge + retry, source of truth | poll `getPreapproval`/authorized_payments as safety-net for missed webhooks |
-| Dólar-tarjeta FX rate | USD catalog → ARS debit amount | see below |
+| Dólar oficial FX rate | USD catalog → ARS debit amount | see below |
 
 **FX rate source**: no rate exists in the repo today. Add `nodo_core.fx_rates` (date, rate,
-source) refreshed daily from a public API (e.g. dolarapi.com "tarjeta") via the reconciliation
+source) refreshed daily from a public API (e.g. dolarapi.com "oficial") via the reconciliation
 job, with an admin-editable manual override row. **Fallback order at debit time**: (1) today's
 fetched rate → (2) most recent stored rate ≤ N days old → (3) admin manual rate. If ALL are
 missing/stale: do NOT charge $0 and do NOT crash — skip this unit's renewal, log, and alert
@@ -136,10 +136,10 @@ Finanzas → Autos → Inmo → Clinica.
 ## Open Questions
 
 RESOLVED: (1) billing engine = MP native `auto_recurring`, landing is reactive-only; (2) day
-= 30 calendar days since anniversary; (3) FX = USD × dólar-tarjeta on debit day with tiered fallback.
+= 30 calendar days since anniversary; (3) FX = USD × dólar oficial on debit day with tiered fallback.
 
 Remaining verification at implementation time (no design blocker):
 - [ ] Confirm exact MP field names/values for a terminally-failed recurring charge
   (`authorized_payments` status `recycling` vs terminal, preapproval auto-`paused`) so the
   day-30 impago trigger reads MP's real terminal state, not a mid-retry state.
-- [ ] Confirm the dólar-tarjeta public source + staleness threshold `N` days for fallback (2).
+- [ ] Confirm the dólar oficial public source + staleness threshold `N` days for fallback (2).

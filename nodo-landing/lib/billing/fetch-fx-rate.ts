@@ -2,17 +2,17 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Fetches the current "dólar tarjeta" (foreign-card purchase) rate from
- * dolarapi.com and upserts it into nodo_core.fx_rates for today, keyed
+ * Fetches the current "dólar oficial" (official/wholesale, sell side) rate
+ * from dolarapi.com and upserts it into nodo_core.fx_rates for today, keyed
  * (rate_date, source='dolarapi'). Feeds resolveFxRate()'s fallback chain
  * (lib/billing/fx-rate.ts). Wired into a daily cron —
  * app/api/cron/refresh-fx-rate/route.ts.
  */
 
-const DOLARAPI_TARJETA_URL = "https://dolarapi.com/v1/dolares/tarjeta";
+const DOLARAPI_OFICIAL_URL = "https://dolarapi.com/v1/dolares/oficial";
 const SOURCE = "dolarapi";
 
-interface DolarApiTarjetaResponse {
+interface DolarApiOficialResponse {
   moneda?: string;
   casa?: string;
   nombre?: string;
@@ -33,7 +33,7 @@ function toIsoDate(date: Date): string {
 }
 
 /**
- * Fetches today's dólar-tarjeta "venta" rate and upserts it into
+ * Fetches today's dólar oficial "venta" rate and upserts it into
  * nodo_core.fx_rates. Never throws — network/parse/DB failures are returned
  * as `{ ok: false, error }` so the cron handler can log and return a 500
  * without crashing, leaving resolveFxRate()'s stale/manual fallbacks intact.
@@ -41,21 +41,21 @@ function toIsoDate(date: Date): string {
 export async function fetchAndStoreFxRate(
   referenceDate: Date = new Date(),
 ): Promise<FetchFxRateResult> {
-  let payload: DolarApiTarjetaResponse;
+  let payload: DolarApiOficialResponse;
 
   try {
-    const res = await fetch(DOLARAPI_TARJETA_URL, { cache: "no-store" });
+    const res = await fetch(DOLARAPI_OFICIAL_URL, { cache: "no-store" });
     if (!res.ok) {
       return { ok: false, error: `dolarapi.com responded with HTTP ${res.status}` };
     }
-    payload = (await res.json()) as DolarApiTarjetaResponse;
+    payload = (await res.json()) as DolarApiOficialResponse;
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 
   const rate = payload.venta;
   if (typeof rate !== "number" || !(rate > 0)) {
-    return { ok: false, error: "dolarapi.com returned no usable 'venta' rate for dólar tarjeta" };
+    return { ok: false, error: "dolarapi.com returned no usable 'venta' rate for dólar oficial" };
   }
 
   const rateDate = toIsoDate(referenceDate);

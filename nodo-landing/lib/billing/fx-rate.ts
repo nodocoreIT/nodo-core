@@ -2,8 +2,8 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Resolves the dólar-tarjeta FX rate used to convert nodo_core.planes USD
- * prices to ARS at MercadoPago debit time.
+ * Resolves the dólar oficial (venta) FX rate used to convert nodo_core.planes
+ * USD prices to ARS at MercadoPago debit time.
  *
  * Fallback chain (design.md — "FX rate source"):
  *   1. Today's fetched rate (source = "dolarapi", rate_date = today)
@@ -118,6 +118,6 @@ export async function resolveFxRate(
     ok: false,
     reason: "fx-unavailable",
     detail:
-      "No dólar-tarjeta rate available: today's fetch, the stale fallback window, and the manual override are all missing.",
+      "No dólar oficial rate available: today's fetch, the stale fallback window, and the manual override are all missing.",
   };
 }

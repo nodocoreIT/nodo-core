@@ -32,7 +32,7 @@ introducing a second, parallel prices table.
 ### Requirement: FX Conversion at Charge Time (USD to ARS)
 
 Plans in `nodo_core.planes` are priced in USD. MercadoPago charges Argentine cards in ARS, so the
-system MUST convert the USD plan price to ARS using the prevailing "dólar tarjeta" rate at the
+system MUST convert the USD plan price to ARS using the prevailing "dólar oficial" rate at the
 moment of debit. No FX-rate source exists in the codebase today; this capability MUST introduce
 one as an explicit dependency (source and refresh cadence are a design decision). If no FX rate
 can be resolved at charge time, the system MUST NOT charge $0, MUST NOT silently skip the cycle,
@@ -42,7 +42,7 @@ check rather than being lost.
 
 #### Scenario: FX rate resolves successfully
 
-- GIVEN an available "dólar tarjeta" rate at charge time
+- GIVEN an available "dólar oficial" rate at charge time
 - WHEN the system computes the ARS amount for a USD plan price
 - THEN it MUST charge `price_usd * rate` and MUST record the rate used alongside the payment history entry
 
