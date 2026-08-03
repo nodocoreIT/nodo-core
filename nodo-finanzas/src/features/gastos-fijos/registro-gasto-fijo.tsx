@@ -13,6 +13,7 @@ import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { obtenerFechaActual } from '@/utils/formatters';
 import { capitalizarDescripcion } from '@/utils/capitalizar-descripcion';
+import { cuentaIdPorFormaPago } from '@/utils/cuenta-por-forma-pago';
 import type { GastoFijo } from '@/types';
 
 const schema = z.object({
@@ -114,19 +115,17 @@ export function RegistroGastoFijo({ onVolver, onGastoRegistrado, gastoEditando, 
   useEffect(() => {
     if (gastoEditando) return;
     const cuentasBancarias = finanzas.configuracion.cuentasBancarias;
-    if (formaDePago === 'MERCADO_PAGO') {
-      const mp = cuentasBancarias.find((c) =>
-        c.activa && c.nombre.toLowerCase().includes('mercado pago')
-      );
-      if (mp) setValue('cuentaBancariaId', mp.id);
-    } else if (formaDePago === 'DEBITO' || formaDePago === 'TRANSFERENCIA BANCO') {
-      const santander = cuentasBancarias.find((c) =>
-        c.activa && c.nombre.toLowerCase().includes('santander')
-      );
-      if (santander) setValue('cuentaBancariaId', santander.id);
+    const autoId = cuentaIdPorFormaPago(
+      formaDePago,
+      cuentasBancarias.map((c) => ({ id: c.id, nombre: c.nombre, activa: c.activa })),
+    );
+    if (autoId) {
+      setValue('cuentaBancariaId', autoId);
     } else if (formaDePago === 'TARJETA') {
       const activas = finanzas.tarjetas.filter((t) => t.activa);
       if (activas.length === 1) setValue('tarjetaId', activas[0].id);
+    } else {
+      setValue('cuentaBancariaId', '');
     }
   }, [formaDePago, finanzas.configuracion.cuentasBancarias, finanzas.tarjetas, setValue, gastoEditando]);
 

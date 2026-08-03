@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useForm, Controller } from 'react-hook-form';
@@ -14,6 +14,7 @@ import { useFinanzas } from '@/hooks/use-finanzas';
 import { useRubros } from '@/hooks/use-rubros';
 import { getFechaHoy, formatearMoneda } from '@/utils/formatters';
 import { capitalizarDescripcion } from '@/utils/capitalizar-descripcion';
+import { cuentaIdPorFormaPago } from '@/utils/cuenta-por-forma-pago';
 import type { FormaDePago, GastoDiario } from '@/types';
 
 const schema = z.object({
@@ -105,8 +106,6 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
   const tarjetasActivas = finanzas.tarjetas.filter((t) => t.activa);
   const cuentasActivas = finanzas.cuentas.filter((c) => c.activa);
 
-  const norm = useCallback((s: string) => s.toLowerCase().replace(/\s/g, ''), []);
-
   // Compute auto-selections inline — instant, no effect delay
   const autoTarjetaId = useMemo(() => {
     // When editing, field.value takes priority (field.value || autoTarjetaId).
@@ -118,14 +117,10 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
     )?.id ?? '';
   }, [tarjetasActivas]);
 
-  const autoCuentaId = useMemo(() => {
-    // Fallback only when field.value is empty (new records or old records without cuentaId).
-    // Uses saldo IDs — same as gastos_diarios.cuenta_id FK references cuentas table.
-    if (formaPago === 'EFECTIVO') return cuentasActivas.find((c) => norm(c.nombre).includes('efectivo'))?.id ?? '';
-    if (formaPago === 'MERCADO_PAGO') return cuentasActivas.find((c) => { const n = norm(c.nombre); return n.includes('mercadopago') && !n.includes('reserva'); })?.id ?? '';
-    if (formaPago === 'DEBITO' || formaPago === 'TRANSFERENCIA BANCO') return cuentasActivas.find((c) => { const n = norm(c.nombre); return n.includes('santander') && !n.includes('pampa'); })?.id ?? '';
-    return '';
-  }, [cuentasActivas, formaPago, norm]);
+  const autoCuentaId = useMemo(
+    () => cuentaIdPorFormaPago(formaPago, cuentasActivas),
+    [cuentasActivas, formaPago],
+  );
   const opcionesCuotas = Array.from({ length: 24 }, (_, i) => ({
     value: i + 1,
     label: i === 0 ? '1 cuota (contado)' : `${i + 1} cuotas`,
@@ -266,8 +261,9 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
                   error={errors.formaPago?.message}
                   value={field.value ?? ''}
                   onChange={(e) => {
-                    field.onChange(e.target.value);
-                    setValue('cuentaId', '');
+                    const next = e.target.value as FormaDePago;
+                    field.onChange(next);
+                    setValue('cuentaId', cuentaIdPorFormaPago(next, cuentasActivas));
                     setValue('tarjetaId', '');
                   }}
                   name={field.name}

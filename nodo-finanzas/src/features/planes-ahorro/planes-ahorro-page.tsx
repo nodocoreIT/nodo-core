@@ -20,6 +20,7 @@ import { ModalConfirmacion } from '@/components/ui/modal-confirmacion';
 import { useLocation } from 'react-router-dom';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { formatearMoneda, formatearFecha, getFechaHoy } from '@/utils/formatters';
+import { cuentaIdPorFormaPago } from '@/utils/cuenta-por-forma-pago';
 import { GestionCuotasPlan } from './gestion-cuotas-plan';
 import toast from 'react-hot-toast';
 import type { PlanAhorro, Moneda, FormaDePago } from '@/types';
@@ -796,7 +797,6 @@ export function PlanesAhorroPage() {
                     <div className="space-y-2">
                       {formas.map((f) => {
                         const esTarjeta = f.codigo === 'TARJETA';
-                        const esMercadoPago = f.codigo === 'MERCADO_PAGO';
                         let cuenta = null;
                         let tarjeta = null;
                         let saldoLabel = '';
@@ -807,15 +807,9 @@ export function PlanesAhorroPage() {
                             return n.includes('santander') && (n.includes('río') || n.includes('rio'));
                           });
                           saldoLabel = tarjeta?.nombre ?? 'Santander Río';
-                        } else if (esMercadoPago) {
-                          cuenta = finanzas.cuentas
-                            .filter((c) => c.activa && c.moneda === 'ARS' && c.nombre.toLowerCase().includes('mercado'))
-                            .sort((a, b) => b.saldoActual - a.saldoActual)[0] ?? null;
-                          saldoLabel = cuenta ? formatearMoneda(cuenta.saldoActual) : '';
                         } else {
-                          cuenta = finanzas.cuentas
-                            .filter((c) => c.activa && c.moneda === 'ARS' && !c.nombre.toLowerCase().includes('mercado'))
-                            .find((c) => f.codigo === 'EFECTIVO' ? c.tipo === 'EFECTIVO' : c.tipo !== 'EFECTIVO') ?? null;
+                          const cuentaId = cuentaIdPorFormaPago(f.codigo, finanzas.cuentas);
+                          cuenta = finanzas.cuentas.find((c) => c.id === cuentaId) ?? null;
                           saldoLabel = cuenta ? formatearMoneda(cuenta.saldoActual) : '';
                         }
 

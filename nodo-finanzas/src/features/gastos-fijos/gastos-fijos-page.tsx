@@ -17,6 +17,7 @@ import { useDolar } from '@/hooks/use-dolar';
 import { useExtractGastoFijoFromVoice, type ExtractedGastoFijo } from './hooks/use-extract-gasto-fijo-from-voice';
 import { formatearMoneda, esFechaDelMesActual } from '@/utils/formatters';
 import { cuentaPillClass } from '@/utils/cuenta-colors';
+import { cuentaIdPorFormaPago } from '@/utils/cuenta-por-forma-pago';
 import { normalizarCodigoRubro } from '@/utils/rubro-formatters';
 import type { GastoFijo } from '@/types';
 
@@ -231,9 +232,10 @@ export function GastosFijosPage() {
       return;
     }
 
+    const forma = gasto.formaDePago || 'DEBITO';
     setGastoParaPagar(gasto);
-    setFormaPagoModal(gasto.formaDePago || 'DEBITO');
-    setCuentaSeleccionadaId('');
+    setFormaPagoModal(forma);
+    setCuentaSeleccionadaId(cuentaIdPorFormaPago(forma, finanzas.cuentas));
     setEsSilenciosoModal(false);
     setModalPagoAbierto(true);
   }
@@ -747,7 +749,10 @@ export function GastosFijosPage() {
                     <label className="text-sm font-medium text-ink">Medio de Pago</label>
                     <FormSelect
                       value={formaPagoModal}
-                      onChange={setFormaPagoModal}
+                      onChange={(forma) => {
+                        setFormaPagoModal(forma);
+                        setCuentaSeleccionadaId(cuentaIdPorFormaPago(forma, finanzas.cuentas));
+                      }}
                       options={[
                         { value: 'EFECTIVO', label: 'Efectivo' },
                         { value: 'DEBITO', label: 'Débito Automático' },
