@@ -6,6 +6,30 @@ function mesKey(fechaISO: string): string {
   return fechaISO.slice(0, 7);
 }
 
+/** Misma serie recurrente: tarjeta + lugar + importes. */
+export function esMismaSerieRecurrente(a: ConsumoTarjeta, b: ConsumoTarjeta): boolean {
+  return (
+    a.tarjetaId === b.tarjetaId &&
+    a.lugar === b.lugar &&
+    (a.importeARS ?? 0) === (b.importeARS ?? 0) &&
+    (a.importeUSD ?? 0) === (b.importeUSD ?? 0)
+  );
+}
+
+/** Consumos de la misma serie con fecha de cobro posterior. */
+export function consumosRecurrentesFuturos(
+  base: ConsumoTarjeta,
+  todos: ConsumoTarjeta[],
+): ConsumoTarjeta[] {
+  const baseFecha = base.fecha.slice(0, 10);
+  return todos.filter(
+    (c) =>
+      c.id !== base.id &&
+      esMismaSerieRecurrente(c, base) &&
+      c.fecha.slice(0, 10) > baseFecha,
+  );
+}
+
 function fechaEnMes(year: number, month0: number, day: number): string {
   const maxDay = new Date(year, month0 + 1, 0).getDate();
   const d = Math.min(day, maxDay);

@@ -16,7 +16,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
-import { ModalConfirmacion } from '@/components/ui/modal-confirmacion';
 import { MonthPicker } from '@/components/ui/month-picker';
 import { RubroDisplay } from '@/components/rubros/rubro-display';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
@@ -24,6 +23,10 @@ import { useFinanzas } from '@/hooks/use-finanzas';
 import { formatearFecha, getFechaHoy } from '@/utils/formatters';
 import { ModalEditarConsumo } from './modal-editar-consumo';
 import { RegistroConsumo } from './registro-consumo';
+import {
+  consumosRecurrentesFuturos,
+  esMismaSerieRecurrente,
+} from './completar-consumo-recurrente';
 import toast from 'react-hot-toast';
 import type { ConsumoTarjeta } from '@/types';
 
@@ -41,6 +44,8 @@ export function DetalleTarjetaPage() {
   const [consumoEditando, setConsumoEditando] = useState<ConsumoTarjeta | null>(null);
   const [consumoClonar, setConsumoClonar] = useState<ConsumoTarjeta | null>(null);
   const [consumoAEliminar, setConsumoAEliminar] = useState<ConsumoTarjeta | null>(null);
+  const [borrarFuturosRecurrentes, setBorrarFuturosRecurrentes] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
   const [vistaRegistro, setVistaRegistro] = useState(false);
   const [sortField, setSortField] = useState<SortField>('fecha');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -112,20 +117,62 @@ export function DetalleTarjetaPage() {
     });
   };
 
+  const futurosRecurrentes = useMemo(() => {
+    if (!consumoAEliminar) return [];
+    return consumosRecurrentesFuturos(consumoAEliminar, finanzas.consumosTarjetas);
+  }, [consumoAEliminar, finanzas.consumosTarjetas]);
+
+  const esRecurrenteAEliminar = !!(
+    consumoAEliminar &&
+    (consumoAEliminar.gastoFijo || futurosRecurrentes.length > 0)
+  );
+
   const handleEliminar = (consumo: ConsumoTarjeta) => {
+    setBorrarFuturosRecurrentes(false);
     setConsumoAEliminar(consumo);
   };
 
   const confirmarEliminarConsumo = async () => {
     if (!consumoAEliminar) return;
+    setEliminando(true);
     try {
-      await finanzas.eliminarConsumo(consumoAEliminar.id);
+      const base = consumoAEliminar;
+      const futuros =
+        borrarFuturosRecurrentes && esRecurrenteAEliminar
+          ? consumosRecurrentesFuturos(base, finanzas.consumosTarjetas)
+          : [];
+
+      await finanzas.eliminarConsumo(base.id);
+      for (const f of futuros) {
+        await finanzas.eliminarConsumo(f.id);
+      }
+
+      // Si borró futuros, apagar el template para que el auto-gen no los recree.
+      if (futuros.length > 0) {
+        const templates = finanzas.consumosTarjetas.filter(
+          (c) =>
+            c.id !== base.id &&
+            c.gastoFijo &&
+            esMismaSerieRecurrente(c, base) &&
+            !futuros.some((f) => f.id === c.id),
+        );
+        for (const t of templates) {
+          await finanzas.actualizarConsumo(t.id, { gastoFijo: false });
+        }
+      }
+
       await finanzas.recargarConsumosTarjetas();
-      toast.success('Consumo eliminado');
+      toast.success(
+        futuros.length > 0
+          ? `Se eliminaron este consumo y ${futuros.length} recurrente${futuros.length === 1 ? '' : 's'} a futuro`
+          : 'Consumo eliminado',
+      );
     } catch {
       toast.error('Error al eliminar');
     } finally {
+      setEliminando(false);
       setConsumoAEliminar(null);
+      setBorrarFuturosRecurrentes(false);
     }
   };
 
@@ -417,15 +464,68 @@ export function DetalleTarjetaPage() {
         onCancel={() => setConsumoEditando(null)}
       />
 
-      <ModalConfirmacion
-        open={!!consumoAEliminar}
-        title="Eliminar consumo"
-        message="¿Confirmás que querés eliminar este consumo? Esta acción no se puede deshacer."
-        onConfirm={confirmarEliminarConsumo}
-        onCancel={() => setConsumoAEliminar(null)}
-        confirmText="Sí, eliminar"
-        cancelText="Cancelar"
-      />
+      {consumoAEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-lg max-w-sm w-full p-6 space-y-4">
+            <div>
+              <h3 className="text-lg font-bold text-ink mb-1">Eliminar consumo</h3>
+              <p className="text-sm text-slate2">
+                ¿Confirmás que querés eliminar{' '}
+                <strong className="text-ink">{consumoAEliminar.lugar}</strong>? Esta acción no se
+                puede deshacer.
+              </p>
+            </div>
+
+            {esRecurrenteAEliminar && (
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50/70 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={borrarFuturosRecurrentes}
+                  onChange={(e) => setBorrarFuturosRecurrentes(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-brand"
+                  disabled={eliminando}
+                />
+                <span className="text-sm text-ink">
+                  También borrar los recurrentes a futuro
+                  {futurosRecurrentes.length > 0 ? (
+                    <span className="block text-xs text-slate2 mt-0.5">
+                      {futurosRecurrentes.length} mes
+                      {futurosRecurrentes.length === 1 ? '' : 'es'} posterior
+                      {futurosRecurrentes.length === 1 ? '' : 'es'} con el mismo gasto
+                    </span>
+                  ) : (
+                    <span className="block text-xs text-slate2 mt-0.5">
+                      No hay meses posteriores cargados todavía.
+                    </span>
+                  )}
+                </span>
+              </label>
+            )}
+
+            <div className="flex gap-3">
+              <Button
+                variant="danger"
+                onClick={confirmarEliminarConsumo}
+                className="flex-1"
+                disabled={eliminando}
+              >
+                {eliminando ? 'Eliminando…' : 'Sí, eliminar'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setConsumoAEliminar(null);
+                  setBorrarFuturosRecurrentes(false);
+                }}
+                className="flex-1"
+                disabled={eliminando}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
