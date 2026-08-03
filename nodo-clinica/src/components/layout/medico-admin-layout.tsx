@@ -14,7 +14,6 @@ import {
   Wallet,
   CalendarDays,
   CalendarPlus,
-  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -71,7 +70,6 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/medico/turnos-programados", label: "Turnos Programados", icon: CalendarDays },
   { href: "/medico/cobros", label: "Cobros", icon: Wallet },
   { href: "/medico/interconsultas", label: "Interconsultas", icon: MessageSquare },
-  { href: "/medico/suscripcion-plataforma", label: "Suscripción NODO", icon: DollarSign },
 ];
 
 const ROUTE_TITLES: Record<string, string> = {
@@ -81,7 +79,6 @@ const ROUTE_TITLES: Record<string, string> = {
   "/medico/turnos-programados": "Turnos Programados",
   "/medico/cobros": "Cobros",
   "/medico/interconsultas": "Interconsultas",
-  "/medico/suscripcion-plataforma": "Suscripción NODO",
 };
 
 function initials(value: string): string {
