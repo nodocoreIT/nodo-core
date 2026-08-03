@@ -59,6 +59,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    const { data: termsAcceptance, error: termsError } = await serviceClient
+      .from("terms_acceptances")
+      .select("id")
+      .eq("pending_registration_id", pending.id)
+      .maybeSingle();
+
+    if (termsError || !termsAcceptance) {
+      return NextResponse.json(
+        { error: "Debés aceptar los términos y condiciones antes de continuar." },
+        { status: 400 },
+      );
+    }
+
     const normalizedPhone = normalizeArMobilePhone((phone ?? "").trim());
     if (!normalizedPhone) {
       return NextResponse.json(

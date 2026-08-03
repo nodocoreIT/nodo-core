@@ -10,6 +10,7 @@ import { SpecialtyCombobox } from "@/components/ui/specialty-combobox";
 import { NeuralNodesBackground } from "@/components/ui/neural-nodes-background";
 import { ONBOARDING_PLANS, formatPlanPrice } from "@/lib/clinic/subscription-plans";
 import { PhoneField } from "@/components/onboarding/phone-field";
+import { TermsAcceptanceModal } from "@/components/onboarding/terms-acceptance-modal";
 import { CLINIC_BRAND_LOGO_SRC } from "@/lib/clinic/brand";
 
 /**
@@ -35,6 +36,7 @@ function OnboardingMedicoContent() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [checkoutFailed, setCheckoutFailed] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [plan, setPlan] = useState("demo");
   const [form, setForm] = useState({
     fullName: "",
@@ -91,6 +93,10 @@ function OnboardingMedicoContent() {
       toast.error("Ingresá un número de celular con formato válido.");
       return;
     }
+    if (!termsAccepted) {
+      toast.error("Debés aceptar los términos y condiciones para continuar.");
+      return;
+    }
     setLoading(true);
     try {
       const result = await clinicApi.completeOnboardingMedico({
@@ -115,6 +121,12 @@ function OnboardingMedicoContent() {
 
   return (
     <div className="relative min-h-screen py-10 px-4">
+      <TermsAcceptanceModal
+        open={!termsAccepted}
+        role="medico"
+        token={token}
+        onAccept={() => setTermsAccepted(true)}
+      />
       <NeuralNodesBackground />
       <div className="relative z-10 mx-auto w-full max-w-5xl">
 

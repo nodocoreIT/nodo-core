@@ -10,6 +10,7 @@ import { clinicApi, OnboardingSubmitError } from "@/lib/clinic/client-api";
 import { CLINIC_BRAND_LOGO_SRC } from "@/lib/clinic/brand";
 import { NeuralNodesBackground } from "@/components/ui/neural-nodes-background";
 import { PhoneField } from "@/components/onboarding/phone-field";
+import { TermsAcceptanceModal } from "@/components/onboarding/terms-acceptance-modal";
 import { PATIENT_SUBSCRIPTION_PLANS } from "@/lib/clinic/patient-subscription-plans";
 
 const PLANS = PATIENT_SUBSCRIPTION_PLANS;
@@ -68,6 +69,7 @@ function OnboardingPacienteContent() {
 
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [plan, setPlan] = useState("gratuito");
   const [form, setForm] = useState({
     fullName: "",
@@ -102,6 +104,7 @@ function OnboardingPacienteContent() {
     if (!form.fullName) { toast.error("El nombre completo es requerido."); return; }
     if (!form.dni.trim()) { toast.error("El número de DNI es requerido."); return; }
     if (!phoneValid) { toast.error("Ingresá un número de celular con formato válido."); return; }
+    if (!termsAccepted) { toast.error("Debés aceptar los términos y condiciones para continuar."); return; }
     setLoading(true);
     try {
       const formData = new FormData();
@@ -128,6 +131,12 @@ function OnboardingPacienteContent() {
 
   return (
     <div className="relative min-h-screen py-10 px-4">
+      <TermsAcceptanceModal
+        open={!termsAccepted}
+        role="paciente"
+        token={token}
+        onAccept={() => setTermsAccepted(true)}
+      />
       <NeuralNodesBackground />
       <div className="relative z-10 mx-auto w-full max-w-5xl">
 

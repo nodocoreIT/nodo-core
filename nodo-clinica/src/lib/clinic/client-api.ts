@@ -483,6 +483,21 @@ export const clinicApi = {
     }
   },
 
+  async acceptOnboardingTerms(data: {
+    token: string;
+    role: "medico" | "paciente";
+  }): Promise<{ ok: boolean }> {
+    const res = await fetch(`${BASE}/api/clinic/account/onboarding/aceptar-terminos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    const resData = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(resData.error || "Error al aceptar términos");
+    return resData as { ok: boolean };
+  },
+
   async completeOnboardingMedico(data: {
     fullName: string;
     specialty: string;
