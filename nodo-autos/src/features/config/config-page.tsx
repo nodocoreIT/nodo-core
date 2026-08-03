@@ -72,6 +72,7 @@ export function ConfigPage() {
         horarios: values.horarios || null,
       };
       await updateCliente(currentCliente.id, updates);
+      window.dispatchEvent(new CustomEvent("nodo:org-switched"));
       toast.success("Configuración guardada");
     } catch {
       toast.error("Error al guardar la configuración");

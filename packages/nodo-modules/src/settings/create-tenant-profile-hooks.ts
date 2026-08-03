@@ -73,8 +73,11 @@ export function createTenantProfileHooks(config: TenantProfileHooksConfig) {
           .eq(tenantColumn, tenantId);
         if (error) throw error;
       },
-      onSuccess: () => {
+      onSuccess: (_data, input) => {
         queryClient.invalidateQueries({ queryKey });
+        if (input.legal_name?.trim()) {
+          window.dispatchEvent(new CustomEvent("nodo:org-switched"));
+        }
       },
     });
   }
