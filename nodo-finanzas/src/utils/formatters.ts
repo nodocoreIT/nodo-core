@@ -198,15 +198,31 @@ export const obtenerRangoMesActual = (): { inicio: string; fin: string } => {
 };
 
 /**
+ * Mes calendario local en formato YYYY-MM (Argentina / timezone del browser).
+ * Preferir esto sobre toISOString().slice(0, 7) que usa UTC y puede cruzar de mes.
+ */
+export const mesActualYYYYMM = (fecha: Date = new Date()): string =>
+  `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+
+/**
  * Valida si una fecha está en el mes actual
  */
 export const esFechaDelMesActual = (fecha: string): boolean => {
   if (!fecha) return false;
-  // Si la fecha es YYYY-MM-DD, la comparamos directamente con el mes actual
-  const ahora = new Date();
-  const mesActual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
-  return fecha.startsWith(mesActual);
+  return fecha.startsWith(mesActualYYYYMM());
 };
+
+/**
+ * ¿La cuota del préstamo está abonada en el mes en curso?
+ * Usa ultimoPagoMes (YYYY-MM). Ignora cuotaAbonada pegada de meses anteriores.
+ */
+export function prestamoCuotaPagadaEsteMes(
+  prestamo: { pagado?: boolean; ultimoPagoMes?: string },
+  mesActual: string = mesActualYYYYMM(),
+): boolean {
+  if (prestamo.pagado) return true;
+  return prestamo.ultimoPagoMes === mesActual;
+}
 
 /**
  * Parsea las cuotas de un string (ej: "2 de 3" -> { actual: 2, total: 3 })

@@ -99,7 +99,6 @@ export const useNotifications = () => {
       if (
         !prestamo.activo ||
         !prestamo.fechaVencimiento ||
-        prestamo.cuotaAbonada ||
         prestamo.pagado ||
         prestamo.ultimoPagoMes === mesActualStr
       ) return;

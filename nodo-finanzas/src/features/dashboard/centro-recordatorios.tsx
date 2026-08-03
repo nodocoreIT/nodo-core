@@ -15,7 +15,7 @@ import { Card } from '@/components/ui/card';
 import { MoneyInput } from '@/components/ui/money-input';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { calcularFechasTarjeta } from '@/utils/tarjeta-fechas';
-import { formatearMoneda, formatearFecha } from '@/utils/formatters';
+import { formatearMoneda, formatearFecha, prestamoCuotaPagadaEsteMes } from '@/utils/formatters';
 import type { Tarjeta, Prestamo, PlanAhorro } from '@/types';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -77,9 +77,15 @@ export function CentroRecordatorios({ onNavigate }: Props) {
     hoy.setHours(0, 0, 0, 0);
     const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
 
-    // Préstamos
+    // Préstamos (pendientes del mes en curso — no usar cuotaAbonada sticky)
     finanzas.prestamos
-      .filter((p: Prestamo) => p.activo && !p.pagado && !p.noCobrarCuota && !p.cuotaAbonada && p.fechaVencimiento)
+      .filter(
+        (p: Prestamo) =>
+          p.activo &&
+          !p.noCobrarCuota &&
+          !prestamoCuotaPagadaEsteMes(p, mesActual) &&
+          p.fechaVencimiento,
+      )
       .forEach((p: Prestamo) => {
         const id = `PRESTAMO-${p.id}-${mesActual}`;
         if (dismissedIds.includes(id)) return;

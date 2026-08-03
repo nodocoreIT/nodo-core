@@ -22,7 +22,13 @@ import { Spinner } from '@/components/ui/spinner';
 import { useLocation } from 'react-router-dom';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { useRubros } from '@/hooks/use-rubros';
-import { formatearMoneda, formatearFecha, getFechaHoy } from '@/utils/formatters';
+import {
+  formatearMoneda,
+  formatearFecha,
+  getFechaHoy,
+  mesActualYYYYMM,
+  prestamoCuotaPagadaEsteMes,
+} from '@/utils/formatters';
 import { GestionCuotasProgramadas } from './gestion-cuotas-programadas';
 import { ModalComprobantes } from './modal-comprobantes';
 import toast from 'react-hot-toast';
@@ -114,7 +120,7 @@ export function PrestamosPage() {
   const finanzas = useFinanzas();
   const { rubrosActivos } = useRubros();
   const location = useLocation();
-  const mesActual = new Date().toISOString().slice(0, 7);
+  const mesActual = mesActualYYYYMM();
 
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [prestamoEditando, setPrestamoEditando] = useState<Prestamo | null>(null);
@@ -150,7 +156,8 @@ export function PrestamosPage() {
         prestamista: prestamo.prestamista || '',
         notas: prestamo.notas || '',
         pagado: prestamo.pagado || false,
-        cuotaAbonada: prestamo.cuotaAbonada || false,
+        // Solo marcar si el pago corresponde al mes en curso (no flag sticky viejo)
+        cuotaAbonada: prestamoCuotaPagadaEsteMes(prestamo, mesActual) && !prestamo.pagado,
         noCobrarCuota: prestamo.noCobrarCuota || false,
         esSalvataje: !prestamo.cuotasTotales,
         diaPago: prestamo.diaPago ? String(prestamo.diaPago) : '',
@@ -345,7 +352,7 @@ export function PrestamosPage() {
         ultimoPagoMes: cuotasReduced
           ? undefined
           : form.cuotaAbonada
-            ? (prestamoEditando?.ultimoPagoMes ?? mesActual)
+            ? mesActual
             : undefined,
         noCobrarCuota: form.noCobrarCuota,
         diaPago: form.diaPago ? parseInt(form.diaPago) : undefined,
@@ -501,8 +508,8 @@ export function PrestamosPage() {
                 const diasRestantes = calcularDiasRestantes(prestamo.fechaVencimiento);
                 const vencido = diasRestantes !== null && diasRestantes < 0;
                 const proximoVencimiento = diasRestantes !== null && diasRestantes <= 30 && diasRestantes >= 0;
-                const estaPagadoEsteMes =
-                  prestamo.pagado || prestamo.cuotaAbonada || prestamo.ultimoPagoMes === mesActual;
+                const estaPagadoEsteMes = prestamoCuotaPagadaEsteMes(prestamo, mesActual);
+                const cuotaDelMesPagada = !prestamo.pagado && prestamo.ultimoPagoMes === mesActual;
                 const cuotasPagadas =
                   prestamo.cuotasPagas != null
                     ? prestamo.cuotasPagas
@@ -586,12 +593,12 @@ export function PrestamosPage() {
                               variant="outline"
                               size="sm"
                               className={`text-xs font-bold w-full ${
-                                prestamo.cuotaAbonada
+                                cuotaDelMesPagada
                                   ? 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
                                   : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                               }`}
                               onClick={() => {
-                                if (prestamo.cuotaAbonada) {
+                                if (cuotaDelMesPagada) {
                                   handleDesmarcarCuota(prestamo);
                                 } else {
                                   const cuentasCompatibles = finanzas.cuentas.filter(
@@ -603,7 +610,7 @@ export function PrestamosPage() {
                               }}
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
-                              {prestamo.cuotaAbonada ? 'Desmarcar pago' : 'Pagar cuota'}
+                              {cuotaDelMesPagada ? 'Desmarcar pago' : 'Pagar cuota'}
                             </Button>
                           )}
                         </div>
@@ -647,12 +654,12 @@ export function PrestamosPage() {
                           variant="outline"
                           size="sm"
                           className={`text-xs font-bold flex-1 ${
-                            prestamo.cuotaAbonada
+                            cuotaDelMesPagada
                               ? 'border-slate-200 bg-slate-50 text-slate-500'
                               : 'border-emerald-200 bg-emerald-50 text-emerald-700'
                           }`}
                           onClick={() => {
-                            if (prestamo.cuotaAbonada) {
+                            if (cuotaDelMesPagada) {
                               handleDesmarcarCuota(prestamo);
                             } else {
                               const cuentasCompatibles = finanzas.cuentas.filter(
@@ -664,7 +671,7 @@ export function PrestamosPage() {
                           }}
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          {prestamo.cuotaAbonada ? 'Desmarcar' : 'Pagar cuota'}
+                          {cuotaDelMesPagada ? 'Desmarcar' : 'Pagar cuota'}
                         </Button>
                       )}
                       <Button

@@ -114,12 +114,12 @@ export function DashboardPage() {
     .reduce((s, gf) => s + gf.monto, 0);
 
   // Sum of monthly installments for loans pending payment this month
+  // (status is month-scoped via ultimoPagoMes — ignore sticky cuotaAbonada)
   const totalPrestamos = finanzas.prestamos
     .filter(
       (p) =>
         p.activo &&
         !p.pagado &&
-        !p.cuotaAbonada &&
         p.ultimoPagoMes !== mesActualStr &&
         p.moneda === 'ARS',
     )
