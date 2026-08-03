@@ -19,6 +19,8 @@ interface MoneyInputProps {
   className?: string;
   disabled?: boolean;
   compact?: boolean;
+  /** Permite montos negativos (ajustes de caja, etc.). */
+  allowNegative?: boolean;
 }
 
 function contarDigitosAntes(valor: string, posicion: number): number {
@@ -53,6 +55,7 @@ export function MoneyInput({
   className = '',
   disabled = false,
   compact = false,
+  allowNegative = false,
 }: MoneyInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const cursorRef = useRef<number | null>(null);
@@ -73,10 +76,11 @@ export function MoneyInput({
   function aplicarEntrada(texto: string, posicionCursor: number) {
     const digitosAntes = contarDigitosAntes(texto, posicionCursor);
     const cursorJustAfterComma = posicionCursor > 0 && texto[posicionCursor - 1] === ',';
-    const sanitizado = sanitizarEntradaMonto(texto);
+    const sanitizado = sanitizarEntradaMonto(texto, { allowNegative });
     const formateado = formatearMontoInputEnVivo(sanitizado);
 
     let pos = posicionCursorTrasFormato(formateado, digitosAntes);
+    if (formateado.startsWith('-') && pos === 0 && digitosAntes === 0) pos = 1;
     if (cursorJustAfterComma && formateado[pos] === ',') pos++;
 
     cursorRef.current = pos;
@@ -96,6 +100,21 @@ export function MoneyInput({
       const end = input.selectionEnd ?? raw.length;
       const newValue = raw.slice(0, start) + ',' + raw.slice(end);
       aplicarEntrada(newValue, start + 1);
+      return;
+    }
+    if (allowNegative && (e.key === '-' || e.key === 'Minus')) {
+      const input = inputRef.current!;
+      const start = input.selectionStart ?? 0;
+      const end = input.selectionEnd ?? 0;
+      // Solo al inicio o seleccionando todo el valor
+      if (start === 0 || (start === 0 && end === raw.length) || raw === '' || (start === 0 && end > 0)) {
+        if (raw.startsWith('-') && start === 0 && end === 0) {
+          e.preventDefault();
+          return;
+        }
+      } else {
+        e.preventDefault();
+      }
     }
   }
 

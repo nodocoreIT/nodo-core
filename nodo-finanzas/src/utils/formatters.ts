@@ -7,46 +7,61 @@ export const simboloMoneda = (moneda: Moneda = 'ARS'): string =>
   moneda === 'USD' ? 'U$S' : '$';
 
 /**
- * Limpia texto mientras el usuario escribe (solo dígitos y una coma decimal).
+ * Limpia texto mientras el usuario escribe (dígitos, coma decimal y opcionalmente signo −).
  */
-export const sanitizarEntradaMonto = (valor: string): string => {
+export const sanitizarEntradaMonto = (
+  valor: string,
+  opts?: { allowNegative?: boolean },
+): string => {
   // Dots are always thousands separators (produced by the live formatter).
   // Decimal input via "." is handled at the keydown level in MoneyInput,
   // which converts "." → "," before it reaches this function.
+  const negativo = !!opts?.allowNegative && /^-/.test(valor.trim());
   const sinSeparadores = valor.replace(/\./g, '');
   let limpio = sinSeparadores.replace(/[^\d,]/g, '');
 
   const commaIdx = limpio.indexOf(',');
-  if (commaIdx < 0) return limpio;
+  if (commaIdx < 0) return negativo ? `-${limpio}` : limpio;
 
   const parteEntera = limpio.slice(0, commaIdx);
   const parteDecimal = limpio.slice(commaIdx + 1).replace(/,/g, '').slice(0, 2);
   const terminaEnComa = limpio.endsWith(',');
 
-  if (terminaEnComa && !parteDecimal) return `${parteEntera},`;
-  return `${parteEntera},${parteDecimal}`;
+  const cuerpo =
+    terminaEnComa && !parteDecimal
+      ? `${parteEntera},`
+      : `${parteEntera},${parteDecimal}`;
+  return negativo ? `-${cuerpo}` : cuerpo;
 };
 
 /**
  * Aplica separadores de miles mientras el usuario escribe (es-AR: 1.234.567,89).
  */
 export const formatearMontoInputEnVivo = (valor: string): string => {
-  if (!valor) return '';
+  if (!valor || valor === '-') return valor;
 
-  const terminaEnComa = valor.endsWith(',');
-  const [parteEnteraRaw = '', parteDecimalRaw = ''] = valor.split(',');
+  const negativo = valor.startsWith('-');
+  const sinSigno = negativo ? valor.slice(1) : valor;
+
+  const terminaEnComa = sinSigno.endsWith(',');
+  const [parteEnteraRaw = '', parteDecimalRaw = ''] = sinSigno.split(',');
   const digitosEnteros = parteEnteraRaw.replace(/\D/g, '');
   const digitosDecimales = parteDecimalRaw.replace(/\D/g, '').slice(0, 2);
 
-  if (!digitosEnteros && !digitosDecimales && !terminaEnComa) return '';
+  if (!digitosEnteros && !digitosDecimales && !terminaEnComa) {
+    return negativo ? '-' : '';
+  }
 
   const enterosFormateados = digitosEnteros
     ? Number(digitosEnteros).toLocaleString('es-AR')
     : '0';
 
-  if (terminaEnComa && !digitosDecimales) return `${enterosFormateados},`;
-  if (digitosDecimales || terminaEnComa) return `${enterosFormateados},${digitosDecimales}`;
-  return enterosFormateados;
+  let cuerpo: string;
+  if (terminaEnComa && !digitosDecimales) cuerpo = `${enterosFormateados},`;
+  else if (digitosDecimales || terminaEnComa) cuerpo = `${enterosFormateados},${digitosDecimales}`;
+  else cuerpo = enterosFormateados;
+
+  return negativo ? `-${cuerpo}` : cuerpo;
 };
 
 /**

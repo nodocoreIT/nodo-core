@@ -78,7 +78,10 @@ function tipoLabel(tipo: TipoCuenta): string {
 
 const schemaMovimiento = z.object({
   tipo: z.enum(['entrada', 'salida']),
-  monto: z.number().min(0.01, 'El monto debe ser mayor a 0'),
+  // Negativo permitido: se interpreta como el sentido inverso (ajuste de caja).
+  monto: z
+    .number()
+    .refine((n) => n !== 0 && Number.isFinite(n), 'El monto no puede ser 0'),
   descripcion: z.string().min(1, 'La descripción es requerida'),
   fecha: z.string().min(1),
   detalle: z.string().optional(),
@@ -211,12 +214,20 @@ function MovimientosModal({ cuenta, onClose, finanzas }: MovimientosModalProps) 
 
   async function onSubmit(data: FormMovimiento) {
     try {
+      // Monto negativo = sentido inverso (ajuste): salida −X → entrada X, y viceversa.
+      let tipo = data.tipo;
+      let monto = data.monto;
+      if (monto < 0) {
+        monto = Math.abs(monto);
+        tipo = tipo === 'entrada' ? 'salida' : 'entrada';
+      }
+
       if (editando) {
         await finanzas.actualizarMovimientoManual(
           editando.id,
           {
-            tipo: data.tipo,
-            monto: data.monto,
+            tipo,
+            monto,
             descripcion: data.descripcion,
             fecha: data.fecha,
             detalle: data.detalle || undefined,
@@ -227,14 +238,14 @@ function MovimientosModal({ cuenta, onClose, finanzas }: MovimientosModalProps) 
       } else {
         await finanzas.registrarMovimientoManual({
           cuentaId: cuenta.id,
-          tipo: data.tipo,
-          monto: data.monto,
+          tipo,
+          monto,
           descripcion: data.descripcion,
           fecha: data.fecha,
           detalle: data.detalle || undefined,
           origen: 'ajuste_manual',
         });
-        toast.success(data.tipo === 'entrada' ? 'Entrada registrada' : 'Salida registrada');
+        toast.success(tipo === 'entrada' ? 'Entrada registrada' : 'Salida registrada');
       }
       cargarMovimientos();
       volverALista();
@@ -366,14 +377,20 @@ function MovimientosModal({ cuenta, onClose, finanzas }: MovimientosModalProps) 
                 name="monto"
                 control={control}
                 render={({ field }) => (
-                  <MoneyInput
-                    label="Monto"
-                    value={field.value}
-                    onChange={field.onChange}
-                    moneda={cuenta.moneda}
-                    error={errors.monto?.message}
-                    required
-                  />
+                  <div className="space-y-1">
+                    <MoneyInput
+                      label="Monto"
+                      value={field.value}
+                      onChange={field.onChange}
+                      moneda={cuenta.moneda}
+                      error={errors.monto?.message}
+                      required
+                      allowNegative
+                    />
+                    <p className="text-xs text-slate2">
+                      Podés usar negativo para ajustes de caja (invierte entrada/salida).
+                    </p>
+                  </div>
                 )}
               />
 
