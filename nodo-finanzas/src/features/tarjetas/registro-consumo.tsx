@@ -6,6 +6,7 @@ import { FormSelect, SearchableSelect } from '@nodocore/shared-components';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { formatearMoneda, getFechaHoy } from '@/utils/formatters';
+import { completarConsumoRecurrenteHastaFinDeAnio } from './completar-consumo-recurrente';
 import toast from 'react-hot-toast';
 import type { Tarjeta, RubroConsumo, ConsumoTarjeta } from '@/types';
 
@@ -122,6 +123,29 @@ export function RegistroConsumo({
           gastoFijo,
           codigoOperacion,
         });
+
+        if (gastoFijo) {
+          const creados = await completarConsumoRecurrenteHastaFinDeAnio({
+            fechaBase: fecha,
+            tarjetaId,
+            lugar,
+            rubro: rubroCodigo || 'OTROS',
+            rubroId,
+            detalle,
+            importeARS: moneda === 'ARS' ? monto : 0,
+            importeUSD: moneda === 'USD' ? monto : undefined,
+            fechaCompra,
+            existentes: [...finanzas.consumosTarjetas],
+            agregarConsumo: finanzas.agregarConsumo,
+          });
+          if (creados > 0) {
+            toast.success(
+              `Consumo registrado · se generaron ${creados} mes${creados === 1 ? '' : 'es'} hasta fin de año`,
+            );
+            onGastoRegistrado?.(tarjetaId);
+            return;
+          }
+        }
       }
 
       // Update diaVencimiento on the card if user set/changed it
@@ -406,9 +430,9 @@ export function RegistroConsumo({
                 className="mt-1 w-4 h-4 text-brand border-mist rounded focus:ring-brand"
               />
               <div>
-                <span className="text-sm font-medium text-ink">Gasto Fijo Mensual</span>
+                <span className="text-sm font-medium text-ink">Gasto recurrente mensual</span>
                 <p className="text-xs text-slate2 mt-1">
-                  Marcá esta opción para gastos recurrentes como suscripciones o servicios.
+                  Suscripciones o servicios: al activarlo se completa automáticamente hasta fin de año.
                 </p>
               </div>
             </label>

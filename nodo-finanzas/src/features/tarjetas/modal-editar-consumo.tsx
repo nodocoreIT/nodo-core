@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/ui/money-input';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { useFinanzas } from '@/hooks/use-finanzas';
+import { completarConsumoRecurrenteHastaFinDeAnio } from './completar-consumo-recurrente';
 import toast from 'react-hot-toast';
 import type { ConsumoTarjeta, RubroConsumo } from '@/types';
 
@@ -41,12 +42,20 @@ export function ModalEditarConsumo({
   const [fecha, setFecha] = useState('');
   const [importeARS, setImporteARS] = useState(0);
   const [importeUSD, setImporteUSD] = useState(0);
+  const [gastoFijo, setGastoFijo] = useState(false);
 
   // Installment mode
   const [moneda, setMoneda] = useState<'ARS' | 'USD'>('ARS');
   const [cuotasDetalle, setCuotasDetalle] = useState<InstallmentRow[]>([]);
 
   const isInstallment = !!(consumo?.totalCuotas && consumo.totalCuotas > 1 && consumo.codigoOperacion);
+
+  const mesesHastaFinAnio = useMemo(() => {
+    if (!fecha) return 0;
+    const d = new Date(`${fecha}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return 0;
+    return Math.max(0, 11 - d.getMonth());
+  }, [fecha]);
 
   const siblings = useMemo(() => {
     if (!consumo?.codigoOperacion) return [];
@@ -63,6 +72,7 @@ export function ModalEditarConsumo({
     setRubroId(consumo.rubroId ?? '');
     setRubroCodigo((consumo.rubro as string) ?? '');
     setDetalle(consumo.detalle ?? '');
+    setGastoFijo(!!consumo.gastoFijo);
 
     const totalCuotas = consumo.totalCuotas ?? 1;
 
@@ -144,7 +154,31 @@ export function ModalEditarConsumo({
           detalle,
           importeARS,
           importeUSD: importeUSD > 0 ? importeUSD : undefined,
+          gastoFijo,
         });
+
+        if (gastoFijo && mesesHastaFinAnio > 0) {
+          const creados = await completarConsumoRecurrenteHastaFinDeAnio({
+            fechaBase: fecha,
+            tarjetaId: consumo.tarjetaId,
+            lugar,
+            rubro: rubroCodigo || consumo.rubro || 'OTROS',
+            rubroId: rubroId || undefined,
+            detalle,
+            importeARS,
+            importeUSD: importeUSD > 0 ? importeUSD : undefined,
+            fechaCompra,
+            existentes: [...finanzas.consumosTarjetas],
+            agregarConsumo: finanzas.agregarConsumo,
+          });
+          if (creados > 0) {
+            toast.success(
+              `Consumo actualizado · se generaron ${creados} mes${creados === 1 ? '' : 'es'} hasta fin de año`,
+            );
+            onSave();
+            return;
+          }
+        }
       } else {
         // Batch: update existing + create missing
         const ops = cuotasDetalle.map((row) => {
@@ -283,6 +317,24 @@ export function ModalEditarConsumo({
                   moneda="USD"
                 />
               </div>
+
+              <label className="flex items-start gap-3 p-4 bg-brand/5 rounded-lg border border-brand/20 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={gastoFijo}
+                  onChange={(e) => setGastoFijo(e.target.checked)}
+                  className="mt-1 w-4 h-4 text-brand border-mist rounded focus:ring-brand"
+                />
+                <div>
+                  <span className="text-sm font-medium text-ink">Gasto recurrente mensual</span>
+                  <p className="text-xs text-slate2 mt-1">
+                    Si lo activás, se completa automáticamente hasta fin de año
+                    {mesesHastaFinAnio > 0
+                      ? ` (${mesesHastaFinAnio} mes${mesesHastaFinAnio === 1 ? '' : 'es'} más).`
+                      : ' (este es el último mes del año).'}
+                  </p>
+                </div>
+              </label>
             </>
           )}
 
