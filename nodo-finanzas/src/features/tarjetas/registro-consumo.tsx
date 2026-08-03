@@ -27,7 +27,7 @@ export function RegistroConsumo({
   const [procesando, setProcesando] = useState(false);
 
   const origen = consumoAClonar;
-  const monedaOrigen: 'ARS' | 'USD' = origen?.importeUSD ? 'USD' : 'ARS';
+  const monedaOrigen: 'ARS' | 'USD' = (origen?.importeUSD ?? 0) !== 0 ? 'USD' : 'ARS';
 
   const [tarjetaId, setTarjetaId] = useState(tarjetaPreseleccionada?.id ?? origen?.tarjetaId ?? '');
   const [fecha, setFecha] = useState(getFechaHoy());
@@ -57,7 +57,7 @@ export function RegistroConsumo({
       setCuotasDetalle([]);
       return;
     }
-    const montoPorCuota = monto > 0 ? monto / cuotas : 0;
+    const montoPorCuota = monto !== 0 ? monto / cuotas : 0;
     const detalle = Array.from({ length: cuotas }, (_, i) => {
       const d = new Date(`${fecha}T12:00:00`);
       d.setMonth(d.getMonth() + i);
@@ -76,8 +76,8 @@ export function RegistroConsumo({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tarjetaId || !lugar || !rubroId || monto <= 0) {
-      toast.error('Completá todos los campos requeridos');
+    if (!tarjetaId || !lugar || !rubroId || monto === 0) {
+      toast.error('Completá todos los campos requeridos (el monto no puede ser 0)');
       return;
     }
 
@@ -330,7 +330,11 @@ export function RegistroConsumo({
                   onChange={setMonto}
                   moneda={moneda}
                   required
+                  allowNegative
                 />
+                <p className="text-xs text-slate2 mt-1">
+                  Usá negativo para ajustes, devoluciones o notas de crédito.
+                </p>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-ink">Moneda</label>
@@ -363,7 +367,7 @@ export function RegistroConsumo({
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium text-ink">Detalle de cuotas</label>
-                  {monto > 0 && (
+                  {monto !== 0 && (
                     <span className="text-xs text-slate2">
                       Total: {formatearMoneda(monto, moneda)}
                     </span>
@@ -401,12 +405,13 @@ export function RegistroConsumo({
                             setCuotasDetalle(next);
                           }}
                           moneda={moneda}
+                          allowNegative
                         />
                       </div>
                     ))}
                   </div>
                 </div>
-                {monto > 0 && (() => {
+                {monto !== 0 && (() => {
                   const sumaDetalle = cuotasDetalle.reduce((acc, c) => acc + c.monto, 0);
                   const diff = Math.abs(sumaDetalle - monto);
                   if (diff > 0.01) {

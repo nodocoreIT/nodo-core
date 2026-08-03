@@ -384,12 +384,18 @@ export function DetalleTarjetaPage() {
                         <span className="text-slate2">—</span>
                       )}
                     </td>
-                    <td className="py-3 px-2 text-right font-bold text-ink whitespace-nowrap">
-                      {consumo.importeARS
-                        ? `$${consumo.importeARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+                    <td
+                      className={`py-3 px-2 text-right font-bold whitespace-nowrap ${
+                        (consumo.importeARS ?? 0) < 0 || (consumo.importeUSD ?? 0) < 0
+                          ? 'text-emerald-700'
+                          : 'text-ink'
+                      }`}
+                    >
+                      {(consumo.importeARS ?? 0) !== 0
+                        ? `$${consumo.importeARS!.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
                         : ''}
-                      {consumo.importeUSD
-                        ? `USD ${consumo.importeUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                      {(consumo.importeUSD ?? 0) !== 0
+                        ? `${(consumo.importeARS ?? 0) !== 0 ? ' · ' : ''}USD ${consumo.importeUSD!.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
                         : ''}
                     </td>
                     <td className="py-3 px-2">

@@ -86,7 +86,7 @@ export function ModalEditarConsumo({
 
     // Determine currency from any existing sibling (or from consumo itself)
     const detectedMoneda: 'ARS' | 'USD' =
-      (consumo.importeUSD ?? 0) > 0 ? 'USD' : 'ARS';
+      (consumo.importeUSD ?? 0) !== 0 ? 'USD' : 'ARS';
     setMoneda(detectedMoneda);
 
     // Build a map of existing installments by cuota number
@@ -145,6 +145,10 @@ export function ModalEditarConsumo({
       const totalCuotas = consumo.totalCuotas ?? 1;
 
       if (!isInstallment) {
+        if (importeARS === 0 && importeUSD === 0) {
+          toast.error('El importe no puede ser 0');
+          return;
+        }
         // Simple single-installment update
         await finanzas.actualizarConsumo(consumo.id, {
           lugar,
@@ -153,7 +157,7 @@ export function ModalEditarConsumo({
           rubroId: rubroId || undefined,
           detalle,
           importeARS,
-          importeUSD: importeUSD > 0 ? importeUSD : undefined,
+          importeUSD: importeUSD !== 0 ? importeUSD : undefined,
           gastoFijo,
         });
 
@@ -166,7 +170,7 @@ export function ModalEditarConsumo({
             rubroId: rubroId || undefined,
             detalle,
             importeARS,
-            importeUSD: importeUSD > 0 ? importeUSD : undefined,
+            importeUSD: importeUSD !== 0 ? importeUSD : undefined,
             fechaCompra,
             existentes: [...finanzas.consumosTarjetas],
             agregarConsumo: finanzas.agregarConsumo,
@@ -194,7 +198,7 @@ export function ModalEditarConsumo({
               rubroId: rubroId || undefined,
               detalle,
               importeARS: montoARS,
-              importeUSD: montoUSD > 0 ? montoUSD : undefined,
+              importeUSD: montoUSD !== 0 ? montoUSD : undefined,
             });
           }
 
@@ -207,7 +211,7 @@ export function ModalEditarConsumo({
             rubroId: rubroId || undefined,
             detalle,
             importeARS: montoARS,
-            importeUSD: montoUSD > 0 ? montoUSD : undefined,
+            importeUSD: montoUSD !== 0 ? montoUSD : undefined,
             cuotas: `${row.cuotaNum} de ${totalCuotas}`,
             cuotaActual: row.cuotaNum,
             totalCuotas,
@@ -309,14 +313,19 @@ export function ModalEditarConsumo({
                   value={importeARS}
                   onChange={setImporteARS}
                   moneda="ARS"
+                  allowNegative
                 />
                 <MoneyInput
                   label="Importe USD"
                   value={importeUSD}
                   onChange={setImporteUSD}
                   moneda="USD"
+                  allowNegative
                 />
               </div>
+              <p className="text-xs text-slate2 -mt-2">
+                Usá negativo para ajustes, devoluciones o notas de crédito.
+              </p>
 
               <label className="flex items-start gap-3 p-4 bg-brand/5 rounded-lg border border-brand/20 cursor-pointer">
                 <input
@@ -386,6 +395,7 @@ export function ModalEditarConsumo({
                           setCuotasDetalle(next);
                         }}
                         moneda={moneda}
+                        allowNegative
                       />
                       {!row.existing ? (
                         <span className="text-[10px] text-amber-600 font-medium whitespace-nowrap">nuevo</span>

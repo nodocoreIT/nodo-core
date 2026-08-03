@@ -280,10 +280,30 @@ function MovimientosModal({ cuenta, onClose, finanzas }: MovimientosModalProps) 
     let list = filtroTipo === 'todos' ? movimientosMes : movimientosMes.filter((m) => m.tipo === filtroTipo);
     if (busqueda.trim()) {
       const t = busqueda.toLowerCase().trim();
-      list = list.filter((m) =>
-        m.descripcion.toLowerCase().includes(t) ||
-        (m.detalle && m.detalle.toLowerCase().includes(t))
-      );
+      const qNorm = t.replace(/[$\s]/g, '');
+      const qDigits = qNorm.replace(/[.,]/g, '');
+      const qNumero = qNorm.replace(/\./g, '').replace(',', '.');
+      list = list.filter((m) => {
+        if (m.descripcion.toLowerCase().includes(t)) return true;
+        if (m.detalle && m.detalle.toLowerCase().includes(t)) return true;
+
+        const abs = Math.abs(m.monto);
+        const raw = String(abs);
+        const fixed = abs.toFixed(2);
+        const fixedComa = fixed.replace('.', ',');
+        const formateado = abs.toLocaleString('es-AR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+        const montoDigits = fixed.replace('.', '');
+
+        if (raw.includes(qNorm) || fixed.includes(qNorm) || fixedComa.includes(qNorm)) return true;
+        if (formateado.includes(qNorm)) return true;
+        if (qDigits.length > 0 && montoDigits.includes(qDigits)) return true;
+        const parsed = Number(qNumero);
+        if (Number.isFinite(parsed) && abs === parsed) return true;
+        return false;
+      });
     }
     if (sortField) {
       list = [...list].sort((a, b) => {
@@ -480,7 +500,7 @@ function MovimientosModal({ cuenta, onClose, finanzas }: MovimientosModalProps) 
                       type="text"
                       value={busqueda}
                       onChange={(e) => setBusqueda(e.target.value)}
-                      placeholder="Buscar movimiento…"
+                      placeholder="Buscar por texto o importe…"
                       className="w-full pl-8 pr-3 py-1.5 text-sm border border-mist rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand"
                     />
                   </div>
