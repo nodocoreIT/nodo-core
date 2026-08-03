@@ -22,6 +22,7 @@ import {
   appointmentMatchesScheduleGrid,
   slotKeyFromIso,
   addDaysToDateKey,
+  formatAppointmentLabelFromIso,
 } from "@/lib/clinic/schedule";
 import {
   isPaymentConfirmed,
@@ -38,8 +39,6 @@ import {
   confirmAppointmentPaymentAndNotify,
   patientLoginUrl,
 } from "@/lib/clinic/appointment-payment";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { appendConsultationArtifacts } from "@/lib/clinic/finalize-appointment";
 import { validatePaymentReceipt } from "@/lib/ai/payment-receipt";
 import { notifyDoctorTransferPendingReview } from "@/lib/clinic/doctor-notifications";
@@ -947,9 +946,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const scheduledLabel = format(when, "EEEE d 'de' MMMM 'a las' HH:mm 'hs'", {
-    locale: es,
-  });
+  const scheduledLabel = formatAppointmentLabelFromIso(when.toISOString());
 
   let reminderNote: string | undefined;
   if (doctorForLogic.reminderSettings?.enabled) {

@@ -2,8 +2,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { notifyDoctorMercadoPagoPayment } from "@/lib/clinic/doctor-notifications";
 import { sendAppointmentConfirmationEmail } from "@/lib/email/resend";
 import { formatReminderLabel } from "@/lib/email/reminder-label";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatAppointmentLabelFromIso } from "@/lib/clinic/schedule";
 
 export function appBaseUrl() {
   const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
@@ -213,11 +212,7 @@ export async function confirmAppointmentPaymentAndNotify(
     minutesBefore?: number;
   } | null) ?? {};
 
-  const scheduledLabel = format(
-    new Date(apt.scheduled_at),
-    "EEEE d 'de' MMMM 'a las' HH:mm 'hs'",
-    { locale: es },
-  );
+  const scheduledLabel = formatAppointmentLabelFromIso(apt.scheduled_at);
 
   let reminderNote: string | undefined;
   if (reminderSettings.enabled) {

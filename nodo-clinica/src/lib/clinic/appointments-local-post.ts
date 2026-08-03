@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { appBaseUrl, patientLoginUrl } from "@/lib/clinic/appointment-payment";
 import { attachLocalDocument } from "@/lib/clinic/documents-local";
 import { buildPaymentReceiptAudit } from "@/lib/clinic/payment-receipt-audit";
@@ -16,6 +14,7 @@ import { getSessionFromRequest } from "@/lib/clinic/session";
 import {
   DEFAULT_AVAILABILITY,
   appointmentMatchesScheduleGrid,
+  formatAppointmentLabelFromIso,
   slotKeyFromIso,
   localDateKeyFromIso,
 } from "@/lib/clinic/schedule";
@@ -254,9 +253,7 @@ export async function handleAppointmentsPostLocal(request: NextRequest) {
     }
   }
 
-  const scheduledLabel = format(when, "EEEE d 'de' MMMM 'a las' HH:mm 'hs'", {
-    locale: es,
-  });
+  const scheduledLabel = formatAppointmentLabelFromIso(when.toISOString());
 
   let reminderNote: string | undefined;
   if (doctor.reminderSettings?.enabled) {

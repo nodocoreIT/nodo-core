@@ -1,21 +1,13 @@
 import "server-only";
-import { CLINIC_REMINDER_LOGO_DATA_URI } from "@/lib/email/clinic-logo-data-uri";
 import { currencySymbol } from "@/lib/clinic/currency";
 import { sendClinicEmail, type EmailSendResult } from "@/lib/mail";
+import {
+  clinicEmailDocument,
+  clinicEmailParagraph,
+  clinicEmailTealHeader,
+} from "@/lib/email/clinic-email-layout";
 
 export type { EmailSendResult };
-
-function clinicEmailTealHeader(title: string): string {
-  return `
-        <div style="background: linear-gradient(135deg, #0f766e, #14b8a6); padding: 32px; text-align: center;">
-          <img
-            src="${CLINIC_REMINDER_LOGO_DATA_URI}"
-            alt="Nodo Clínica"
-            style="height:44px;width:auto;display:inline-block;margin:0 auto 16px;"
-          />
-          <h1 style="color: white; margin: 0; font-size: 24px;">${title}</h1>
-        </div>`;
-}
 
 interface AppointmentEmailParams {
   patientEmail: string;
@@ -39,41 +31,34 @@ export async function sendAppointmentConfirmationEmail(
   } = params;
 
   const reminderBlock = reminderNote
-    ? `<p style="color: #64748b; line-height: 1.6; font-size: 14px;">📅 ${reminderNote}</p>`
+    ? clinicEmailParagraph(`📅 ${reminderNote}`)
     : "";
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="utf-8"></head>
-    <body style="font-family: 'Inter', Arial, sans-serif; background: #f8fafc; padding: 32px;">
-      <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
+  const html = clinicEmailDocument(
+    "Confirmación de turno",
+    `
         ${clinicEmailTealHeader("Confirmación de turno")}
-        <div style="padding: 32px;">
-          <p style="color: #334155; font-size: 16px;">Hola <strong>${patientName}</strong>,</p>
-          <p style="color: #64748b; line-height: 1.6;">
-            Tu consulta con <strong>${doctorName}</strong> está confirmada para el
-            <strong>${scheduledAt}</strong>.
-          </p>
+        <div style="padding:32px 24px;">
+          ${clinicEmailParagraph(`Hola <strong>${patientName}</strong>,`)}
+          ${clinicEmailParagraph(
+            `Tu consulta con <strong>${doctorName}</strong> está confirmada para el <strong>${scheduledAt}</strong>.`,
+          )}
           ${reminderBlock}
-          <p style="color: #64748b; line-height: 1.6;">
-            Ingresá a la app como paciente para ver tu turno en <strong>Mis turnos</strong>:
-          </p>
-          <div style="text-align: center; margin: 32px 0;">
+          ${clinicEmailParagraph(
+            `Ingresá a la app como paciente para ver tu turno en <strong>Mis turnos</strong>:`,
+          )}
+          <div style="text-align:center;margin:32px 0;">
             <a href="${waitingRoomUrl}"
-               style="background: #0f766e; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
+               style="background:#0f766e;color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;word-wrap:break-word;">
               Ingresar como paciente
             </a>
           </div>
-          <p style="color: #94a3b8; font-size: 13px; line-height: 1.5;">
-            Este enlace es único y personal. No lo compartas con terceros.
-            Podrás subir estudios previos desde la sala de espera.
-          </p>
+          ${clinicEmailParagraph(
+            `<span style="color:#94a3b8;font-size:13px;line-height:1.5;display:block;">Este enlace es único y personal. No lo compartas con terceros. Podrás subir estudios previos desde la sala de espera.</span>`,
+          )}
         </div>
-      </div>
-    </body>
-    </html>
-  `;
+  `,
+  );
 
   return sendClinicEmail({
     to: patientEmail,
@@ -118,39 +103,33 @@ export async function sendDoctorAssignedAppointmentEmail(
   const feeLabel = currencySymbol(currency);
   const feeBlock =
     consultationFee && consultationFee > 0
-      ? `<p style="color: #64748b; line-height: 1.6;">
-           Honorario de consulta: <strong>${feeLabel} ${consultationFee.toLocaleString("es-AR")}</strong>
-         </p>`
+      ? clinicEmailParagraph(
+          `Honorario de consulta: <strong>${feeLabel} ${consultationFee.toLocaleString("es-AR")}</strong>`,
+        )
       : "";
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="utf-8"></head>
-    <body style="font-family: 'Inter', Arial, sans-serif; background: #f8fafc; padding: 32px;">
-      <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
+  const html = clinicEmailDocument(
+    "Turno asignado",
+    `
         ${clinicEmailTealHeader("Turno asignado")}
-        <div style="padding: 32px;">
-          <p style="color: #334155; font-size: 16px;">Hola <strong>${patientName}</strong>,</p>
-          <p style="color: #64748b; line-height: 1.6;">
-            <strong>${doctorName}</strong> te asignó un turno para el
-            <strong>${scheduledAt}</strong>.
-          </p>
+        <div style="padding:32px 24px;">
+          ${clinicEmailParagraph(`Hola <strong>${patientName}</strong>,`)}
+          ${clinicEmailParagraph(
+            `<strong>${doctorName}</strong> te asignó un turno para el <strong>${scheduledAt}</strong>.`,
+          )}
           ${feeBlock}
-          <p style="color: #64748b; line-height: 1.6;">
-            Para confirmar tu lugar, realizá el pago del turno desde el siguiente botón.
-          </p>
-          <div style="text-align: center; margin: 32px 0;">
+          ${clinicEmailParagraph(
+            `Para confirmar tu lugar, realizá el pago del turno desde el siguiente botón.`,
+          )}
+          <div style="text-align:center;margin:32px 0;">
             <a href="${loginUrl}"
-               style="background: #0f766e; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
+               style="background:#0f766e;color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">
               Realizar pago
             </a>
           </div>
         </div>
-      </div>
-    </body>
-    </html>
-  `;
+  `,
+  );
 
   return sendClinicEmail({
     to: patientEmail,
@@ -185,33 +164,27 @@ export async function sendAppointmentReminderEmail(
   const { patientEmail, patientName, doctorName, scheduledAt, waitingRoomUrl } =
     params;
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="utf-8"></head>
-    <body style="font-family: 'Inter', Arial, sans-serif; background: #f8fafc; padding: 32px;">
-      <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
+  const html = clinicEmailDocument(
+    "Recordatorio de turno",
+    `
         ${clinicEmailTealHeader("Recordatorio de turno")}
-        <div style="padding: 32px;">
-          <p style="color: #334155; font-size: 16px;">Hola <strong>${patientName}</strong>,</p>
-          <p style="color: #64748b; line-height: 1.6;">
-            Te recordamos que tenés consulta con <strong>${doctorName}</strong> el
-            <strong>${scheduledAt}</strong>.
-          </p>
-          <div style="text-align: center; margin: 32px 0;">
+        <div style="padding:32px 24px;">
+          ${clinicEmailParagraph(`Hola <strong>${patientName}</strong>,`)}
+          ${clinicEmailParagraph(
+            `Te recordamos que tenés consulta con <strong>${doctorName}</strong> el <strong>${scheduledAt}</strong>.`,
+          )}
+          <div style="text-align:center;margin:32px 0;">
             <a href="${waitingRoomUrl}"
-               style="background: #0f766e; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
+               style="background:#0f766e;color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">
               Ingresar como paciente
             </a>
           </div>
-          <p style="color: #94a3b8; font-size: 13px; line-height: 1.5;">
-            Si no podés asistir, contactá al consultorio con anticipación.
-          </p>
+          ${clinicEmailParagraph(
+            `<span style="color:#94a3b8;font-size:13px;line-height:1.5;display:block;">Si no podés asistir, contactá al consultorio con anticipación.</span>`,
+          )}
         </div>
-      </div>
-    </body>
-    </html>
-  `;
+  `,
+  );
 
   return sendClinicEmail({
     to: patientEmail,

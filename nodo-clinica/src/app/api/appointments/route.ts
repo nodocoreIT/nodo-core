@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { patientLoginUrl } from "@/lib/clinic/appointment-payment";
 import { sendAppointmentConfirmationEmail } from "@/lib/email/resend";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatAppointmentLabelFromIso } from "@/lib/clinic/schedule";
 
 export async function POST(request: NextRequest) {
   try {
@@ -80,9 +79,7 @@ export async function POST(request: NextRequest) {
       patientEmail,
       patientName,
       doctorName,
-      scheduledAt: format(new Date(scheduledAt), "dd 'de' MMMM 'yyyy' 'a las' HH:mm 'hs'", {
-        locale: es,
-      }),
+      scheduledAt: formatAppointmentLabelFromIso(new Date(scheduledAt).toISOString()),
       waitingRoomUrl: patientLoginUrl(baseUrl),
     });
 

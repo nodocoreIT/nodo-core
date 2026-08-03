@@ -1,11 +1,10 @@
 import { randomUUID } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { createAppointment } from "@/lib/clinic/db/appointments";
 import {
   DEFAULT_AVAILABILITY,
   appointmentMatchesScheduleGrid,
+  formatAppointmentLabelFromIso,
   slotKeyFromIso,
   localDateKeyFromIso,
 } from "@/lib/clinic/schedule";
@@ -223,9 +222,7 @@ export async function doctorAssignAppointments(
       patient_id: patientRow.id,
     });
 
-    const scheduledLabel = format(when, "EEEE d 'de' MMMM 'a las' HH:mm 'hs'", {
-      locale: es,
-    });
+    const scheduledLabel = formatAppointmentLabelFromIso(when.toISOString());
     const loginUrl = patientTurnosPaymentUrl(apt.access_token, baseUrl);
 
     if (requiresPayment) {

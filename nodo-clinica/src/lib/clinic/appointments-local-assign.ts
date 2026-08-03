@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import {
   readDb,
   writeDb,
@@ -12,6 +10,7 @@ import { getSessionFromRequest } from "@/lib/clinic/session";
 import {
   DEFAULT_AVAILABILITY,
   appointmentMatchesScheduleGrid,
+  formatAppointmentLabelFromIso,
   slotKeyFromIso,
   localDateKeyFromIso,
 } from "@/lib/clinic/schedule";
@@ -190,9 +189,7 @@ export async function handleAppointmentsAssignLocal(request: NextRequest) {
     newAppointments.push(apt);
     takenSlotKeys.add(slotKey);
 
-    const scheduledLabel = format(when, "EEEE d 'de' MMMM 'a las' HH:mm 'hs'", {
-      locale: es,
-    });
+    const scheduledLabel = formatAppointmentLabelFromIso(when.toISOString());
     const loginUrl = patientTurnosPaymentUrl(apt.accessToken, baseUrl);
 
     if (requiresPayment) {

@@ -13,8 +13,7 @@ import { appBaseUrl as baseUrl, patientLoginUrl } from "@/lib/clinic/appointment
 import { isLocalMode } from "@/lib/clinic/config";
 import { readDb } from "@/lib/clinic/local-db";
 import { getSessionFromRequest } from "@/lib/clinic/session";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatAppointmentLabelFromIso } from "@/lib/clinic/schedule";
 
 const DOCTOR_ROLES = new Set([
   "doctor",
@@ -85,10 +84,8 @@ export async function POST(request: NextRequest) {
       patientEmail: toEmail,
       patientName: REMINDER_TEST_PATIENT_NAME,
       doctorName: professional.full_name,
-      scheduledAt: format(
-        new Date(Date.now() + (settings?.minutesBefore ?? 1440) * 60 * 1000),
-        "EEEE d 'de' MMMM 'a las' HH:mm 'hs'",
-        { locale: es },
+      scheduledAt: formatAppointmentLabelFromIso(
+        new Date(Date.now() + (settings?.minutesBefore ?? 1440) * 60 * 1000).toISOString(),
       ),
       waitingRoomUrl: patientLoginUrl(baseUrl()),
     });
@@ -155,11 +152,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const scheduledLabel = format(
-      new Date(apt.scheduled_at),
-      "EEEE d 'de' MMMM 'a las' HH:mm 'hs'",
-      { locale: es },
-    );
+    const scheduledLabel = formatAppointmentLabelFromIso(apt.scheduled_at);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const reminderSettings = (professional as any).office_settings
@@ -232,10 +225,8 @@ async function handleLocalReminders(
       patientEmail: toEmail,
       patientName: REMINDER_TEST_PATIENT_NAME,
       doctorName: doctor.fullName,
-      scheduledAt: format(
-        new Date(Date.now() + (settings?.minutesBefore ?? 1440) * 60 * 1000),
-        "EEEE d 'de' MMMM 'a las' HH:mm 'hs'",
-        { locale: es },
+      scheduledAt: formatAppointmentLabelFromIso(
+        new Date(Date.now() + (settings?.minutesBefore ?? 1440) * 60 * 1000).toISOString(),
       ),
       waitingRoomUrl: patientLoginUrl(baseUrl()),
     });
@@ -280,11 +271,7 @@ async function handleLocalReminders(
       );
     }
 
-    const scheduledLabel = format(
-      new Date(apt.scheduledAt),
-      "EEEE d 'de' MMMM 'a las' HH:mm 'hs'",
-      { locale: es },
-    );
+    const scheduledLabel = formatAppointmentLabelFromIso(apt.scheduledAt);
 
     let reminderNote: string | undefined;
     if (doctor.reminderSettings?.enabled) {

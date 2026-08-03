@@ -6,8 +6,7 @@ import { getReminderTestEmail } from "@/lib/email/reminder-test-email";
 import { appBaseUrl, patientLoginUrl } from "@/lib/clinic/appointment-payment";
 import { isLocalMode } from "@/lib/clinic/config";
 import { readDb, writeDb } from "@/lib/clinic/local-db";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatAppointmentLabelFromIso } from "@/lib/clinic/schedule";
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -58,11 +57,7 @@ export async function GET(request: NextRequest) {
     if (now - remindAt > maxLatenessMs) continue;
     if (now >= scheduledMs) continue;
 
-    const scheduledLabel = format(
-      new Date(apt.scheduled_at),
-      "EEEE d 'de' MMMM 'a las' HH:mm 'hs'",
-      { locale: es },
-    );
+    const scheduledLabel = formatAppointmentLabelFromIso(apt.scheduled_at);
 
     try {
       await sendAppointmentReminderEmail({
@@ -116,11 +111,7 @@ async function runLocalReminders() {
     if (now - remindAt > maxLatenessMs) continue;
     if (now >= scheduledMs) continue;
 
-    const scheduledLabel = format(
-      new Date(apt.scheduledAt),
-      "EEEE d 'de' MMMM 'a las' HH:mm 'hs'",
-      { locale: es },
-    );
+    const scheduledLabel = formatAppointmentLabelFromIso(apt.scheduledAt);
 
     try {
       const result = await sendAppointmentReminderEmail({

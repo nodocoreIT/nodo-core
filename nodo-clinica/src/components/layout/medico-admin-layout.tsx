@@ -124,8 +124,9 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const mpCallbackHandled = useRef(false);
 
   const chatEmbedded = pathname === "/medico/interconsultas";
+  const hasActiveConsultation = useConsultationStore((s) => s.hasActiveSession());
   const inVideoConsultation =
-    pathname === "/medico/consultorio" && useConsultationStore((s) => s.hasActiveSession());
+    pathname === "/medico/consultorio" && hasActiveConsultation;
   const [chatFloatingOpen, setChatFloatingOpen] = useState(false);
   const [chatSessionKey, setChatSessionKey] = useState(0);
   const [chatInitialPeer, setChatInitialPeer] = useState<{

@@ -194,6 +194,18 @@ export function clinicTimeLabelFromIso(iso: string): string {
   return formatClinicTimeLabel(iso);
 }
 
+/** Human-readable turno label in Argentina timezone (emails, SMS). */
+export function formatAppointmentLabelFromIso(iso: string): string {
+  const datePart = new Intl.DateTimeFormat("es-AR", {
+    timeZone: CLINIC_TIMEZONE,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date(iso));
+  const capitalized = datePart.charAt(0).toUpperCase() + datePart.slice(1);
+  return `${capitalized} a las ${formatClinicTimeLabel(iso)} hs`;
+}
+
 export function addDaysToDateKey(dateKey: string, days: number): string {
   const base = new Date(argentinaDateTimeToIso(dateKey, "12:00"));
   return localDateKeyFromDate(addDays(base, days));
