@@ -16,6 +16,10 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { calcularFechasTarjeta } from '@/utils/tarjeta-fechas';
 import { formatearMoneda, formatearFecha, prestamoCuotaPagadaEsteMes } from '@/utils/formatters';
+import {
+  diasHastaFecha,
+  vencimientoCuotaMesEnCurso,
+} from '@/utils/vencimientos';
 import type { Tarjeta, Prestamo, PlanAhorro } from '@/types';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -77,21 +81,23 @@ export function CentroRecordatorios({ onNavigate }: Props) {
     hoy.setHours(0, 0, 0, 0);
     const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
 
-    // Préstamos (pendientes del mes en curso — no usar cuotaAbonada sticky)
+    // Préstamos (pendientes del mes en curso — fecha proyectada al mes actual)
     finanzas.prestamos
       .filter(
         (p: Prestamo) =>
           p.activo &&
           !p.noCobrarCuota &&
-          !prestamoCuotaPagadaEsteMes(p, mesActual) &&
-          p.fechaVencimiento,
+          !prestamoCuotaPagadaEsteMes(p, mesActual),
       )
       .forEach((p: Prestamo) => {
         const id = `PRESTAMO-${p.id}-${mesActual}`;
         if (dismissedIds.includes(id)) return;
-        const vto = new Date(p.fechaVencimiento! + 'T12:00:00');
-        vto.setHours(0, 0, 0, 0);
-        const diff = Math.ceil((vto.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+        const vtoStr = vencimientoCuotaMesEnCurso(
+          { diaPago: p.diaPago, fechaVencimiento: p.fechaVencimiento },
+          hoy,
+        );
+        if (!vtoStr) return;
+        const diff = diasHastaFecha(vtoStr, hoy);
         if (diff <= 10) {
           list.push({
             id,
@@ -100,7 +106,7 @@ export function CentroRecordatorios({ onNavigate }: Props) {
             title: p.concepto,
             amount: p.importeCuota || 0,
             moneda: p.moneda,
-            dueDate: p.fechaVencimiento!,
+            dueDate: vtoStr,
             daysLeft: diff,
             isOverdue: diff < 0,
             priority: diff < 0 ? 'high' : diff <= 2 ? 'high' : 'medium',
@@ -110,13 +116,16 @@ export function CentroRecordatorios({ onNavigate }: Props) {
 
     // Planes de Ahorro
     finanzas.planesAhorro
-      .filter((p: PlanAhorro) => p.activa && p.fechaVencimiento)
+      .filter((p: PlanAhorro) => p.activa)
       .forEach((p: PlanAhorro) => {
         const id = `PLAN_AHORRO-${p.id}-${mesActual}`;
         if (dismissedIds.includes(id)) return;
-        const vto = new Date(p.fechaVencimiento + 'T12:00:00');
-        vto.setHours(0, 0, 0, 0);
-        const diff = Math.ceil((vto.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+        const vtoStr = vencimientoCuotaMesEnCurso(
+          { fechaVencimiento: p.fechaVencimiento },
+          hoy,
+        );
+        if (!vtoStr) return;
+        const diff = diasHastaFecha(vtoStr, hoy);
         if (diff <= 10) {
           list.push({
             id,
@@ -125,7 +134,7 @@ export function CentroRecordatorios({ onNavigate }: Props) {
             title: p.detalle,
             amount: p.importeCuota,
             moneda: p.moneda,
-            dueDate: p.fechaVencimiento,
+            dueDate: vtoStr,
             daysLeft: diff,
             isOverdue: diff < 0,
             priority: diff < 0 ? 'high' : diff <= 2 ? 'high' : 'medium',
@@ -139,12 +148,17 @@ export function CentroRecordatorios({ onNavigate }: Props) {
       .forEach((t: Tarjeta) => {
         const offset = ((t.diaVencimiento || 10) - (t.diaCierre || 20) + 30) % 30 || 14;
         const fechas = calcularFechasTarjeta({ closingDay: t.diaCierre!, dueOffsetDays: offset }, hoy);
-        const vtoStr = fechas.currentDueDate;
+        const prevMes = fechas.previousDueDate.slice(0, 7);
+        const currMes = fechas.currentDueDate.slice(0, 7);
+        let vtoStr = fechas.currentDueDate;
+        if (t.ultimoPagoMes !== prevMes && diasHastaFecha(fechas.previousDueDate, hoy) < 0) {
+          vtoStr = fechas.previousDueDate;
+        } else if (t.ultimoPagoMes === currMes) {
+          return;
+        }
         const id = `TARJETA-${t.id}-${vtoStr.substring(0, 7)}`;
         if (dismissedIds.includes(id)) return;
-        const vto = new Date(vtoStr + 'T12:00:00');
-        vto.setHours(0, 0, 0, 0);
-        const diff = Math.ceil((vto.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+        const diff = diasHastaFecha(vtoStr, hoy);
         if (diff >= -5 && diff <= 7) {
           list.push({
             id,

@@ -7,6 +7,7 @@ import { useFinanzas } from '@/hooks/use-finanzas';
 import { useNotifications } from '@/hooks/use-notifications';
 import { usePresupuestos } from '@/hooks/use-presupuestos';
 import { formatearMoneda, formatearFecha } from '@/utils/formatters';
+import { diasHastaFecha, labelDiasVencimiento } from '@/utils/vencimientos';
 import { normalizarCodigoRubro } from '@/utils/rubro-formatters';
 import { calcularEstadoPagoTarjetaMes, montoAdeudado } from '@/features/tarjetas/calcular-estado-pago-tarjeta';
 import { barraColor, textoColor } from '@/features/presupuestos/presupuesto-colors';
@@ -460,13 +461,8 @@ export function DashboardPage() {
             <div className="space-y-2 mt-3">
               {vencimientos.slice(0, 5).map((n) => {
                 const s = urgenciaStyle[n.urgencia];
-                const diffDays = Math.ceil((new Date(n.fecha + 'T00:00:00').getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
-                const diasLabel =
-                  diffDays <= 0
-                    ? 'vence hoy'
-                    : diffDays === 1
-                      ? 'vence mañana'
-                      : `vence en ${diffDays} días`;
+                const diffDays = diasHastaFecha(n.fecha, hoy);
+                const diasLabel = labelDiasVencimiento(diffDays);
                 return (
                   <button
                     key={n.id}

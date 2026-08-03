@@ -2,6 +2,11 @@ import { useMemo } from 'react';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { usePresupuestos } from '@/hooks/use-presupuestos';
 import { normalizarCodigoRubro } from '@/utils/rubro-formatters';
+import { calcularFechasTarjeta } from '@/utils/tarjeta-fechas';
+import {
+  diasHastaFecha,
+  vencimientoCuotaMesEnCurso,
+} from '@/utils/vencimientos';
 import type { Tarjeta, Prestamo, PlanAhorro } from '@/types';
 
 export interface Notification {
@@ -30,6 +35,44 @@ function fechaHoyIso(): string {
   return `${y}-${m}-${d}`;
 }
 
+function urgenciaPorDias(diffDays: number): 'baja' | 'media' | 'alta' {
+  if (diffDays <= 2) return 'alta';
+  if (diffDays <= 5) return 'media';
+  return 'baja';
+}
+
+function resolveTarjetaDueDate(tarjeta: Tarjeta, hoy: Date): string | null {
+  if (tarjeta.diaCierre && tarjeta.diaVencimiento) {
+    const offset =
+      ((tarjeta.diaVencimiento - tarjeta.diaCierre + 30) % 30) || 14;
+    const fechas = calcularFechasTarjeta(
+      { closingDay: tarjeta.diaCierre, dueOffsetDays: offset },
+      hoy,
+    );
+    const prevMes = fechas.previousDueDate.slice(0, 7);
+    const currMes = fechas.currentDueDate.slice(0, 7);
+
+    // Si el ciclo anterior sigue sin pagar, mostrar ese vencimiento (vencido).
+    if (
+      tarjeta.ultimoPagoMes !== prevMes &&
+      diasHastaFecha(fechas.previousDueDate, hoy) < 0
+    ) {
+      return fechas.previousDueDate;
+    }
+
+    // Si ya pagó el ciclo actual, no hay aviso.
+    if (tarjeta.ultimoPagoMes === currMes) return null;
+
+    return fechas.currentDueDate;
+  }
+
+  // Fallback: proyectar el día de fechaVencimiento al mes en curso.
+  return vencimientoCuotaMesEnCurso(
+    { fechaVencimiento: tarjeta.fechaVencimiento },
+    hoy,
+  );
+}
+
 export const useNotifications = () => {
   const { tarjetas, prestamos, planesAhorro, gastosDiarios, consumosTarjetas } = useFinanzas();
   const { presupuestos } = usePresupuestos();
@@ -42,14 +85,13 @@ export const useNotifications = () => {
     const mesActualStr = `${anioActual}-${String(mesActualIdx + 1).padStart(2, '0')}`;
     const hoyIso = fechaHoyIso();
 
-    // Helper para verificar si ya se pagó este mes
     const estaPagado = (tipo: 'tarjeta' | 'prestamo' | 'plan', id: string) => {
-      return gastosDiarios.some(g => {
+      return gastosDiarios.some((g) => {
         const fechaGasto = new Date(g.fecha + 'T12:00:00');
-        const mismoMes = fechaGasto.getMonth() === mesActualIdx && fechaGasto.getFullYear() === anioActual;
-
+        const mismoMes =
+          fechaGasto.getMonth() === mesActualIdx &&
+          fechaGasto.getFullYear() === anioActual;
         if (!mismoMes) return false;
-
         if (tipo === 'tarjeta') return g.pagoTarjetaId === id;
         if (tipo === 'prestamo') return g.prestamoId === id;
         if (tipo === 'plan') return g.planId === id;
@@ -57,106 +99,123 @@ export const useNotifications = () => {
       });
     };
 
-    // 1. Tarjetas
+    // 1. Tarjetas — fecha del ciclo actual (o anterior impago), no fecha sticky vieja
     tarjetas.forEach((tarjeta: Tarjeta) => {
-      if (!tarjeta.activa || !tarjeta.fechaVencimiento) return;
-      // estaPagado solo mira gastosDiarios (pago real) — una tarjeta marcada
-      // pagada "a mano" (checkbox, sin gasto) también debe dejar de avisar.
+      if (!tarjeta.activa) return;
       if (estaPagado('tarjeta', tarjeta.id) || tarjeta.ultimoPagoMes === mesActualStr) return;
 
-      const vtoStr = tarjeta.fechaVencimiento;
-      const id = `TARJETA-${tarjeta.id}-${vtoStr.substring(0, 7)}`;
+      const vtoStr = resolveTarjetaDueDate(tarjeta, hoy);
+      if (!vtoStr) return;
 
-      const fechaVencimiento = new Date(vtoStr + 'T00:00:00');
-      const diff = fechaVencimiento.getTime() - hoy.getTime();
-      const diffDays = Math.ceil(diff / (1000 * 60 * 60 * 24));
+      const mesVto = vtoStr.slice(0, 7);
+      if (tarjeta.ultimoPagoMes === mesVto) return;
 
-      if (diffDays <= 31) {
-        const venceHoy = diffDays <= 0;
-        const mesVto = vtoStr.substring(0, 7);
-        const montoPeriodo = consumosTarjetas
-          .filter((c) => c.tarjetaId === tarjeta.id && c.fecha.startsWith(mesVto))
-          .reduce((sum, c) => sum + (c.importeARS ?? 0), 0);
-        list.push({
-          id,
-          tipo: 'tarjeta',
-          entityId: tarjeta.id,
-          titulo: `Vencimiento ${tarjeta.nombre}`,
-          mensaje: venceHoy
-            ? `El pago de tu tarjeta ${tarjeta.nombre} vence hoy.`
-            : `El pago de tu tarjeta ${tarjeta.nombre} vence el ${isoAFecha(vtoStr)}.`,
-          fecha: vtoStr,
-          urgencia: diffDays <= 2 ? 'alta' : diffDays <= 5 ? 'media' : 'baja',
-          venceHoy,
-          monto: montoPeriodo > 0 ? montoPeriodo : undefined,
-          moneda: 'ARS',
-        });
-      }
+      const diffDays = diasHastaFecha(vtoStr, hoy);
+      // Solo el ciclo en curso / recién vencido (evita basura de hace meses)
+      if (diffDays < -35 || diffDays > 31) return;
+
+      const venceHoy = diffDays === 0;
+      const montoPeriodo = consumosTarjetas
+        .filter((c) => c.tarjetaId === tarjeta.id && c.fecha.startsWith(mesVto))
+        .reduce((sum, c) => sum + (c.importeARS ?? 0), 0);
+
+      list.push({
+        id: `TARJETA-${tarjeta.id}-${mesVto}`,
+        tipo: 'tarjeta',
+        entityId: tarjeta.id,
+        titulo: `Vencimiento ${tarjeta.nombre}`,
+        mensaje:
+          diffDays < 0
+            ? `El pago de tu tarjeta ${tarjeta.nombre} está vencido (${isoAFecha(vtoStr)}).`
+            : venceHoy
+              ? `El pago de tu tarjeta ${tarjeta.nombre} vence hoy.`
+              : `El pago de tu tarjeta ${tarjeta.nombre} vence el ${isoAFecha(vtoStr)}.`,
+        fecha: vtoStr,
+        urgencia: urgenciaPorDias(diffDays),
+        venceHoy,
+        monto: montoPeriodo > 0 ? montoPeriodo : undefined,
+        moneda: 'ARS',
+      });
     });
 
-    // 2. Préstamos
+    // 2. Préstamos — proyectar al mes en curso
     prestamos.forEach((prestamo: Prestamo) => {
       if (
         !prestamo.activo ||
-        !prestamo.fechaVencimiento ||
         prestamo.pagado ||
+        prestamo.noCobrarCuota ||
         prestamo.ultimoPagoMes === mesActualStr
-      ) return;
+      ) {
+        return;
+      }
+
+      const vtoStr = vencimientoCuotaMesEnCurso(
+        { diaPago: prestamo.diaPago, fechaVencimiento: prestamo.fechaVencimiento },
+        hoy,
+      );
+      if (!vtoStr) return;
 
       const id = `PRESTAMO-${prestamo.id}-${mesActualStr}`;
       if (estaPagado('prestamo', prestamo.id)) return;
 
-      const fechaVencimiento = new Date(prestamo.fechaVencimiento + 'T00:00:00');
-      const diff = fechaVencimiento.getTime() - hoy.getTime();
-      const diffDays = Math.ceil(diff / (1000 * 60 * 60 * 24));
+      const diffDays = diasHastaFecha(vtoStr, hoy);
+      if (diffDays < -35 || diffDays > 31) return;
 
-      if (diffDays <= 31) {
-        const venceHoy = diffDays <= 0;
-        list.push({
-          id,
-          tipo: 'prestamo',
-          entityId: prestamo.id,
-          titulo: `Cuota de ${prestamo.concepto}`,
-          mensaje: venceHoy
-            ? `La cuota de "${prestamo.concepto}" vence hoy.`
-            : `La cuota de "${prestamo.concepto}" vence el ${isoAFecha(prestamo.fechaVencimiento)}.`,
-          fecha: prestamo.fechaVencimiento,
-          urgencia: diffDays <= 2 ? 'alta' : diffDays <= 5 ? 'media' : 'baja',
-          venceHoy,
-          monto: prestamo.importeCuota,
-          moneda: prestamo.moneda,
-        });
-      }
+      const venceHoy = diffDays === 0;
+      list.push({
+        id,
+        tipo: 'prestamo',
+        entityId: prestamo.id,
+        titulo: `Cuota de ${prestamo.concepto}`,
+        mensaje:
+          diffDays < 0
+            ? `La cuota de "${prestamo.concepto}" está vencida (${isoAFecha(vtoStr)}).`
+            : venceHoy
+              ? `La cuota de "${prestamo.concepto}" vence hoy.`
+              : `La cuota de "${prestamo.concepto}" vence el ${isoAFecha(vtoStr)}.`,
+        fecha: vtoStr,
+        urgencia: urgenciaPorDias(diffDays),
+        venceHoy,
+        monto: prestamo.importeCuota,
+        moneda: prestamo.moneda,
+      });
     });
 
-    // 3. Planes de Ahorro
+    // 3. Planes de Ahorro — proyectar al mes en curso
     planesAhorro.forEach((plan: PlanAhorro) => {
-      if (!plan.activa || !plan.fechaVencimiento) return;
+      if (!plan.activa) return;
+
+      const vtoStr = vencimientoCuotaMesEnCurso(
+        { fechaVencimiento: plan.fechaVencimiento },
+        hoy,
+      );
+      if (!vtoStr) return;
 
       const id = `PLAN_AHORRO-${plan.id}-${mesActualStr}`;
       if (estaPagado('plan', plan.id)) return;
+      // Si el último pago del plan quedó marcado en otro campo, el gasto del mes ya filtra
 
-      const fechaVencimiento = new Date(plan.fechaVencimiento + 'T00:00:00');
-      const diff = fechaVencimiento.getTime() - hoy.getTime();
-      const diffDays = Math.ceil(diff / (1000 * 60 * 60 * 24));
+      const diffDays = diasHastaFecha(vtoStr, hoy);
+      if (diffDays < -35 || diffDays > 31) return;
 
-      if (diffDays <= 31) {
-        const venceHoy = diffDays <= 0;
-        list.push({
-          id,
-          tipo: 'plan',
-          entityId: plan.id,
-          titulo: `Cuota de Plan: ${plan.detalle}`,
-          mensaje: venceHoy
-            ? `La cuota del plan "${plan.detalle}" vence hoy.`
-            : `La cuota del plan "${plan.detalle}" vence el ${isoAFecha(plan.fechaVencimiento)}.`,
-          fecha: plan.fechaVencimiento,
-          urgencia: diffDays <= 2 ? 'alta' : diffDays <= 5 ? 'media' : 'baja',
-          venceHoy,
-          monto: plan.importeCuota,
-          moneda: plan.moneda,
-        });
-      }
+      const venceHoy = diffDays === 0;
+      list.push({
+        id,
+        tipo: 'plan',
+        entityId: plan.id,
+        titulo: `Cuota de Plan: ${plan.detalle}`,
+        mensaje:
+          diffDays < 0
+            ? `La cuota del plan "${plan.detalle}" está vencida (${isoAFecha(vtoStr)}).`
+            : venceHoy
+              ? `La cuota del plan "${plan.detalle}" vence hoy.`
+              : `La cuota del plan "${plan.detalle}" vence el ${isoAFecha(vtoStr)}.`,
+        fecha: vtoStr,
+        urgencia: urgenciaPorDias(diffDays),
+        venceHoy,
+        monto: plan.importeCuota,
+        moneda: plan.moneda,
+      });
     });
 
     // 4. Presupuestos (mes calendario actual)
@@ -201,7 +260,7 @@ export const useNotifications = () => {
   return {
     notifications,
     count: notifications.length,
-    // Only items ≤ 2 days away drive the bell badge
-    bellCount: notifications.filter(n => n.urgencia === 'alta').length,
+    // Only items ≤ 2 days away (or overdue) drive the bell badge
+    bellCount: notifications.filter((n) => n.urgencia === 'alta').length,
   };
 };
