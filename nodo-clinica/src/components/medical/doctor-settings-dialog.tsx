@@ -37,6 +37,11 @@ import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { currencySymbol, formatThousands, parseThousands } from "@/lib/clinic/currency";
 import { PAID_SUBSCRIPTION_PLANS, formatPlanPrice } from "@/lib/clinic/subscription-plans";
+
+/** Maps PAID_SUBSCRIPTION_PLANS ids to nodo_core.planes codes, purely for live display pricing. */
+const SUSCRIPCION_PLAN_DB_CODES: Record<string, string> = {
+  profesional: "medico_pro",
+};
 import { trialDaysRemaining, isTrialExpired } from "@/lib/clinic/trial";
 import {
   dayLabel,
@@ -176,8 +181,11 @@ export function DoctorSettingsDialog({
     trialEndsAt: string | null;
   } | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
-  const [choosingPlan, setChoosingPlan] = useState(false);
   const [startingPlanId, setStartingPlanId] = useState<string | null>(null);
+  const [subscriptionBillingCycle, setSubscriptionBillingCycle] = useState<"monthly" | "annual">("annual");
+  const [subscriptionLivePricing, setSubscriptionLivePricing] = useState<
+    Record<string, { label: string; amount: number; amountAnnual: number; currency: string }>
+  >({});
   const loadGen = useRef(0);
   /** Keep optimistic "connected" until the schedule API confirms (or dialog closes). */
   const mpOptimisticRef = useRef(false);
@@ -197,6 +205,11 @@ export function DoctorSettingsDialog({
       .catch(() => toast.error("No se pudo consultar el estado de la suscripción"))
       .finally(() => setSubscriptionLoading(false));
   }, [activeSection, subscription, subscriptionLoading]);
+
+  useEffect(() => {
+    if (activeSection !== "suscripcion") return;
+    void clinicApi.getOnboardingPlanPricing().then(setSubscriptionLivePricing);
+  }, [activeSection]);
 
   type OfficeData = Record<string, unknown>;
 
@@ -1136,28 +1149,52 @@ export function DoctorSettingsDialog({
                               ? "Tu período de prueba venció. Suscribite para seguir usando Nodo Clínica."
                               : "Todavía no tenés una suscripción paga a Nodocore."}
                       </p>
-                      {!choosingPlan ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="h-8 text-xs bg-violet-700 hover:bg-violet-800"
-                          onClick={() => setChoosingPlan(true)}
-                        >
-                          Suscribirme
-                        </Button>
-                      ) : (
-                        <div className="grid sm:grid-cols-2 gap-3">
-                          {PAID_SUBSCRIPTION_PLANS.map((p) => (
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <span className="text-xs font-medium text-amber-900">Ciclo de pago</span>
+                        <div className="inline-flex rounded-lg border border-violet-200 bg-white p-1">
+                          <button
+                            type="button"
+                            onClick={() => setSubscriptionBillingCycle("annual")}
+                            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                              subscriptionBillingCycle === "annual"
+                                ? "bg-violet-700 text-white"
+                                : "text-slate-500 hover:text-slate-700"
+                            }`}
+                          >
+                            Anual
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSubscriptionBillingCycle("monthly")}
+                            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                              subscriptionBillingCycle === "monthly"
+                                ? "bg-violet-700 text-white"
+                                : "text-slate-500 hover:text-slate-700"
+                            }`}
+                          >
+                            Mensual
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        {PAID_SUBSCRIPTION_PLANS.map((p) => {
+                          const live = subscriptionLivePricing[SUSCRIPCION_PLAN_DB_CODES[p.id]];
+                          const amount =
+                            subscriptionBillingCycle === "annual" && live
+                              ? live.amountAnnual
+                              : (live?.amount ?? p.amount);
+                          const currency = live?.currency ?? p.currency;
+                          const period =
+                            amount > 0 ? (subscriptionBillingCycle === "annual" ? "/año" : "/mes") : p.period;
+                          return (
                             <div
                               key={p.id}
                               className="rounded-lg border border-violet-200 bg-white p-3 space-y-2"
                             >
-                              <p className="text-sm font-semibold text-slate-800">{p.name}</p>
+                              <p className="text-sm font-semibold text-slate-800">{live?.label ?? p.name}</p>
                               <p className="text-base font-bold text-violet-700">
-                                {formatPlanPrice(p)}{" "}
-                                <span className="text-xs font-normal text-slate-400">
-                                  {p.period}
-                                </span>
+                                {formatPlanPrice({ ...p, amount, currency })}{" "}
+                                <span className="text-xs font-normal text-slate-400">{period}</span>
                               </p>
                               <ul className="space-y-1">
                                 {p.features.map((f) => (
@@ -1177,7 +1214,10 @@ export function DoctorSettingsDialog({
                                 onClick={async () => {
                                   setStartingPlanId(p.id);
                                   try {
-                                    const result = await clinicApi.startSubscriptionCheckout(p.id);
+                                    const result = await clinicApi.startSubscriptionCheckout(
+                                      p.id,
+                                      subscriptionBillingCycle,
+                                    );
                                     window.location.href = result.initPoint;
                                   } catch (e) {
                                     toast.error(
@@ -1197,9 +1237,9 @@ export function DoctorSettingsDialog({
                                 )}
                               </Button>
                             </div>
-                          ))}
-                        </div>
-                      )}
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </>

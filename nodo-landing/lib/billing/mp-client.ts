@@ -29,6 +29,26 @@ export async function getPreapproval(
   return data as MpPreapprovalInfo;
 }
 
+/** PUT /preapproval/{id} { status: "cancelled" } — voluntary cancel, stops future charges. */
+export async function cancelPreapproval(
+  accessToken: string,
+  preapprovalId: string,
+): Promise<MpPreapprovalInfo> {
+  const res = await fetch(`${MP_API}/preapproval/${preapprovalId}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ status: "cancelled" }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || "Error al cancelar el Preapproval en Mercado Pago");
+  }
+  return data as MpPreapprovalInfo;
+}
+
 export interface MpAuthorizedPaymentInfo {
   id: number | string;
   preapproval_id?: string;
