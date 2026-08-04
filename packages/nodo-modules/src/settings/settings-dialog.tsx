@@ -648,7 +648,12 @@ const ALL_SETTINGS_TABS: SettingsSectionNavItem<SettingsTabId>[] = [
 export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialogProps) {
   const module = useSettingsModule();
   const managedNav = module.managedNav;
-  const settingsTabs = ALL_SETTINGS_TABS.filter((tab) => !module.hiddenTabs?.includes(tab.id));
+  const { role: authRole, user: authUser, plan, billingLocked } = useAuth();
+  // Nodo pausado (demo vencida o pago rechazado): solo la pestaña Suscripción
+  // queda visible/seleccionable — nada de esconder-pero-igual-clickeable.
+  const settingsTabs = billingLocked
+    ? ALL_SETTINGS_TABS.filter((tab) => tab.id === "suscripcion")
+    : ALL_SETTINGS_TABS.filter((tab) => !module.hiddenTabs?.includes(tab.id));
   const [activeTab, setActiveTab] = useState<SettingsTabId>(settingsTabs[0]?.id ?? "profile");
 
   // Switch to initialTab when dialog opens with one specified.
@@ -657,6 +662,14 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
       setActiveTab(initialTab);
     }
   }, [open, initialTab]);
+
+  // Defense in depth: if billing locks mid-session (or initialTab wasn't
+  // "suscripcion"), force back to the only tab that's actually allowed.
+  useEffect(() => {
+    if (billingLocked && activeTab !== "suscripcion") {
+      setActiveTab("suscripcion");
+    }
+  }, [billingLocked, activeTab]);
   const { aiSettings, setAiSettings } = { aiSettings: module.aiSettings, setAiSettings: module.setAiSettings };
   const [selectedProvider, setSelectedProvider] = useState<AiProvider>(aiSettings.provider ?? "gemini");
   const [apiKeyInput, setApiKeyInput] = useState(() => {
@@ -755,7 +768,6 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
     setAiKeySaved(true);
     setTimeout(() => setAiKeySaved(false), 2500);
   };
-  const { role: authRole, user: authUser, plan } = useAuth();
   const aiUnlocked = hasProPlan(plan);
   const settingsNavItems: SettingsSectionNavItem<SettingsTabId>[] = settingsTabs.map((tab) => ({
     ...tab,
