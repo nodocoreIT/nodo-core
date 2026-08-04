@@ -108,3 +108,38 @@ export async function fetchFeedbackInbox(): Promise<FeedbackInboxRow[]> {
     (readStateRes.data ?? []) as RawReadStateRow[],
   );
 }
+
+/**
+ * Pure anti-join — no I/O — so it can be unit tested without a DB. Counts
+ * shared.feedback ids that have no matching row in feedback_read_state by
+ * real set comparison, not by subtracting counts (D3 fix): a naive
+ * count(feedback) - count(read_state) diverges as soon as read_state has an
+ * orphaned feedback_id (one with no matching shared.feedback row, possible
+ * today since POST /read doesn't validate the id exists before upserting).
+ */
+export function countUnreadFeedback(feedbackIds: string[], readFeedbackIds: string[]): number {
+  const readSet = new Set(readFeedbackIds);
+  return feedbackIds.reduce((count, id) => (readSet.has(id) ? count : count + 1), 0);
+}
+
+/**
+ * Server-only data access for the unread badge — only selects id columns
+ * (not full rows) to keep the query light. Must run behind
+ * requirePanelTeamMember().
+ */
+export async function fetchUnreadFeedbackCount(): Promise<number> {
+  const admin = createAdminClient();
+
+  const [feedbackRes, readStateRes] = await Promise.all([
+    admin.schema("shared").from("feedback").select("id"),
+    admin.from("feedback_read_state").select("feedback_id"),
+  ]);
+
+  if (feedbackRes.error) throw feedbackRes.error;
+  if (readStateRes.error) throw readStateRes.error;
+
+  const feedbackIds = (feedbackRes.data ?? []).map((row) => row.id as string);
+  const readFeedbackIds = (readStateRes.data ?? []).map((row) => row.feedback_id as string);
+
+  return countUnreadFeedback(feedbackIds, readFeedbackIds);
+}

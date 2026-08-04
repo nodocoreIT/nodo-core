@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  countUnreadFeedback,
   mergeFeedbackInbox,
   ORG_NAME_FALLBACK,
   type RawFeedbackRow,
@@ -102,5 +103,33 @@ describe("mergeFeedbackInbox", () => {
 
   it("returns an empty array for empty feedback history", () => {
     expect(mergeFeedbackInbox([], [], [])).toEqual([]);
+  });
+});
+
+describe("countUnreadFeedback", () => {
+  it("computes unread count as total minus read (10 - 3 = 7)", () => {
+    const feedbackIds = Array.from({ length: 10 }, (_, i) => `fb-${i}`);
+    const readFeedbackIds = Array.from({ length: 3 }, (_, i) => `fb-${i}`);
+
+    expect(countUnreadFeedback(feedbackIds, readFeedbackIds)).toBe(7);
+  });
+
+  it("does not undercount when feedback_read_state has an orphaned feedback_id", () => {
+    // feedback_id "fb-ghost" has no matching row in shared.feedback — e.g.
+    // POST /read was called with a stale/invalid id. A naive
+    // count(feedback) - count(read_state) would compute 3 - 2 = 1 here,
+    // which is wrong: only "fb-1" is actually unread.
+    const feedbackIds = ["fb-1", "fb-2", "fb-3"];
+    const readFeedbackIds = ["fb-2", "fb-3", "fb-ghost"];
+
+    expect(countUnreadFeedback(feedbackIds, readFeedbackIds)).toBe(1);
+  });
+
+  it("returns 0 when everything is read", () => {
+    expect(countUnreadFeedback(["fb-1", "fb-2"], ["fb-1", "fb-2"])).toBe(0);
+  });
+
+  it("returns 0 for empty feedback history regardless of read state", () => {
+    expect(countUnreadFeedback([], ["fb-ghost"])).toBe(0);
   });
 });
