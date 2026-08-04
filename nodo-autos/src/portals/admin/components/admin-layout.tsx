@@ -73,7 +73,7 @@ function initials(value: string): string {
 }
 
 export function AdminLayout() {
-  const { user, plan, billingLocked, signOut } = useAuth();
+  const { user, plan, billingLocked, accessReason, signOut } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
@@ -406,7 +406,9 @@ export function AdminLayout() {
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
               <Lock className="h-10 w-10 text-slate2" />
               <p className="text-sm text-slate2 max-w-sm">
-                Tu acceso está restringido por un problema con el pago de la suscripción.
+                {accessReason === "trial_expired"
+                  ? "Tu período de prueba terminó. El nodo quedó pausado — suscribite para seguir usando Nodo Autos."
+                  : "No pudimos procesar tu último pago. El nodo quedó pausado hasta que regularices la suscripción."}
               </p>
               <Button
                 variant="outline"

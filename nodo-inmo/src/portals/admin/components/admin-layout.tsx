@@ -178,7 +178,7 @@ function initials(value: string): string {
 // ── Layout ────────────────────────────────────────────────────────────────────
 
 export function AdminLayout() {
-  const { user, role, plan, billingLocked, signOut } = useAuth();
+  const { user, role, plan, billingLocked, accessReason, signOut } = useAuth();
   const { data: profile } = useOrgProfile();
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -351,6 +351,7 @@ export function AdminLayout() {
         signOut={signOut}
         pathname={pathname}
         billingGate={billingGate}
+        accessReason={accessReason}
         placeholder={placeholder}
         title={title}
         fullName={fullName}
@@ -378,6 +379,7 @@ interface AdminLayoutShellProps {
   signOut: ReturnType<typeof useAuth>["signOut"];
   pathname: string;
   billingGate: BillingLockoutResult;
+  accessReason: ReturnType<typeof useAuth>["accessReason"];
   placeholder: string | undefined;
   title: string;
   fullName: string;
@@ -402,6 +404,7 @@ function AdminLayoutShell({
   signOut,
   pathname,
   billingGate,
+  accessReason,
   placeholder,
   title,
   fullName,
@@ -693,7 +696,9 @@ function AdminLayoutShell({
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
               <Lock className="h-10 w-10 text-slate2" />
               <p className="text-sm text-slate2 max-w-sm">
-                Tu acceso está restringido por un problema con el pago de la suscripción.
+                {accessReason === "trial_expired"
+                  ? "Tu período de prueba terminó. El nodo quedó pausado — suscribite para seguir usando Nodo Inmo."
+                  : "No pudimos procesar tu último pago. El nodo quedó pausado hasta que regularices la suscripción."}
               </p>
               <Button
                 variant="outline"

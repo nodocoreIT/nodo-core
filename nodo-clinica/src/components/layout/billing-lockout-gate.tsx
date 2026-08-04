@@ -19,7 +19,7 @@ const SUBSCRIPTION_PATH = "/medico/suscripcion-plataforma";
  * guard around this component. Calling `useAuth()` outside that provider throws.
  */
 export function BillingLockoutGate({ children }: { children: ReactNode }) {
-  const { billingLocked } = useAuth();
+  const { billingLocked, accessReason } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -41,8 +41,10 @@ export function BillingLockoutGate({ children }: { children: ReactNode }) {
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
         <Lock className="h-10 w-10 text-slate2" />
         <p className="text-sm text-slate2 max-w-sm">
-          Tu acceso está restringido por un problema con el pago de la suscripción de la clínica.
-          Contactate con NODO Core para regularizarlo.
+          {accessReason === "trial_expired"
+            ? "Tu período de prueba terminó. El nodo quedó pausado — suscribite para seguir usando Nodo Clínica."
+            : "No pudimos procesar tu último pago. El nodo quedó pausado hasta que regularices la suscripción."}{" "}
+          Contactate con NODO Core si el problema persiste.
         </p>
       </div>
     );
