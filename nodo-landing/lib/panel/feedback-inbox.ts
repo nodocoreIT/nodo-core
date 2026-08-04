@@ -1,0 +1,110 @@
+import { createAdminClient } from "@/lib/supabase/admin";
+import { FEEDBACK_CATEGORY_LABELS, FEEDBACK_NODE_LABELS } from "./build-panel-notifications";
+
+export type FeedbackCategory = "bug" | "idea" | "bloat";
+
+export type FeedbackInboxRow = {
+  id: string;
+  category: FeedbackCategory;
+  categoryLabel: string;
+  content: string | null;
+  sourceNode: string;
+  sourceNodeLabel: string;
+  orgId: string | null;
+  orgName: string;
+  userId: string | null;
+  createdAt: string;
+  read: boolean;
+  readAt: string | null;
+};
+
+/** Raw row shapes as they come back from Supabase — kept narrow on purpose. */
+export type RawFeedbackRow = {
+  id: string;
+  org_id: string | null;
+  user_id: string | null;
+  category: string;
+  content: string | null;
+  metadata: { source_node?: string } | null;
+  created_at: string;
+};
+
+export type RawOrganizationRow = {
+  id: string;
+  name: string | null;
+};
+
+export type RawReadStateRow = {
+  feedback_id: string;
+  read_at: string | null;
+};
+
+export const ORG_NAME_FALLBACK = "Sin organización";
+
+/**
+ * Pure merge — no I/O — so it can be unit tested without a DB. Joins
+ * shared.feedback with shared.organizations and nodo_core.feedback_read_state
+ * in JS (D2): the panel's admin client is scoped per-schema and these three
+ * sources live in different schemas without a declared FK between them.
+ */
+export function mergeFeedbackInbox(
+  feedback: RawFeedbackRow[],
+  organizations: RawOrganizationRow[],
+  readState: RawReadStateRow[],
+): FeedbackInboxRow[] {
+  const orgNameById = new Map(
+    organizations.map((org) => [org.id, org.name?.trim() || ORG_NAME_FALLBACK]),
+  );
+  const readAtByFeedbackId = new Map(readState.map((r) => [r.feedback_id, r.read_at]));
+
+  return feedback.map((row) => {
+    const sourceNode = row.metadata?.source_node ?? "unknown";
+    const isRead = readAtByFeedbackId.has(row.id);
+
+    return {
+      id: row.id,
+      category: row.category as FeedbackCategory,
+      categoryLabel: FEEDBACK_CATEGORY_LABELS[row.category] ?? "Feedback",
+      content: row.content ?? null,
+      sourceNode,
+      sourceNodeLabel: FEEDBACK_NODE_LABELS[sourceNode] ?? `NODO | ${sourceNode}`,
+      orgId: row.org_id ?? null,
+      orgName: row.org_id ? orgNameById.get(row.org_id) ?? ORG_NAME_FALLBACK : ORG_NAME_FALLBACK,
+      userId: row.user_id ?? null,
+      createdAt: row.created_at,
+      read: isRead,
+      readAt: isRead ? readAtByFeedbackId.get(row.id) ?? null : null,
+    };
+  });
+}
+
+/**
+ * Server-only data access: reads the full shared.feedback history (no
+ * 10-record/7-day cap, unlike panel_notifications), shared.organizations,
+ * and nodo_core.feedback_read_state, then merges them. Must run behind
+ * requirePanelTeamMember() — shared.feedback has no RLS policy for the
+ * panel, so this relies on the service-role client (D1).
+ */
+export async function fetchFeedbackInbox(): Promise<FeedbackInboxRow[]> {
+  const admin = createAdminClient();
+
+  const [feedbackRes, orgRes, readStateRes] = await Promise.all([
+    admin
+      .schema("shared")
+      .from("feedback")
+      .select("id, org_id, user_id, category, content, metadata, created_at")
+      .order("created_at", { ascending: false }),
+    admin.schema("shared").from("organizations").select("id, name"),
+    admin.from("feedback_read_state").select("feedback_id, read_at"),
+  ]);
+
+  if (feedbackRes.error) throw feedbackRes.error;
+  if (orgRes.error) throw orgRes.error;
+  if (readStateRes.error) throw readStateRes.error;
+
+  return mergeFeedbackInbox(
+    (feedbackRes.data ?? []) as RawFeedbackRow[],
+    (orgRes.data ?? []) as RawOrganizationRow[],
+    (readStateRes.data ?? []) as RawReadStateRow[],
+  );
+}
