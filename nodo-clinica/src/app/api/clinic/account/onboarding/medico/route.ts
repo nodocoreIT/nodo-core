@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient, createSharedServiceClient } from "@/lib/supabase/server";
+import { createServiceClient, createSharedServiceClient, createNodoCoreServiceClient } from "@/lib/supabase/server";
 import { normalizeArMobilePhone } from "@/lib/clinic/phone-utils";
 import { CLINIC_ORG_ID, syncClinicaAuthClaims } from "@/lib/clinic/clinic-org";
 import { upsertProfessionalOnboardingRecord } from "@/lib/clinic/db/professionals";
 import { findSubscriptionPlan } from "@/lib/clinic/subscription-plans";
 import { createNodoSubscriptionPreapproval } from "@/lib/mercadopago/nodo-subscription";
 import { appBaseUrl } from "@/lib/clinic/appointment-payment";
+import { TERMS_VERSION } from "@/lib/clinic/terms-content";
+
+/** Must match nodo_core.client_units/planes.unit_code exactly (case/accent-sensitive). */
+const UNIT_CODE = "Clínica";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
-    const { fullName, specialty, licenseNumber, plan, token, phone } = body as {
+    const { fullName, specialty, licenseNumber, dni, plan, token, phone } = body as {
       fullName?: string;
       specialty?: string;
       licenseNumber?: string;
+      dni?: string;
       plan?: string;
       token?: string;
       phone?: string;
@@ -26,9 +31,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    if (!fullName || !specialty || !plan) {
+    if (!fullName || !specialty || !plan || !dni?.trim()) {
       return NextResponse.json(
-        { error: "Se requieren fullName, specialty y plan." },
+        { error: "Se requieren fullName, specialty, dni y plan." },
         { status: 400 },
       );
     }
@@ -47,19 +52,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (tokenError || !pending) {
       return NextResponse.json(
         { error: "Token inválido o expirado." },
-        { status: 400 },
-      );
-    }
-
-    const { data: termsAcceptance, error: termsError } = await serviceClient
-      .from("terms_acceptances")
-      .select("id")
-      .eq("pending_registration_id", pending.id)
-      .maybeSingle();
-
-    if (termsError || !termsAcceptance) {
-      return NextResponse.json(
-        { error: "Debés aceptar los términos y condiciones antes de continuar." },
         { status: 400 },
       );
     }
@@ -99,6 +91,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const userId = authUser.id;
 
+    const nodoCoreClient = await createNodoCoreServiceClient();
+    const { data: termsAcceptance, error: termsError } = await nodoCoreClient
+      .from("terms_acceptances")
+      .select("id")
+      .eq("unit_code", UNIT_CODE)
+      .eq("user_id", userId)
+      .eq("terms_version", TERMS_VERSION)
+      .maybeSingle();
+
+    if (termsError || !termsAcceptance) {
+      return NextResponse.json(
+        { error: "Debés aceptar los términos y condiciones antes de continuar." },
+        { status: 400 },
+      );
+    }
+
     // Insert into org_members (shared schema — ignore duplicate)
     const sharedClient = await createSharedServiceClient();
     const { error: orgError } = await sharedClient
@@ -121,6 +129,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       email,
       specialty,
       licenseNumber,
+      dni: dni.trim(),
       plan,
       phone: normalizedPhone,
       phoneVerifiedAt: null,

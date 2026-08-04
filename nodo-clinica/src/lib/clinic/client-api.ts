@@ -504,6 +504,7 @@ export const clinicApi = {
     fullName: string;
     specialty: string;
     licenseNumber: string;
+    dni: string;
     plan: string;
     token: string;
     phone: string;

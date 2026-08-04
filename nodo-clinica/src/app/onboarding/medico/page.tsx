@@ -43,6 +43,7 @@ function OnboardingMedicoContent() {
     fullName: "",
     specialty: "",
     licenseNumber: "",
+    dni: "",
   });
   const [phone, setPhone] = useState("");
   const [phoneValid, setPhoneValid] = useState(false);
@@ -91,6 +92,7 @@ function OnboardingMedicoContent() {
         fullName: form.fullName,
         specialty: form.specialty,
         licenseNumber: form.licenseNumber,
+        dni: form.dni.trim(),
         plan,
         token,
         phone: phone.trim(),
@@ -113,6 +115,10 @@ function OnboardingMedicoContent() {
       toast.error("El nombre completo y la especialidad son requeridos.");
       return;
     }
+    if (!form.dni.trim()) {
+      toast.error("El número de DNI es requerido.");
+      return;
+    }
     if (!phoneValid) {
       toast.error("Ingresá un número de celular con formato válido.");
       return;
@@ -131,7 +137,7 @@ function OnboardingMedicoContent() {
         role="medico"
         token={token}
         fullName={form.fullName}
-        documentNumber={form.licenseNumber}
+        documentNumber={form.dni}
         onAccept={() => {
           setTermsAccepted(true);
           setShowTermsModal(false);
@@ -166,8 +172,8 @@ function OnboardingMedicoContent() {
         <div className="rounded-2xl border p-6 md:p-10 shadow-2xl backdrop-blur-md" style={{ background: "rgba(27,42,65,0.88)", borderColor: "rgba(255,255,255,.1)", boxShadow: "0 24px 80px rgba(0,0,0,.35)" }}>
           <form onSubmit={handleSubmit} className="space-y-6">
 
-            {/* Row 1: Nombre + Matrícula */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Row 1: Nombre + DNI + Matrícula */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div className="sm:col-span-2">
                 <label htmlFor="fullName" className={labelClass}>Nombre completo</label>
                 <input
@@ -176,6 +182,17 @@ function OnboardingMedicoContent() {
                   value={form.fullName}
                   onChange={(e) => setForm({ ...form, fullName: e.target.value })}
                   placeholder="Dr/a. Juan García"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label htmlFor="dni" className={labelClass}>DNI</label>
+                <input
+                  id="dni"
+                  required
+                  value={form.dni}
+                  onChange={(e) => setForm({ ...form, dni: e.target.value })}
+                  placeholder="Ingresá tu DNI"
                   className={inputClass}
                 />
               </div>

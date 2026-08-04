@@ -23,6 +23,7 @@ export interface ProfessionalOnboardingInput {
   email: string;
   specialty: string;
   licenseNumber?: string | null;
+  dni?: string | null;
   plan: string;
   phone?: string | null;
   phoneVerifiedAt?: string | null;
@@ -51,6 +52,7 @@ export async function upsertProfessionalOnboardingRecord(
     specialty: input.specialty,
     specialties: [input.specialty],
     license_number: input.licenseNumber ?? null,
+    dni: input.dni ?? null,
     subscription_status: isPaidPlan ? "pending_payment" : "demo",
     subscription_plan: input.plan,
     trial_ends_at: isPaidPlan ? null : computeTrialEndsAt(),

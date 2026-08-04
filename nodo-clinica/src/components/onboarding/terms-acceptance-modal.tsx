@@ -59,8 +59,31 @@ export function TermsAcceptanceModal({
           </h2>
         </div>
 
-        <div className="prose prose-sm max-w-none overflow-y-auto px-6 py-4 text-slate-700 prose-headings:text-navy prose-strong:text-navy">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        <div className="overflow-y-auto px-6 py-5 text-sm text-slate-700 leading-relaxed [&_strong]:font-semibold [&_strong]:text-navy">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              // El título ya está en el header del modal
+              h1: () => null,
+              h2: ({ children }) => (
+                <h2 className="pt-4 pb-3 text-base font-bold text-navy first:pt-0">{children}</h2>
+              ),
+              h3: ({ children }) => (
+                <h3 className="pt-3 pb-2 text-sm font-semibold text-navy">{children}</h3>
+              ),
+              p: ({ children }) => <p className="mb-3">{children}</p>,
+              ul: ({ children }) => (
+                <ul className="mb-3 list-disc pl-5">{children}</ul>
+              ),
+              ol: ({ children }) => (
+                <ol className="mb-3 list-decimal pl-5">{children}</ol>
+              ),
+              li: ({ children }) => (
+                <li className="mb-1.5 pl-1">{children}</li>
+              ),
+              hr: () => <hr className="my-3 border-slate-200" />,
+            }}
+          >
             {TERMS_CONTENT}
           </ReactMarkdown>
         </div>

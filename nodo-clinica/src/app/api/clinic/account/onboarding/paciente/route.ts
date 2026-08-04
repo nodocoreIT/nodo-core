@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createServiceClient, createNodoCoreServiceClient } from "@/lib/supabase/server";
 import { normalizeArMobilePhone } from "@/lib/clinic/phone-utils";
 import { CLINIC_ORG_ID, syncClinicaAuthClaims } from "@/lib/clinic/clinic-org";
 import {
@@ -7,6 +7,10 @@ import {
   upsertPatientOnboardingRecord,
   DNI_ALREADY_REGISTERED_CODE,
 } from "@/lib/clinic/db/patients";
+import { TERMS_VERSION } from "@/lib/clinic/terms-content";
+
+/** Must match nodo_core.client_units/planes.unit_code exactly (case/accent-sensitive). */
+const UNIT_CODE = "Clínica";
 
 function getExtension(filename: string): string {
   const parts = filename.split(".");
@@ -59,19 +63,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const { data: termsAcceptance, error: termsError } = await serviceClient
-      .from("terms_acceptances")
-      .select("id")
-      .eq("pending_registration_id", pending.id)
-      .maybeSingle();
-
-    if (termsError || !termsAcceptance) {
-      return NextResponse.json(
-        { error: "Debés aceptar los términos y condiciones antes de continuar." },
-        { status: 400 },
-      );
-    }
-
     const normalizedPhone = normalizeArMobilePhone((phone ?? "").trim());
     if (!normalizedPhone) {
       return NextResponse.json(
@@ -106,6 +97,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const userId = authUser.id;
+
+    const nodoCoreClient = await createNodoCoreServiceClient();
+    const { data: termsAcceptance, error: termsError } = await nodoCoreClient
+      .from("terms_acceptances")
+      .select("id")
+      .eq("unit_code", UNIT_CODE)
+      .eq("user_id", userId)
+      .eq("terms_version", TERMS_VERSION)
+      .maybeSingle();
+
+    if (termsError || !termsAcceptance) {
+      return NextResponse.json(
+        { error: "Debés aceptar los términos y condiciones antes de continuar." },
+        { status: 400 },
+      );
+    }
 
     let dniFrontPath: string | null = null;
     let dniBackPath: string | null = null;
