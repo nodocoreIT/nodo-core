@@ -9,6 +9,10 @@
     {
       "path": "/api/cron/refresh-fx-rate",
       "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron/generate-rent-installments",
+      "schedule": "0 9 * * *"
     }
   ]
 }
