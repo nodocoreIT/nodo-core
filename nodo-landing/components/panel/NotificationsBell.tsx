@@ -7,6 +7,7 @@ import {
   ClipboardList,
   CreditCard,
   Lightbulb,
+  MessageSquare,
   UserPlus,
   Wallet,
 } from "lucide-react";
@@ -49,6 +50,10 @@ export const PANEL_NOTIFICATION_KIND_STYLES = {
   new_idea: {
     icon: Lightbulb,
     iconColor: "text-amber-600 bg-amber-50",
+  },
+  new_feedback: {
+    icon: MessageSquare,
+    iconColor: "text-indigo-600 bg-indigo-50",
   },
   default: {
     icon: AlertTriangle,

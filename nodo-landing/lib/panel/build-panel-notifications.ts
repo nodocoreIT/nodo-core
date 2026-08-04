@@ -274,7 +274,7 @@ export function buildPanelNotifications({
       kind: "new_feedback",
       title: `${categoryLabel} · ${nodeLabel}`,
       description: snippet || "Sin mensaje",
-      href: "/panel",
+      href: "/panel/feedback",
       priority: 15,
     });
   }
