@@ -540,6 +540,34 @@ function hasProPlan(plan: string | null | undefined): boolean {
   return plan === "pro";
 }
 
+/** Shown instead of a tab's real content when the nodo is billing-locked (demo
+ * vencida o pago rechazado) and this isn't the Suscripción tab — every other
+ * tab stays visible in the nav so it's clear what the plan includes, but the
+ * content itself is replaced by this notice + a way back to Suscripción. */
+function LockedTabNotice({
+  accessReason,
+  onGoToSubscription,
+}: {
+  accessReason: string;
+  onGoToSubscription: () => void;
+}) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16 px-8 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+        <Lock className="h-5 w-5 text-slate-400" />
+      </div>
+      <p className="text-sm text-slate-500 max-w-sm">
+        {accessReason === "trial_expired"
+          ? "Tu período de prueba terminó. El nodo quedó pausado hasta que te suscribas."
+          : "No pudimos procesar tu último pago. El nodo quedó pausado hasta que regularices la suscripción."}
+      </p>
+      <Button variant="outline" size="sm" onClick={onGoToSubscription}>
+        Ver mi suscripción
+      </Button>
+    </div>
+  );
+}
+
 function AiProGate() {
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-16 px-8 text-center">
@@ -648,12 +676,11 @@ const ALL_SETTINGS_TABS: SettingsSectionNavItem<SettingsTabId>[] = [
 export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialogProps) {
   const module = useSettingsModule();
   const managedNav = module.managedNav;
-  const { role: authRole, user: authUser, plan, billingLocked } = useAuth();
-  // Nodo pausado (demo vencida o pago rechazado): solo la pestaña Suscripción
-  // queda visible/seleccionable — nada de esconder-pero-igual-clickeable.
-  const settingsTabs = billingLocked
-    ? ALL_SETTINGS_TABS.filter((tab) => tab.id === "suscripcion")
-    : ALL_SETTINGS_TABS.filter((tab) => !module.hiddenTabs?.includes(tab.id));
+  const { role: authRole, user: authUser, plan, billingLocked, accessReason } = useAuth();
+  // Nodo pausado (demo vencida o pago rechazado): todas las pestañas se ven
+  // (para que quede claro qué incluye el plan), pero el contenido de
+  // cualquiera que no sea Suscripción se reemplaza por el aviso de bloqueo.
+  const settingsTabs = ALL_SETTINGS_TABS.filter((tab) => !module.hiddenTabs?.includes(tab.id));
   const [activeTab, setActiveTab] = useState<SettingsTabId>(settingsTabs[0]?.id ?? "profile");
 
   // Switch to initialTab when dialog opens with one specified.
@@ -662,14 +689,6 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
       setActiveTab(initialTab);
     }
   }, [open, initialTab]);
-
-  // Defense in depth: if billing locks mid-session (or initialTab wasn't
-  // "suscripcion"), force back to the only tab that's actually allowed.
-  useEffect(() => {
-    if (billingLocked && activeTab !== "suscripcion") {
-      setActiveTab("suscripcion");
-    }
-  }, [billingLocked, activeTab]);
   const { aiSettings, setAiSettings } = { aiSettings: module.aiSettings, setAiSettings: module.setAiSettings };
   const [selectedProvider, setSelectedProvider] = useState<AiProvider>(aiSettings.provider ?? "gemini");
   const [apiKeyInput, setApiKeyInput] = useState(() => {
@@ -1046,6 +1065,10 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
           </div>
 
           <div className={`flex-1 overflow-y-auto bg-white ${activeTab === "system-config" ? "p-4" : "p-6"}`}>
+          {billingLocked && activeTab !== "suscripcion" ? (
+            <LockedTabNotice accessReason={accessReason} onGoToSubscription={() => setActiveTab("suscripcion")} />
+          ) : (
+          <>
           {/* TAB 0: Mi Perfil */}
           {activeTab === "profile" && <ProfileSettingsSection />}
 
@@ -2021,6 +2044,8 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
 
           {/* TAB: Suscripción */}
           {activeTab === "suscripcion" && module.subscriptionContent}
+          </>
+          )}
           </div>
         </div>
       </DialogContent>
