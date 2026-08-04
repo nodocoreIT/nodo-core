@@ -189,16 +189,20 @@ export async function createPreapproval(
 
   let billingAmount: number;
   if (billingCycle === "annual") {
-    const annualMonthly = Number(plan.price_annual_monthly);
-    if (!Number.isFinite(annualMonthly) || annualMonthly <= 0) {
+    // Despite its name, nodo_core.planes.price_annual_monthly stores the
+    // TOTAL annual amount (price_monthly × 10 — "10 months paid for 12"),
+    // not a monthly-equivalent rate. Confirmed against live data (e.g.
+    // medico_pro: price_monthly=1, price_annual_monthly=10 — not 0.83).
+    // Do NOT multiply by 12 here.
+    const annualTotal = Number(plan.price_annual_monthly);
+    if (!Number.isFinite(annualTotal) || annualTotal <= 0) {
       return {
         ok: false,
         reason: "annual_price_not_configured",
         detail: `Plan '${plan.label}' no tiene price_annual_monthly configurado.`,
       };
     }
-    // One charge per year — the discounted annual total, not 12 monthly charges.
-    billingAmount = round2(annualMonthly * 12 * fx.rate);
+    billingAmount = round2(annualTotal * fx.rate);
   } else {
     billingAmount = round2(Number(plan.price_monthly) * fx.rate);
   }

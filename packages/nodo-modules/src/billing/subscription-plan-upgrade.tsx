@@ -18,6 +18,10 @@ import {
   type BillingCycle,
 } from "./platform-billing";
 
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 export interface SubscriptionPlanUpgradePanelProps {
   supabase: SupabaseClient;
   unitCode: string;
@@ -260,9 +264,20 @@ export function SubscriptionPlanUpgradePanel({
               <p className="text-base font-bold text-slate-800">
                 {formatUnitPlanPrice(displayPrice, plan.currency)}{" "}
                 <span className="text-xs font-normal text-slate-400">
-                  {displayPrice > 0 ? "/mes" : displayPrice === 0 ? "siempre" : ""}
+                  {displayPrice > 0
+                    ? billingCycle === "annual"
+                      ? "/año"
+                      : "/mes"
+                    : displayPrice === 0
+                      ? "siempre"
+                      : ""}
                 </span>
               </p>
+              {billingCycle === "annual" && displayPrice > 0 ? (
+                <p className="text-[11px] text-slate-400">
+                  Equivale a {formatUnitPlanPrice(round2(displayPrice / 12), plan.currency)}/mes
+                </p>
+              ) : null}
               {plan.features.length > 0 ? (
                 <ul className="space-y-1">
                   {plan.features.map((feature) => (

@@ -60,12 +60,14 @@ export async function POST(request: NextRequest) {
   if (!plan) {
     return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
   }
+  const billingCycle = body.billingCycle === "annual" ? "annual" : "monthly";
 
   const result = await createNodoSubscriptionPreapproval({
     plan,
     payerEmail: professional.email,
     externalReference: professional.id,
     backUrl: `${appBaseUrl()}/medico/dashboard?settings=suscripcion`,
+    billingCycle,
   });
 
   if (!result.ok) {

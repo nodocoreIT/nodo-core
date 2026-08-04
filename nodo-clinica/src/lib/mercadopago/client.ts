@@ -181,6 +181,8 @@ export async function createPreapproval(params: {
   amount: number;
   currency?: string;
   backUrl: string;
+  /** Months between charges — 1 for monthly, 12 for one charge per year. Defaults to 1. */
+  frequency?: number;
 }): Promise<MpPreapprovalResult> {
   const body = {
     reason: params.reason.slice(0, 256),
@@ -188,7 +190,7 @@ export async function createPreapproval(params: {
     external_reference: params.externalReference,
     back_url: params.backUrl,
     auto_recurring: {
-      frequency: 1,
+      frequency: params.frequency ?? 1,
       frequency_type: "months",
       transaction_amount: params.amount,
       currency_id: mpCurrency(params.currency),

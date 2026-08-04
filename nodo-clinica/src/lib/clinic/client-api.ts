@@ -468,7 +468,7 @@ export const clinicApi = {
    * their static fallback copy, this never blocks onboarding.
    */
   async getOnboardingPlanPricing(): Promise<
-    Record<string, { label: string; amount: number; currency: string }>
+    Record<string, { label: string; amount: number; amountAnnual: number; currency: string }>
   > {
     try {
       const res = await fetch(`${BASE}/api/clinic/account/onboarding/plans`);
@@ -476,7 +476,7 @@ export const clinicApi = {
       if (!res.ok || !data.ok) return {};
       return data.plans as Record<
         string,
-        { label: string; amount: number; currency: string }
+        { label: string; amount: number; amountAnnual: number; currency: string }
       >;
     } catch {
       return {};
@@ -506,6 +506,7 @@ export const clinicApi = {
     licenseNumber: string;
     dni: string;
     plan: string;
+    billingCycle: "monthly" | "annual";
     token: string;
     phone: string;
   }): Promise<{ ok: boolean; checkoutUrl?: string; checkoutFailed?: boolean }> {
@@ -797,24 +798,24 @@ export const clinicApi = {
     };
   },
 
-  async startSubscriptionCheckout(planId: string) {
+  async startSubscriptionCheckout(planId: string, billingCycle: "monthly" | "annual" = "monthly") {
     const res = await fetch(`${BASE}/api/clinic/subscription/checkout`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId }),
+      body: JSON.stringify({ planId, billingCycle }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al iniciar la suscripción");
     return data as { initPoint: string };
   },
 
-  async startPatientSubscriptionCheckout(planId: string) {
+  async startPatientSubscriptionCheckout(planId: string, billingCycle: "monthly" | "annual" = "monthly") {
     const res = await fetch(`${BASE}/api/clinic/patient-subscription/checkout`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId }),
+      body: JSON.stringify({ planId, billingCycle }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al iniciar la suscripción");
