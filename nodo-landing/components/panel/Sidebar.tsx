@@ -13,6 +13,7 @@ import {
   Lightbulb,
   LogOut,
   Mail,
+  MessageSquare,
   Settings,
   UserCog,
   Users,
@@ -29,6 +30,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { SettingsDialog } from "@nodocore/nodo-modules/settings";
 import { useCommandPalette } from "@/components/CommandPaletteProvider";
+import { useUnreadFeedbackCount } from "@/hooks/use-unread-feedback-count";
 import { PanelBrandMark } from "./PanelBrandMark";
 
 type NavItem = {
@@ -36,6 +38,7 @@ type NavItem = {
   href: string;
   icon: React.ElementType;
   enabled?: boolean;
+  badgeCount?: number;
 };
 
 export type SidebarProps = {
@@ -50,6 +53,7 @@ export type SidebarProps = {
 
 const PLATFORM_ITEMS: NavItem[] = [
   { label: "Solicitudes pendientes", href: "/panel/solicitudes", icon: ClipboardList },
+  { label: "Feedback", href: "/panel/feedback", icon: MessageSquare },
   { label: "Ideas", href: "/panel/ideas", icon: Lightbulb },
   { label: "Tareas", href: "/panel/tareas", icon: LayoutDashboard },
   { label: "Clientes", href: "/panel/clientes", icon: Users },
@@ -66,6 +70,24 @@ const ECOSYSTEM_ITEMS: NavItem[] = [
   { label: "Informes", href: "/panel/informes", icon: BarChart3, enabled: true },
 ];
 
+
+function NavBadge({ count }: { count: number }) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "3px 10px",
+        borderRadius: 999,
+        fontSize: 11.5,
+        fontWeight: 600,
+        background: "#E11D48",
+        color: "#ffffff",
+      }}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
 
 function NavLinks({
   items,
@@ -110,6 +132,7 @@ function NavLinks({
       >
         <Icon className="h-4 w-4 flex-shrink-0" />
         <span className="flex-1 truncate">{item.label}</span>
+        {!!item.badgeCount && item.badgeCount > 0 && <NavBadge count={item.badgeCount} />}
       </Link>
     );
   });
@@ -128,6 +151,11 @@ export default function Sidebar({
   const router = useRouter();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { open: openCommandPalette } = useCommandPalette();
+  const { count: unreadFeedbackCount } = useUnreadFeedbackCount();
+
+  const platformItems = PLATFORM_ITEMS.map((item) =>
+    item.href === "/panel/feedback" ? { ...item, badgeCount: unreadFeedbackCount } : item,
+  );
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -162,7 +190,7 @@ export default function Sidebar({
           aria-label="Navegación principal"
         >
           <NavLinks
-            items={PLATFORM_ITEMS}
+            items={platformItems}
             pathname={pathname}
             onNavigate={onMobileClose}
           />
