@@ -166,7 +166,7 @@ async function listFromClientUnits(): Promise<NodoUserRecord[]> {
   const { data, error } = await admin
     .from("client_units")
     .select(
-      "id, unit_code, plan, status, provision_user_id, access_user, created_at, client_id, clients ( name, email )",
+      "id, unit_code, plan, status, trial_ends_at, provision_user_id, access_user, created_at, client_id, clients ( name, email )",
     )
     .not("access_user", "is", null)
     .order("created_at", { ascending: false });
@@ -182,6 +182,14 @@ async function listFromClientUnits(): Promise<NodoUserRecord[]> {
     );
     const email = String(unit.access_user ?? "").trim().toLowerCase();
     const unitCode = String(unit.unit_code ?? "");
+    const rawStatus = String(unit.status ?? "activo");
+    const plan = (unit.plan as string) ?? null;
+    const trialEndsAt = unit.trial_ends_at as string | null;
+    // Demo expiry is a computed condition (trial_ends_at vs now), not a
+    // stored status — surface it distinctly from "activo" so admins can tell
+    // "still in a valid demo" apart from "demo ran out, needs a real plan".
+    const isExpiredDemo =
+      plan === "demo" && !!trialEndsAt && new Date(trialEndsAt).getTime() < Date.now();
 
     return {
       id: `unit:${unit.id}`,
@@ -190,14 +198,14 @@ async function listFromClientUnits(): Promise<NodoUserRecord[]> {
       unitCode,
       unitLabel: unitLabel(unitCode),
       role: null,
-      accessType: inferAccessType((unit.plan as string) ?? null, unitCode),
-      status: String(unit.status ?? "activo"),
+      accessType: inferAccessType(plan, unitCode),
+      status: isExpiredDemo ? "demo_expired" : rawStatus,
       clientId: unit.client_id as string,
       clientUnitId: unit.id as string,
       authUserId: (unit.provision_user_id as string) ?? null,
       orgName: null,
       orgId: null,
-      plan: (unit.plan as string) ?? null,
+      plan,
       createdAt: (unit.created_at as string) ?? null,
       authBanned: false,
     };

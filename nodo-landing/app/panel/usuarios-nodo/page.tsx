@@ -77,6 +77,18 @@ const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }
   onboarding: { bg: "#FCE9D8", color: "#B5630C", label: "Onboarding" },
   trial: { bg: "#E8EEF8", color: "#2A6FDB", label: "Trial" },
   expired: { bg: "#FEE2E2", color: "#991B1B", label: "Expirado" },
+  // impago = client_units.status: la suscripción de plataforma (nodo_core)
+  // rechazó/no pudo cobrar un ciclo ya activo.
+  impago: { bg: "#FEE2E2", color: "#991B1B", label: "Suscripción impaga" },
+  // demo_expired es calculado (plan=demo + trial_ends_at vencido), no un
+  // status guardado — ver listFromClientUnits en nodo-users-list.ts.
+  demo_expired: { bg: "#FCE9D8", color: "#B5630C", label: "Fin de demo" },
+  // pending_payment = professionals.subscription_status (suscripción
+  // personal del médico a Nodo Clínica, sistema aparte de client_units):
+  // eligió un plan pago y arrancó el checkout en MP, pero todavía no llegó
+  // la confirmación del pago — no tiene nada que ver con el fin de la demo.
+  pending_payment: { bg: "#FCE9D8", color: "#B5630C", label: "Pago sin confirmar" },
+  sin_acceso: { bg: "#FEE2E2", color: "#991B1B", label: "Sin acceso" },
 };
 
 function statusStyle(status: string) {
