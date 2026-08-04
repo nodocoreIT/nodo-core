@@ -14,7 +14,7 @@ export type NodoSubscriptionCheckoutResult =
  *
  * MercadoPago Argentina rejects auto_recurring.currency_id = "USD" ("Invalid
  * field") — Preapproval subscriptions must be billed in ARS even though
- * nodo_core.planes prices this plan in USD. Convert at dólar-tarjeta rate,
+ * nodo_core.planes prices this plan in USD. Convert at dólar oficial rate,
  * mirroring nodo-landing/lib/billing/mp-preapproval.ts.
  */
 export async function createNodoSubscriptionPreapproval(params: {

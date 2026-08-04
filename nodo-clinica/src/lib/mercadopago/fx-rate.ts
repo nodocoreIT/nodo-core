@@ -2,8 +2,8 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 
 /**
- * Resolves the dólar-tarjeta FX rate used to convert nodo_core.planes USD
- * prices to ARS at MercadoPago debit time. Mirrors
+ * Resolves the dólar oficial (venta) FX rate used to convert nodo_core.planes
+ * USD prices to ARS at MercadoPago debit time. Mirrors
  * nodo-landing/lib/billing/fx-rate.ts exactly (same nodo_core.fx_rates
  * table, same fallback chain) — ported instead of imported since
  * nodo-clinica is a separate Next.js app with no shared package for this.
@@ -109,6 +109,6 @@ export async function resolveFxRate(
     ok: false,
     reason: "fx-unavailable",
     detail:
-      "No dólar-tarjeta rate available: today's fetch, the stale fallback window, and the manual override are all missing.",
+      "No dólar oficial rate available: today's fetch, the stale fallback window, and the manual override are all missing.",
   };
 }
