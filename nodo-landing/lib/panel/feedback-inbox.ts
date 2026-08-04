@@ -3,6 +3,13 @@ import { FEEDBACK_CATEGORY_LABELS, FEEDBACK_NODE_LABELS } from "./build-panel-no
 
 export type FeedbackCategory = "bug" | "idea" | "bloat";
 
+/**
+ * Cap on cross-schema reads against shared.feedback — matches the
+ * .limit(500) precedent already used for cross-schema queries in
+ * lib/panel/nodo-users-list.ts.
+ */
+const FEEDBACK_FETCH_LIMIT = 500;
+
 export type FeedbackInboxRow = {
   id: string;
   category: FeedbackCategory;
@@ -79,11 +86,12 @@ export function mergeFeedbackInbox(
 }
 
 /**
- * Server-only data access: reads the full shared.feedback history (no
- * 10-record/7-day cap, unlike panel_notifications), shared.organizations,
- * and nodo_core.feedback_read_state, then merges them. Must run behind
- * requirePanelTeamMember() — shared.feedback has no RLS policy for the
- * panel, so this relies on the service-role client (D1).
+ * Server-only data access: reads shared.feedback (capped at
+ * FEEDBACK_FETCH_LIMIT — see nodo-users-list.ts precedent for the same
+ * cross-schema cap), shared.organizations, and nodo_core.feedback_read_state,
+ * then merges them. Must run behind requirePanelTeamMember() —
+ * shared.feedback has no RLS policy for the panel, so this relies on the
+ * service-role client (D1).
  */
 export async function fetchFeedbackInbox(): Promise<FeedbackInboxRow[]> {
   const admin = createAdminClient();
@@ -93,7 +101,8 @@ export async function fetchFeedbackInbox(): Promise<FeedbackInboxRow[]> {
       .schema("shared")
       .from("feedback")
       .select("id, org_id, user_id, category, content, metadata, created_at")
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .limit(FEEDBACK_FETCH_LIMIT),
     admin.schema("shared").from("organizations").select("id, name"),
     admin.from("feedback_read_state").select("feedback_id, read_at"),
   ]);
@@ -123,15 +132,21 @@ export function countUnreadFeedback(feedbackIds: string[], readFeedbackIds: stri
 }
 
 /**
- * Server-only data access for the unread badge — only selects id columns
- * (not full rows) to keep the query light. Must run behind
- * requirePanelTeamMember().
+ * Server-only data access for the unread badge — mirrors fetchFeedbackInbox's
+ * cap (FEEDBACK_FETCH_LIMIT) so the count matches the same universe of rows
+ * the inbox list would show, and only selects id columns (not full rows) to
+ * keep the query light. Must run behind requirePanelTeamMember().
  */
 export async function fetchUnreadFeedbackCount(): Promise<number> {
   const admin = createAdminClient();
 
   const [feedbackRes, readStateRes] = await Promise.all([
-    admin.schema("shared").from("feedback").select("id"),
+    admin
+      .schema("shared")
+      .from("feedback")
+      .select("id")
+      .order("created_at", { ascending: false })
+      .limit(FEEDBACK_FETCH_LIMIT),
     admin.from("feedback_read_state").select("feedback_id"),
   ]);
 
