@@ -74,15 +74,8 @@ const ECOSYSTEM_ITEMS: NavItem[] = [
 function NavBadge({ count }: { count: number }) {
   return (
     <span
-      style={{
-        display: "inline-block",
-        padding: "3px 10px",
-        borderRadius: 999,
-        fontSize: 11.5,
-        fontWeight: 600,
-        background: "#E11D48",
-        color: "#ffffff",
-      }}
+      aria-label={`${count} sin leer`}
+      className="inline-block rounded-full bg-rose-600 px-2.5 py-[3px] text-[11.5px] font-semibold text-white"
     >
       {count > 99 ? "99+" : count}
     </span>
