@@ -1,7 +1,21 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { FEEDBACK_CATEGORY_LABELS, FEEDBACK_NODE_LABELS } from "./build-panel-notifications";
 
-export type FeedbackCategory = "bug" | "idea" | "bloat";
+export type FeedbackCategory = "bug" | "idea" | "bloat" | "unknown";
+
+const KNOWN_FEEDBACK_CATEGORIES: readonly FeedbackCategory[] = ["bug", "idea", "bloat"];
+
+/**
+ * shared.feedback.category is a free string, not a schema-enforced enum —
+ * never trust it as FeedbackCategory via a blind cast. Falls back to
+ * "unknown" the same way categoryLabel/sourceNodeLabel fall back for
+ * unmapped values below.
+ */
+function normalizeFeedbackCategory(value: string): FeedbackCategory {
+  return (KNOWN_FEEDBACK_CATEGORIES as readonly string[]).includes(value)
+    ? (value as FeedbackCategory)
+    : "unknown";
+}
 
 /**
  * Cap on cross-schema reads against shared.feedback — matches the
@@ -70,7 +84,7 @@ export function mergeFeedbackInbox(
 
     return {
       id: row.id,
-      category: row.category as FeedbackCategory,
+      category: normalizeFeedbackCategory(row.category),
       categoryLabel: FEEDBACK_CATEGORY_LABELS[row.category] ?? "Feedback",
       content: row.content ?? null,
       sourceNode,

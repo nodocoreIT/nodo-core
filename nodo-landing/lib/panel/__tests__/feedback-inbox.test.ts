@@ -88,6 +88,13 @@ describe("mergeFeedbackInbox", () => {
     expect(row.categoryLabel).toBe("Idea nueva");
   });
 
+  it("falls back to 'unknown' for a category value outside the known enum", () => {
+    const [row] = mergeFeedbackInbox([feedbackRow({ category: "algo-random" })], [], []);
+
+    expect(row.category).toBe("unknown");
+    expect(row.categoryLabel).toBe("Feedback");
+  });
+
   it("computes unread count as total minus read (10 - 3 = 7)", () => {
     const feedback = Array.from({ length: 10 }, (_, i) => feedbackRow({ id: `fb-${i}` }));
     const readState: RawReadStateRow[] = Array.from({ length: 3 }, (_, i) => ({
