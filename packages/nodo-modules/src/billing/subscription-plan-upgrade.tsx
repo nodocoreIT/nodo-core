@@ -15,6 +15,7 @@ import {
   fetchUnitPlansForSubscriber,
   formatUnitPlanPrice,
   startPlatformSubscriptionCheckout,
+  cancelPlatformSubscription,
   type BillingCycle,
 } from "./platform-billing";
 
@@ -52,6 +53,8 @@ export function SubscriptionPlanUpgradePanel({
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -143,6 +146,30 @@ export function SubscriptionPlanUpgradePanel({
     }
   };
 
+  const handleCancel = async () => {
+    if (!confirmingCancel) {
+      setConfirmingCancel(true);
+      return;
+    }
+    setCancelling(true);
+    setError(null);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Debés iniciar sesión para cancelar la suscripción.");
+
+      await cancelPlatformSubscription({ landingOrigin, unitCode, accessToken: token });
+      setConfirmingCancel(false);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cancelar la suscripción.");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className={cn("flex justify-center py-10", className)}>
@@ -191,6 +218,40 @@ export function SubscriptionPlanUpgradePanel({
                 </li>
               ))}
             </ul>
+          ) : null}
+          {currentPlan.priceMonthly > 0 && clientUnitStatus !== "pausado" ? (
+            <div className="pt-1.5 flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={cancelling}
+                onClick={() => void handleCancel()}
+                className={cn(
+                  "h-7 text-xs px-2",
+                  confirmingCancel
+                    ? "text-red-700 hover:text-red-800"
+                    : "text-emerald-700/70 hover:text-emerald-900",
+                )}
+              >
+                {cancelling ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : confirmingCancel ? (
+                  "¿Confirmar baja? Se cancela ya"
+                ) : (
+                  "Dar de baja la suscripción"
+                )}
+              </Button>
+              {confirmingCancel ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingCancel(false)}
+                  className="text-xs text-slate-400 hover:text-slate-600"
+                >
+                  Cancelar
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </div>
       ) : null}

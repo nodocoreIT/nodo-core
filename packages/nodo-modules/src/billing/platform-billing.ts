@@ -111,6 +111,27 @@ export async function startPlatformSubscriptionCheckout(params: {
   return data;
 }
 
+export async function cancelPlatformSubscription(params: {
+  landingOrigin?: string;
+  unitCode: string;
+  accessToken: string;
+}): Promise<void> {
+  const origin = (params.landingOrigin ?? defaultLandingBillingOrigin()).replace(/\/$/, "");
+  const res = await fetch(`${origin}/api/billing/subscription/cancel`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${params.accessToken}`,
+    },
+    body: JSON.stringify({ unitCode: params.unitCode }),
+  });
+
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) {
+    throw new Error(data.error || "No se pudo cancelar la suscripción.");
+  }
+}
+
 export function formatUnitPlanPrice(amount: number, currency: string): string {
   if (!Number.isFinite(amount) || amount <= 0) return currency === "USD" ? "US$0" : "$0";
   const formatted = amount.toLocaleString("es-AR");

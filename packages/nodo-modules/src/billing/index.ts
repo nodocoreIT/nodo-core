@@ -6,6 +6,7 @@ export {
   fetchUnitPlansForSubscriber,
   fetchMyBillingSubscriptionRow,
   startPlatformSubscriptionCheckout,
+  cancelPlatformSubscription,
   formatUnitPlanPrice,
   defaultLandingBillingOrigin,
   type UnitPlanOption,

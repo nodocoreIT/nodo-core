@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveFxRate } from "./fx-rate";
 import { billingDayFrom, currentCycleKey } from "./billing-time";
+import { cancelPreapproval } from "./mp-client";
 
 /**
  * Creates/refreshes NODO's own MercadoPago Preapproval (recurring subscription
@@ -168,10 +169,12 @@ export async function createPreapproval(
 
   const { data: existingSubData } = await db
     .from("client_unit_subscriptions")
-    .select("id")
+    .select("id, mp_preapproval_id, status")
     .eq("client_unit_id", clientUnitId)
     .maybeSingle();
-  const existingSubscription = existingSubData as { id: string } | null;
+  const existingSubscription = existingSubData as
+    | { id: string; mp_preapproval_id: string | null; status: string }
+    | null;
 
   const now = new Date();
   const fx = await resolveFxRate(now);
@@ -205,6 +208,23 @@ export async function createPreapproval(
     billingAmount = round2(annualTotal * fx.rate);
   } else {
     billingAmount = round2(Number(plan.price_monthly) * fx.rate);
+  }
+
+  // Changing plan/cycle: cancel the previous Preapproval in MP first so it
+  // never keeps charging in parallel with the new one — MP has no "replace"
+  // operation, creating a new Preapproval doesn't touch the old one.
+  if (
+    existingSubscription?.mp_preapproval_id &&
+    existingSubscription.status !== "cancelled"
+  ) {
+    try {
+      await cancelPreapproval(accessToken, existingSubscription.mp_preapproval_id);
+    } catch (err) {
+      console.error(
+        `[createPreapproval] failed to cancel previous preapproval ${existingSubscription.mp_preapproval_id} for client_unit ${clientUnitId}:`,
+        err,
+      );
+    }
   }
 
   const billingDay = billingDayFrom(new Date(unit.enabled_at));
@@ -302,4 +322,75 @@ export async function createPreapproval(
     billingCycle,
     billingDay,
   };
+}
+
+export type CancelSubscriptionFailureReason =
+  | "missing_token"
+  | "unit_not_found"
+  | "no_active_subscription"
+  | "mp_rejected";
+
+export type CancelSubscriptionResult =
+  | { ok: true }
+  | { ok: false; reason: CancelSubscriptionFailureReason; detail: string };
+
+/**
+ * Cancels the client_unit's current MP Preapproval (voluntary cancel) and
+ * flips client_unit_subscriptions.status to 'cancelled' + client_units.status
+ * to 'pausado' (distinct from 'impago' — this isn't a failed payment).
+ */
+export async function cancelSubscription(clientUnitId: string): Promise<CancelSubscriptionResult> {
+  const accessToken = process.env.LANDING_MERCADOPAGO_ACCESS_TOKEN?.trim();
+  if (!accessToken) {
+    return {
+      ok: false,
+      reason: "missing_token",
+      detail: "Falta configurar LANDING_MERCADOPAGO_ACCESS_TOKEN en el servidor.",
+    };
+  }
+
+  const db = createAdminClient();
+
+  const { data: unitRow } = await db
+    .from("client_units")
+    .select("id")
+    .eq("id", clientUnitId)
+    .maybeSingle();
+  if (!unitRow) {
+    return { ok: false, reason: "unit_not_found", detail: `client_unit ${clientUnitId} not found.` };
+  }
+
+  const { data: subData } = await db
+    .from("client_unit_subscriptions")
+    .select("id, mp_preapproval_id, status")
+    .eq("client_unit_id", clientUnitId)
+    .maybeSingle();
+  const sub = subData as { id: string; mp_preapproval_id: string | null; status: string } | null;
+
+  if (!sub || !sub.mp_preapproval_id || sub.status === "cancelled") {
+    return {
+      ok: false,
+      reason: "no_active_subscription",
+      detail: "No hay una suscripción activa para cancelar.",
+    };
+  }
+
+  try {
+    await cancelPreapproval(accessToken, sub.mp_preapproval_id);
+  } catch (err) {
+    return {
+      ok: false,
+      reason: "mp_rejected",
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  await db
+    .from("client_unit_subscriptions")
+    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .eq("id", sub.id);
+
+  await db.from("client_units").update({ status: "pausado" }).eq("id", clientUnitId);
+
+  return { ok: true };
 }
