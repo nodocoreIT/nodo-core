@@ -1,9 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+export type BillingCycle = "monthly" | "annual";
+
 export interface UnitPlanOption {
   code: string;
   label: string;
   priceMonthly: number;
+  priceAnnualMonthly: number;
   currency: string;
   sortOrder: number;
 }
@@ -13,6 +16,7 @@ export interface BillingSubscriptionRow {
   plan_label: string | null;
   billing_amount: number | string | null;
   billing_currency: string | null;
+  billing_cycle: string | null;
   cycle_started_at: string | null;
   next_due_at: string | null;
   subscription_status: string | null;
@@ -33,12 +37,14 @@ export async function fetchUnitPlansForSubscriber(
     code: string;
     label: string;
     price_monthly: number | string;
+    price_annual_monthly: number | string | null;
     currency: string;
     sort_order: number;
   }>).map((row) => ({
     code: row.code,
     label: row.label,
     priceMonthly: Number(row.price_monthly),
+    priceAnnualMonthly: Number(row.price_annual_monthly) || 0,
     currency: row.currency,
     sortOrder: row.sort_order,
   }));
@@ -74,6 +80,7 @@ export async function startPlatformSubscriptionCheckout(params: {
   planCode: string;
   backUrl: string;
   accessToken: string;
+  billingCycle?: BillingCycle;
 }): Promise<{ initPoint?: string; planChanged?: boolean; requiresPayment?: boolean }> {
   const origin = (params.landingOrigin ?? defaultLandingBillingOrigin()).replace(/\/$/, "");
   const res = await fetch(`${origin}/api/billing/subscription/checkout`, {
@@ -86,6 +93,7 @@ export async function startPlatformSubscriptionCheckout(params: {
       unitCode: params.unitCode,
       planCode: params.planCode,
       backUrl: params.backUrl,
+      billingCycle: params.billingCycle ?? "monthly",
     }),
   });
 

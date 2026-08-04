@@ -8,7 +8,6 @@ import {
   getCatalogPlansForUnit,
   getPlanByCode,
   mergeUnitPlans,
-  planPeriodLabel,
   type PlatformPlanDefinition,
 } from "./platform-plan-catalog";
 import {
@@ -16,6 +15,7 @@ import {
   fetchUnitPlansForSubscriber,
   formatUnitPlanPrice,
   startPlatformSubscriptionCheckout,
+  type BillingCycle,
 } from "./platform-billing";
 
 export interface SubscriptionPlanUpgradePanelProps {
@@ -25,7 +25,6 @@ export interface SubscriptionPlanUpgradePanelProps {
   backUrl: string;
   landingOrigin?: string;
   className?: string;
-  /** Shown when client_unit status is impago */
   impagoWarning?: string;
 }
 
@@ -42,8 +41,10 @@ export function SubscriptionPlanUpgradePanel({
     getCatalogPlansForUnit(unitCode),
   );
   const [currentPlanCode, setCurrentPlanCode] = useState<string | null>(null);
+  const [currentBillingCycle, setCurrentBillingCycle] = useState<BillingCycle | null>(null);
   const [clientUnitStatus, setClientUnitStatus] = useState<string | null>(null);
   const [selectedPlanCode, setSelectedPlanCode] = useState<string | null>(null);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("annual");
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +63,7 @@ export function SubscriptionPlanUpgradePanel({
 
       const current = billingRow?.plan_code ?? null;
       setCurrentPlanCode(current);
+      setCurrentBillingCycle(billingRow?.billing_cycle === "annual" ? "annual" : billingRow?.billing_cycle === "monthly" ? "monthly" : null);
       setClientUnitStatus(billingRow?.client_unit_status ?? null);
       setSelectedPlanCode((prev) => {
         if (prev) return prev;
@@ -95,7 +97,10 @@ export function SubscriptionPlanUpgradePanel({
   const effectiveCurrentCode = currentPlanCode ?? currentPlan?.code ?? null;
 
   const canCheckout = Boolean(
-    selectedPlan && effectiveCurrentCode && selectedPlan.code !== effectiveCurrentCode,
+    selectedPlan &&
+      effectiveCurrentCode &&
+      (selectedPlan.code !== effectiveCurrentCode ||
+        (currentBillingCycle !== null && billingCycle !== currentBillingCycle)),
   );
 
   const handleCheckout = async () => {
@@ -115,6 +120,7 @@ export function SubscriptionPlanUpgradePanel({
         planCode: selectedPlan.code,
         backUrl,
         accessToken: token,
+        billingCycle,
       });
 
       if (result.initPoint) {
@@ -167,9 +173,7 @@ export function SubscriptionPlanUpgradePanel({
           </p>
           <p className="text-base font-bold text-emerald-800">
             {formatUnitPlanPrice(currentPlan.priceMonthly, currentPlan.currency)}{" "}
-            <span className="text-xs font-normal text-emerald-700/80">
-              {planPeriodLabel(currentPlan.priceMonthly)}
-            </span>
+            <span className="text-xs font-normal text-emerald-700/80">/mes</span>
           </p>
           {currentPlan.features.length > 0 ? (
             <ul className="mt-2 space-y-1">
@@ -195,10 +199,44 @@ export function SubscriptionPlanUpgradePanel({
         </p>
       ) : null}
 
+      <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+        <button
+          type="button"
+          onClick={() => setBillingCycle("annual")}
+          className={cn(
+            "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
+            billingCycle === "annual"
+              ? "bg-white text-emerald-700 shadow-sm"
+              : "text-slate-500 hover:text-slate-700",
+          )}
+        >
+          Anual
+        </button>
+        <button
+          type="button"
+          onClick={() => setBillingCycle("monthly")}
+          className={cn(
+            "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
+            billingCycle === "monthly"
+              ? "bg-white text-emerald-700 shadow-sm"
+              : "text-slate-500 hover:text-slate-700",
+          )}
+        >
+          Mensual
+        </button>
+      </div>
+      {billingCycle === "annual" ? (
+        <p className="text-[11px] text-slate-500 -mt-2">
+          Se cobra una vez al año (equivale a 10 meses de 12).
+        </p>
+      ) : null}
+
       <div className="grid sm:grid-cols-2 gap-3">
         {plans.map((plan) => {
-          const isCurrent = plan.code === effectiveCurrentCode;
+          const isCurrent = plan.code === effectiveCurrentCode && billingCycle === currentBillingCycle;
           const isSelected = plan.code === selectedPlanCode;
+          const displayPrice =
+            billingCycle === "annual" ? plan.priceAnnualMonthly : plan.priceMonthly;
           return (
             <button
               key={plan.code}
@@ -220,9 +258,9 @@ export function SubscriptionPlanUpgradePanel({
                 ) : null}
               </div>
               <p className="text-base font-bold text-slate-800">
-                {formatUnitPlanPrice(plan.priceMonthly, plan.currency)}{" "}
+                {formatUnitPlanPrice(displayPrice, plan.currency)}{" "}
                 <span className="text-xs font-normal text-slate-400">
-                  {planPeriodLabel(plan.priceMonthly)}
+                  {displayPrice > 0 ? "/mes" : displayPrice === 0 ? "siempre" : ""}
                 </span>
               </p>
               {plan.features.length > 0 ? (

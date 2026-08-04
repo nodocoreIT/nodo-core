@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createPreapproval } from "@/lib/billing/mp-preapproval";
+import { createPreapproval, type BillingCycle } from "@/lib/billing/mp-preapproval";
 import { resolveClientUnitForAuthUser } from "@/lib/billing/resolve-client-unit-for-user";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
   const unitCode = String(body.unitCode ?? "").trim();
   const planCode = String(body.planCode ?? "").trim();
   const backUrl = typeof body.backUrl === "string" ? body.backUrl.trim() : "";
+  const billingCycle: BillingCycle = body.billingCycle === "annual" ? "annual" : "monthly";
 
   if (!unitCode || !planCode) {
     return json({ error: "unitCode y planCode son obligatorios." }, 400);
@@ -124,6 +125,7 @@ export async function POST(request: NextRequest) {
 
   const result = await createPreapproval(unit.id, {
     backUrl: backUrl || undefined,
+    billingCycle,
   });
 
   if (!result.ok) {

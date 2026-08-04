@@ -10,6 +10,7 @@ export {
   defaultLandingBillingOrigin,
   type UnitPlanOption,
   type BillingSubscriptionRow,
+  type BillingCycle,
 } from "./platform-billing";
 export {
   PLATFORM_PLAN_CATALOG,

@@ -10,6 +10,7 @@ export const PLATFORM_PLAN_CATALOG: Record<string, PlatformPlanDefinition[]> = {
       code: "starter",
       label: "Starter",
       priceMonthly: 75,
+      priceAnnualMonthly: 62.5,
       currency: "USD",
       sortOrder: 1,
       features: [
@@ -23,6 +24,7 @@ export const PLATFORM_PLAN_CATALOG: Record<string, PlatformPlanDefinition[]> = {
       code: "pro",
       label: "Pro",
       priceMonthly: 125,
+      priceAnnualMonthly: 104.17,
       currency: "USD",
       sortOrder: 2,
       features: [
@@ -39,6 +41,7 @@ export const PLATFORM_PLAN_CATALOG: Record<string, PlatformPlanDefinition[]> = {
       code: "demo",
       label: "Demo (7 días)",
       priceMonthly: 0,
+      priceAnnualMonthly: 0,
       currency: "USD",
       sortOrder: 0,
       features: ["Prueba gratuita de 7 días", "Gastos, tarjetas y préstamos", "Informe mensual"],
@@ -47,6 +50,7 @@ export const PLATFORM_PLAN_CATALOG: Record<string, PlatformPlanDefinition[]> = {
       code: "unico",
       label: "Plan único",
       priceMonthly: 4.99,
+      priceAnnualMonthly: 4.16,
       currency: "USD",
       sortOrder: 1,
       features: [

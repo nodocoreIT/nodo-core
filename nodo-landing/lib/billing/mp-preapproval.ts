@@ -21,7 +21,10 @@ export type CreatePreapprovalFailureReason =
   | "plan_not_found"
   | "payer_email_missing"
   | "fx_unavailable"
+  | "annual_price_not_configured"
   | "mp_rejected";
+
+export type BillingCycle = "monthly" | "annual";
 
 export interface CreatePreapprovalSuccess {
   ok: true;
@@ -31,6 +34,7 @@ export interface CreatePreapprovalSuccess {
   initPoint?: string;
   billingAmount: number;
   billingCurrency: "ARS";
+  billingCycle: BillingCycle;
   billingDay: number;
 }
 
@@ -56,6 +60,7 @@ interface ClientUnitRow {
 interface PlanRow {
   id: string;
   price_monthly: number | string;
+  price_annual_monthly: number | string | null;
   label: string;
 }
 
@@ -81,8 +86,9 @@ function round2(value: number): number {
  */
 export async function createPreapproval(
   clientUnitId: string,
-  options: { backUrl?: string } = {},
+  options: { backUrl?: string; billingCycle?: BillingCycle } = {},
 ): Promise<CreatePreapprovalResult> {
+  const billingCycle: BillingCycle = options.billingCycle ?? "monthly";
   const accessToken = process.env.LANDING_MERCADOPAGO_ACCESS_TOKEN?.trim();
   if (!accessToken) {
     return {
@@ -128,7 +134,7 @@ export async function createPreapproval(
 
   const { data: planRowData, error: planError } = await db
     .from("planes")
-    .select("id, price_monthly, label")
+    .select("id, price_monthly, price_annual_monthly, label")
     .eq("unit_code", unit.unit_code)
     .eq("code", unit.plan)
     .eq("is_active", true)
@@ -181,17 +187,33 @@ export async function createPreapproval(
     return { ok: false, reason: "fx_unavailable", detail: fx.detail };
   }
 
-  const billingAmount = round2(Number(plan.price_monthly) * fx.rate);
+  let billingAmount: number;
+  if (billingCycle === "annual") {
+    const annualMonthly = Number(plan.price_annual_monthly);
+    if (!Number.isFinite(annualMonthly) || annualMonthly <= 0) {
+      return {
+        ok: false,
+        reason: "annual_price_not_configured",
+        detail: `Plan '${plan.label}' no tiene price_annual_monthly configurado.`,
+      };
+    }
+    // One charge per year — the discounted annual total, not 12 monthly charges.
+    billingAmount = round2(annualMonthly * 12 * fx.rate);
+  } else {
+    billingAmount = round2(Number(plan.price_monthly) * fx.rate);
+  }
+
   const billingDay = billingDayFrom(new Date(unit.enabled_at));
   const backUrl = options.backUrl ?? `${appBaseUrl()}/panel/facturacion`;
+  const frequency = billingCycle === "annual" ? 12 : 1;
 
   const mpBody = {
-    reason: `Suscripción NODO — ${plan.label}`.slice(0, 256),
+    reason: `Suscripción NODO — ${plan.label} (${billingCycle === "annual" ? "anual" : "mensual"})`.slice(0, 256),
     payer_email: payerEmail,
     external_reference: clientUnitId,
     back_url: backUrl,
     auto_recurring: {
-      frequency: 1,
+      frequency,
       frequency_type: "months",
       transaction_amount: billingAmount,
       currency_id: "ARS",
@@ -236,7 +258,7 @@ export async function createPreapproval(
   }
 
   const nextDueAt = new Date(now);
-  nextDueAt.setUTCMonth(nextDueAt.getUTCMonth() + 1);
+  nextDueAt.setUTCMonth(nextDueAt.getUTCMonth() + frequency);
 
   const { data: savedSubData, error: saveError } = await db
     .from("client_unit_subscriptions")
@@ -247,6 +269,7 @@ export async function createPreapproval(
         mp_preapproval_id: mpData.id,
         billing_currency: "ARS",
         billing_amount: billingAmount,
+        billing_cycle: billingCycle,
         cycle_started_at: now.toISOString(),
         next_due_at: nextDueAt.toISOString(),
         status: "active",
@@ -272,6 +295,7 @@ export async function createPreapproval(
     initPoint: mpData.init_point,
     billingAmount,
     billingCurrency: "ARS",
+    billingCycle,
     billingDay,
   };
 }
