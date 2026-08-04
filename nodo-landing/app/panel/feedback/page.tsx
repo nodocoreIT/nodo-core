@@ -23,7 +23,7 @@ export default function FeedbackPage() {
   const [items, setItems] = useState<FeedbackInboxRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterReadStatus, setFilterReadStatus] = useState<ReadFilter>("all");
   const [filterNode, setFilterNode] = useState("all");
@@ -83,7 +83,10 @@ export default function FeedbackPage() {
   const unreadCount = useMemo(() => items.filter((item) => !item.read).length, [items]);
 
   async function toggleRead(item: FeedbackInboxRow) {
-    setProcessingId(item.id);
+    // Guard: ignore a second click on the same item while its request is still in flight.
+    if (processingIds.has(item.id)) return;
+
+    setProcessingIds((prev) => new Set(prev).add(item.id));
     setError(null);
     const nextRead = !item.read;
 
@@ -108,7 +111,11 @@ export default function FeedbackPage() {
       setItems((prev) => prev.map((row) => (row.id === item.id ? item : row)));
       setError("Error de red al actualizar el estado de lectura.");
     } finally {
-      setProcessingId(null);
+      setProcessingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
     }
   }
 
@@ -229,12 +236,12 @@ export default function FeedbackPage() {
                 <tbody>
                   {filtered.map((item) => {
                     const st = READ_STATUS_STYLES[item.read ? "read" : "unread"];
-                    const busy = processingId === item.id;
+                    const busy = processingIds.has(item.id);
 
                     return (
                       <tr key={item.id}>
                         <td style={tdStyle}>{item.categoryLabel}</td>
-                        <td style={{ ...tdStyle, maxWidth: 360 }}>{item.content ?? "—"}</td>
+                        <td style={{ ...tdStyle, maxWidth: 360, wordBreak: "break-word" }}>{item.content ?? "—"}</td>
                         <td style={tdStyle}>{item.sourceNodeLabel}</td>
                         <td style={tdStyle}>{item.orgName}</td>
                         <td style={{ ...tdStyle, color: "var(--color-slate2)" }}>{formatDate(item.createdAt)}</td>
