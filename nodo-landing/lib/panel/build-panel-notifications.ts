@@ -85,17 +85,19 @@ function daysBetween(from: Date, to: Date): number {
   return Math.floor(ms / (1000 * 60 * 60 * 24));
 }
 
-const FEEDBACK_CATEGORY_LABELS: Record<string, string> = {
+export const FEEDBACK_CATEGORY_LABELS: Record<string, string> = {
   bug: "Error reportado",
   idea: "Idea nueva",
   bloat: "Algo que sobra",
 };
 
-const FEEDBACK_NODE_LABELS: Record<string, string> = {
+export const FEEDBACK_NODE_LABELS: Record<string, string> = {
   inmo: "NODO | Inmo",
   autos: "NODO | Autos",
   finanzas: "NODO | Finanzas",
   clinica: "NODO | Clínica",
+  legales: "NODO | Legales",
+  salud: "NODO | Salud",
 };
 
 export function buildPanelNotifications({
