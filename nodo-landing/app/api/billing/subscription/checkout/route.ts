@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
   if (!Number.isFinite(priceMonthly) || priceMonthly <= 0) {
     const { error: freeUpdateError } = await db
       .from("client_units")
-      .update({ plan: plan.code, updated_at: new Date().toISOString() })
+      .update({ plan: plan.code })
       .eq("id", unit.id);
 
     if (freeUpdateError) {
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
   }
 
   const nowIso = new Date().toISOString();
-  const patch: Record<string, string> = { plan: plan.code, updated_at: nowIso };
+  const patch: Record<string, string> = { plan: plan.code };
   if (!unit.enabledAt) {
     patch.enabled_at = nowIso;
   }
