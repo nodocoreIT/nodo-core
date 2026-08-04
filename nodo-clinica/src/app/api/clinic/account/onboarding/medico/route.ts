@@ -14,12 +14,13 @@ const UNIT_CODE = "Clínica";
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
-    const { fullName, specialty, licenseNumber, dni, plan, token, phone } = body as {
+    const { fullName, specialty, licenseNumber, dni, plan, billingCycle, token, phone } = body as {
       fullName?: string;
       specialty?: string;
       licenseNumber?: string;
       dni?: string;
       plan?: string;
+      billingCycle?: string;
       token?: string;
       phone?: string;
     };
@@ -154,6 +155,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         payerEmail: email,
         externalReference: profResult.id,
         backUrl: `${appBaseUrl()}/login`,
+        billingCycle: billingCycle === "annual" ? "annual" : "monthly",
       });
 
       if (!result.ok) {

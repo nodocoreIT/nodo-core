@@ -160,6 +160,7 @@ export interface PatientOnboardingInput {
   address: string | null;
   obraSocial: string | null;
   plan: string;
+  billingCycle: "monthly" | "annual";
   phone: string | null;
   phoneVerifiedAt: string | null;
   dniFrontPath: string | null;
@@ -199,6 +200,7 @@ export async function upsertPatientOnboardingRecord(
     address: input.address,
     obra_social: input.obraSocial,
     subscription_plan: input.plan,
+    billing_cycle: input.billingCycle,
     dni_front_path: input.dniFrontPath,
     dni_back_path: input.dniBackPath,
   };

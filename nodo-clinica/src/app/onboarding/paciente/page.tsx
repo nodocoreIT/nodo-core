@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ObraSocialCombobox } from "@/components/ui/obra-social-combobox";
@@ -14,6 +14,17 @@ import { TermsAcceptanceModal } from "@/components/onboarding/terms-acceptance-m
 import { PATIENT_SUBSCRIPTION_PLANS } from "@/lib/clinic/patient-subscription-plans";
 
 const PLANS = PATIENT_SUBSCRIPTION_PLANS;
+
+/**
+ * Maps PATIENT_SUBSCRIPTION_PLANS ids to their nodo_core.planes `code`,
+ * purely to pull live display pricing (mirrors ONBOARDING_PLAN_DB_CODES in
+ * onboarding/medico/page.tsx). The actual plan id submitted at onboarding
+ * stays "gratuito"/"pago" — untouched.
+ */
+const PATIENT_PLAN_DB_CODES: Record<string, string> = {
+  gratuito: "paciente_gratis",
+  pago: "paciente_pro",
+};
 
 const inputClass =
   "mt-1 w-full rounded-lg px-3 py-2.5 text-sm bg-white border border-slate-200 text-navy placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/25 focus:border-teal-500 transition-shadow [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_#ffffff] [&:-webkit-autofill]:[-webkit-text-fill-color:#1e293b]";
@@ -72,6 +83,7 @@ function OnboardingPacienteContent() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [plan, setPlan] = useState("gratuito");
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("annual");
   const [form, setForm] = useState({
     fullName: "",
     dni: "",
@@ -83,6 +95,37 @@ function OnboardingPacienteContent() {
   const [phone, setPhone] = useState("");
   const [phoneValid, setPhoneValid] = useState(false);
   const [dniConflictOpen, setDniConflictOpen] = useState(false);
+
+  const [livePricing, setLivePricing] = useState<
+    Record<string, { label: string; amount: number; amountAnnual: number; currency: string }>
+  >({});
+
+  useEffect(() => {
+    let cancelled = false;
+    clinicApi.getOnboardingPlanPricing().then((pricing) => {
+      if (!cancelled) setLivePricing(pricing);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const displayPlans = PLANS.map((p) => {
+    const dbCode = PATIENT_PLAN_DB_CODES[p.id];
+    const live = dbCode ? livePricing[dbCode] : undefined;
+    if (!live) return p;
+    const amount = billingCycle === "annual" ? live.amountAnnual : live.amount;
+    const formatted =
+      amount > 0
+        ? `${live.currency === "USD" ? "US$" : "$"}${amount.toLocaleString("es-AR")}`
+        : "$0";
+    return {
+      ...p,
+      name: live.label,
+      price: formatted,
+      period: amount > 0 ? (billingCycle === "annual" ? "/año" : "/mes") : "siempre",
+    };
+  });
 
   if (!token) {
     return (
@@ -110,6 +153,7 @@ function OnboardingPacienteContent() {
       if (form.address) formData.append("address", form.address);
       if (form.obraSocial) formData.append("obraSocial", form.obraSocial);
       formData.append("plan", plan);
+      formData.append("billingCycle", billingCycle);
       if (dniFront) formData.append("dniFront", dniFront);
       if (dniBack) formData.append("dniBack", dniBack);
       formData.append("phone", phone.trim());
@@ -236,49 +280,68 @@ function OnboardingPacienteContent() {
               labelClass={labelClass}
             />
 
-            {/* Row 3: DNI upload + Plan side by side */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* DNI upload */}
-              <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Documento de identidad</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <DniSlot label="DNI frente" file={dniFront} onChange={setDniFront} />
-                  <DniSlot label="DNI dorso" file={dniBack} onChange={setDniBack} />
-                </div>
-                <p className="text-xs" style={{ color: "rgba(234,240,247,.4)" }}>Las fotos son opcionales. Se usan para verificar tu identidad.</p>
+            {/* Row 3: DNI upload */}
+            <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Documento de identidad</p>
+              <div className="grid grid-cols-2 gap-3 max-w-md">
+                <DniSlot label="DNI frente" file={dniFront} onChange={setDniFront} />
+                <DniSlot label="DNI dorso" file={dniBack} onChange={setDniBack} />
               </div>
+              <p className="text-xs" style={{ color: "rgba(234,240,247,.4)" }}>Las fotos son opcionales. Se usan para verificar tu identidad.</p>
+            </div>
 
-              {/* Plan */}
-              <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4">
+            {/* Row 4: Plan */}
+            <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Plan</p>
-                <div className="space-y-3">
-                  {PLANS.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setPlan(p.id)}
-                      className={`w-full rounded-lg px-4 py-3 text-left border font-medium transition-all ${
-                        plan === p.id
-                          ? "border-teal-500 bg-white text-navy ring-1 ring-teal-400 shadow-sm"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-teal-300"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold">{p.name}</span>
-                        <span className={`text-sm font-bold ${plan === p.id ? "text-teal-600" : "text-slate-500"}`}>
-                          {p.price} <span className="text-xs font-normal">{p.period}</span>
-                        </span>
-                      </div>
-                      <ul className="mt-1.5 space-y-0.5">
-                        {p.features.map((f) => (
-                          <li key={f} className="text-xs text-slate-400 flex items-center gap-1">
-                            <span className={plan === p.id ? "text-teal-500" : "text-slate-300"}>✓</span> {f}
-                          </li>
-                        ))}
-                      </ul>
-                    </button>
-                  ))}
+                <div className="inline-flex rounded-lg border border-white/10 bg-white/5 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setBillingCycle("annual")}
+                    className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                      billingCycle === "annual" ? "bg-teal-600 text-white" : "text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    Anual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBillingCycle("monthly")}
+                    className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                      billingCycle === "monthly" ? "bg-teal-600 text-white" : "text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    Mensual
+                  </button>
                 </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {displayPlans.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPlan(p.id)}
+                    className={`rounded-lg px-4 py-4 text-left border font-medium transition-all ${
+                      plan === p.id
+                        ? "border-teal-600 bg-teal-600 text-white shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-teal-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold">{p.name}</span>
+                      <span className={`text-sm font-bold ${plan === p.id ? "text-white" : "text-slate-500"}`}>
+                        {p.price} <span className={`text-xs font-normal ${plan === p.id ? "text-teal-100" : "text-slate-400"}`}>{p.period}</span>
+                      </span>
+                    </div>
+                    <ul className="mt-2 space-y-1">
+                      {p.features.map((f) => (
+                        <li key={f} className={`text-xs flex items-center gap-1 ${plan === p.id ? "text-teal-50" : "text-slate-400"}`}>
+                          <span className={plan === p.id ? "text-white" : "text-slate-300"}>✓</span> {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </button>
+                ))}
               </div>
             </div>
 

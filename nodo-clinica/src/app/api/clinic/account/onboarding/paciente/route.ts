@@ -27,6 +27,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const address = formData.get("address") as string | null;
     const obraSocial = formData.get("obraSocial") as string | null;
     const plan = formData.get("plan") as string | null;
+    const billingCycle = formData.get("billingCycle") === "annual" ? "annual" : "monthly";
     const dniFront = formData.get("dniFront") as File | null;
     const dniBack = formData.get("dniBack") as File | null;
     const phone = formData.get("phone") as string | null;
@@ -181,6 +182,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       address: address ?? null,
       obraSocial: obraSocial?.trim() || null,
       plan,
+      billingCycle,
       phone: normalizedPhone,
       phoneVerifiedAt: null,
       dniFrontPath,

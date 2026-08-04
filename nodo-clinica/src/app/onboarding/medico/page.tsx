@@ -39,6 +39,7 @@ function OnboardingMedicoContent() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [plan, setPlan] = useState("demo");
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("annual");
   const [form, setForm] = useState({
     fullName: "",
     specialty: "",
@@ -49,7 +50,7 @@ function OnboardingMedicoContent() {
   const [phoneValid, setPhoneValid] = useState(false);
 
   const [livePricing, setLivePricing] = useState<
-    Record<string, { label: string; amount: number; currency: string }>
+    Record<string, { label: string; amount: number; amountAnnual: number; currency: string }>
   >({});
 
   useEffect(() => {
@@ -66,7 +67,14 @@ function OnboardingMedicoContent() {
     const dbCode = ONBOARDING_PLAN_DB_CODES[p.id];
     const live = dbCode ? livePricing[dbCode] : undefined;
     if (!live) return p;
-    return { ...p, name: live.label, amount: live.amount, currency: live.currency };
+    const amount = billingCycle === "annual" ? live.amountAnnual : live.amount;
+    return {
+      ...p,
+      name: live.label,
+      amount,
+      currency: live.currency,
+      period: amount > 0 ? (billingCycle === "annual" ? "/año" : "/mes") : p.period,
+    };
   });
 
   if (!token) {
@@ -94,6 +102,7 @@ function OnboardingMedicoContent() {
         licenseNumber: form.licenseNumber,
         dni: form.dni.trim(),
         plan,
+        billingCycle,
         token,
         phone: phone.trim(),
       });
@@ -228,7 +237,29 @@ function OnboardingMedicoContent() {
 
             {/* Planes */}
             <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Plan de suscripción</p>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Plan de suscripción</p>
+                <div className="inline-flex rounded-lg border border-white/10 bg-white/5 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setBillingCycle("annual")}
+                    className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                      billingCycle === "annual" ? "bg-teal-600 text-white" : "text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    Anual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBillingCycle("monthly")}
+                    className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                      billingCycle === "monthly" ? "bg-teal-600 text-white" : "text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    Mensual
+                  </button>
+                </div>
+              </div>
               <div className="grid sm:grid-cols-3 gap-3">
                 {displayPlans.map((p) => (
                   <button
