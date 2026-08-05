@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { SupabaseProvider, AuthProvider } from "@nodocore/shared-components";
 import { createClient } from "@/lib/supabase/client";
 import { PanelSettingsModuleProvider } from "@/lib/panel/panel-settings-module";
+import { UnreadFeedbackCountProvider } from "@/hooks/use-unread-feedback-count";
 
 const PANEL_AUTH_CONFIG = {
   roleDestinations: {
@@ -20,7 +21,9 @@ export function PanelProviders({ children }: { children: ReactNode }) {
   return (
     <SupabaseProvider client={supabase}>
       <AuthProvider config={PANEL_AUTH_CONFIG}>
-        <PanelSettingsModuleProvider>{children}</PanelSettingsModuleProvider>
+        <PanelSettingsModuleProvider>
+          <UnreadFeedbackCountProvider>{children}</UnreadFeedbackCountProvider>
+        </PanelSettingsModuleProvider>
       </AuthProvider>
     </SupabaseProvider>
   );

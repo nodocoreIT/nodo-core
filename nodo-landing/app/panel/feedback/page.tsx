@@ -15,6 +15,7 @@ import {
 } from "@nodocore/shared-components";
 import { CheckCircle2, Loader2, MessageSquareText, RotateCcw, Trash2 } from "lucide-react";
 import type { FeedbackInboxRow } from "@/lib/panel/feedback-inbox";
+import { useUnreadFeedbackCount } from "@/hooks/use-unread-feedback-count";
 
 type ReadFilter = "all" | "unread" | "read";
 
@@ -39,6 +40,7 @@ export default function FeedbackPage() {
   const [filterNode, setFilterNode] = useState("all");
   const [pendingDelete, setPendingDelete] = useState<FeedbackInboxRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const { refresh: refreshUnreadBadge } = useUnreadFeedbackCount();
 
   const loadFeedback = useCallback(async () => {
     setLoading(true);
@@ -118,6 +120,10 @@ export default function FeedbackPage() {
         // Roll back on failure.
         setItems((prev) => prev.map((row) => (row.id === item.id ? item : row)));
         setError(data.error ?? "No se pudo actualizar el estado de lectura.");
+      } else {
+        // Éxito: el badge del sidebar depende de este mismo conteo, refrescalo
+        // ya en vez de esperar hasta 60s de polling.
+        void refreshUnreadBadge();
       }
     } catch {
       setItems((prev) => prev.map((row) => (row.id === item.id ? item : row)));
@@ -152,6 +158,8 @@ export default function FeedbackPage() {
       // el server confirmó — a diferencia de toggleRead, acá no hay
       // rollback posible que tenga sentido mostrar (es irreversible).
       setItems((prev) => prev.filter((row) => row.id !== item.id));
+      // Si era un feedback sin leer, el badge del sidebar tiene que bajar ya.
+      if (!item.read) void refreshUnreadBadge();
     } catch {
       setError("Error de red al borrar el feedback.");
     } finally {
