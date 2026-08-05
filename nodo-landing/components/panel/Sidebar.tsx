@@ -87,6 +87,10 @@ function NavBadge({ count }: { count: number }) {
   );
 }
 
+function isNavItemActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
 function NavLinks({
   items,
   pathname,
@@ -96,12 +100,8 @@ function NavLinks({
   pathname: string;
   onNavigate?: () => void;
 }) {
-  function isActive(href: string) {
-    return pathname === href || pathname.startsWith(href + "/");
-  }
-
   return items.map((item) => {
-    const active = isActive(item.href);
+    const active = isNavItemActive(pathname, item.href);
     const Icon = item.icon;
 
     if (item.enabled === false) {
@@ -155,18 +155,24 @@ function NavGroup({
   pathname: string;
   onNavigate?: () => void;
 }) {
-  const hasActiveChild = items.some(
-    (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
-  );
+  const hasActiveChild = items.some((item) => isNavItemActive(pathname, item.href));
   const [manuallyExpanded, setManuallyExpanded] = useState(false);
   const expanded = hasActiveChild || manuallyExpanded;
+  const panelId = `nav-group-${label.toLowerCase().replace(/\s+/g, "-")}`;
 
   return (
     <div>
       <button
         type="button"
-        onClick={() => setManuallyExpanded((prev) => !prev)}
+        onClick={() => {
+          // Bloqueado abierto por la ruta activa: ignorar el click en vez de
+          // dejar manuallyExpanded="pegado" en true para cuando se navegue
+          // afuera del grupo y ya no haya nada forzándolo.
+          if (hasActiveChild) return;
+          setManuallyExpanded((prev) => !prev);
+        }}
         aria-expanded={expanded}
+        aria-controls={panelId}
         className="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium text-[var(--color-sidebar-text)] transition-colors hover:bg-brand/10 hover:text-brand"
       >
         <Icon className="h-4 w-4 flex-shrink-0" />
@@ -179,7 +185,7 @@ function NavGroup({
         />
       </button>
       {expanded && (
-        <div className="ml-4 space-y-1 border-l border-[var(--color-sidebar-border)] pl-3">
+        <div id={panelId} className="ml-4 space-y-1 border-l border-[var(--color-sidebar-border)] pl-3">
           <NavLinks items={items} pathname={pathname} onNavigate={onNavigate} />
         </div>
       )}
