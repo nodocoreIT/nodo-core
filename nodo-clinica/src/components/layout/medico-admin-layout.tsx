@@ -47,6 +47,7 @@ import { ClinicNotificationsBell } from "@/components/layout/clinic-notification
 import { needsSpecialtyAssignment } from "@/lib/clinic/unassigned-specialty";
 import { PlanBadge } from "@/components/plan/plan-badge";
 import { BillingLockoutGate } from "@/components/layout/billing-lockout-gate";
+import { PROFESSIONAL_PENDING_APPROVAL_CODE } from "@/lib/clinic/professional-approval";
 import { toast } from "sonner";
 
 function mpErrorLabel(code: string) {
@@ -208,6 +209,13 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
           body: JSON.stringify({ role: "medico" }),
         });
         if (!verifyRes.ok) {
+          const verifyError = (await verifyRes.json().catch(() => ({}))) as {
+            error?: string;
+            code?: string;
+          };
+          if (verifyError.code === PROFESSIONAL_PENDING_APPROVAL_CODE && verifyError.error) {
+            toast.error(verifyError.error);
+          }
           await clinicApi.logout();
           setChecking(false);
           router.push("/login?role=medico");
