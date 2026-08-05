@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requirePanelAdmin } from "@/lib/panel/panel-api-auth";
+import { requirePanelAdmin, requirePanelTeamMember } from "@/lib/panel/panel-api-auth";
 
 function getInitials(name: string): string {
   return name
@@ -17,6 +17,45 @@ function getColor(name: string): string {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
   return colors[Math.abs(hash) % colors.length];
+}
+
+/**
+ * Lists team members with their email — nodo_core.profiles has no email
+ * column (it lives in auth.users, not exposed to the browser client), so
+ * this joins them server-side via admin.auth.admin.listUsers(). No
+ * pagination handling: the team is a handful of people, well under
+ * listUsers()'s default page size.
+ */
+export async function GET() {
+  const auth = await requirePanelTeamMember();
+  if (!auth.ok) return auth.response;
+
+  const admin = createAdminClient();
+
+  const { data: profiles, error: profilesErr } = await admin
+    .from("profiles")
+    .select("id, full_name, role, initials, color, created_at")
+    .order("created_at");
+
+  if (profilesErr) {
+    console.error("[team] GET profiles", profilesErr);
+    return Response.json({ error: "Error al cargar el equipo." }, { status: 500 });
+  }
+
+  const { data: usersPage, error: usersErr } = await admin.auth.admin.listUsers();
+  if (usersErr) {
+    console.error("[team] GET listUsers", usersErr);
+    return Response.json({ error: "Error al cargar los emails del equipo." }, { status: 500 });
+  }
+
+  const emailById = new Map(usersPage.users.map((u) => [u.id, u.email ?? null]));
+
+  const members = (profiles ?? []).map((p) => ({
+    ...p,
+    email: emailById.get(p.id) ?? null,
+  }));
+
+  return Response.json({ members });
 }
 
 // Create a team member.

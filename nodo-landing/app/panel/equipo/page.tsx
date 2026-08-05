@@ -12,6 +12,7 @@ type Member = {
   initials: string;
   color: string;
   created_at: string;
+  email: string | null;
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -40,13 +41,15 @@ export default function EquipoPage() {
   }, []);
 
   async function loadMembers() {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, full_name, role, initials, color, created_at")
-      .order("created_at");
-    setMembers((data ?? []) as Member[]);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/team");
+      const data = await res.json().catch(() => ({}));
+      setMembers(res.ok ? ((data.members ?? []) as Member[]) : []);
+    } catch {
+      setMembers([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function getInitials(name: string): string {
@@ -261,6 +264,11 @@ export default function EquipoPage() {
                   <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--color-slate2)" }}>
                     {ROLE_LABELS[member.role] ?? member.role}
                   </p>
+                  {member.email && (
+                    <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--color-slate2-300)" }}>
+                      {member.email}
+                    </p>
+                  )}
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                   <button
