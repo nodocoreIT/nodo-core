@@ -13,6 +13,7 @@ import {
   type NodePlan,
 } from "@/lib/panel/planes";
 import { FormSelect } from "@nodocore/shared-components";
+import type { NodoUserRecord } from "@/lib/panel/nodo-users-list";
 
 type ClientStatus =
   | "activo"
@@ -29,6 +30,11 @@ type Client = {
   phone: string | null;
   since: string | null;
   created_at: string;
+  // True for a médico/paciente de Nodo Clínica that has no row in `clients`
+  // at all — built client-side from nodo_clinica.professionals/patients just
+  // so this table can show them. Never persisted, never editable/deletable
+  // from here (see openEditForm/requestDelete guards below).
+  isVirtual?: boolean;
 };
 
 type ClientUnit = {
@@ -36,13 +42,20 @@ type ClientUnit = {
   client_id: string;
   unit_code: string;
   plan: string | null;
-  status: ClientStatus;
+  // Real client_units rows are always one of the ClientStatus values; a
+  // virtual Clínica unit carries whatever raw status nodo_clinica uses
+  // (subscription_status like "demo"/"active"/"expired", or "pausado") —
+  // widened to string so it doesn't lie about the shape.
+  status: ClientStatus | string;
   progress: number;
   access_url: string | null;
   access_user: string | null;
   access_password: string | null;
   provisioned_at: string | null;
   provision_user_id: string | null;
+  // True for a synthetic "Clínica" badge sourced from nodo_clinica — not a
+  // real client_units row. Never included when saving the edit form.
+  isVirtual?: boolean;
 };
 
 // Local form representation of a nodo (with a stable key for React lists).
@@ -68,6 +81,16 @@ const STATUS_STYLES: Record<ClientStatus, { bg: string; color: string; label: st
   sin_acceso: { bg: "#FBE3E1", color: "#C0392B", label: "Sin credenciales" },
 };
 
+// Extra statuses that only ever come from the virtual Clínica units (raw
+// nodo_clinica.professionals.subscription_status values) — not part of the
+// ClientStatus union clients_units uses, so kept separate from STATUS_STYLES.
+const CLINICA_STATUS_STYLES: Record<string, { bg: string; color: string; label: string }> = {
+  active: { bg: "#E1F0E8", color: "#1F8A5B", label: "Activo" },
+  demo: { bg: "#E8EEF8", color: "#2A6FDB", label: "Demo" },
+  pending_payment: { bg: "#FCE9D8", color: "#B5630C", label: "Pago sin confirmar" },
+  expired: { bg: "#FBE3E1", color: "#C0392B", label: "Vencido" },
+};
+
 type SortKey = "cliente" | "contacto" | "estado" | "desde";
 type SortDir = "asc" | "desc";
 
@@ -80,7 +103,10 @@ const ALL_STATUSES: ClientStatus[] = [
 ];
 
 function statusStyle(status: string) {
-  return STATUS_STYLES[status as ClientStatus] ?? STATUS_STYLES.pausado;
+  return (
+    STATUS_STYLES[status as ClientStatus] ??
+    CLINICA_STATUS_STYLES[status] ?? { bg: "var(--color-mist)", color: "var(--color-slate2)", label: status }
+  );
 }
 
 function getInitials(name: string): string {
@@ -277,10 +303,106 @@ export default function ClientesPage() {
         .eq("is_active", true)
         .order("sort_order"),
     ]);
-    setClients((cs ?? []) as Client[]);
-    setUnits((us ?? []) as ClientUnit[]);
+
+    const realClients = (cs ?? []) as Client[];
+    const realUnits = (us ?? []) as ClientUnit[];
+
+    const { virtualClients, virtualUnits } = await loadClinicaVirtualRows(realClients, realUnits);
+
+    setClients([...realClients, ...virtualClients]);
+    setUnits([...realUnits, ...virtualUnits]);
     setPlanes((ps ?? []) as NodePlan[]);
     setLoading(false);
+  }
+
+  // Nodo Clínica médicos/pacientes don't have a client_units row anymore
+  // (the phantom "Clínica" row that used to fake one was removed on purpose
+  // — it lied about plan/status). This re-derives what the table needs to
+  // show for them, read-only, straight from nodo_clinica via the same admin
+  // client pattern /panel/usuarios-nodo already uses.
+  async function loadClinicaVirtualRows(
+    realClients: Client[],
+    realUnits: ClientUnit[],
+  ): Promise<{ virtualClients: Client[]; virtualUnits: ClientUnit[] }> {
+    let rows: NodoUserRecord[] = [];
+    try {
+      const res = await fetch("/api/admin/clients-clinica-rows");
+      if (res.ok) {
+        const json = await res.json();
+        rows = Array.isArray(json.rows) ? json.rows : [];
+      }
+    } catch {
+      // Best-effort: the Clínica badge is extra context on this screen, not
+      // the reason it exists — a failed fetch shouldn't block the rest of
+      // the clients table from loading.
+    }
+    if (rows.length === 0) return { virtualClients: [], virtualUnits: [] };
+
+    const unitsByClientId = new Map<string, ClientUnit[]>();
+    for (const u of realUnits) {
+      const arr = unitsByClientId.get(u.client_id) ?? [];
+      arr.push(u);
+      unitsByClientId.set(u.client_id, arr);
+    }
+
+    const emailToClient = new Map<string, Client>();
+    for (const c of realClients) {
+      const key = (c.email ?? "").trim().toLowerCase();
+      if (key) emailToClient.set(key, c);
+    }
+
+    const virtualClients: Client[] = [];
+    const virtualUnits: ClientUnit[] = [];
+    const seenVirtualEmails = new Set<string>();
+
+    for (const row of rows) {
+      const email = row.email.trim().toLowerCase();
+      if (!email) continue;
+
+      const matchedClient = emailToClient.get(email);
+
+      if (matchedClient) {
+        // Don't stack a virtual "Clínica" pill on top of a real one — a
+        // client can already have a legit, admin-managed Clínica
+        // client_units row (it's one of PANEL_ASSIGNABLE_NODE_CODES).
+        const alreadyHasRealClinica = (unitsByClientId.get(matchedClient.id) ?? []).some(
+          (u) => normalizeUnitCodeForPill(u.unit_code) === "clinica",
+        );
+        if (alreadyHasRealClinica) continue;
+      }
+
+      const clientId = matchedClient ? matchedClient.id : `clinic-virtual-client:${email}`;
+
+      virtualUnits.push({
+        id: `clinic-virtual:${row.id}`,
+        client_id: clientId,
+        unit_code: "Clínica",
+        plan: row.plan,
+        status: row.status,
+        progress: 0,
+        access_url: null,
+        access_user: row.email,
+        access_password: null,
+        provisioned_at: null,
+        provision_user_id: row.authUserId,
+        isVirtual: true,
+      });
+
+      if (!matchedClient && !seenVirtualEmails.has(email)) {
+        seenVirtualEmails.add(email);
+        virtualClients.push({
+          id: clientId,
+          name: row.fullName ?? row.email,
+          email: row.email,
+          phone: null,
+          since: null,
+          created_at: row.createdAt ?? new Date().toISOString(),
+          isVirtual: true,
+        });
+      }
+    }
+
+    return { virtualClients, virtualUnits };
   }
 
   const unitsByClient = new Map<string, ClientUnit[]>();
@@ -338,12 +460,17 @@ export default function ClientesPage() {
     }
   }
 
-  // Stats (per-nodo)
-  const activeCount = units.filter((u) => u.status === "activo").length;
-  const onboardingCount = units.filter((u) => u.status === "onboarding").length;
-  const distinctUnits = new Set(units.map((u) => u.unit_code)).size;
-  const avgProgress = units.length > 0
-    ? Math.round(units.reduce((acc, u) => acc + (u.progress ?? 0), 0) / units.length)
+  // Stats (per-nodo) — computed from real client_units only. Virtual Clínica
+  // units don't carry a comparable "progress"/status vocabulary (they're
+  // registro_gratuito médicos/pacientes, not a provisioning pipeline), so
+  // mixing them in would skew "Avance promedio" and the active/onboarding
+  // counts with meaningless data.
+  const realUnits = units.filter((u) => !u.isVirtual);
+  const activeCount = realUnits.filter((u) => u.status === "activo").length;
+  const onboardingCount = realUnits.filter((u) => u.status === "onboarding").length;
+  const distinctUnits = new Set(realUnits.map((u) => u.unit_code)).size;
+  const avgProgress = realUnits.length > 0
+    ? Math.round(realUnits.reduce((acc, u) => acc + (u.progress ?? 0), 0) / realUnits.length)
     : 0;
 
   function openAddForm() {
@@ -360,19 +487,29 @@ export default function ClientesPage() {
   }
 
   function openEditForm(c: Client) {
+    // Virtual clients (Clínica-only médicos/pacientes with no `clients` row)
+    // have nothing here to edit — the UI already disables this action for
+    // them, this is just a safety net against calling it directly.
+    if (c.isVirtual) return;
     setEditingClient(c);
     setFormName(c.name);
     setFormEmail(c.email ?? "");
     setFormPhone(c.phone ?? "");
     setFormSince(c.since ?? today);
-    const cu = unitsByClient.get(c.id) ?? [];
+    // Drop virtual Clínica units — they don't exist in client_units, so
+    // handleSave must never try to persist them (that would reintroduce the
+    // phantom-row bug this whole feature replaces).
+    const cu = (unitsByClient.get(c.id) ?? []).filter((u) => !u.isVirtual);
     const mappedUnits =
       cu.length > 0
         ? cu.map((u) => ({
             key: u.id,
             unit_code: u.unit_code,
             plan: normalizePlanCode(planes, u.unit_code, u.plan),
-            status: u.status,
+            // Real (non-virtual) client_units.status is always a ClientStatus —
+            // isVirtual rows were already filtered out above. The field itself
+            // is widened to `string` to also fit the virtual Clínica rows.
+            status: u.status as ClientStatus,
             progress: String(u.progress ?? 0),
             access_url: u.access_url ?? "",
             access_user: u.access_user ?? "",
@@ -462,7 +599,14 @@ export default function ClientesPage() {
     let clientId: string;
 
     // Capture previous units before deleting — needed to detect provisioning changes.
-    const prevUnits = editingClient ? (unitsByClient.get(editingClient.id) ?? []) : [];
+    // Excludes virtual Clínica units (same as openEditForm's `cu`) — a virtual
+    // entry's provision_user_id belongs to nodo_clinica's own auth account,
+    // not to a real client_units provisioning here; matching it by unit_code
+    // against a freshly (manually) assigned real "Clínica" node would wrongly
+    // carry that id over as if this node had already been provisioned.
+    const prevUnits = editingClient
+      ? (unitsByClient.get(editingClient.id) ?? []).filter((u) => !u.isVirtual)
+      : [];
 
     if (editingClient) {
       const { error: err } = await supabase.from("clients").update(clientPayload).eq("id", editingClient.id);
@@ -647,6 +791,9 @@ export default function ClientesPage() {
   }
 
   function requestDelete(id: string, name: string) {
+    // Same guard as openEditForm: a virtual client has no `clients` row to
+    // DELETE. The UI disables this action for them already.
+    if (clients.find((c) => c.id === id)?.isVirtual) return;
     setError("");
     setConfirmDelete({ ids: [id], label: name });
   }
@@ -701,7 +848,10 @@ export default function ClientesPage() {
   }
 
   function toggleSelectAll() {
-    setSelected((prev) => (prev.size === filtered.length ? new Set() : new Set(filtered.map((c) => c.id))));
+    // Virtual clients can't be bulk-deleted (no `clients` row behind them),
+    // so "select all" only ever selects real ones.
+    const selectableIds = filtered.filter((c) => !c.isVirtual).map((c) => c.id);
+    setSelected((prev) => (prev.size === selectableIds.length ? new Set() : new Set(selectableIds)));
   }
 
   function toggleExpand(id: string) {
@@ -919,7 +1069,8 @@ export default function ClientesPage() {
     );
   }
 
-  const allSelected = filtered.length > 0 && selected.size === filtered.length;
+  const selectableFiltered = filtered.filter((c) => !c.isVirtual);
+  const allSelected = selectableFiltered.length > 0 && selected.size === selectableFiltered.length;
   const activeFormUnit = formUnits.find((u) => u.key === activeUnitKey) ?? formUnits[0];
   const assignableNodes = getAssignableNodes(formUnits.map((u) => u.unit_code));
 
@@ -1010,7 +1161,19 @@ export default function ClientesPage() {
                     <Fragment key={client.id}>
                       <tr style={{ borderTop: "1px solid var(--color-mist)", background: isSelected ? "var(--color-paper)" : "transparent" }}>
                         <td style={{ padding: "13px 16px" }}>
-                          <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(client.id)} aria-label={`Seleccionar ${client.name}`} style={{ accentColor: "var(--color-brand)", cursor: "pointer" }} />
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={client.isVirtual}
+                            onChange={() => toggleSelect(client.id)}
+                            aria-label={`Seleccionar ${client.name}`}
+                            title={client.isVirtual ? "Usuario de Nodo Clínica — no seleccionable acá" : undefined}
+                            style={{
+                              accentColor: "var(--color-brand)",
+                              cursor: client.isVirtual ? "not-allowed" : "pointer",
+                              opacity: client.isVirtual ? 0.4 : 1,
+                            }}
+                          />
                         </td>
 
                         {/* Cliente */}
@@ -1038,6 +1201,32 @@ export default function ClientesPage() {
                             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                               {cu.map((u) => {
                                 const st = statusStyle(u.status);
+                                // Virtual Clínica units have no client_unit_id to PATCH
+                                // /api/admin/client-unit-status against — render a plain,
+                                // non-interactive badge instead of the editable dropdown.
+                                if (u.isVirtual) {
+                                  return (
+                                    <span
+                                      key={u.id}
+                                      title="Estado de Nodo Clínica — se gestiona desde Usuarios de Nodo"
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 6,
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        background: st.bg,
+                                        color: st.color,
+                                        borderRadius: 999,
+                                        padding: "4px 10px",
+                                        width: "fit-content",
+                                      }}
+                                    >
+                                      <span style={{ fontSize: 10, opacity: 0.85 }}>{u.unit_code}</span>
+                                      {st.label}
+                                    </span>
+                                  );
+                                }
                                 const menuOpen = statusMenuUnitId === u.id;
                                 return (
                                   <div key={u.id} style={{ position: "relative" }}>
@@ -1160,10 +1349,46 @@ export default function ClientesPage() {
                         {/* Acciones */}
                         <td style={{ padding: "13px 16px", whiteSpace: "nowrap" }}>
                           <div style={{ display: "flex", gap: 6 }}>
-                            <button onClick={() => openEditForm(client)} aria-label={`Editar ${client.name}`} title="Editar" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, background: "transparent", color: "#2A6FDB", border: "1px solid #AFC6F0", borderRadius: 6, cursor: "pointer" }}>
+                            <button
+                              onClick={() => openEditForm(client)}
+                              disabled={client.isVirtual}
+                              aria-label={`Editar ${client.name}`}
+                              title={client.isVirtual ? "Usuario de Nodo Clínica — gestionalo desde Usuarios de Nodo" : "Editar"}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                width: 32,
+                                height: 32,
+                                background: "transparent",
+                                color: "#2A6FDB",
+                                border: "1px solid #AFC6F0",
+                                borderRadius: 6,
+                                cursor: client.isVirtual ? "not-allowed" : "pointer",
+                                opacity: client.isVirtual ? 0.4 : 1,
+                              }}
+                            >
                               <Pencil size={15} strokeWidth={2} />
                             </button>
-                            <button onClick={() => requestDelete(client.id, client.name)} aria-label={`Eliminar ${client.name}`} title="Eliminar" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, background: "transparent", color: "#C0392B", border: "1px solid #F5C6C2", borderRadius: 6, cursor: "pointer" }}>
+                            <button
+                              onClick={() => requestDelete(client.id, client.name)}
+                              disabled={client.isVirtual}
+                              aria-label={`Eliminar ${client.name}`}
+                              title={client.isVirtual ? "Usuario de Nodo Clínica — gestionalo desde Usuarios de Nodo" : "Eliminar"}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                width: 32,
+                                height: 32,
+                                background: "transparent",
+                                color: "#C0392B",
+                                border: "1px solid #F5C6C2",
+                                borderRadius: 6,
+                                cursor: client.isVirtual ? "not-allowed" : "pointer",
+                                opacity: client.isVirtual ? 0.4 : 1,
+                              }}
+                            >
                               <Trash2 size={15} strokeWidth={2} />
                             </button>
                           </div>
@@ -1193,9 +1418,15 @@ export default function ClientesPage() {
                                         <span style={{ fontSize: 11.5, fontWeight: 700, background: st.bg, color: st.color, borderRadius: 999, padding: "2px 9px" }}>{st.label}</span>
                                       </div>
                                     </div>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
                                       <span style={{ fontSize: 12.5, color: "var(--color-slate2)" }}>Plan: <strong style={{ color: "var(--color-ink)" }}>{u.plan ?? "—"}</strong></span>
-                                      <span style={{ fontSize: 12.5, color: "var(--color-slate2)" }}>· Avance: <strong style={{ color: "var(--color-ink)" }}>{u.progress ?? 0}%</strong></span>
+                                      {u.isVirtual ? (
+                                        <span style={{ fontSize: 11.5, color: "var(--color-slate2)", fontStyle: "italic" }}>
+                                          · Desde Nodo Clínica — gestionalo en Usuarios de Nodo
+                                        </span>
+                                      ) : (
+                                        <span style={{ fontSize: 12.5, color: "var(--color-slate2)" }}>· Avance: <strong style={{ color: "var(--color-ink)" }}>{u.progress ?? 0}%</strong></span>
+                                      )}
                                     </div>
 
                                     {/* Credentials */}

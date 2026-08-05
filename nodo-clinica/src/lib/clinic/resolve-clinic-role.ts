@@ -6,6 +6,7 @@ export interface ClinicMembership {
   professionalId: string | null;
   professionalUserId: string | null;
   professionalPausedAt: string | null;
+  professionalEnabledAt: string | null;
   patientId: string | null;
   patientProfileId: string | null;
   patientPausedAt: string | null;
@@ -35,7 +36,7 @@ export async function lookupClinicMembershipByEmail(
   const [{ data: professional }, { data: patient }] = await Promise.all([
     service
       .from("professionals")
-      .select("id, user_id, email, paused_at")
+      .select("id, user_id, email, paused_at, enabled_at")
       .ilike("email", normalized)
       .maybeSingle(),
     service
@@ -49,6 +50,7 @@ export async function lookupClinicMembershipByEmail(
     professionalId: professional?.id ?? null,
     professionalUserId: professional?.user_id ?? null,
     professionalPausedAt: professional?.paused_at ?? null,
+    professionalEnabledAt: professional?.enabled_at ?? null,
     patientId: patient?.id ?? null,
     patientProfileId: patient?.profile_id ?? null,
     patientPausedAt: patient?.paused_at ?? null,
@@ -62,7 +64,7 @@ export async function lookupClinicMembershipByEmail(
     if (!membership.professionalId) {
       const { data: profByUser } = await service
         .from("professionals")
-        .select("id, user_id, paused_at")
+        .select("id, user_id, paused_at, enabled_at")
         .eq("user_id", authUserId)
         .maybeSingle();
       if (profByUser?.id) {
@@ -71,6 +73,7 @@ export async function lookupClinicMembershipByEmail(
           professionalId: profByUser.id,
           professionalUserId: profByUser.user_id ?? authUserId,
           professionalPausedAt: profByUser.paused_at ?? null,
+          professionalEnabledAt: profByUser.enabled_at ?? null,
         };
       }
     }
@@ -107,6 +110,10 @@ function mergeClinicMembership(
       primary.professionalId != null
         ? primary.professionalPausedAt
         : secondary.professionalPausedAt,
+    professionalEnabledAt:
+      primary.professionalId != null
+        ? primary.professionalEnabledAt
+        : secondary.professionalEnabledAt,
     patientId: primary.patientId ?? secondary.patientId,
     patientProfileId: primary.patientProfileId ?? secondary.patientProfileId,
     patientPausedAt:
@@ -123,6 +130,7 @@ export async function lookupClinicMembership(
     professionalId: null,
     professionalUserId: null,
     professionalPausedAt: null,
+    professionalEnabledAt: null,
     patientId: null,
     patientProfileId: null,
     patientPausedAt: null,
@@ -154,7 +162,7 @@ export async function lookupClinicMembershipByAuthUserId(
   const [{ data: professional }, { data: patientByProfile }] = await Promise.all([
     service
       .from("professionals")
-      .select("id, user_id, paused_at")
+      .select("id, user_id, paused_at, enabled_at")
       .eq("user_id", authUserId)
       .maybeSingle(),
     service
@@ -168,6 +176,7 @@ export async function lookupClinicMembershipByAuthUserId(
     professionalId: professional?.id ?? null,
     professionalUserId: professional?.user_id ?? null,
     professionalPausedAt: professional?.paused_at ?? null,
+    professionalEnabledAt: professional?.enabled_at ?? null,
     patientId: patientByProfile?.id ?? null,
     patientProfileId: patientByProfile?.profile_id ?? null,
     patientPausedAt: patientByProfile?.paused_at ?? null,
@@ -204,6 +213,14 @@ export function isRolePaused(
 ): boolean {
   if (role === "medico") return !!membership.professionalPausedAt;
   return !!membership.patientPausedAt;
+}
+
+/**
+ * True once an admin approved the professional (professionals.enabled_at
+ * set) — see professional-approval.ts for the full gate rationale.
+ */
+export function isProfessionalApproved(membership: ClinicMembership): boolean {
+  return !!membership.professionalEnabledAt;
 }
 
 /** Pick portal role; when dual account, honour intended tab/flow role. */
