@@ -22,6 +22,7 @@ type Member = {
   color: string;
   created_at: string;
   email: string | null;
+  avatarUrl: string | null;
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -88,55 +89,57 @@ export default function EquipoPage() {
     setSaving(true);
     setError("");
 
-    if (editingMember) {
-      // Vía server (admin client): la RLS de nodo_core.profiles ("own
-      // profile") solo deja a cada usuario editar su PROPIA fila — un
-      // update directo del browser client sobre el id de otro miembro
-      // corre sin error pero no toca ninguna fila.
-      const res = await fetch("/api/team", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: editingMember.id,
-          fullName: formName.trim(),
-          role: formRole,
-        }),
-      });
-      const result = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(result.error ?? "Error al actualizar el miembro.");
-        setSaving(false);
-        return;
+    try {
+      if (editingMember) {
+        // Vía server (admin client): la RLS de nodo_core.profiles ("own
+        // profile") solo deja a cada usuario editar su PROPIA fila — un
+        // update directo del browser client sobre el id de otro miembro
+        // corre sin error pero no toca ninguna fila.
+        const res = await fetch("/api/team", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: editingMember.id,
+            fullName: formName.trim(),
+            role: formRole,
+          }),
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(result.error ?? "Error al actualizar el miembro.");
+          return;
+        }
+      } else {
+        if (!formEmail.trim() || !formPassword.trim()) {
+          setError("El email y la contraseña son obligatorios para nuevos miembros.");
+          return;
+        }
+        // Create via the admin API on the server so the user is confirmed and our
+        // own admin session is left intact (client signUp would break both).
+        const res = await fetch("/api/team", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fullName: formName.trim(),
+            email: formEmail.trim(),
+            password: formPassword.trim(),
+            role: formRole,
+          }),
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(result.error ?? "Error al crear el usuario.");
+          return;
+        }
       }
-    } else {
-      if (!formEmail.trim() || !formPassword.trim()) {
-        setError("El email y la contraseña son obligatorios para nuevos miembros.");
-        setSaving(false);
-        return;
-      }
-      // Create via the admin API on the server so the user is confirmed and our
-      // own admin session is left intact (client signUp would break both).
-      const res = await fetch("/api/team", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName: formName.trim(),
-          email: formEmail.trim(),
-          password: formPassword.trim(),
-          role: formRole,
-        }),
-      });
-      const result = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(result.error ?? "Error al crear el usuario.");
-        setSaving(false);
-        return;
-      }
-    }
 
-    setSaving(false);
-    setShowForm(false);
-    loadMembers();
+      setShowForm(false);
+      loadMembers();
+    } catch {
+      setError("Error de red. Intentá de nuevo.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function confirmDelete() {
@@ -205,6 +208,25 @@ export default function EquipoPage() {
         searchPlaceholder="Buscar miembros..."
       />
       <div style={{ flex: 1, overflowY: "auto", padding: "24px 30px" }}>
+        {/* Errores fuera de los modales (ej. falló el borrado) — el error
+            del modal de alta/edición se muestra aparte, adentro de ese
+            modal, mientras está abierto. */}
+        {error && !showForm && !pendingDelete && (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "12px 16px",
+              background: "#FEF2F2",
+              border: "1px solid #FECACA",
+              borderRadius: 8,
+              fontSize: 14,
+              color: "#991B1B",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
         {/* Header + Add button */}
         <div
           style={{
@@ -266,22 +288,31 @@ export default function EquipoPage() {
                   e.currentTarget.style.boxShadow = "none";
                 }}
               >
-                <div
-                  style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: "50%",
-                    background: member.color,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 18,
-                    fontWeight: 700,
-                    color: "white",
-                  }}
-                >
-                  {member.initials}
-                </div>
+                {member.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={member.avatarUrl}
+                    alt={member.full_name}
+                    style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: "50%",
+                      background: member.color,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 18,
+                      fontWeight: 700,
+                      color: "white",
+                    }}
+                  >
+                    {member.initials}
+                  </div>
+                )}
                 <div style={{ textAlign: "center" }}>
                   <p
                     style={{

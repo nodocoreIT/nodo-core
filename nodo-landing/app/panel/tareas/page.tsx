@@ -22,8 +22,33 @@ export default function TareasPage() {
         supabase.from("units").select("code, name").order("sort"),
       ]);
 
+      // profiles.avatar_url is a storage PATH in the private "panel-branding"
+      // bucket, not a directly-usable URL — resolve to signed URLs here,
+      // same reason as app/panel/layout.tsx and the Equipo page. Without
+      // this, AssigneeAvatar's <img src> just 404s instead of falling back
+      // to the initials circle.
+      const rawProfiles = (profilesData ?? []) as Profile[];
+      const avatarPaths = rawProfiles
+        .map((p) => p.avatar_url)
+        .filter((path): path is string => !!path);
+
+      let resolvedProfiles = rawProfiles;
+      if (avatarPaths.length > 0) {
+        const { data: signedUrls } = await supabase.storage
+          .from("panel-branding")
+          .createSignedUrls(avatarPaths, 3600);
+        const urlByPath = new Map<string, string>();
+        for (const item of signedUrls ?? []) {
+          if (item.path && item.signedUrl && !item.error) urlByPath.set(item.path, item.signedUrl);
+        }
+        resolvedProfiles = rawProfiles.map((p) => ({
+          ...p,
+          avatar_url: p.avatar_url ? urlByPath.get(p.avatar_url) ?? null : null,
+        }));
+      }
+
       setTasks((tasksData ?? []) as Task[]);
-      setProfiles((profilesData ?? []) as Profile[]);
+      setProfiles(resolvedProfiles);
       setUnits((unitsData ?? []).map((u: { code: string; name: string }) => u.code));
       setLoading(false);
     }

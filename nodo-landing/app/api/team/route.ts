@@ -25,6 +25,10 @@ function getColor(name: string): string {
  * this joins them server-side via admin.auth.admin.listUsers(). No
  * pagination handling: the team is a handful of people, well under
  * listUsers()'s default page size.
+ *
+ * avatar_url is a storage PATH in the private "panel-branding" bucket, not
+ * a usable URL — resolved here to signed URLs in one batch call, same
+ * reason as the Sidebar's own avatar in app/panel/layout.tsx.
  */
 export async function GET() {
   const auth = await requirePanelTeamMember();
@@ -34,7 +38,7 @@ export async function GET() {
 
   const { data: profiles, error: profilesErr } = await admin
     .from("profiles")
-    .select("id, full_name, role, initials, color, created_at")
+    .select("id, full_name, role, initials, color, created_at, avatar_url")
     .order("created_at");
 
   if (profilesErr) {
@@ -50,9 +54,24 @@ export async function GET() {
 
   const emailById = new Map(usersPage.users.map((u) => [u.id, u.email ?? null]));
 
+  const avatarPaths = (profiles ?? [])
+    .map((p) => p.avatar_url)
+    .filter((path): path is string => !!path);
+
+  const avatarUrlByPath = new Map<string, string>();
+  if (avatarPaths.length > 0) {
+    const { data: signedUrls } = await admin.storage
+      .from("panel-branding")
+      .createSignedUrls(avatarPaths, 3600);
+    for (const item of signedUrls ?? []) {
+      if (item.path && item.signedUrl && !item.error) avatarUrlByPath.set(item.path, item.signedUrl);
+    }
+  }
+
   const members = (profiles ?? []).map((p) => ({
     ...p,
     email: emailById.get(p.id) ?? null,
+    avatarUrl: p.avatar_url ? avatarUrlByPath.get(p.avatar_url) ?? null : null,
   }));
 
   return Response.json({ members });
