@@ -2,8 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Topbar from "@/components/panel/Topbar";
-import { FormSelect } from "@nodocore/shared-components";
-import { CheckCircle2, Loader2, MessageSquareText, RotateCcw } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  FormSelect,
+} from "@nodocore/shared-components";
+import { CheckCircle2, Loader2, MessageSquareText, RotateCcw, Trash2 } from "lucide-react";
 import type { FeedbackInboxRow } from "@/lib/panel/feedback-inbox";
 
 type ReadFilter = "all" | "unread" | "read";
@@ -27,6 +37,8 @@ export default function FeedbackPage() {
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterReadStatus, setFilterReadStatus] = useState<ReadFilter>("all");
   const [filterNode, setFilterNode] = useState("all");
+  const [pendingDelete, setPendingDelete] = useState<FeedbackInboxRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadFeedback = useCallback(async () => {
     setLoading(true);
@@ -116,6 +128,38 @@ export default function FeedbackPage() {
         next.delete(item.id);
         return next;
       });
+    }
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const item = pendingDelete;
+
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/panel/feedback", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "No se pudo borrar el feedback.");
+        return;
+      }
+      // Recién sacamos el item de la lista después de que el borrado en
+      // el server confirmó — a diferencia de toggleRead, acá no hay
+      // rollback posible que tenga sentido mostrar (es irreversible).
+      setItems((prev) => prev.filter((row) => row.id !== item.id));
+    } catch {
+      setError("Error de red al borrar el feedback.");
+    } finally {
+      // Siempre cerramos el diálogo al terminar (éxito o error) — el
+      // mensaje de error queda visible en el banner de arriba, que el
+      // modal tapa mientras está abierto.
+      setDeleting(false);
+      setPendingDelete(null);
     }
   }
 
@@ -260,7 +304,7 @@ export default function FeedbackPage() {
                             {st.label}
                           </span>
                         </td>
-                        <td style={tdStyle}>
+                        <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
                           <button
                             type="button"
                             title={item.read ? "Marcar como no leído" : "Marcar como leído"}
@@ -278,6 +322,7 @@ export default function FeedbackPage() {
                               color: "var(--color-slate2)",
                               cursor: busy ? "not-allowed" : "pointer",
                               opacity: busy ? 0.5 : 1,
+                              marginRight: 6,
                             }}
                           >
                             {item.read ? (
@@ -285,6 +330,27 @@ export default function FeedbackPage() {
                             ) : (
                               <CheckCircle2 className="h-3.5 w-3.5" />
                             )}
+                          </button>
+                          <button
+                            type="button"
+                            title="Borrar feedback"
+                            disabled={busy}
+                            onClick={() => setPendingDelete(item)}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 32,
+                              height: 32,
+                              borderRadius: 8,
+                              border: "1px solid var(--color-mist)",
+                              background: "white",
+                              color: "#B91C1C",
+                              cursor: busy ? "not-allowed" : "pointer",
+                              opacity: busy ? 0.5 : 1,
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </td>
                       </tr>
@@ -296,6 +362,35 @@ export default function FeedbackPage() {
           </div>
         )}
       </div>
+
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Borrar este feedback?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El feedback se va a borrar permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmDelete();
+              }}
+            >
+              {deleting ? "Borrando..." : "Borrar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

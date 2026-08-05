@@ -133,6 +133,23 @@ export async function fetchFeedbackInbox(): Promise<FeedbackInboxRow[]> {
 }
 
 /**
+ * Deletes a shared.feedback row and its associated read-state row (if any)
+ * in nodo_core.feedback_read_state — irreversible, only reachable from the
+ * panel behind requirePanelTeamMember(). Cleans up the read-state row too so
+ * a deleted feedback_id never lingers there as an orphan (see D3 in
+ * countUnreadFeedback's docstring for why orphaned read-state rows matter).
+ */
+export async function deleteFeedback(id: string): Promise<void> {
+  const admin = createAdminClient();
+
+  const { error: feedbackError } = await admin.schema("shared").from("feedback").delete().eq("id", id);
+  if (feedbackError) throw feedbackError;
+
+  const { error: readStateError } = await admin.from("feedback_read_state").delete().eq("feedback_id", id);
+  if (readStateError) throw readStateError;
+}
+
+/**
  * Pure anti-join — no I/O — so it can be unit tested without a DB. Counts
  * shared.feedback ids that have no matching row in feedback_read_state by
  * real set comparison, not by subtracting counts (D3 fix): a naive
