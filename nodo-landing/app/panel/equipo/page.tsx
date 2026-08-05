@@ -2,8 +2,17 @@
 
 import { useState, useEffect } from "react";
 import Topbar from "@/components/panel/Topbar";
-import { createClient } from "@/lib/supabase/client";
-import { FormSelect } from "@nodocore/shared-components";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  FormSelect,
+} from "@nodocore/shared-components";
 
 type Member = {
   id: string;
@@ -35,6 +44,8 @@ export default function EquipoPage() {
   const [formPassword, setFormPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<Member | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadMembers();
@@ -50,15 +61,6 @@ export default function EquipoPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function getInitials(name: string): string {
-    return name
-      .split(" ")
-      .slice(0, 2)
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
   }
 
   function openAddForm() {
@@ -85,16 +87,24 @@ export default function EquipoPage() {
     if (!formName.trim()) return;
     setSaving(true);
     setError("");
-    const supabase = createClient();
 
     if (editingMember) {
-      const initials = getInitials(formName.trim());
-      const { error: err } = await supabase
-        .from("profiles")
-        .update({ full_name: formName.trim(), role: formRole, initials })
-        .eq("id", editingMember.id);
-      if (err) {
-        setError("Error al actualizar el miembro.");
+      // Vía server (admin client): la RLS de nodo_core.profiles ("own
+      // profile") solo deja a cada usuario editar su PROPIA fila — un
+      // update directo del browser client sobre el id de otro miembro
+      // corre sin error pero no toca ninguna fila.
+      const res = await fetch("/api/team", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingMember.id,
+          fullName: formName.trim(),
+          role: formRole,
+        }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(result.error ?? "Error al actualizar el miembro.");
         setSaving(false);
         return;
       }
@@ -129,10 +139,33 @@ export default function EquipoPage() {
     loadMembers();
   }
 
-  async function handleDelete(id: string) {
-    const supabase = createClient();
-    await supabase.from("profiles").delete().eq("id", id);
-    setMembers((prev) => prev.filter((m) => m.id !== id));
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const member = pendingDelete;
+
+    setDeleting(true);
+    setError("");
+    try {
+      // Vía server por el mismo motivo que el PATCH: la RLS de
+      // nodo_core.profiles no deja borrar la fila de otra persona desde
+      // el browser client.
+      const res = await fetch("/api/team", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: member.id }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(result.error ?? "No se pudo eliminar el miembro.");
+        return;
+      }
+      setMembers((prev) => prev.filter((m) => m.id !== member.id));
+    } catch {
+      setError("Error de red al eliminar el miembro.");
+    } finally {
+      setDeleting(false);
+      setPendingDelete(null);
+    }
   }
 
   const filtered = searchTerm
@@ -261,14 +294,14 @@ export default function EquipoPage() {
                   >
                     {member.full_name}
                   </p>
-                  <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--color-slate2)" }}>
-                    {ROLE_LABELS[member.role] ?? member.role}
-                  </p>
                   {member.email && (
-                    <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--color-slate2-300)" }}>
+                    <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--color-slate2)" }}>
                       {member.email}
                     </p>
                   )}
+                  <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--color-slate2-300)" }}>
+                    {ROLE_LABELS[member.role] ?? member.role}
+                  </p>
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                   <button
@@ -288,7 +321,7 @@ export default function EquipoPage() {
                     Editar
                   </button>
                   <button
-                    onClick={() => handleDelete(member.id)}
+                    onClick={() => setPendingDelete(member)}
                     style={{
                       background: "transparent",
                       color: "#C0392B",
@@ -467,6 +500,35 @@ export default function EquipoPage() {
           </div>
         )}
       </div>
+
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Sacar a {pendingDelete?.full_name} del equipo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Pierde el acceso al panel. Su cuenta de acceso no se borra, solo se revoca el ingreso.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmDelete();
+              }}
+            >
+              {deleting ? "Sacando..." : "Sacar del equipo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

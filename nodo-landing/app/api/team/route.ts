@@ -127,3 +127,64 @@ export async function POST(request: Request) {
 
   return Response.json({ ok: true, id: created.user.id });
 }
+
+/**
+ * Edita nombre/rol de OTRO miembro del equipo. Tiene que pasar por acá (con
+ * el admin client) porque la RLS de nodo_core.profiles ("own profile", USING
+ * auth.uid() = id) solo deja a cada usuario editar su PROPIA fila — un
+ * update del browser client sobre el id de otra persona corre sin error
+ * pero filtra 0 filas, así que no pasaba nada silenciosamente.
+ */
+export async function PATCH(request: Request) {
+  const auth = await requirePanelAdmin();
+  if (!auth.ok) return auth.response;
+
+  const body = await request.json().catch(() => ({}));
+  const id = String(body.id ?? "").trim();
+  const fullName = String(body.fullName ?? "").trim();
+  const role = String(body.role ?? "").trim();
+
+  if (!id || !fullName || !role) {
+    return Response.json({ error: "id, fullName y role son obligatorios." }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("profiles")
+    .update({ full_name: fullName, role, initials: getInitials(fullName) })
+    .eq("id", id);
+
+  if (error) {
+    console.error("[team] PATCH", error);
+    return Response.json({ error: "Error al actualizar el miembro." }, { status: 500 });
+  }
+
+  return Response.json({ ok: true });
+}
+
+/**
+ * Saca a alguien del equipo — borra su fila de nodo_core.profiles (revoca
+ * acceso al panel vía is_team_member()), NO borra la cuenta de auth.users
+ * completa. Borrar la cuenta entera es una operación más drástica, aparte,
+ * hecha a mano con chequeo de FKs — ver conversación del team.
+ */
+export async function DELETE(request: Request) {
+  const auth = await requirePanelAdmin();
+  if (!auth.ok) return auth.response;
+
+  const body = await request.json().catch(() => ({}));
+  const id = String(body.id ?? "").trim();
+  if (!id) {
+    return Response.json({ error: "id es obligatorio." }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("profiles").delete().eq("id", id);
+
+  if (error) {
+    console.error("[team] DELETE", error);
+    return Response.json({ error: "Error al eliminar el miembro." }, { status: 500 });
+  }
+
+  return Response.json({ ok: true });
+}
