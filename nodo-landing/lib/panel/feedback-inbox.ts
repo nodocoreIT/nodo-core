@@ -133,6 +133,30 @@ export async function fetchFeedbackInbox(): Promise<FeedbackInboxRow[]> {
 }
 
 /**
+ * Deletes a shared.feedback row and its associated read-state row (if any)
+ * in nodo_core.feedback_read_state — irreversible, only reachable from the
+ * panel behind requirePanelAdmin().
+ *
+ * Order matters: read_state first, then feedback. If the process gets
+ * interrupted between the two calls (network blip, differing RLS between
+ * schemas), leaving feedback_read_state deleted but shared.feedback intact
+ * just means that row goes back to "unread" — a normal, harmless state.
+ * The reverse order would leave an orphaned feedback_read_state row
+ * pointing at an id that no longer exists, which is exactly the case the
+ * error message would then lie about ("no se pudo borrar" when the
+ * feedback row actually was deleted already).
+ */
+export async function deleteFeedback(id: string): Promise<void> {
+  const admin = createAdminClient();
+
+  const { error: readStateError } = await admin.from("feedback_read_state").delete().eq("feedback_id", id);
+  if (readStateError) throw readStateError;
+
+  const { error: feedbackError } = await admin.schema("shared").from("feedback").delete().eq("id", id);
+  if (feedbackError) throw feedbackError;
+}
+
+/**
  * Pure anti-join — no I/O — so it can be unit tested without a DB. Counts
  * shared.feedback ids that have no matching row in feedback_read_state by
  * real set comparison, not by subtracting counts (D3 fix): a naive

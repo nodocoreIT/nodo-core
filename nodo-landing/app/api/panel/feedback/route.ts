@@ -1,5 +1,6 @@
-import { requirePanelTeamMember } from "@/lib/panel/panel-api-auth";
-import { fetchFeedbackInbox } from "@/lib/panel/feedback-inbox";
+import { NextRequest } from "next/server";
+import { requirePanelAdmin, requirePanelTeamMember } from "@/lib/panel/panel-api-auth";
+import { deleteFeedback, fetchFeedbackInbox } from "@/lib/panel/feedback-inbox";
 
 export async function GET() {
   const auth = await requirePanelTeamMember();
@@ -11,5 +12,30 @@ export async function GET() {
   } catch (err) {
     console.error("[panel/feedback] GET", err);
     return Response.json({ error: "Error al cargar el feedback." }, { status: 500 });
+  }
+}
+
+/**
+ * Borra un feedback (irreversible) — solo desde el panel, con confirmación
+ * en la UI. Gateado por requirePanelAdmin(), no requirePanelTeamMember():
+ * mismo guard más estricto que el resto de las acciones destructivas del
+ * panel (purge-nodo-data, backups/restore, purga de team).
+ */
+export async function DELETE(request: NextRequest) {
+  const auth = await requirePanelAdmin();
+  if (!auth.ok) return auth.response;
+
+  const body = await request.json().catch(() => ({}));
+  const id = String(body.id ?? "").trim();
+  if (!id) {
+    return Response.json({ error: "id es obligatorio." }, { status: 400 });
+  }
+
+  try {
+    await deleteFeedback(id);
+    return Response.json({ ok: true });
+  } catch (err) {
+    console.error("[panel/feedback] DELETE", err);
+    return Response.json({ error: "Error al borrar el feedback." }, { status: 500 });
   }
 }
