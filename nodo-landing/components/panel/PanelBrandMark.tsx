@@ -3,6 +3,8 @@
 import { BrandMark } from "@nodocore/shared-components";
 import { useSettingsModule } from "@nodocore/nodo-modules/settings";
 
+const PANEL_LOGO_SRC = "/logos/logo compuesto_50.png";
+
 type PanelBrandMarkProps = {
   onDark?: boolean;
   fillWidth?: boolean;
@@ -16,16 +18,9 @@ export function PanelBrandMark({
   iconClassName,
   className,
 }: PanelBrandMarkProps) {
-  const { themeSettings, logoSignedUrl } = useSettingsModule();
+  const { themeSettings } = useSettingsModule();
 
-  const useCustomLogo =
-    themeSettings.logoType === "custom" || Boolean(logoSignedUrl);
-  const mode =
-    themeSettings.logoType === "text"
-      ? "text"
-      : useCustomLogo
-        ? "custom"
-        : "default";
+  const mode = themeSettings.logoType === "text" ? "text" : "custom";
 
   return (
     <BrandMark
@@ -35,10 +30,9 @@ export function PanelBrandMark({
       className={className}
       mode={mode}
       orgName={themeSettings.brandText || "nodo dashboard"}
-      logoUrl={logoSignedUrl}
+      logoUrl={PANEL_LOGO_SRC}
       primaryColor={themeSettings.primaryColor}
       secondaryColor={themeSettings.secondaryColor}
-      productSuffix={mode === "default" ? " Core" : undefined}
     />
   );
 }

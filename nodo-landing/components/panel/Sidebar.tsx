@@ -164,9 +164,9 @@ export default function Sidebar({
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="relative mt-2.5 flex h-16 w-full flex-shrink-0 items-center">
-          <Link href="/panel" className="flex w-full items-center" onClick={onMobileClose}>
-            <PanelBrandMark onDark fillWidth iconClassName="h-6 w-6" />
+        <div className="relative mt-2.5 flex h-14 w-full flex-shrink-0 items-center px-5">
+          <Link href="/panel" className="flex items-center" onClick={onMobileClose}>
+            <PanelBrandMark onDark iconClassName="h-12 w-auto max-w-[190px]" />
           </Link>
           <button
             type="button"

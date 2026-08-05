@@ -87,10 +87,10 @@ export function BrandMark({
           src={logoUrl}
           alt="Logo"
           className={cn(
-            "object-contain",
+            "object-contain flex-shrink-0",
             fillWidth
               ? "block h-full w-full"
-              : "h-10 w-auto max-w-[180px] md:max-w-[200px] flex-shrink-0"
+              : iconClassName || "h-10 w-auto max-w-[180px] md:max-w-[200px]"
           )}
         />
       </span>
