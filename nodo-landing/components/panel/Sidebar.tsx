@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
+  ChevronDown,
   ClipboardList,
   DatabaseBackup,
   KeyRound,
@@ -20,6 +21,7 @@ import {
   UsersRound,
   Video,
   Wallet,
+  Wrench,
   X,
 } from "lucide-react";
 import {
@@ -60,14 +62,17 @@ const PLATFORM_ITEMS: NavItem[] = [
   { label: "Usuarios de Nodo", href: "/panel/usuarios-nodo", icon: UserCog },
   { label: "Caja", href: "/panel/caja", icon: Wallet },
   { label: "Equipo", href: "/panel/equipo", icon: UsersRound },
-  { label: "Bóveda de contraseñas", href: "/panel/passwords", icon: KeyRound },
   { label: "Invitaciones", href: "/panel/invitaciones", icon: Mail },
-  { label: "Backups", href: "/panel/backups", icon: DatabaseBackup },
 ];
 
 const ECOSYSTEM_ITEMS: NavItem[] = [
   { label: "Unidades", href: "/panel/unidades", icon: Layers, enabled: true },
-  { label: "Informes", href: "/panel/informes", icon: BarChart3, enabled: true },
+];
+
+const TOOLS_ITEMS: NavItem[] = [
+  { label: "Bóveda de contraseñas", href: "/panel/passwords", icon: KeyRound },
+  { label: "Backups", href: "/panel/backups", icon: DatabaseBackup },
+  { label: "Informes", href: "/panel/informes", icon: BarChart3 },
 ];
 
 
@@ -131,6 +136,57 @@ function NavLinks({
   });
 }
 
+/**
+ * Grupo colapsable de ítems de nav (ej. "Herramientas"). Se auto-expande
+ * cuando la ruta activa está dentro del grupo, y no se puede colapsar
+ * manualmente mientras eso sea así — evita esconder la sección en la que
+ * el usuario está parado.
+ */
+function NavGroup({
+  label,
+  icon: Icon,
+  items,
+  pathname,
+  onNavigate,
+}: {
+  label: string;
+  icon: React.ElementType;
+  items: NavItem[];
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  const hasActiveChild = items.some(
+    (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
+  );
+  const [manuallyExpanded, setManuallyExpanded] = useState(false);
+  const expanded = hasActiveChild || manuallyExpanded;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setManuallyExpanded((prev) => !prev)}
+        aria-expanded={expanded}
+        className="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium text-[var(--color-sidebar-text)] transition-colors hover:bg-brand/10 hover:text-brand"
+      >
+        <Icon className="h-4 w-4 flex-shrink-0" />
+        <span className="flex-1 text-left">{label}</span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 flex-shrink-0 transition-transform duration-200",
+            expanded ? "rotate-180" : "",
+          )}
+        />
+      </button>
+      {expanded && (
+        <div className="ml-4 space-y-1 border-l border-[var(--color-sidebar-border)] pl-3">
+          <NavLinks items={items} pathname={pathname} onNavigate={onNavigate} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Sidebar({
   userFullName,
   userEmail,
@@ -192,6 +248,16 @@ export default function Sidebar({
 
           <NavLinks
             items={ECOSYSTEM_ITEMS}
+            pathname={pathname}
+            onNavigate={onMobileClose}
+          />
+
+          <div className="my-2 border-t border-[var(--color-sidebar-border)]" />
+
+          <NavGroup
+            label="Herramientas"
+            icon={Wrench}
+            items={TOOLS_ITEMS}
             pathname={pathname}
             onNavigate={onMobileClose}
           />
