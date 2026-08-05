@@ -188,6 +188,16 @@ export interface SettingsModuleContextValue {
   updateUserProfile: (input: { full_name: string; password?: string }) => Promise<void>;
   isUpdatingUserProfile: boolean;
 
+  /**
+   * Personal avatar photo for "Mi Perfil" — optional because most apps
+   * consuming this shared settings module don't have per-user avatar
+   * storage wired up yet. ProfileSettingsSection only renders the uploader
+   * when uploadAvatar is provided.
+   */
+  uploadAvatar?: (file: File) => Promise<string>;
+  isUploadingAvatar?: boolean;
+  avatarSignedUrl?: string | null;
+
   bankAccounts?: BankAccountsApi;
   companyExtraContent?: ReactNode;
 

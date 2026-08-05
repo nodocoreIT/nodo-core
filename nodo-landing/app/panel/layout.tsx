@@ -62,7 +62,14 @@ export default async function PanelLayout({
   const email = user.email ?? "";
   const fullName =
     profile?.full_name ?? user.user_metadata?.full_name ?? email.split("@")[0] ?? "Usuario";
-  const avatarUrl = profile?.avatar_url ?? null;
+  // profiles.avatar_url is a storage PATH (panel-branding is a private
+  // bucket), not a directly-usable URL — resolve it to a signed URL here,
+  // server-side, before it reaches the Sidebar.
+  const avatarUrl = profile?.avatar_url
+    ? (
+        await supabase.storage.from("panel-branding").createSignedUrl(profile.avatar_url, 3600)
+      ).data?.signedUrl ?? null
+    : null;
   const initials = getInitials(fullName);
   const color = profile?.color ?? getAvatarColor(email);
 

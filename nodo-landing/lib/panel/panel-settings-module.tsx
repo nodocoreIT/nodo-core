@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
   SettingsModuleProvider,
   type AlertSettings,
@@ -21,6 +22,7 @@ import {
   upsertPanelOrgProfile,
   usePanelOrgProfile,
 } from "./use-panel-org-profile";
+import { getPanelAvatarSignedUrl, uploadPanelAvatar } from "./use-panel-avatar";
 import { usePanelStaff } from "./use-panel-staff";
 
 const PANEL_MANAGED_NAV = [
@@ -35,6 +37,15 @@ const PANEL_MANAGED_NAV = [
   { to: "/panel/unidades", label: "Unidades" },
   { to: "/panel/informes", label: "Informes" },
 ];
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase();
+}
 
 const AI_STORAGE_KEY = "nodo-panel-ai-settings";
 
@@ -64,6 +75,7 @@ function readAiSettings() {
 }
 
 export function PanelSettingsModuleProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const { profile, loading: profileLoading, refresh } = usePanelOrgProfile();
   const staff = usePanelStaff();
   const [sessionRole, setSessionRole] = useState<string | null>(null);
@@ -74,6 +86,9 @@ export function PanelSettingsModuleProvider({ children }: { children: ReactNode 
   const [isUpsertingProfile, setIsUpsertingProfile] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isUpdatingUserProfile, setIsUpdatingUserProfile] = useState(false);
+  const [avatarPath, setAvatarPath] = useState<string | null>(null);
+  const [avatarSignedUrl, setAvatarSignedUrl] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   useApplyPanelTheme(themeSettings);
 
@@ -89,11 +104,42 @@ export function PanelSettingsModuleProvider({ children }: { children: ReactNode 
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+      const { data } = await supabase
+        .from("profiles")
+        .select("role, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle();
       setSessionRole(data?.role ?? null);
+      setAvatarPath(data?.avatar_url ?? null);
     }
     void loadSessionRole();
   }, []);
+
+  useEffect(() => {
+    void getPanelAvatarSignedUrl(avatarPath).then(setAvatarSignedUrl);
+  }, [avatarPath]);
+
+  const uploadAvatar = useCallback(async (file: File) => {
+    setIsUploadingAvatar(true);
+    try {
+      const path = await uploadPanelAvatar(file);
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("No hay sesión activa.");
+      const { error } = await supabase.from("profiles").update({ avatar_url: path }).eq("id", user.id);
+      if (error) throw error;
+      setAvatarPath(path);
+      // El Sidebar lee userAvatarUrl como prop de un Server Component
+      // (app/panel/layout.tsx) — sin esto, la foto nueva no aparece ahí
+      // hasta una recarga manual del navegador.
+      router.refresh();
+      return path;
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }, [router]);
 
   useEffect(() => {
     if (profile?.theme_settings && typeof profile.theme_settings === "object") {
@@ -195,16 +241,33 @@ export function PanelSettingsModuleProvider({ children }: { children: ReactNode 
     setIsUpdatingUserProfile(true);
     try {
       const supabase = createClient();
+
       const attrs: { data: { full_name: string }; password?: string } = {
         data: { full_name: input.full_name },
       };
       if (input.password && input.password.length > 0) attrs.password = input.password;
-      const { error } = await supabase.auth.updateUser(attrs);
+      const { data: userData, error } = await supabase.auth.updateUser(attrs);
       if (error) throw error;
+
+      // The Sidebar/Equipo list read nodo_core.profiles.full_name, NOT
+      // auth.users.user_metadata — the line above alone never changed what
+      // shows on screen. Own-row write, RLS ("own profile", auth.uid() = id)
+      // allows this from the browser client, no server route needed.
+      const userId = userData.user?.id;
+      if (userId) {
+        const { error: profileErr } = await supabase
+          .from("profiles")
+          .update({ full_name: input.full_name, initials: getInitials(input.full_name) })
+          .eq("id", userId);
+        if (profileErr) throw profileErr;
+        // Mismo motivo que en uploadAvatar: el Sidebar es un Server
+        // Component, necesita este refresh para mostrar el nombre nuevo.
+        router.refresh();
+      }
     } finally {
       setIsUpdatingUserProfile(false);
     }
-  }, []);
+  }, [router]);
 
   const alertSettings: AlertSettings = DEFAULT_ALERT_SETTINGS;
 
@@ -244,6 +307,9 @@ export function PanelSettingsModuleProvider({ children }: { children: ReactNode 
       staff,
       updateUserProfile,
       isUpdatingUserProfile,
+      uploadAvatar,
+      isUploadingAvatar,
+      avatarSignedUrl,
     };
   }, [
     sessionRole,
@@ -263,6 +329,9 @@ export function PanelSettingsModuleProvider({ children }: { children: ReactNode 
     staff,
     updateUserProfile,
     isUpdatingUserProfile,
+    uploadAvatar,
+    isUploadingAvatar,
+    avatarSignedUrl,
   ]);
 
   return <SettingsModuleProvider value={value}>{children}</SettingsModuleProvider>;
