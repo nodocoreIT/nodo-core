@@ -56,6 +56,68 @@ const profileSchema = z
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
+function ProfileAvatarUploader() {
+  const { uploadAvatar, isUploadingAvatar, avatarSignedUrl } = useSettingsModule();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // No hay capacidad de avatar wireada en esta app (uploadAvatar es
+  // opcional en el tipo compartido) — no renderizamos nada en vez de
+  // mostrar un uploader roto.
+  if (!uploadAvatar) return null;
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    try {
+      await uploadAvatar(file);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al subir la foto");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs font-bold text-navy">Foto de Perfil</Label>
+      <div className="flex items-center gap-4">
+        {avatarSignedUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={avatarSignedUrl}
+            alt="Tu foto de perfil"
+            className="h-16 w-16 rounded-full object-cover border border-border"
+          />
+        ) : (
+          <div className="h-16 w-16 rounded-full bg-border flex items-center justify-center text-slate2">
+            <ImageIcon className="h-6 w-6" />
+          </div>
+        )}
+        <div className="flex-1 space-y-1">
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleFileChange}
+            disabled={isUploadingAvatar}
+            className="text-xs file:mr-4 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-brand/10 file:text-brand hover:file:bg-brand/20 cursor-pointer"
+          />
+          <p className="text-[10px] text-slate2">JPG, PNG o WebP. Máximo 2 MB.</p>
+        </div>
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      {isUploadingAvatar && (
+        <div className="flex items-center gap-2 text-xs text-brand font-semibold">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Subiendo foto...
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProfileSettingsSection() {
   const { user } = useAuth();
   const { updateUserProfile, isUpdatingUserProfile } = useSettingsModule();
@@ -78,8 +140,10 @@ function ProfileSettingsSection() {
     <div className="space-y-6 max-w-md">
       <div>
         <h3 className="text-base font-bold text-navy">Información Personal</h3>
-        <p className="text-xs text-slate2">Actualizá tu nombre y contraseña de acceso.</p>
+        <p className="text-xs text-slate2">Actualizá tu foto, nombre y contraseña de acceso.</p>
       </div>
+
+      <ProfileAvatarUploader />
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit as any)} className="space-y-4">
