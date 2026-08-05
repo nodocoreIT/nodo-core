@@ -6,12 +6,28 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import {
   canAccessAsRole,
+  isProfessionalApproved,
   lookupClinicMembershipByAuthUserId,
   resolveRoleForContext,
   toSessionRole,
 } from "@/lib/clinic/resolve-clinic-role";
 import { resolveSupabaseAuthUser } from "@/lib/supabase/resolve-auth-user";
 import { getClinicOrgId } from "@/lib/clinic/clinic-org";
+import {
+  isProfessionalEnabled,
+  PROFESSIONAL_PENDING_APPROVAL_CODE,
+  PROFESSIONAL_PENDING_APPROVAL_MESSAGE,
+} from "@/lib/clinic/professional-approval";
+
+export function pendingApprovalResponse(): NextResponse {
+  return NextResponse.json(
+    {
+      error: PROFESSIONAL_PENDING_APPROVAL_MESSAGE,
+      code: PROFESSIONAL_PENDING_APPROVAL_CODE,
+    },
+    { status: 403 },
+  );
+}
 
 async function createAuthedClinicClient(accessToken?: string) {
   if (accessToken) {
@@ -154,6 +170,18 @@ export async function requireAuth(
         );
       }
 
+      // Gate: onboarding complete is NOT the same as "admin approved". A
+      // médico whose professionals.enabled_at is still NULL must not reach
+      // the operational panel, even with a fully valid session — see
+      // professional-approval.ts. Unrelated to isSubscriptionActive()
+      // (billing/trial) — a doctor can be approved-but-trial-expired
+      // (different gate) or not-approved-but-trial-active (this gate).
+      if (effectiveRole === "doctor" && membership.professionalId) {
+        if (!isProfessionalApproved(membership)) {
+          return pendingApprovalResponse();
+        }
+      }
+
       if (effectiveRole === "patient" && !membership.patientId) {
         return NextResponse.json(
           { error: "Unauthorized — not a patient account" },
@@ -191,6 +219,23 @@ export async function requireAuth(
     const clinicSession = await getSession();
     if (clinicSession) {
       const sessionRole = clinicSession.role === "doctor" ? "doctor" : "patient";
+
+      // Same enabled_at gate as the primary Supabase-auth path above —
+      // platform-sync SSO logins land here (Supabase auth cookie absent,
+      // ClinicSession JWT present), and clinicSession.userId is the
+      // professionals.id PK for that flow (see comment above). Skipped in
+      // isLocalMode(): NEXT_PUBLIC_CLINIC_MODE=local can reach this same
+      // branch (per the comment below) with a local-db synthetic id that
+      // doesn't exist in the real professionals table — querying it here
+      // would false-block every local/demo médico login.
+      if (sessionRole === "doctor" && !isLocalMode()) {
+        const svc = await createServiceClient();
+        const enabled = await isProfessionalEnabled(svc, clinicSession.userId);
+        if (!enabled) {
+          return pendingApprovalResponse();
+        }
+      }
+
       const supabase = await createClient();
       return {
         user: {

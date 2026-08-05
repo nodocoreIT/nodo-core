@@ -4,6 +4,7 @@ import { isLocalMode } from "@/lib/clinic/config";
 import { getSessionFromRequest, jsonWithSession, type ClinicSession } from "@/lib/clinic/session";
 import {
   canAccessAsRole,
+  isProfessionalApproved,
   linkClinicMembershipProfiles,
   lookupClinicMembership,
   parseClinicDbRole,
@@ -12,6 +13,7 @@ import {
 import { repairDashboardPacienteProfile } from "@/lib/clinic/repair-dashboard-profile";
 import { portalNotRegisteredMessage } from "@/lib/clinic/portal-login-eligibility";
 import { resolveSupabaseAuthUser } from "@/lib/supabase/resolve-auth-user";
+import { pendingApprovalResponse } from "@/lib/supabase/auth-guard";
 
 /**
  * POST /api/clinic/account/verify-portal
@@ -72,6 +74,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { error: portalNotRegisteredMessage(intendedRole) },
       { status: 404 },
     );
+  }
+
+  // Same gate as requireAuth() (auth-guard.ts): onboarding complete is NOT
+  // "admin approved". This is the page-level entry point médico-admin-layout
+  // awaits before rendering the panel, so it must reject here too — relying
+  // only on requireAuth() would still flash the panel shell while its data
+  // fetches silently 403 in the background.
+  if (intendedRole === "medico" && membership.professionalId) {
+    if (!isProfessionalApproved(membership)) {
+      return pendingApprovalResponse();
+    }
   }
 
   const sessionRole = toSessionRole(intendedRole);
