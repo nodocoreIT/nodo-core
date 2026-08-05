@@ -212,7 +212,7 @@ async function listFromClientUnits(): Promise<NodoUserRecord[]> {
   });
 }
 
-async function listFromClinicaProfiles(existingKeys: Set<string>): Promise<NodoUserRecord[]> {
+export async function listFromClinicaProfiles(existingKeys: Set<string>): Promise<NodoUserRecord[]> {
   const clinicDb = createAdminClient("nodo_clinica");
   const unitCode = "Clínica";
   const rows: NodoUserRecord[] = [];
