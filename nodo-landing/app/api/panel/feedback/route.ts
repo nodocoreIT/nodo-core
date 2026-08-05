@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requirePanelTeamMember } from "@/lib/panel/panel-api-auth";
+import { requirePanelAdmin, requirePanelTeamMember } from "@/lib/panel/panel-api-auth";
 import { deleteFeedback, fetchFeedbackInbox } from "@/lib/panel/feedback-inbox";
 
 export async function GET() {
@@ -15,9 +15,14 @@ export async function GET() {
   }
 }
 
-/** Borra un feedback (irreversible) — solo desde el panel, con confirmación en la UI. */
+/**
+ * Borra un feedback (irreversible) — solo desde el panel, con confirmación
+ * en la UI. Gateado por requirePanelAdmin(), no requirePanelTeamMember():
+ * mismo guard más estricto que el resto de las acciones destructivas del
+ * panel (purge-nodo-data, backups/restore, purga de team).
+ */
 export async function DELETE(request: NextRequest) {
-  const auth = await requirePanelTeamMember();
+  const auth = await requirePanelAdmin();
   if (!auth.ok) return auth.response;
 
   const body = await request.json().catch(() => ({}));

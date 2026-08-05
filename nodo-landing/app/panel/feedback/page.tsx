@@ -345,7 +345,7 @@ export default function FeedbackPage() {
                               borderRadius: 8,
                               border: "1px solid var(--color-mist)",
                               background: "white",
-                              color: "#B91C1C",
+                              color: "var(--color-destructive)",
                               cursor: busy ? "not-allowed" : "pointer",
                               opacity: busy ? 0.5 : 1,
                             }}
