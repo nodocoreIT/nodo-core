@@ -11,13 +11,14 @@ import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { ModalConfirmacion } from '@/components/ui/modal-confirmacion';
 import { useRubros } from '@/hooks/use-rubros';
+import { capitalizarDescripcion } from '@/utils/capitalizar-descripcion';
+import { generarCodigoRubro } from '@/utils/generar-codigo-rubro';
 import type { Rubro } from '@/types';
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
 const schemaRubro = z.object({
   nombre: z.string().min(1, 'El nombre es requerido'),
-  codigo: z.string().min(1, 'El código es requerido'),
   emoji: z.string().min(1, 'El emoji es requerido'),
   color: z.string().optional(),
   descripcion: z.string().optional(),
@@ -61,11 +62,12 @@ export function RubroGestion() {
     handleSubmit,
     reset,
     setValue,
+    setError,
     watch,
     formState: { errors, isSubmitting },
   } = useForm<FormRubro>({
     resolver: zodResolver(schemaRubro),
-    defaultValues: { nombre: '', codigo: '', emoji: '📦', color: '', descripcion: '', orden: 0 },
+    defaultValues: { nombre: '', emoji: '📦', color: '', descripcion: '', orden: 0 },
   });
 
   const emojiActual = watch('emoji');
@@ -75,7 +77,6 @@ export function RubroGestion() {
       setRubroEditando(rubro);
       reset({
         nombre: rubro.nombre,
-        codigo: rubro.codigo,
         emoji: rubro.emoji,
         color: rubro.color,
         descripcion: rubro.descripcion ?? '',
@@ -83,7 +84,7 @@ export function RubroGestion() {
       });
     } else {
       setRubroEditando(null);
-      reset({ nombre: '', codigo: '', emoji: '📦', color: '', descripcion: '', orden: rubrosActivos.length });
+      reset({ nombre: '', emoji: '📦', color: '', descripcion: '', orden: rubrosActivos.length });
     }
     setModal(true);
   }
@@ -95,9 +96,19 @@ export function RubroGestion() {
   }
 
   async function onSubmit(data: FormRubro) {
+    const nombre = capitalizarDescripcion(data.nombre.trim().replace(/\s+/g, ' '));
+
+    const duplicado = rubros.some(
+      (r) => r.id !== rubroEditando?.id && r.nombre.trim().toLowerCase() === nombre.toLowerCase(),
+    );
+    if (duplicado) {
+      setError('nombre', { type: 'manual', message: `Ya existe un rubro llamado "${nombre}"` });
+      return;
+    }
+
     try {
       if (rubroEditando) {
-        const ok = await actualizarRubro(rubroEditando.id, data);
+        const ok = await actualizarRubro(rubroEditando.id, { ...data, nombre });
         if (ok) {
           toast.success('Rubro actualizado');
           cerrarModal();
@@ -105,8 +116,11 @@ export function RubroGestion() {
           toast.error('Error al actualizar el rubro');
         }
       } else {
+        const codigo = generarCodigoRubro(nombre, rubros.map((r) => r.codigo));
         const created = await crearRubro({
           ...data,
+          nombre,
+          codigo,
           color: data.color ?? '',
           activo: true,
           esSistema: false,
@@ -324,13 +338,6 @@ export function RubroGestion() {
                 {...register('nombre')}
                 error={errors.nombre?.message}
                 placeholder="Ej: Alimentación"
-              />
-
-              <Input
-                label="Código"
-                {...register('codigo')}
-                error={errors.codigo?.message}
-                placeholder="Ej: ALIMENTACION"
               />
 
               <Input
