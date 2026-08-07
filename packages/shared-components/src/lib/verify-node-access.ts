@@ -23,9 +23,20 @@ export function mapAuthLoginError(message: string | undefined): string {
   return INVALID_LOGIN_MESSAGE;
 }
 
+const inFlightNodeAccess = new Map<string, Promise<boolean>>();
+
 /**
  * Returns true when the signed-in user is registered for the given node (unit_code).
  * Uses RPC `user_has_node_access` on the shared Supabase project.
+ *
+ * Dedupes concurrent calls for the same unit_code into a single in-flight
+ * request. Without this, independent callers checking access around the same
+ * auth transition (e.g. an auth-callback page's explicit check racing the
+ * ambient AuthProvider validation triggered by the same setSession()) fire
+ * two RPC requests for the same thing — if the loser gets aborted mid-flight
+ * (e.g. by the winner's navigation), the resulting network error is
+ * indistinguishable from a real denial and can sign out a user who was
+ * already correctly granted access.
  */
 export async function userHasNodeAccess(
   supabase: SupabaseClient,
@@ -34,22 +45,35 @@ export async function userHasNodeAccess(
   const code = unitCode.trim();
   if (!code) return false;
 
-  const candidates = [code, code.toLowerCase(), code.charAt(0).toUpperCase() + code.slice(1).toLowerCase()];
+  const cacheKey = code.toLowerCase();
+  const inFlight = inFlightNodeAccess.get(cacheKey);
+  if (inFlight) return inFlight;
 
-  for (const candidate of [...new Set(candidates)]) {
-    const { data, error } = await supabase.schema("public").rpc("user_has_node_access", {
-      p_unit_code: candidate,
-    });
+  const promise = (async () => {
+    const candidates = [code, code.toLowerCase(), code.charAt(0).toUpperCase() + code.slice(1).toLowerCase()];
 
-    if (error) {
-      console.error("user_has_node_access RPC failed:", error.message);
-      return false;
+    for (const candidate of [...new Set(candidates)]) {
+      const { data, error } = await supabase.schema("public").rpc("user_has_node_access", {
+        p_unit_code: candidate,
+      });
+
+      if (error) {
+        console.error("user_has_node_access RPC failed:", error.message);
+        return false;
+      }
+
+      if (data === true) return true;
     }
 
-    if (data === true) return true;
-  }
+    return false;
+  })();
 
-  return false;
+  inFlightNodeAccess.set(cacheKey, promise);
+  try {
+    return await promise;
+  } finally {
+    inFlightNodeAccess.delete(cacheKey);
+  }
 }
 
 export type NodeAccessReason =

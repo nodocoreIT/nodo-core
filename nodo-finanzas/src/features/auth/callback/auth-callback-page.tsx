@@ -29,6 +29,13 @@ export function AuthCallbackPage() {
   const [inviteRole, setInviteRole] = useState<string | undefined>();
 
   useEffect(() => {
+    // React StrictMode double-invokes effects in dev, and this effect has no
+    // cancellation guard otherwise — two full, uncancelled settle() runs fire
+    // concurrently (double setSession/refreshSession, double
+    // acceptPendingInvitations, double enforceNodeAccess), racing each other's
+    // network calls. Mirrors the cancelled-flag pattern used in AuthProvider.
+    let cancelled = false;
+
     const hash = window.location.hash.substring(1);
     const params = new URLSearchParams(hash);
     const access_token = params.get("access_token");
@@ -46,6 +53,7 @@ export function AuthCallbackPage() {
           access_token,
           refresh_token,
         });
+        if (cancelled) return;
         if (sessionErr) {
           setError(INVALID_LOGIN_MESSAGE);
           setReady(true);
@@ -53,18 +61,22 @@ export function AuthCallbackPage() {
           return;
         }
         await supabase.auth.refreshSession();
+        if (cancelled) return;
       } else {
         await supabase.auth.getSession();
+        if (cancelled) return;
       }
 
       // Auto-accept any pending invitations so the user is added to shared.org_members.
       await acceptPendingInvitations(supabase);
+      if (cancelled) return;
 
       const mustReset =
         type === "invite" ||
         mode === "invite" ||
         type === "recovery" ||
         (await fetchMustSetPassword(supabase));
+      if (cancelled) return;
 
       if (mustReset) {
         if (type !== "recovery") {
@@ -83,6 +95,7 @@ export function AuthCallbackPage() {
       }
 
       const access = await enforceNodeAccess(supabase, "Finanzas");
+      if (cancelled) return;
       if (!access.ok) {
         hideAppSplash();
         window.location.replace(
@@ -99,9 +112,14 @@ export function AuthCallbackPage() {
     };
 
     void settle().catch(() => {
+      if (cancelled) return;
       hideAppSplash();
       window.location.replace(nodeLoginUrlWithAuthError(LANDING_LOGIN_URL));
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
 
   if (error && ready) {
