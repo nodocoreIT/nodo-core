@@ -63,8 +63,8 @@ export function BrandMark({ onDark, className, iconClassName }: BrandMarkProps) 
     return (
       <span
         className={cn(
-          "font-display font-bold tracking-tight py-1 block whitespace-normal break-words leading-tight text-base sm:text-lg",
-          onDark ? "max-w-[180px]" : "",
+          "font-display font-bold tracking-tight py-1 block leading-tight whitespace-nowrap",
+          onDark ? "text-sm" : "text-base sm:text-lg",
           className,
         )}
       >
@@ -74,19 +74,24 @@ export function BrandMark({ onDark, className, iconClassName }: BrandMarkProps) 
   }
 
   return (
-    <span className={cn("inline-flex items-center gap-2", className)}>
+    <span className={cn("inline-flex min-w-0 items-center gap-2", className)}>
       <span
-        className="flex items-center justify-center p-1.5 rounded-md"
+        className="flex shrink-0 items-center justify-center rounded-md p-1.5"
         style={{ backgroundColor: settings.secondaryColor }}
       >
         <Stethoscope
-          className={cn("h-5 w-5 flex-shrink-0", iconClassName)}
+          className={cn("h-5 w-5 shrink-0", iconClassName)}
           style={{ color: settings.primaryColor }}
           strokeWidth={2}
           aria-hidden="true"
         />
       </span>
-      <span className="font-display text-xl font-bold tracking-tight">
+      <span
+        className={cn(
+          "font-display font-bold tracking-tight whitespace-nowrap",
+          onDark ? "text-base" : "text-xl",
+        )}
+      >
         <span
           className={onDark ? "text-white" : ""}
           style={onDark ? undefined : { color: settings.secondaryColor }}

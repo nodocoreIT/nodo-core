@@ -9,6 +9,8 @@ export interface PlanBadgeProps {
   /** Days left in the Free/Demo trial (0 when expired or unknown). */
   trialDaysRemaining?: number;
   variant?: "default" | "sidebar";
+  /** Shorter label for tight headers (mobile). */
+  compact?: boolean;
   className?: string;
 }
 
@@ -16,6 +18,7 @@ export function PlanBadge({
   subscriptionStatus,
   trialDaysRemaining,
   variant = "default",
+  compact = false,
   className,
 }: PlanBadgeProps) {
   // No status yet (e.g. session still resolving) — don't show a fake plan.
@@ -30,11 +33,15 @@ export function PlanBadge({
   const label = isActive
     ? "Pro"
     : demoExpired || subscriptionStatus === "expired"
-      ? "Demo vencida"
+      ? compact
+        ? "Vencida"
+        : "Demo vencida"
       : isPendingPayment
         ? "Pago pendiente"
         : isDemo
-          ? `Demo · ${days} día${days === 1 ? "" : "s"}`
+          ? compact
+            ? `${days}d`
+            : `Demo · ${days} día${days === 1 ? "" : "s"}`
           : "Demo";
 
   const title = isActive
@@ -50,7 +57,8 @@ export function PlanBadge({
   return (
     <div
       className={cn(
-        "flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide shadow-sm",
+        "flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide shadow-sm",
+        compact && "px-2 gap-0.5",
         variant === "sidebar" && "w-full justify-center",
         isActive
           ? "border-orange-300/60 bg-gradient-to-r from-orange-500 to-orange-600 text-white"
@@ -68,7 +76,7 @@ export function PlanBadge({
       ) : (
         <Lock className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
       )}
-      <span>{label}</span>
+      <span className="whitespace-nowrap">{label}</span>
     </div>
   );
 }

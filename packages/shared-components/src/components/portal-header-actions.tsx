@@ -54,7 +54,8 @@ export function PortalHeaderActions({
     <div
       className={cn(
         "flex items-center gap-2 sm:gap-2.5",
-        hasSearch ? "w-full sm:ml-auto sm:w-auto" : "ml-auto hidden sm:flex",
+        // Pair with PortalHeaderMobileActions (md:hidden) — avoid sm–md double cluster
+        hasSearch ? "w-full sm:ml-auto sm:w-auto" : "ml-auto hidden md:flex",
         className,
       )}
     >

@@ -52,10 +52,18 @@ export function RoleSwitcher({
       type="button"
       onClick={() => void handleSwitch()}
       disabled={switching || disabled}
-      className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-semibold text-navy shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-60"
+      title={meta.label}
+      aria-label={meta.label}
+      className="flex items-center gap-1.5 rounded-lg border border-border bg-white px-2 py-1.5 text-xs font-semibold text-navy shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-60 sm:gap-2 sm:px-3"
     >
-      {switching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <meta.Icon className="h-3.5 w-3.5" />}
-      {switching ? "Cambiando…" : meta.label}
+      {switching ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <meta.Icon className="h-3.5 w-3.5 shrink-0" />
+      )}
+      <span className="hidden sm:inline">
+        {switching ? "Cambiando…" : meta.label}
+      </span>
     </button>
   );
 }

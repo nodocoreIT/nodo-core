@@ -34,7 +34,6 @@ import {
   SidebarNavGroup,
   SidebarCommandPaletteHint,
   PortalHeaderActions,
-  PortalHeaderMobileActions,
   type AdminCommandPaletteItem,
 } from "@nodocore/shared-components";
 import { NodoSwitcher } from "@nodocore/nodo-modules";
@@ -288,6 +287,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
 
   const title = ROUTE_TITLES[pathname] ?? "Gestión";
   const displayName = doctor?.fullName ?? "Médico";
+  const firstName = displayName.trim().split(/\s+/)[0] || displayName;
 
   useEffect(() => {
     if (!doctor) return;
@@ -412,11 +412,11 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
           )}
         >
-          <div className="mt-2.5 flex h-16 flex-shrink-0 items-center justify-between px-5">
+          <div className="mt-2.5 flex h-16 shrink-0 items-center justify-between gap-2 px-5">
             <BrandMark onDark iconClassName="h-6 w-6" />
             <button
               type="button"
-              className="md:hidden text-[var(--color-sidebar-text)] hover:text-white"
+              className="shrink-0 md:hidden text-[var(--color-sidebar-text)] hover:text-white"
               onClick={() => setMobileMenuOpen(false)}
               aria-label="Cerrar menú"
             >
@@ -440,7 +440,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-white">
-                  {displayName}
+                  {firstName}
                 </p>
                 {doctor?.email && (
                   <p className="truncate text-xs text-[var(--color-sidebar-text)]">
@@ -613,105 +613,98 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
         </aside>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <header className="flex min-h-16 flex-shrink-0 flex-col gap-3 border-b border-border bg-[#EEF3F8] px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
-            <div className="flex items-center justify-between gap-2 min-w-0 sm:justify-start">
-              <div className="flex items-center gap-2 min-w-0">
+          <header className="flex flex-shrink-0 flex-col gap-3 border-b border-border bg-[#EEF3F8] px-4 py-3 shadow-sm sm:px-6 md:min-h-16 md:flex-row md:items-center md:gap-4">
+            {/* Mobile: title row + actions row (evita solapamiento del PlanBadge) */}
+            <div className="flex w-full min-w-0 flex-col gap-2 md:hidden">
+              <div className="flex min-w-0 items-center gap-2">
                 <button
                   type="button"
-                  className="block md:hidden text-[var(--color-navy)] hover:text-[var(--color-primary)]"
+                  className="shrink-0 text-[var(--color-navy)] hover:text-[var(--color-primary)]"
                   onClick={() => setMobileMenuOpen(true)}
                   aria-label="Abrir menú"
                 >
                   <Menu className="h-6 w-6" />
                 </button>
-                <button
-                  type="button"
-                  className={cn(
-                    "block md:hidden rounded-md p-1 text-[var(--color-navy)] hover:text-[var(--color-primary)]",
-                    inVideoConsultation && "opacity-40 cursor-not-allowed",
-                  )}
-                  onClick={() => {
-                    if (inVideoConsultation) {
-                      warnNavigationBlocked();
-                      return;
-                    }
-                    setSettingsOpen(true);
-                  }}
-                  aria-label="Configuración"
-                >
-                  <Settings className="h-6 w-6" />
-                </button>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[10px] font-semibold uppercase tracking-wide">
                     <span className="text-navy">NODO</span>
                     <span className="text-[var(--color-primary)]"> Clínica</span>
                     <span className="text-slate2"> · Profesionales</span>
                   </p>
-                  <h1 className="truncate text-base sm:text-xl font-bold text-navy font-display">
+                  <h1 className="truncate font-display text-base font-bold text-navy">
                     {title}
                   </h1>
                 </div>
+                {doctor ? (
+                  <PlanBadge
+                    compact
+                    subscriptionStatus={
+                      doctor.subscriptionStatus as
+                        | "demo"
+                        | "pending_payment"
+                        | "active"
+                        | "expired"
+                        | undefined
+                    }
+                    trialDaysRemaining={doctor.trialDaysRemaining}
+                  />
+                ) : null}
               </div>
 
-              {doctor && (
-                <PortalHeaderMobileActions
-                  metrics={
-                    <PlanBadge
-                      subscriptionStatus={
-                        doctor.subscriptionStatus as
-                          | "demo"
-                          | "pending_payment"
-                          | "active"
-                          | "expired"
-                          | undefined
-                      }
-                      trialDaysRemaining={doctor.trialDaysRemaining}
+              {doctor ? (
+                <div className="flex items-center justify-end gap-1.5">
+                  <div
+                    className={cn(
+                      "flex items-center gap-0.5",
+                      inVideoConsultation && "pointer-events-none opacity-50",
+                    )}
+                  >
+                    <ClinicNotificationsBell
+                      doctorId={doctor.id}
+                      navigationDisabled={inVideoConsultation}
+                      onNavigationBlocked={warnNavigationBlocked}
                     />
-                  }
-                  notifications={
-                    <div className="flex items-center gap-0.5">
-                      <div
-                        className={cn(
-                          inVideoConsultation && "pointer-events-none opacity-50",
-                        )}
-                      >
-                        <ClinicNotificationsBell
-                          doctorId={doctor.id}
-                          navigationDisabled={inVideoConsultation}
-                          onNavigationBlocked={warnNavigationBlocked}
-                        />
-                      </div>
-                      <NodoChatBell
-                        className="relative z-[120]"
-                        chatEmbedded={chatEmbedded}
-                        inVideoConsultation={inVideoConsultation}
-                        onOpenChat={chatEmbedded ? undefined : openFloatingChat}
-                      />
-                    </div>
-                  }
-                  trailing={
-                    <div
-                      className={cn(
-                        "flex items-center gap-2",
-                        inVideoConsultation && "pointer-events-none opacity-50",
-                      )}
-                    >
-                      <RoleSwitcher
-                        currentRole="doctor"
-                        canSwitchToOther={canSwitchToPatient}
-                        disabled={inVideoConsultation}
-                        onDisabledClick={warnNavigationBlocked}
-                      />
-                      {isPlatformMode() && isBrowserSupabaseEnabled() ? (
-                        <NodoSwitcher product="clinica" clinicaRole="medico" />
-                      ) : null}
-                    </div>
-                  }
-                />
-              )}
+                    <NodoChatBell
+                      chatEmbedded={chatEmbedded}
+                      inVideoConsultation={inVideoConsultation}
+                      onOpenChat={chatEmbedded ? undefined : openFloatingChat}
+                    />
+                  </div>
+                  <div
+                    className={cn(
+                      "flex items-center gap-1.5",
+                      inVideoConsultation && "pointer-events-none opacity-50",
+                    )}
+                  >
+                    <RoleSwitcher
+                      currentRole="doctor"
+                      canSwitchToOther={canSwitchToPatient}
+                      disabled={inVideoConsultation}
+                      onDisabledClick={warnNavigationBlocked}
+                    />
+                    {isPlatformMode() && isBrowserSupabaseEnabled() ? (
+                      <NodoSwitcher product="clinica" clinicaRole="medico" />
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
-            {doctor && (
+            {/* Desktop / tablet */}
+            <div className="hidden min-w-0 flex-1 items-center gap-3 md:flex">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide">
+                  <span className="text-navy">NODO</span>
+                  <span className="text-[var(--color-primary)]"> Clínica</span>
+                  <span className="text-slate2"> · Profesionales</span>
+                </p>
+                <h1 className="truncate font-display text-xl font-bold text-navy">
+                  {title}
+                </h1>
+              </div>
+            </div>
+
+            {doctor ? (
               <PortalHeaderActions
                 notifications={
                   <div className="flex items-center gap-0.5">
@@ -727,7 +720,6 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                       />
                     </div>
                     <NodoChatBell
-                      className="relative z-[120]"
                       chatEmbedded={chatEmbedded}
                       inVideoConsultation={inVideoConsultation}
                       onOpenChat={chatEmbedded ? undefined : openFloatingChat}
@@ -766,10 +758,10 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                   </div>
                 }
               />
-            )}
+            ) : null}
           </header>
 
-          <main className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] sm:p-6 sm:pb-6">
+          <main className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4 pb-[max(6rem,env(safe-area-inset-bottom,0px))] sm:p-6 sm:pb-6">
             {isPlatformMode() && isBrowserSupabaseEnabled() ? (
               <BillingLockoutGate>{children}</BillingLockoutGate>
             ) : (
@@ -792,6 +784,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
             open={settingsOpen}
             onOpenChange={(o) => {
               setSettingsOpen(o);
+              if (o) setChatFloatingOpen(false);
               if (!o) {
                 setSettingsSection(undefined);
                 setMpJustConnected(false);
@@ -808,7 +801,10 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
             onComplete={() => setSpecialtySetupOpen(false)}
           />
         )}
-        {doctor && !chatEmbedded && isProPlan(doctor.subscriptionPlan) && (
+        {doctor &&
+          !chatEmbedded &&
+          !settingsOpen &&
+          isProPlan(doctor.subscriptionPlan) && (
           <NodoChatWidget
             key={chatSessionKey}
             doctorId={doctor.id}
