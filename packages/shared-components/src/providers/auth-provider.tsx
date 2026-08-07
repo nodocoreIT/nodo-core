@@ -219,9 +219,15 @@ export function AuthProvider({
       void validateSession(data.session);
     });
 
-    // Subscribe to auth state changes
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
+    // Subscribe to auth state changes. Supabase always emits INITIAL_SESSION
+    // on subscribe, which duplicates the getSession() call above and used to
+    // fire two concurrent user_has_node_access RPCs on every mount — if either
+    // one flaked, validateSession's fail-closed signOut could bounce a user
+    // with legitimate access. getSession() already covers the initial load,
+    // so only react here to real subsequent changes.
+    const { data: listener } = supabase.auth.onAuthStateChange((event, s) => {
       if (cancelled) return;
+      if (event === "INITIAL_SESSION") return;
       setSession(s);
       setIsLoading(false);
       void validateSession(s);
