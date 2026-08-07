@@ -759,6 +759,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
     if (aiSettings.provider === "openai") return aiSettings.openaiApiKey ?? "";
     if (aiSettings.provider === "anthropic") return aiSettings.anthropicApiKey ?? "";
     if (aiSettings.provider === "groq") return aiSettings.groqApiKey ?? "";
+    if (aiSettings.provider === "cohere") return aiSettings.cohereApiKey ?? "";
     return aiSettings.geminiApiKey ?? "";
   });
   const [showApiKey, setShowApiKey] = useState(false);
@@ -771,6 +772,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
     if (p === "openai") setApiKeyInput(aiSettings.openaiApiKey ?? "");
     else if (p === "anthropic") setApiKeyInput(aiSettings.anthropicApiKey ?? "");
     else if (p === "groq") setApiKeyInput(aiSettings.groqApiKey ?? "");
+    else if (p === "cohere") setApiKeyInput(aiSettings.cohereApiKey ?? "");
     else setApiKeyInput(aiSettings.geminiApiKey ?? "");
   };
 
@@ -781,7 +783,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
     placeholder: string;
     helpUrl: string;
     helpLabel: string;
-    keyField: "geminiApiKey" | "openaiApiKey" | "anthropicApiKey" | "groqApiKey";
+    keyField: "geminiApiKey" | "openaiApiKey" | "anthropicApiKey" | "groqApiKey" | "cohereApiKey";
     logo: React.ReactNode;
   }> = [
     {
@@ -837,6 +839,20 @@ export function SettingsDialog({ open, onOpenChange, initialTab }: SettingsDialo
       logo: (
         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#F55036] text-[10px] font-black text-white">
           GQ
+        </div>
+      ),
+    },
+    {
+      id: "cohere",
+      name: "Cohere",
+      description: "Command A — trial gratis",
+      placeholder: "…",
+      helpUrl: "https://dashboard.cohere.com/api-keys",
+      helpLabel: "Creá una API key gratis en Cohere (trial)",
+      keyField: "cohereApiKey",
+      logo: (
+        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#39594D] text-[10px] font-black text-white">
+          Co
         </div>
       ),
     },

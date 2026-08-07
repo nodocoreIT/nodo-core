@@ -55,6 +55,7 @@ const DEFAULT_AI_SETTINGS: AiSettings = {
   openaiApiKey: "",
   anthropicApiKey: "",
   groqApiKey: "",
+  cohereApiKey: "",
 };
 
 function readAiSettings() {
@@ -66,6 +67,8 @@ function readAiSettings() {
       if (!parsed.provider) parsed.provider = "gemini";
       if (!parsed.openaiApiKey) parsed.openaiApiKey = "";
       if (!parsed.anthropicApiKey) parsed.anthropicApiKey = "";
+      if (!parsed.groqApiKey) parsed.groqApiKey = "";
+      if (!parsed.cohereApiKey) parsed.cohereApiKey = "";
       return { ...DEFAULT_AI_SETTINGS, ...parsed };
     }
   } catch {

@@ -1,8 +1,33 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Bug, CheckSquare, Lightbulb } from "lucide-react";
-import { FormSelect, SearchableSelect } from "@nodocore/shared-components";
+import { useState, useRef, useEffect, useMemo } from "react";
+import {
+  AlertTriangle,
+  Bug,
+  CheckSquare,
+  ChevronDown,
+  Lightbulb,
+  Plus,
+  Search,
+  Wrench,
+} from "lucide-react";
+import {
+  FormSelect,
+  SearchableSelect,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@nodocore/shared-components";
+import { ECOMMERCE_ACCENT, getNodeAccentByCode } from "@/lib/node-accents";
+import {
+  buildCodedTaskTitle,
+  formatTaskDescription,
+  getTaskPrefixForUnit,
+} from "@/lib/panel/task-code";
+import { GenerateTitleFromDescriptionButton } from "@/components/panel/generate-title-button";
+import { TaskCommentsSection } from "@/components/panel/task-comments-section";
 import {
   DndContext,
   DragEndEvent,
@@ -32,11 +57,20 @@ export type Task = {
   unit_code: string;
   status: "backlog" | "doing" | "review" | "done";
   priority: "alta" | "media" | "baja";
-  type: "task" | "bug" | "idea";
+  type: "task" | "bug" | "idea" | "debt" | "known_issue";
   assignee: string | null;
   due_date: string | null;
+  created_at: string;
   position: number;
 };
+
+export const TASK_TYPES: Task["type"][] = [
+  "task",
+  "bug",
+  "idea",
+  "debt",
+  "known_issue",
+];
 
 export type Profile = {
   id: string;
@@ -51,7 +85,11 @@ type KanbanBoardProps = {
   profiles: Profile[];
   units: string[];
   searchTerm: string;
+  onSearchChange: (value: string) => void;
 };
+
+/** Select menus portal above Kanban modals (zIndex 1000). */
+const MODAL_SELECT_Z = "z-[1100]";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -71,11 +109,122 @@ const PRIORITY_STYLES: Record<
   baja: { bg: "var(--color-mist)", color: "var(--color-slate2)", label: "Baja" },
 };
 
-const TYPE_CONFIG: Record<Task["type"], { label: string; color: string; bg: string; Icon: React.ElementType }> = {
-  task: { label: "Tarea",  color: "#2A6FDB", bg: "#E3EDFC", Icon: CheckSquare },
-  bug:  { label: "Bug",    color: "#C0392B", bg: "#FBE6E1", Icon: Bug },
-  idea: { label: "Idea",   color: "#B5630C", bg: "#FCE9D8", Icon: Lightbulb },
+const TYPE_CONFIG: Record<
+  Task["type"],
+  { label: string; color: string; bg: string; Icon: React.ElementType }
+> = {
+  task: { label: "Tarea", color: "#2A6FDB", bg: "#E3EDFC", Icon: CheckSquare },
+  bug: { label: "Bug", color: "#C0392B", bg: "#FBE6E1", Icon: Bug },
+  idea: { label: "Idea", color: "#B5630C", bg: "#FCE9D8", Icon: Lightbulb },
+  debt: {
+    label: "Deuda técnica",
+    color: "#6D28D9",
+    bg: "#EDE9FE",
+    Icon: Wrench,
+  },
+  known_issue: {
+    label: "Known issue",
+    color: "#B45309",
+    bg: "#FEF3C7",
+    Icon: AlertTriangle,
+  },
 };
+
+function getTypeConfig(type: Task["type"] | string | null | undefined) {
+  if (type && type in TYPE_CONFIG) {
+    return TYPE_CONFIG[type as Task["type"]];
+  }
+  return TYPE_CONFIG.task;
+}
+
+function TaskTypeSelect({
+  value,
+  onChange,
+  className,
+  contentClassName,
+}: {
+  value: Task["type"];
+  onChange: (value: Task["type"]) => void;
+  className?: string;
+  contentClassName?: string;
+}) {
+  const selected = getTypeConfig(value);
+  const SelectedIcon = selected.Icon;
+
+  return (
+    <Select
+      value={value}
+      onValueChange={(next) => onChange(next as Task["type"])}
+    >
+      <SelectTrigger className={["rounded-md", className].filter(Boolean).join(" ")}>
+        {/* div (not span): SelectTrigger applies [&>span]:line-clamp-1 which stacks icon/label */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            flex: 1,
+            minWidth: 0,
+            overflow: "hidden",
+          }}
+        >
+          <SelectedIcon
+            className="h-3.5 w-3.5 shrink-0"
+            style={{ color: selected.color, flexShrink: 0 }}
+            strokeWidth={2.2}
+            aria-hidden
+          />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {selected.label}
+          </span>
+        </div>
+        {/* Radix requires SelectValue; hide mirrored item content (avoids double icon) */}
+        <div
+          style={{
+            position: "absolute",
+            width: 1,
+            height: 1,
+            padding: 0,
+            margin: -1,
+            overflow: "hidden",
+            clip: "rect(0, 0, 0, 0)",
+            whiteSpace: "nowrap",
+            border: 0,
+          }}
+        >
+          <SelectValue />
+        </div>
+      </SelectTrigger>
+      <SelectContent className={["z-[200]", contentClassName].filter(Boolean).join(" ")}>
+        {TASK_TYPES.map((key) => {
+          const conf = TYPE_CONFIG[key];
+          const Icon = conf.Icon;
+          return (
+            <SelectItem key={key} value={key} textValue={conf.label}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <Icon
+                  className="h-3.5 w-3.5 shrink-0"
+                  style={{ color: conf.color, flexShrink: 0 }}
+                  strokeWidth={2.2}
+                  aria-hidden
+                />
+                <span>{conf.label}</span>
+              </div>
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
 
 const MONTH_NAMES = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -83,8 +232,34 @@ const MONTH_NAMES = [
 ];
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = new Date(dateStr.includes("T") ? dateStr : `${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
   return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
+}
+
+/** Local calendar date as YYYY-MM-DD (for `<input type="date">`). */
+function todayLocalDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function toDateInputValue(isoOrDate: string | null | undefined): string {
+  if (!isoOrDate) return todayLocalDate();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(isoOrDate)) return isoOrDate;
+  const d = new Date(isoOrDate);
+  if (Number.isNaN(d.getTime())) return todayLocalDate();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Noon UTC keeps the calendar day stable across AR/UTC when saving created_at. */
+function dateInputToCreatedAt(dateInput: string): string {
+  return `${dateInput}T12:00:00.000Z`;
 }
 
 // ─── AssigneeAvatar (photo or initials) ───────────────────────────────────────
@@ -188,7 +363,7 @@ function TaskEditModal({
   task: Task;
   profiles: Profile[];
   units: string[];
-  onSave: (updated: Task) => void;
+  onSave: (updated: Task) => Promise<string | null> | string | null | void;
   onDelete: (id: string) => void;
   onClose: () => void;
 }) {
@@ -198,9 +373,17 @@ function TaskEditModal({
   const [priority, setPriority] = useState<Task["priority"]>(task.priority);
   const [type, setType] = useState<Task["type"]>(task.type ?? "task");
   const [dueDate, setDueDate] = useState(task.due_date ?? "");
+  const [createdDate, setCreatedDate] = useState(toDateInputValue(task.created_at));
   const [assignee, setAssignee] = useState(task.assignee ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const unitOptions = useMemo(() => {
+    const codes = [...units];
+    if (unitCode && !codes.includes(unitCode)) codes.unshift(unitCode);
+    return codes.map((unit) => ({ value: unit, label: unit }));
+  }, [units, unitCode]);
 
   const inputStyle: React.CSSProperties = {
     width: "100%",
@@ -227,19 +410,32 @@ function TaskEditModal({
   };
 
   async function handleSave() {
-    if (!title.trim()) return;
+    if (!title.trim() || saving) return;
     setSaving(true);
+    setSaveError(null);
+    const normalizedDescription = formatTaskDescription(description);
+    if (normalizedDescription && normalizedDescription !== description) {
+      setDescription(normalizedDescription);
+    }
     const updated: Task = {
       ...task,
       title: title.trim(),
-      description: description.trim() || null,
+      description: normalizedDescription,
       unit_code: unitCode,
       priority,
       type,
       due_date: dueDate || null,
+      created_at: createdDate ? dateInputToCreatedAt(createdDate) : task.created_at,
       assignee: assignee || null,
     };
-    onSave(updated);
+    try {
+      const err = await onSave(updated);
+      if (err) setSaveError(err);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "No se pudo guardar la tarea.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDelete() {
@@ -248,7 +444,6 @@ function TaskEditModal({
 
   return (
     <div
-      onClick={onClose}
       style={{
         position: "fixed",
         inset: 0,
@@ -257,7 +452,7 @@ function TaskEditModal({
         alignItems: "center",
         justifyContent: "center",
         zIndex: 1000,
-        padding: 24,
+        padding: 12,
       }}
     >
       <div
@@ -267,8 +462,8 @@ function TaskEditModal({
           borderRadius: 12,
           boxShadow: "0 8px 32px rgba(18,30,47,.18)",
           width: "100%",
-          maxWidth: 480,
-          maxHeight: "90vh",
+          maxWidth: 560,
+          maxHeight: "96vh",
           overflowY: "auto",
           display: "flex",
           flexDirection: "column",
@@ -310,7 +505,64 @@ function TaskEditModal({
           </button>
         </div>
 
-        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0,1fr) minmax(0,0.9fr) minmax(0,1.35fr)",
+              gap: 12,
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <label style={labelStyle}>Unidad</label>
+              <FormSelect
+                value={unitCode}
+                onChange={setUnitCode}
+                options={unitOptions}
+                contentClassName={MODAL_SELECT_Z}
+              />
+            </div>
+
+            <div style={{ minWidth: 0 }}>
+              <label style={labelStyle}>Prioridad</label>
+              <FormSelect
+                value={priority}
+                onChange={(value) => setPriority(value as Task["priority"])}
+                options={[
+                  { value: "alta", label: "Alta" },
+                  { value: "media", label: "Media" },
+                  { value: "baja", label: "Baja" },
+                ]}
+                contentClassName={MODAL_SELECT_Z}
+              />
+            </div>
+
+            <div style={{ minWidth: 0 }}>
+              <label style={labelStyle}>Tipo</label>
+              <TaskTypeSelect
+                value={type}
+                onChange={setType}
+                contentClassName={MODAL_SELECT_Z}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Descripción</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              style={{ ...inputStyle, resize: "vertical" }}
+            />
+            <GenerateTitleFromDescriptionButton
+              description={description}
+              unitCode={unitCode}
+              onTitle={setTitle}
+              onDescriptionNormalized={setDescription}
+            />
+          </div>
+
           <div>
             <label style={labelStyle}>Título</label>
             <input
@@ -321,61 +573,25 @@ function TaskEditModal({
             />
           </div>
 
-          <div>
-            <label style={labelStyle}>Descripción</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              style={{ ...inputStyle, resize: "vertical" }}
-            />
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label style={labelStyle}>Unidad</label>
-              <FormSelect
-                value={unitCode}
-                onChange={setUnitCode}
-                options={units.map((unit) => ({ value: unit, label: unit }))}
+              <label style={labelStyle}>Fecha de creación</label>
+              <input
+                type="date"
+                value={createdDate}
+                onChange={(e) => setCreatedDate(e.target.value)}
+                style={inputStyle}
               />
             </div>
-
             <div>
-              <label style={labelStyle}>Prioridad</label>
-              <FormSelect
-                value={priority}
-                onChange={(value) => setPriority(value as Task["priority"])}
-                options={[
-                  { value: "alta", label: "Alta" },
-                  { value: "media", label: "Media" },
-                  { value: "baja", label: "Baja" },
-                ]}
+              <label style={labelStyle}>Fecha límite</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                style={inputStyle}
               />
             </div>
-
-            <div>
-              <label style={labelStyle}>Tipo</label>
-              <FormSelect
-                value={type}
-                onChange={(value) => setType(value as Task["type"])}
-                options={[
-                  { value: "task", label: "Tarea" },
-                  { value: "bug", label: "Bug" },
-                  { value: "idea", label: "Idea" },
-                ]}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label style={labelStyle}>Fecha límite</label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              style={inputStyle}
-            />
           </div>
 
           <div>
@@ -402,6 +618,22 @@ function TaskEditModal({
               );
             })()}
           </div>
+
+          {saveError ? (
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12.5,
+                color: "#b91c1c",
+                fontFamily: "var(--font-sans)",
+                lineHeight: 1.4,
+              }}
+            >
+              {saveError}
+            </p>
+          ) : null}
+
+          <TaskCommentsSection taskId={task.id} profiles={profiles} />
         </div>
 
         <div
@@ -513,6 +745,331 @@ function TaskEditModal({
   );
 }
 
+// ─── TaskCreateModal ──────────────────────────────────────────────────────────
+
+function TaskCreateModal({
+  profiles,
+  units,
+  tasks,
+  onCreate,
+  onClose,
+}: {
+  profiles: Profile[];
+  units: string[];
+  tasks: readonly Pick<Task, "unit_code" | "title">[];
+  onCreate: (task: Omit<Task, "id" | "position">) => Promise<void> | void;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [unitCode, setUnitCode] = useState(units[0] ?? "");
+  const [priority, setPriority] = useState<Task["priority"]>("media");
+  const [type, setType] = useState<Task["type"]>("task");
+  const [createdDate, setCreatedDate] = useState(todayLocalDate);
+  const [dueDate, setDueDate] = useState("");
+  const [assignee, setAssignee] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const existingTitles = tasks
+    .filter((t) => t.unit_code === unitCode)
+    .map((t) => t.title);
+
+  const codedPreview = title.trim()
+    ? buildCodedTaskTitle(unitCode, title, existingTitles)
+    : `${getTaskPrefixForUnit(unitCode)}-NN-…`;
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    border: "1px solid var(--color-mist)",
+    borderRadius: 6,
+    padding: "8px 10px",
+    fontSize: 13.5,
+    fontFamily: "var(--font-sans)",
+    outline: "none",
+    boxSizing: "border-box",
+    color: "var(--color-ink)",
+    background: "white",
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: "block",
+    fontSize: 12,
+    fontWeight: 600,
+    color: "var(--color-slate2)",
+    marginBottom: 5,
+    fontFamily: "var(--font-sans)",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+  };
+
+  async function handleCreate() {
+    if (!title.trim() || saving) return;
+    setSaving(true);
+    try {
+      const normalizedDescription = formatTaskDescription(description);
+      if (normalizedDescription && normalizedDescription !== description) {
+        setDescription(normalizedDescription);
+      }
+      await onCreate({
+        title: title.trim(),
+        description: normalizedDescription,
+        unit_code: unitCode,
+        status: "backlog",
+        priority,
+        type,
+        due_date: dueDate || null,
+        created_at: dateInputToCreatedAt(createdDate || todayLocalDate()),
+        assignee: assignee || null,
+      });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(18,30,47,.52)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: 12,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "white",
+          borderRadius: 12,
+          boxShadow: "0 8px 32px rgba(18,30,47,.18)",
+          width: "100%",
+          maxWidth: 480,
+          maxHeight: "96vh",
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "20px 24px 16px",
+            borderBottom: "1px solid var(--color-mist)",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "var(--font-display)",
+              fontWeight: 700,
+              fontSize: 16,
+              color: "var(--color-navy)",
+            }}
+          >
+            Nueva tarea
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "var(--color-slate2)",
+              fontSize: 20,
+              lineHeight: 1,
+              padding: "2px 4px",
+              borderRadius: 4,
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0,1fr) minmax(0,0.9fr) minmax(0,1.35fr)",
+              gap: 12,
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <label style={labelStyle}>Unidad</label>
+              <FormSelect
+                value={unitCode}
+                onChange={setUnitCode}
+                options={units.map((unit) => ({ value: unit, label: unit }))}
+                contentClassName={MODAL_SELECT_Z}
+              />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <label style={labelStyle}>Prioridad</label>
+              <FormSelect
+                value={priority}
+                onChange={(value) => setPriority(value as Task["priority"])}
+                options={[
+                  { value: "alta", label: "Alta" },
+                  { value: "media", label: "Media" },
+                  { value: "baja", label: "Baja" },
+                ]}
+                contentClassName={MODAL_SELECT_Z}
+              />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <label style={labelStyle}>Tipo</label>
+              <TaskTypeSelect
+                value={type}
+                onChange={setType}
+                contentClassName={MODAL_SELECT_Z}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Descripción</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="Opcional"
+              autoFocus
+              style={{ ...inputStyle, resize: "vertical" }}
+            />
+            <GenerateTitleFromDescriptionButton
+              description={description}
+              unitCode={unitCode}
+              onTitle={setTitle}
+              onDescriptionNormalized={setDescription}
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Título</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Qué hay que hacer…"
+              style={inputStyle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleCreate();
+                }
+              }}
+            />
+            <p
+              style={{
+                margin: "6px 0 0",
+                fontSize: 11.5,
+                color: "var(--color-slate2)",
+                fontFamily: "var(--font-sans)",
+                lineHeight: 1.4,
+                wordBreak: "break-all",
+              }}
+            >
+              Se guardará como{" "}
+              <span style={{ fontWeight: 700, color: "var(--color-navy)" }}>
+                {codedPreview}
+              </span>
+            </p>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Fecha de creación</label>
+              <input
+                type="date"
+                value={createdDate}
+                onChange={(e) => setCreatedDate(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Fecha límite</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Responsable</label>
+            <SearchableSelect
+              value={assignee}
+              onChange={setAssignee}
+              options={profiles.map((profile) => ({
+                value: profile.id,
+                label: profile.full_name,
+              }))}
+              allowEmpty
+              emptyLabel="Sin asignar"
+              searchPlaceholder="Buscar..."
+            />
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: "16px 24px 20px",
+            borderTop: "1px solid var(--color-mist)",
+            display: "flex",
+            gap: 10,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => void handleCreate()}
+            disabled={saving || !title.trim()}
+            style={{
+              flex: 1,
+              background: "var(--color-brand)",
+              color: "white",
+              border: "none",
+              borderRadius: 8,
+              padding: "10px 16px",
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: saving || !title.trim() ? "not-allowed" : "pointer",
+              fontFamily: "var(--font-sans)",
+              opacity: saving || !title.trim() ? 0.7 : 1,
+            }}
+          >
+            {saving ? "Creando..." : "Crear tarea"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              flex: 1,
+              background: "transparent",
+              color: "var(--color-slate2)",
+              border: "1px solid var(--color-mist)",
+              borderRadius: 8,
+              padding: "10px 16px",
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "var(--font-sans)",
+            }}
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── TaskCard (pure visual) ───────────────────────────────────────────────────
 
 function TaskCard({
@@ -524,8 +1081,10 @@ function TaskCard({
 }) {
   const assignee = profiles.find((p) => p.id === task.assignee);
   const priority = PRIORITY_STYLES[task.priority];
-  const typeConf = TYPE_CONFIG[task.type ?? "task"];
+  const typeConf = getTypeConfig(task.type);
   const TypeIcon = typeConf.Icon;
+  const unitAccent = getNodeAccentByCode(task.unit_code);
+  const unitPillOnLight = unitAccent.brand === ECOMMERCE_ACCENT.brand;
 
   return (
     <div
@@ -546,10 +1105,11 @@ function TaskCard({
             fontFamily: "var(--font-display)",
             fontWeight: 700,
             fontSize: 11.5,
-            background: "var(--color-mist-200)",
+            background: `rgba(${unitAccent.rgb}, 0.14)`,
+            border: `1px solid rgba(${unitAccent.rgb}, 0.32)`,
             borderRadius: 6,
             padding: "3px 8px",
-            color: "var(--color-navy)",
+            color: unitPillOnLight ? unitAccent.brand600 : unitAccent.brand,
             whiteSpace: "nowrap",
           }}
         >
@@ -622,9 +1182,10 @@ function TaskCard({
           marginTop: 10,
         }}
       >
-        {task.due_date ? (
-          <span style={{ fontSize: 12, color: "var(--color-slate2)" }}>
-            🗓 {formatDate(task.due_date)}
+        {task.due_date || task.created_at ? (
+          <span style={{ fontSize: 12, color: "var(--color-slate2)", display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {task.created_at ? <span title="Creación">📅 {formatDate(task.created_at)}</span> : null}
+            {task.due_date ? <span title="Fecha límite">🗓 {formatDate(task.due_date)}</span> : null}
           </span>
         ) : (
           <span />
@@ -698,7 +1259,17 @@ function AddTaskForm({
 
   function handleSubmit() {
     if (!title.trim()) return;
-    onAdd({ title: title.trim(), description: null, unit_code: unit, status, priority, type, assignee: null, due_date: null });
+    onAdd({
+      title: title.trim(),
+      description: null,
+      unit_code: unit,
+      status,
+      priority,
+      type,
+      assignee: null,
+      due_date: null,
+      created_at: dateInputToCreatedAt(todayLocalDate()),
+    });
   }
 
   return (
@@ -736,14 +1307,9 @@ function AddTaskForm({
           ]}
           className="flex-1"
         />
-        <FormSelect
+        <TaskTypeSelect
           value={type}
-          onChange={(value) => setType(value as Task["type"])}
-          options={[
-            { value: "task", label: "Tarea" },
-            { value: "bug", label: "Bug" },
-            { value: "idea", label: "Idea" },
-          ]}
+          onChange={setType}
           className="flex-1"
         />
       </div>
@@ -857,7 +1423,153 @@ function KanbanColumn({
   );
 }
 
-// ─── FilterBar ────────────────────────────────────────────────────────────────
+// ─── Filter dropdown (Jira-style) ─────────────────────────────────────────────
+
+function FilterMenu({
+  label,
+  activeCount,
+  children,
+}: {
+  label: string;
+  activeCount: number;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: PointerEvent) {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  const active = activeCount > 0;
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          height: 32,
+          padding: "0 10px",
+          borderRadius: 6,
+          border: `1px solid ${active ? "var(--color-brand)" : "var(--color-mist)"}`,
+          background: active ? "rgba(232, 93, 4, 0.08)" : "white",
+          color: active ? "var(--color-brand)" : "var(--color-navy)",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          fontFamily: "var(--font-sans)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+        {active ? (
+          <span
+            style={{
+              minWidth: 18,
+              height: 18,
+              borderRadius: 999,
+              background: "var(--color-brand)",
+              color: "white",
+              fontSize: 11,
+              fontWeight: 700,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 5px",
+            }}
+          >
+            {activeCount}
+          </span>
+        ) : null}
+        <ChevronDown size={14} strokeWidth={2.2} style={{ opacity: 0.7 }} />
+      </button>
+      {open ? (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            zIndex: 40,
+            minWidth: 180,
+            background: "white",
+            border: "1px solid var(--color-mist)",
+            borderRadius: 8,
+            boxShadow: "0 8px 24px rgba(18,30,47,.12)",
+            padding: 6,
+          }}
+        >
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function FilterMenuItem({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        textAlign: "left",
+        padding: "8px 10px",
+        border: "none",
+        borderRadius: 6,
+        background: active ? "rgba(42, 111, 219, 0.1)" : "transparent",
+        color: "var(--color-navy)",
+        fontSize: 13,
+        fontWeight: active ? 700 : 500,
+        cursor: "pointer",
+        fontFamily: "var(--font-sans)",
+      }}
+    >
+      <span
+        style={{
+          width: 14,
+          height: 14,
+          borderRadius: 3,
+          border: `1.5px solid ${active ? "var(--color-brand)" : "var(--color-slate2)"}`,
+          background: active ? "var(--color-brand)" : "white",
+          flexShrink: 0,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "white",
+          fontSize: 10,
+          fontWeight: 700,
+        }}
+      >
+        {active ? "✓" : ""}
+      </span>
+      {children}
+    </button>
+  );
+}
+
+// ─── FilterBar (Jira-style single toolbar) ────────────────────────────────────
 
 function FilterBar({
   profiles,
@@ -865,91 +1577,189 @@ function FilterBar({
   selectedAssignees,
   selectedUnits,
   selectedTypes,
+  searchTerm,
+  onSearchChange,
   onToggleAssignee,
   onToggleUnit,
   onToggleType,
   onClearAll,
+  onAddTask,
 }: {
   profiles: Profile[];
   units: string[];
   selectedAssignees: string[];
   selectedUnits: string[];
   selectedTypes: Task["type"][];
+  searchTerm: string;
+  onSearchChange: (value: string) => void;
   onToggleAssignee: (id: string) => void;
   onToggleUnit: (unit: string) => void;
   onToggleType: (type: Task["type"]) => void;
   onClearAll: () => void;
+  onAddTask: () => void;
 }) {
-  const hasFilters = selectedAssignees.length > 0 || selectedUnits.length > 0 || selectedTypes.length > 0;
-
-  const chipBase: React.CSSProperties = {
-    border: "1px solid var(--color-mist)",
-    borderRadius: 999,
-    padding: "4px 12px",
-    fontSize: 12.5,
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: "var(--font-sans)",
-    transition: "background 150ms, color 150ms, border-color 150ms",
-  };
+  const hasFilters =
+    selectedAssignees.length > 0 ||
+    selectedUnits.length > 0 ||
+    selectedTypes.length > 0 ||
+    searchTerm.trim() !== "";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-      {/* Assignees */}
-      {profiles.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-slate2)", textTransform: "uppercase", letterSpacing: "0.05em", width: 90, flexShrink: 0 }}>Responsable</span>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
-            {profiles.map((p) => {
-              const active = selectedAssignees.includes(p.id);
-              const dimmed = selectedAssignees.length > 0 && !active;
-              return (
-                <button key={p.id} type="button" onClick={() => onToggleAssignee(p.id)} title={p.full_name} aria-pressed={active}
-                  style={{ padding: 0, border: "none", background: "transparent", cursor: "pointer", opacity: dimmed ? 0.35 : 1, transform: active ? "translateY(-3px)" : "none", transition: "opacity 150ms, transform 150ms", borderRadius: 8 }}>
-                  <AssigneeAvatar profile={p} size={30} withInitials ring={active} />
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Units */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-slate2)", textTransform: "uppercase", letterSpacing: "0.05em", width: 90, flexShrink: 0 }}>Unidad</span>
-        {units.map((u) => {
-          const active = selectedUnits.includes(u);
-          return (
-            <button key={u} onClick={() => onToggleUnit(u)} style={{ ...chipBase, background: active ? "var(--color-navy)" : "white", color: active ? "white" : "var(--color-slate2)", borderColor: active ? "var(--color-navy)" : "var(--color-mist)" }}>
-              {u}
-            </button>
-          );
-        })}
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: 20,
+        flexWrap: "wrap",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          height: 32,
+          width: 220,
+          maxWidth: "100%",
+          border: "1px solid var(--color-mist)",
+          borderRadius: 6,
+          background: "white",
+          padding: "0 10px",
+          flexShrink: 0,
+        }}
+      >
+        <Search size={15} color="var(--color-slate2)" aria-hidden />
+        <input
+          type="search"
+          value={searchTerm}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Buscar en el tablero"
+          aria-label="Buscar tareas"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            border: "none",
+            outline: "none",
+            background: "transparent",
+            fontSize: 13,
+            fontFamily: "var(--font-sans)",
+            color: "var(--color-ink)",
+          }}
+        />
       </div>
 
-      {/* Types */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-slate2)", textTransform: "uppercase", letterSpacing: "0.05em", width: 90, flexShrink: 0 }}>Tipo</span>
-        {(Object.entries(TYPE_CONFIG) as [Task["type"], (typeof TYPE_CONFIG)[Task["type"]]][]).map(([key, conf]) => {
-          const active = selectedTypes.includes(key);
-          const Icon = conf.Icon;
-          return (
-            <button key={key} onClick={() => onToggleType(key)}
-              style={{ ...chipBase, display: "inline-flex", alignItems: "center", gap: 5, background: active ? conf.bg : "white", color: active ? conf.color : "var(--color-slate2)", borderColor: active ? conf.color : "var(--color-mist)" }}>
-              <Icon size={13} strokeWidth={2.2} />
-              {conf.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {hasFilters && (
-        <div>
-          <button onClick={onClearAll} style={{ ...chipBase, background: "transparent", color: "var(--color-slate2)" }}>
-            Limpiar filtros
-          </button>
+      {profiles.length > 0 ? (
+        <div style={{ display: "flex", alignItems: "center", paddingLeft: 4 }}>
+          {profiles.map((p, index) => {
+            const active = selectedAssignees.includes(p.id);
+            const dimmed = selectedAssignees.length > 0 && !active;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onToggleAssignee(p.id)}
+                title={p.full_name}
+                aria-pressed={active}
+                style={{
+                  padding: 0,
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  marginLeft: index === 0 ? 0 : -8,
+                  zIndex: active ? 20 : profiles.length - index,
+                  opacity: dimmed ? 0.4 : 1,
+                  transition: "opacity 150ms, transform 150ms",
+                  transform: active ? "translateY(-2px)" : "none",
+                  borderRadius: "50%",
+                }}
+              >
+                <AssigneeAvatar profile={p} size={28} ring={active} />
+              </button>
+            );
+          })}
         </div>
-      )}
+      ) : null}
+
+      <FilterMenu label="Unidad" activeCount={selectedUnits.length}>
+        {units.map((u) => (
+          <FilterMenuItem
+            key={u}
+            active={selectedUnits.includes(u)}
+            onClick={() => onToggleUnit(u)}
+          >
+            {u}
+          </FilterMenuItem>
+        ))}
+      </FilterMenu>
+
+      <FilterMenu label="Tipo" activeCount={selectedTypes.length}>
+        {(Object.entries(TYPE_CONFIG) as [Task["type"], (typeof TYPE_CONFIG)[Task["type"]]][]).map(
+          ([key, conf]) => {
+            const Icon = conf.Icon;
+            return (
+              <FilterMenuItem
+                key={key}
+                active={selectedTypes.includes(key)}
+                onClick={() => onToggleType(key)}
+              >
+                <Icon size={14} strokeWidth={2.2} style={{ color: conf.color }} />
+                {conf.label}
+              </FilterMenuItem>
+            );
+          },
+        )}
+      </FilterMenu>
+
+      {hasFilters ? (
+        <button
+          type="button"
+          onClick={() => {
+            onClearAll();
+            onSearchChange("");
+          }}
+          style={{
+            border: "none",
+            background: "transparent",
+            color: "var(--color-slate2)",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "var(--font-sans)",
+            padding: "6px 4px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Limpiar filtros
+        </button>
+      ) : null}
+
+      <div style={{ flex: 1, minWidth: 8 }} />
+
+      <button
+        type="button"
+        onClick={onAddTask}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          height: 32,
+          padding: "0 14px",
+          border: "none",
+          borderRadius: 6,
+          background: "var(--color-brand)",
+          color: "white",
+          fontSize: 13,
+          fontWeight: 700,
+          cursor: "pointer",
+          fontFamily: "var(--font-sans)",
+          flexShrink: 0,
+        }}
+      >
+        <Plus size={15} strokeWidth={2.5} />
+        Crear
+      </button>
     </div>
   );
 }
@@ -961,11 +1771,13 @@ export default function KanbanBoard({
   profiles,
   units,
   searchTerm,
+  onSearchChange,
 }: KanbanBoardProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [overColumnId, setOverColumnId] = useState<Task["status"] | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [creatingTask, setCreatingTask] = useState(false);
   const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
   const [unitFilter, setUnitFilter] = useState<string[]>([]);
   const [typeFilter, setTypeFilter] = useState<Task["type"][]>([]);
@@ -1094,33 +1906,59 @@ export default function KanbanBoard({
       .sort((a, b) => a.position - b.position);
     const position = colTasks.length > 0 ? colTasks[colTasks.length - 1].position + 1000 : 0;
 
+    const codedTitle = buildCodedTaskTitle(
+      taskData.unit_code,
+      taskData.title,
+      // Only titles of the same unit so IN/IT/OB sequences stay independent
+      tasks.filter((t) => t.unit_code === taskData.unit_code).map((t) => t.title),
+    );
+
     const { data, error } = await supabase
       .from("tasks")
-      .insert({ ...taskData, position })
+      .insert({
+        ...taskData,
+        title: codedTitle,
+        description: formatTaskDescription(taskData.description),
+        position,
+      })
       .select()
       .single();
 
-    if (error) { console.error("Error adding task:", error); return; }
+    if (error) {
+      console.error("Error adding task:", error);
+      throw error;
+    }
     if (data) setTasks((prev) => [...prev, data as Task]);
   }
 
-  async function handleSaveTask(updated: Task) {
+  async function handleSaveTask(updated: Task): Promise<string | null> {
+    const normalized: Task = {
+      ...updated,
+      description: formatTaskDescription(updated.description),
+      assignee: updated.assignee?.trim() ? updated.assignee : null,
+      due_date: updated.due_date?.trim() ? updated.due_date : null,
+    };
     const { error } = await supabase
       .from("tasks")
       .update({
-        title: updated.title,
-        description: updated.description,
-        unit_code: updated.unit_code,
-        priority: updated.priority,
-        type: updated.type,
-        due_date: updated.due_date,
-        assignee: updated.assignee,
+        title: normalized.title,
+        description: normalized.description,
+        unit_code: normalized.unit_code,
+        priority: normalized.priority,
+        type: normalized.type,
+        due_date: normalized.due_date,
+        created_at: normalized.created_at,
+        assignee: normalized.assignee,
       })
-      .eq("id", updated.id);
+      .eq("id", normalized.id);
 
-    if (error) { console.error("Error saving task:", error); return; }
-    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    if (error) {
+      console.error("Error saving task:", error.message, error.code, error.details, error.hint);
+      return error.message || "No se pudo guardar la tarea.";
+    }
+    setTasks((prev) => prev.map((t) => (t.id === normalized.id ? normalized : t)));
     setEditingTask(null);
+    return null;
   }
 
   async function handleDeleteTask(id: string) {
@@ -1144,6 +1982,16 @@ export default function KanbanBoard({
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
           onClose={() => setEditingTask(null)}
+        />
+      )}
+
+      {creatingTask && (
+        <TaskCreateModal
+          profiles={profiles}
+          units={units}
+          tasks={tasks}
+          onCreate={handleAddTask}
+          onClose={() => setCreatingTask(false)}
         />
       )}
 
@@ -1223,10 +2071,13 @@ export default function KanbanBoard({
         selectedAssignees={assigneeFilter}
         selectedUnits={unitFilter}
         selectedTypes={typeFilter}
+        searchTerm={searchTerm}
+        onSearchChange={onSearchChange}
         onToggleAssignee={toggleAssignee}
         onToggleUnit={toggleUnit}
         onToggleType={toggleType}
         onClearAll={clearAllFilters}
+        onAddTask={() => setCreatingTask(true)}
       />
 
       <DndContext

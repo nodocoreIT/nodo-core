@@ -13,15 +13,31 @@ import {
   AlertDialogTitle,
   FormSelect,
 } from "@nodocore/shared-components";
-import { CheckCircle2, Loader2, MessageSquareText, RotateCcw, Trash2 } from "lucide-react";
-import type { FeedbackInboxRow } from "@/lib/panel/feedback-inbox";
+import {
+  Loader2,
+  Mail,
+  MailOpen,
+  MessageSquareText,
+  Reply,
+  Trash2,
+  X,
+} from "lucide-react";
+import type {
+  FeedbackInboxRow,
+  FeedbackReplyStatus,
+} from "@/lib/panel/feedback-inbox";
 import { useUnreadFeedbackCount } from "@/hooks/use-unread-feedback-count";
 
 type ReadFilter = "all" | "unread" | "read";
 
-const READ_STATUS_STYLES: Record<"read" | "unread", { bg: string; color: string; label: string }> = {
-  unread: { bg: "#E8EEF8", color: "#2A6FDB", label: "Sin leer" },
-  read: { bg: "var(--color-mist)", color: "var(--color-slate2)", label: "Leído" },
+const TICKET_STATUS_STYLES: Record<
+  FeedbackReplyStatus,
+  { bg: string; color: string; label: string }
+> = {
+  pendiente: { bg: "#E8EEF8", color: "#2A6FDB", label: "Pendiente" },
+  en_proceso: { bg: "#FCE9D8", color: "#B5630C", label: "En proceso" },
+  respondido: { bg: "#E6F4EC", color: "#1F8A5B", label: "Respondido" },
+  resuelto: { bg: "var(--color-mist)", color: "var(--color-slate2)", label: "Resuelto" },
 };
 
 function formatDate(dateStr: string): string {
@@ -29,6 +45,19 @@ function formatDate(dateStr: string): string {
   const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
+
+const actionBtnBase: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 32,
+  height: 32,
+  borderRadius: 8,
+  border: "1px solid var(--color-mist)",
+  background: "white",
+  cursor: "pointer",
+  marginRight: 6,
+};
 
 export default function FeedbackPage() {
   const [items, setItems] = useState<FeedbackInboxRow[]>([]);
@@ -40,6 +69,10 @@ export default function FeedbackPage() {
   const [filterNode, setFilterNode] = useState("all");
   const [pendingDelete, setPendingDelete] = useState<FeedbackInboxRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<FeedbackInboxRow | null>(null);
+  const [replyBody, setReplyBody] = useState("");
+  const [replyStatus, setReplyStatus] = useState<FeedbackReplyStatus>("respondido");
+  const [replySaving, setReplySaving] = useState(false);
   const { refresh: refreshUnreadBadge } = useUnreadFeedbackCount();
 
   const loadFeedback = useCallback(async () => {
@@ -97,16 +130,18 @@ export default function FeedbackPage() {
   const unreadCount = useMemo(() => items.filter((item) => !item.read).length, [items]);
 
   async function toggleRead(item: FeedbackInboxRow) {
-    // Guard: ignore a second click on the same item while its request is still in flight.
     if (processingIds.has(item.id)) return;
 
     setProcessingIds((prev) => new Set(prev).add(item.id));
     setError(null);
     const nextRead = !item.read;
 
-    // Optimistic update — flip locally before the request resolves.
     setItems((prev) =>
-      prev.map((row) => (row.id === item.id ? { ...row, read: nextRead, readAt: nextRead ? new Date().toISOString() : null } : row)),
+      prev.map((row) =>
+        row.id === item.id
+          ? { ...row, read: nextRead, readAt: nextRead ? new Date().toISOString() : null }
+          : row,
+      ),
     );
 
     try {
@@ -117,12 +152,9 @@ export default function FeedbackPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        // Roll back on failure.
         setItems((prev) => prev.map((row) => (row.id === item.id ? item : row)));
         setError(data.error ?? "No se pudo actualizar el estado de lectura.");
       } else {
-        // Éxito: el badge del sidebar depende de este mismo conteo, refrescalo
-        // ya en vez de esperar hasta 60s de polling.
         void refreshUnreadBadge();
       }
     } catch {
@@ -134,6 +166,44 @@ export default function FeedbackPage() {
         next.delete(item.id);
         return next;
       });
+    }
+  }
+
+  function openReply(item: FeedbackInboxRow) {
+    setReplyTarget(item);
+    setReplyBody("");
+    setReplyStatus(item.status === "pendiente" ? "respondido" : item.status);
+    setError(null);
+    if (!item.read) void toggleRead(item);
+  }
+
+  async function submitReply() {
+    if (!replyTarget || !replyBody.trim() || replySaving) return;
+    setReplySaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/panel/feedback/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          feedback_id: replyTarget.id,
+          body: replyBody.trim(),
+          status: replyStatus,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "No se pudo guardar la respuesta.");
+        return;
+      }
+      await loadFeedback();
+      void refreshUnreadBadge();
+      setReplyTarget(null);
+      setReplyBody("");
+    } catch {
+      setError("Error de red al guardar la respuesta.");
+    } finally {
+      setReplySaving(false);
     }
   }
 
@@ -154,18 +224,11 @@ export default function FeedbackPage() {
         setError(data.error ?? "No se pudo borrar el feedback.");
         return;
       }
-      // Recién sacamos el item de la lista después de que el borrado en
-      // el server confirmó — a diferencia de toggleRead, acá no hay
-      // rollback posible que tenga sentido mostrar (es irreversible).
       setItems((prev) => prev.filter((row) => row.id !== item.id));
-      // Si era un feedback sin leer, el badge del sidebar tiene que bajar ya.
       if (!item.read) void refreshUnreadBadge();
     } catch {
       setError("Error de red al borrar el feedback.");
     } finally {
-      // Siempre cerramos el diálogo al terminar (éxito o error) — el
-      // mensaje de error queda visible en el banner de arriba, que el
-      // modal tapa mientras está abierto.
       setDeleting(false);
       setPendingDelete(null);
     }
@@ -276,27 +339,52 @@ export default function FeedbackPage() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
+                    <th style={thStyle}>Fecha</th>
+                    <th style={thStyle}>Organización</th>
+                    <th style={thStyle}>Nodo</th>
                     <th style={thStyle}>Categoría</th>
                     <th style={thStyle}>Contenido</th>
-                    <th style={thStyle}>Nodo</th>
-                    <th style={thStyle}>Organización</th>
-                    <th style={thStyle}>Fecha</th>
                     <th style={thStyle}>Estado</th>
                     <th style={thStyle}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((item) => {
-                    const st = READ_STATUS_STYLES[item.read ? "read" : "unread"];
+                    const st = TICKET_STATUS_STYLES[item.status] ?? TICKET_STATUS_STYLES.pendiente;
                     const busy = processingIds.has(item.id);
+                    const unread = !item.read;
 
                     return (
-                      <tr key={item.id}>
-                        <td style={tdStyle}>{item.categoryLabel}</td>
-                        <td style={{ ...tdStyle, maxWidth: 360, wordBreak: "break-word" }}>{item.content ?? "—"}</td>
-                        <td style={tdStyle}>{item.sourceNodeLabel}</td>
-                        <td style={tdStyle}>{item.orgName}</td>
-                        <td style={{ ...tdStyle, color: "var(--color-slate2)" }}>{formatDate(item.createdAt)}</td>
+                      <tr
+                        key={item.id}
+                        style={{
+                          background: unread ? "#F3F7FC" : "white",
+                        }}
+                      >
+                        <td
+                          style={{
+                            ...tdStyle,
+                            color: "var(--color-slate2)",
+                            fontWeight: unread ? 700 : 400,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {formatDate(item.createdAt)}
+                        </td>
+                        <td style={{ ...tdStyle, fontWeight: unread ? 700 : 400 }}>{item.orgName}</td>
+                        <td style={{ ...tdStyle, fontWeight: unread ? 700 : 400 }}>{item.sourceNodeLabel}</td>
+                        <td style={{ ...tdStyle, fontWeight: unread ? 700 : 400 }}>{item.categoryLabel}</td>
+                        <td
+                          style={{
+                            ...tdStyle,
+                            maxWidth: 360,
+                            wordBreak: "break-word",
+                            fontWeight: unread ? 700 : 400,
+                            color: unread ? "var(--color-navy)" : "var(--color-ink)",
+                          }}
+                        >
+                          {item.content ?? "—"}
+                        </td>
                         <td style={tdStyle}>
                           <span
                             style={{
@@ -319,25 +407,31 @@ export default function FeedbackPage() {
                             disabled={busy}
                             onClick={() => void toggleRead(item)}
                             style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              width: 32,
-                              height: 32,
-                              borderRadius: 8,
-                              border: "1px solid var(--color-mist)",
-                              background: "white",
-                              color: "var(--color-slate2)",
+                              ...actionBtnBase,
+                              color: unread ? "#2A6FDB" : "var(--color-slate2)",
                               cursor: busy ? "not-allowed" : "pointer",
                               opacity: busy ? 0.5 : 1,
-                              marginRight: 6,
                             }}
                           >
                             {item.read ? (
-                              <RotateCcw className="h-3.5 w-3.5" />
+                              <MailOpen className="h-3.5 w-3.5" />
                             ) : (
-                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              <Mail className="h-3.5 w-3.5" />
                             )}
+                          </button>
+                          <button
+                            type="button"
+                            title="Responder"
+                            disabled={busy}
+                            onClick={() => openReply(item)}
+                            style={{
+                              ...actionBtnBase,
+                              color: "var(--color-brand)",
+                              cursor: busy ? "not-allowed" : "pointer",
+                              opacity: busy ? 0.5 : 1,
+                            }}
+                          >
+                            <Reply className="h-3.5 w-3.5" />
                           </button>
                           <button
                             type="button"
@@ -345,14 +439,8 @@ export default function FeedbackPage() {
                             disabled={busy}
                             onClick={() => setPendingDelete(item)}
                             style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              width: 32,
-                              height: 32,
-                              borderRadius: 8,
-                              border: "1px solid var(--color-mist)",
-                              background: "white",
+                              ...actionBtnBase,
+                              marginRight: 0,
                               color: "var(--color-destructive)",
                               cursor: busy ? "not-allowed" : "pointer",
                               opacity: busy ? 0.5 : 1,
@@ -370,6 +458,202 @@ export default function FeedbackPage() {
           </div>
         )}
       </div>
+
+      {replyTarget && (
+        <div
+          onClick={() => !replySaving && setReplyTarget(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(18,30,47,.52)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "white",
+              borderRadius: 12,
+              width: "100%",
+              maxWidth: 520,
+              maxHeight: "90vh",
+              overflowY: "auto",
+              boxShadow: "0 8px 32px rgba(18,30,47,.18)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "16px 20px",
+                borderBottom: "1px solid var(--color-mist)",
+              }}
+            >
+              <span style={{ fontWeight: 700, fontSize: 16, color: "var(--color-navy)" }}>
+                Responder feedback
+              </span>
+              <button
+                type="button"
+                onClick={() => !replySaving && setReplyTarget(null)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--color-slate2)",
+                  padding: 4,
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+              <div
+                style={{
+                  padding: 12,
+                  borderRadius: 8,
+                  background: "var(--color-paper)",
+                  border: "1px solid var(--color-mist)",
+                }}
+              >
+                <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: "var(--color-slate2)", textTransform: "uppercase" }}>
+                  Pregunta del cliente
+                </p>
+                <p style={{ margin: 0, fontSize: 13.5, color: "var(--color-ink)", whiteSpace: "pre-wrap" }}>
+                  {replyTarget.content ?? "—"}
+                </p>
+                <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--color-slate2)" }}>
+                  {replyTarget.orgName} · {replyTarget.sourceNodeLabel} · {formatDate(replyTarget.createdAt)}
+                </p>
+              </div>
+
+              {replyTarget.replies.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: "var(--color-slate2)", textTransform: "uppercase" }}>
+                    Historial
+                  </p>
+                  {replyTarget.replies.map((r) => (
+                    <div
+                      key={r.id}
+                      style={{
+                        padding: 10,
+                        borderRadius: 8,
+                        border: "1px solid var(--color-mist)",
+                        background: "#F8FBFF",
+                      }}
+                    >
+                      <p style={{ margin: "0 0 4px", fontSize: 12, fontWeight: 600, color: "var(--color-navy)" }}>
+                        {r.authorLabel} · {formatDate(r.createdAt)}
+                      </p>
+                      <p style={{ margin: 0, fontSize: 13, whiteSpace: "pre-wrap" }}>{r.body}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: 6,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "var(--color-slate2)",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Estado
+                </label>
+                <FormSelect
+                  value={replyStatus}
+                  onChange={(v) => setReplyStatus(v as FeedbackReplyStatus)}
+                  options={[
+                    { value: "en_proceso", label: "En proceso" },
+                    { value: "respondido", label: "Respondido" },
+                    { value: "resuelto", label: "Resuelto" },
+                  ]}
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: 6,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "var(--color-slate2)",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Respuesta
+                </label>
+                <textarea
+                  value={replyBody}
+                  onChange={(e) => setReplyBody(e.target.value)}
+                  rows={4}
+                  placeholder="Escribí la respuesta que verá el cliente en el nodito…"
+                  autoFocus
+                  style={{
+                    width: "100%",
+                    border: "1px solid var(--color-mist)",
+                    borderRadius: 8,
+                    padding: "10px 12px",
+                    fontSize: 13.5,
+                    fontFamily: "var(--font-sans)",
+                    resize: "vertical",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => void submitReply()}
+                  disabled={replySaving || !replyBody.trim()}
+                  style={{
+                    flex: 1,
+                    background: "var(--color-brand)",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "10px 16px",
+                    fontSize: 13.5,
+                    fontWeight: 700,
+                    cursor: replySaving || !replyBody.trim() ? "not-allowed" : "pointer",
+                    opacity: replySaving || !replyBody.trim() ? 0.6 : 1,
+                  }}
+                >
+                  {replySaving ? "Enviando…" : "Enviar respuesta"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReplyTarget(null)}
+                  disabled={replySaving}
+                  style={{
+                    border: "1px solid var(--color-mist)",
+                    borderRadius: 8,
+                    padding: "10px 16px",
+                    background: "white",
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    color: "var(--color-slate2)",
+                  }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <AlertDialog
         open={!!pendingDelete}

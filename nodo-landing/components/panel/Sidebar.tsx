@@ -13,7 +13,6 @@ import {
   LayoutDashboard,
   Lightbulb,
   LogOut,
-  Mail,
   MessageSquare,
   Settings,
   UserCog,
@@ -33,6 +32,7 @@ import { createClient } from "@/lib/supabase/client";
 import { SettingsDialog } from "@nodocore/nodo-modules/settings";
 import { useCommandPalette } from "@/components/CommandPaletteProvider";
 import { useUnreadFeedbackCount } from "@/hooks/use-unread-feedback-count";
+import { usePendingSolicitudesCount } from "@/hooks/use-pending-solicitudes-count";
 import { PanelBrandMark } from "./PanelBrandMark";
 
 type NavItem = {
@@ -54,7 +54,7 @@ export type SidebarProps = {
 };
 
 const PLATFORM_ITEMS: NavItem[] = [
-  { label: "Solicitudes pendientes", href: "/panel/solicitudes", icon: ClipboardList },
+  { label: "Solicitudes", href: "/panel/solicitudes", icon: ClipboardList },
   { label: "Feedback", href: "/panel/feedback", icon: MessageSquare },
   { label: "Ideas", href: "/panel/ideas", icon: Lightbulb },
   { label: "Tareas", href: "/panel/tareas", icon: LayoutDashboard },
@@ -62,7 +62,6 @@ const PLATFORM_ITEMS: NavItem[] = [
   { label: "Usuarios de Nodo", href: "/panel/usuarios-nodo", icon: UserCog },
   { label: "Caja", href: "/panel/caja", icon: Wallet },
   { label: "Equipo", href: "/panel/equipo", icon: UsersRound },
-  { label: "Invitaciones", href: "/panel/invitaciones", icon: Mail },
 ];
 
 const ECOSYSTEM_ITEMS: NavItem[] = [
@@ -207,10 +206,17 @@ export default function Sidebar({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { open: openCommandPalette } = useCommandPalette();
   const { count: unreadFeedbackCount } = useUnreadFeedbackCount();
+  const { count: pendingSolicitudesCount } = usePendingSolicitudesCount();
 
-  const platformItems = PLATFORM_ITEMS.map((item) =>
-    item.href === "/panel/feedback" ? { ...item, badgeCount: unreadFeedbackCount } : item,
-  );
+  const platformItems = PLATFORM_ITEMS.map((item) => {
+    if (item.href === "/panel/feedback") {
+      return { ...item, badgeCount: unreadFeedbackCount };
+    }
+    if (item.href === "/panel/solicitudes") {
+      return { ...item, badgeCount: pendingSolicitudesCount };
+    }
+    return item;
+  });
 
   async function handleSignOut() {
     const supabase = createClient();

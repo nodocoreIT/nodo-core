@@ -5,10 +5,16 @@ import Topbar from "@/components/panel/Topbar";
 import KanbanBoard, { Task, Profile } from "@/components/panel/KanbanBoard";
 import { createClient } from "@/lib/supabase/client";
 
+/**
+ * Unidades activas del tablero (crear / filtrar). Orden alfabético (es).
+ * El resto de nodos queda fuera hasta que se reactiven.
+ */
+const ACTIVE_TASK_UNITS = ["Clínica", "Dashboard", "Inmo", "Landing"] as const;
+
 export default function TareasPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [units, setUnits] = useState<string[]>([]);
+  const [units, setUnits] = useState<string[]>([...ACTIVE_TASK_UNITS]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -16,10 +22,9 @@ export default function TareasPage() {
     async function load() {
       const supabase = createClient();
 
-      const [{ data: tasksData }, { data: profilesData }, { data: unitsData }] = await Promise.all([
+      const [{ data: tasksData }, { data: profilesData }] = await Promise.all([
         supabase.from("tasks").select("*").order("position"),
         supabase.from("profiles").select("*"),
-        supabase.from("units").select("code, name").order("sort"),
       ]);
 
       // profiles.avatar_url is a storage PATH in the private "panel-branding"
@@ -49,7 +54,7 @@ export default function TareasPage() {
 
       setTasks((tasksData ?? []) as Task[]);
       setProfiles(resolvedProfiles);
-      setUnits((unitsData ?? []).map((u: { code: string; name: string }) => u.code));
+      setUnits([...ACTIVE_TASK_UNITS]);
       setLoading(false);
     }
 
@@ -61,9 +66,6 @@ export default function TareasPage() {
       <Topbar
         breadcrumb="Nodo Core · Desarrollo del Core"
         title="Tareas del equipo"
-        searchValue={searchTerm}
-        onSearchChange={setSearchTerm}
-        searchPlaceholder="Buscar tareas..."
       />
       <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
         {loading ? (
@@ -76,6 +78,7 @@ export default function TareasPage() {
             profiles={profiles}
             units={units}
             searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
           />
         )}
       </div>

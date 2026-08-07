@@ -64,6 +64,8 @@ Deno.serve(async (req) => {
       metadata: {
         dictated: false,
         source_node: sourceNode,
+        status: "pendiente",
+        replies: [],
       },
     });
 
