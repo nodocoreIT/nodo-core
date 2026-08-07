@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-export type AiProvider = "gemini" | "openai" | "anthropic" | "groq";
+export type AiProvider = "gemini" | "openai" | "anthropic" | "groq" | "cohere";
 
 export type TaskPriority = "alta" | "media" | "baja";
 export type TaskStatus = "pendiente" | "en_progreso" | "completada" | "cancelada";

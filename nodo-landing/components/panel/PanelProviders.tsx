@@ -5,6 +5,7 @@ import { SupabaseProvider, AuthProvider } from "@nodocore/shared-components";
 import { createClient } from "@/lib/supabase/client";
 import { PanelSettingsModuleProvider } from "@/lib/panel/panel-settings-module";
 import { UnreadFeedbackCountProvider } from "@/hooks/use-unread-feedback-count";
+import { PendingSolicitudesCountProvider } from "@/hooks/use-pending-solicitudes-count";
 
 const PANEL_AUTH_CONFIG = {
   roleDestinations: {
@@ -22,7 +23,11 @@ export function PanelProviders({ children }: { children: ReactNode }) {
     <SupabaseProvider client={supabase}>
       <AuthProvider config={PANEL_AUTH_CONFIG}>
         <PanelSettingsModuleProvider>
-          <UnreadFeedbackCountProvider>{children}</UnreadFeedbackCountProvider>
+          <UnreadFeedbackCountProvider>
+            <PendingSolicitudesCountProvider>
+              {children}
+            </PendingSolicitudesCountProvider>
+          </UnreadFeedbackCountProvider>
         </PanelSettingsModuleProvider>
       </AuthProvider>
     </SupabaseProvider>

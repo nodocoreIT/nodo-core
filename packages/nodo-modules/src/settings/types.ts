@@ -44,7 +44,7 @@ export interface ThemeSettings {
   brandText: string;
 }
 
-export type AiProvider = "gemini" | "openai" | "anthropic" | "groq";
+export type AiProvider = "gemini" | "openai" | "anthropic" | "groq" | "cohere";
 
 export interface AiSettings {
   provider: AiProvider;
@@ -52,6 +52,7 @@ export interface AiSettings {
   openaiApiKey: string;
   anthropicApiKey: string;
   groqApiKey: string;
+  cohereApiKey: string;
 }
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
@@ -60,12 +61,14 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
   openaiApiKey: "",
   anthropicApiKey: "",
   groqApiKey: "",
+  cohereApiKey: "",
 };
 
 export function getActiveApiKey(settings: AiSettings): string {
   if (settings.provider === "openai") return settings.openaiApiKey;
   if (settings.provider === "anthropic") return settings.anthropicApiKey;
   if (settings.provider === "groq") return settings.groqApiKey;
+  if (settings.provider === "cohere") return settings.cohereApiKey;
   return settings.geminiApiKey;
 }
 
