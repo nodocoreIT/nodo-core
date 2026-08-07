@@ -19,9 +19,16 @@ const AUTH_CONFIG = {
   roleDestinations: {
     super_admin: "/admin/dashboard",
     member: "/admin/dashboard",
+    // Self-registered Finanzas customers get role "user" (see the node
+    // registration flow + custom_access_token_hook). Finanzas is multi-tenant
+    // per user_id — every client manages their own finances in the same admin
+    // panel — so "user" is a first-class role here and must be allowed in, not
+    // just super_admin/member. Omitting it made AuthProvider mark every
+    // self-signup client accessDenied and bounce them straight back to login.
+    user: "/admin/dashboard",
   },
   unitCode: "Finanzas",
-  allowedRoles: ["super_admin", "member"],
+  allowedRoles: ["super_admin", "member", "user"],
 };
 
 interface AppProvidersProps {
