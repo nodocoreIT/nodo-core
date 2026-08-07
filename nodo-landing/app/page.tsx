@@ -79,7 +79,7 @@ function Eyebrow({
 function HeroSection() {
   return (
     <section
-      className="relative overflow-hidden pt-[140px] pb-[clamp(16px,3vw,32px)]"
+      className="relative overflow-hidden pt-[clamp(76px,5vw,88px)] pb-[clamp(16px,3vw,32px)]"
       style={{ backgroundColor: "var(--color-navy-900)" }}
     >
       {/* Glow pseudo-layer */}
@@ -95,7 +95,7 @@ function HeroSection() {
       <div className="w-[min(1200px,92vw)] mx-auto relative z-10 flex flex-col items-center text-center">
         {/* Eyebrow */}
         <RevealOnScroll>
-          <p className="text-[13px] font-bold uppercase tracking-[.16em] text-brand mb-5">
+          <p className="text-[13px] font-bold uppercase tracking-[.16em] text-brand mb-3">
             El ecosistema que centraliza, conecta y potencia
           </p>
         </RevealOnScroll>
@@ -104,7 +104,7 @@ function HeroSection() {
         <RevealOnScroll delay={80}>
           <h1
             className="font-display font-extrabold text-white max-w-[780px] mx-auto"
-            style={{ fontSize: "clamp(40px,6vw,76px)", lineHeight: 1.05 }}
+            style={{ fontSize: "clamp(32px,4.8vw,60px)", lineHeight: 1.05 }}
           >
             El <span className="text-brand">núcleo</span> que conecta todo su
             negocio
@@ -114,9 +114,9 @@ function HeroSection() {
         {/* Lead */}
         <RevealOnScroll delay={160}>
           <p
-            className="max-w-[600px] mx-auto mt-6 leading-relaxed"
+            className="max-w-[720px] mx-auto mt-4 leading-relaxed"
             style={{
-              fontSize: "clamp(17px,1.5vw,21px)",
+              fontSize: "clamp(15px,1.3vw,19px)",
               color: "rgba(234,240,247,.72)",
             }}
           >
@@ -131,7 +131,13 @@ function HeroSection() {
           <EcosystemDiagram
             dark
             interactive
-            className="w-full max-w-[560px] aspect-square mx-auto mt-[26px]"
+            // Nodo IT's and Nodo Salud's submodules (Finanzas/Autos/Ecommerce,
+            // Clínica) are hidden from the public site — no longer surfaced
+            // as satellites here. Only { code } crosses the server/client
+            // boundary, not the full NodeDef (its Icon is a component
+            // reference, not serializable).
+            units={NODES.filter((n) => n.parentSlug !== "it" && n.parentSlug !== "salud").map((n) => ({ code: n.code }))}
+            className="w-full max-w-[480px] aspect-square mx-auto mt-2"
           />
         </RevealOnScroll>
 
@@ -272,7 +278,13 @@ function UnidadesSection() {
       {/* Units list */}
       <div className="flex flex-col">
         {NODES.filter((node) => !node.parentSlug).map((node, i) => {
-          const subnodes = NODES.filter((n) => n.parentSlug === node.slug);
+          // Nodo IT's and Nodo Salud's submodules (Finanzas/Autos/Ecommerce,
+          // Clínica) are hidden from the public site — no longer surfaced as
+          // an expandable row here.
+          const subnodes =
+            node.slug === "it" || node.slug === "salud"
+              ? []
+              : NODES.filter((n) => n.parentSlug === node.slug);
           const hasSubnodes = subnodes.length > 0;
           return (
             <div key={node.slug} className="border-b border-white/10">

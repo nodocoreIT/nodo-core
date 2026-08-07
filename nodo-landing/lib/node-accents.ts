@@ -70,7 +70,7 @@ export function isClinicaLoginNode(nodeParam: string): boolean {
 
 export function getNodeAccentBySlug(slug: string): NodeAccent {
   const key = slug.trim().toLowerCase();
-  if (key === "autos" || key === "automotores") return AUTOS_ACCENT;
+  if (key === "autos" || key === "automotores" || key === "it") return AUTOS_ACCENT;
   if (key === "finanzas") return FINANZAS_ACCENT;
   if (key === "clinica" || key === "salud" || key === "clinica-virtual" || key === "clínica") return CLINICA_ACCENT;
   if (key === "obra") return OBRA_ACCENT;
@@ -104,7 +104,7 @@ export function getLoginAccent(nodeParam: string): NodeAccent {
 export function getNodoLogoSrc(nodeParamOrSlug: string): string {
   const raw = nodeParamOrSlug.trim().toLowerCase();
   const slug = raw.startsWith("nodo-") ? raw.slice(5) : raw;
-  if (slug === "autos") return "/logos/nodo%20roj.png";
+  if (slug === "autos" || slug === "it") return "/logos/nodo%20roj.png";
   if (slug === "finanzas") return "/logos/nodo%20ver.png";
   if (slug === "clinica" || slug === "clinica-virtual" || slug === "salud") {
     return "/logos/nodo%20ver%20clinica.png";

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { SVGProps } from "react";
+import { getNodoLogoSrc } from "@/lib/node-accents";
 
 // Brand glyphs (lucide-react no longer ships brand icons). fill=currentColor so
 // they inherit text color and respond to hover.
@@ -57,6 +58,12 @@ const linkClass =
 export default function Footer() {
   const pathname = usePathname();
   const isHome = pathname === "/";
+  // On a node's own page, brand the footer logo with that node's color
+  // (autos/it → red, finanzas → green, salud/clinica → teal, etc.) — same
+  // asset getNodoLogoSrc resolves elsewhere. Falls back to the default
+  // orange everywhere else (home, /panel, etc.).
+  const nodeSlugMatch = pathname.match(/^\/nodo-([^/]+)/);
+  const logoSrc = nodeSlugMatch ? getNodoLogoSrc(nodeSlugMatch[1]) : "/logos/nodo nar.png";
 
   // On the home page, intercept and smooth-scroll WITHOUT writing the hash to
   // the URL. On any other route, let the <Link> navigate to /#id so the home
@@ -84,7 +91,7 @@ export default function Footer() {
           {/* Col 1: Brand */}
           <div>
             <Image
-              src="/logos/nodo nar.png"
+              src={logoSrc}
               alt="Nodo Core"
               height={26}
               width={78}

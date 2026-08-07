@@ -4,7 +4,6 @@ import { Fragment, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import dynamic from "next/dynamic";
-import { Car, ArrowRight, ShoppingBag, Coins } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 import { getNodeBySlug } from "@/lib/nodes";
@@ -49,7 +48,7 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
   const [devOpen, setDevOpen] = useState(false);
 
   const { Icon, code, description, intro, highlights, inDevelopment } = node;
-  const isAutos = slug === "autos";
+  const isAutos = slug === "autos" || slug === "it";
   const isClinica = slug === "clinica";
   const nodoLogoSrc = getNodoLogoSrc(slug);
 
@@ -290,129 +289,6 @@ export default function NodoPlaceholder({ slug }: { slug: string }) {
           </section>
         )}
 
-        {/* Submodules Section for IT */}
-        {slug === "it" && (
-          <section
-            id="submodulos"
-            className="pt-[clamp(32px,4vw,56px)] pb-[clamp(64px,8vw,112px)] relative"
-            style={{
-              backgroundColor: "var(--color-navy-900)",
-              borderTop: "1px solid rgba(255,255,255,.08)",
-            }}
-          >
-            <div className="w-[min(1200px,92vw)] mx-auto">
-              <div className="text-center mb-12">
-                <p className="text-[13px] font-bold uppercase tracking-[.16em] text-brand mb-3">
-                  Arquitectura Modular
-                </p>
-                <h2 className="font-display font-extrabold text-white text-[clamp(28px,3vw,42px)]">
-                  Submódulos de NODO | IT
-                </h2>
-                <p className="text-slate2-300 max-w-xl mx-auto mt-4 text-[15px]">
-                  Desglosamos la infraestructura y software a medida en soluciones tecnológicas específicas.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-                {/* Active Submodule: Nodo Autos */}
-                <div
-                  className="rounded-2xl p-8 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 text-left"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, var(--color-navy-700), var(--color-navy))",
-                    border: `1px solid rgba(${AUTOS_ACCENT.rgb}, 0.25)`,
-                    boxShadow: `0 10px 30px -15px rgba(${AUTOS_ACCENT.rgb}, 0.15)`,
-                  }}
-                >
-                  <div>
-                    <div className="h-12 w-12 rounded-xl bg-rose-600/15 text-rose-500 flex items-center justify-center mb-6">
-                      <Car className="h-6 w-6" />
-                    </div>
-                    <h3 className="font-display font-bold text-white text-[20px] mb-3">
-                      Nodo Autos
-                    </h3>
-                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4">
-                      Disponible
-                    </span>
-                    <p className="text-[14.5px] leading-relaxed text-slate2-300 mb-6">
-                      Panel de gestión de stock para concesionarias y agencias de autos: inventario, clientes, publicaciones y contratos de venta.
-                    </p>
-                  </div>
-                  <Link
-                    href="/nodo-autos"
-                    className="inline-flex items-center gap-2 text-rose-500 font-semibold text-[15px] hover:text-rose-400 transition-colors"
-                  >
-                    Ver Módulo <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
-
-                {/* Submodule: Nodo Finanzas */}
-                <div
-                  className="rounded-2xl p-8 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 text-left"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, var(--color-navy-700), var(--color-navy))",
-                    border: "1px solid rgba(5, 150, 105, 0.25)",
-                    boxShadow: "0 10px 30px -15px rgba(5, 150, 105, 0.15)",
-                  }}
-                >
-                  <div>
-                    <div className="h-12 w-12 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center mb-6">
-                      <Coins className="h-6 w-6" />
-                    </div>
-                    <h3 className="font-display font-bold text-white text-[20px] mb-3">
-                      Nodo Finanzas
-                    </h3>
-                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4">
-                      Disponible
-                    </span>
-                    <p className="text-[14.5px] leading-relaxed text-slate2-300 mb-6">
-                      Control de finanzas personales: gastos, tarjetas de crédito, préstamos, planes de ahorro e informe mensual.
-                    </p>
-                  </div>
-                  <Link
-                    href="/nodo-finanzas"
-                    className="inline-flex items-center gap-2 text-emerald-400 font-semibold text-[15px] hover:text-emerald-300 transition-colors"
-                  >
-                    Ver Módulo <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
-
-                {/* Submodule: Nodo Ecommerce */}
-                <div
-                  className="rounded-2xl p-8 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 text-left"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, var(--color-navy-700), var(--color-navy))",
-                    border: "1px solid rgba(245, 158, 11, 0.25)",
-                    boxShadow: "0 10px 30px -15px rgba(245, 158, 11, 0.15)",
-                  }}
-                >
-                  <div>
-                    <div className="h-12 w-12 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center mb-6">
-                      <ShoppingBag className="h-6 w-6" />
-                    </div>
-                    <h3 className="font-display font-bold text-white text-[20px] mb-3">
-                      Nodo Ecommerce
-                    </h3>
-                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4">
-                      Disponible
-                    </span>
-                    <p className="text-[14.5px] leading-relaxed text-slate2-300 mb-6">
-                      Todo para gestionar tu e-commerce de manera profesional: catálogo de productos, pasarelas de pago, envíos integrados y control de ventas.
-                    </p>
-                  </div>
-                  <Link
-                    href="/nodo-ecommerce"
-                    className="inline-flex items-center gap-2 text-amber-400 font-semibold text-[15px] hover:text-amber-300 transition-colors"
-                  >
-                    Ver Módulo <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
       </main>
       <Footer />
 

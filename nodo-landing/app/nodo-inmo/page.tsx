@@ -256,7 +256,73 @@ export default function NodoInmoPage() {
             </div>
 
             {/* Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+
+              {/* Demo */}
+              <div
+                className="rounded-2xl p-8 flex flex-col relative overflow-hidden"
+                style={{
+                  background: "linear-gradient(145deg, var(--color-navy-700), var(--color-navy))",
+                  border: "1px solid rgba(234,88,12,.25)",
+                }}
+              >
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full"
+                  style={{
+                    background: "radial-gradient(circle, rgba(234,88,12,.15), transparent 70%)",
+                  }}
+                />
+
+                <p className="text-[13px] font-bold uppercase tracking-[.14em] text-orange-400 mb-1">
+                  Demo
+                </p>
+                <p className="text-[13px] mb-5" style={{ color: "rgba(234,240,247,.45)" }}>
+                  Ideal para probar la plataforma sin compromiso
+                </p>
+
+                <div className="flex items-end gap-2 mb-1">
+                  <span
+                    className="font-display font-extrabold text-white leading-none"
+                    style={{ fontSize: "clamp(38px,4vw,52px)" }}
+                  >
+                    Gratis
+                  </span>
+                  <span
+                    className="mb-2 font-semibold"
+                    style={{ fontSize: 15, color: "rgba(234,240,247,.5)" }}
+                  >
+                    / 7 días
+                  </span>
+                </div>
+                <p className="mb-1" style={{ fontSize: 13, color: "rgba(234,240,247,.45)" }}>
+                  Toda la funcionalidad habilitada, sin tarjeta.
+                </p>
+
+                <div className="my-6 h-px" style={{ background: "rgba(255,255,255,.08)" }} />
+
+                <ul className="flex flex-col gap-3 mb-8 flex-1">
+                  {[...STARTER_FEATURES, ...PRO_EXTRAS].map((f) => (
+                    <li key={f} className="flex items-start gap-3">
+                      <span className="flex-shrink-0 mt-0.5 h-5 w-5 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center">
+                        <Check className="h-3 w-3" strokeWidth={2.5} />
+                      </span>
+                      <span style={{ fontSize: 14, color: "rgba(234,240,247,.78)" }}>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <Link
+                  href="/nodo-inmo/login?mode=register"
+                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 text-[15px] font-bold rounded-xl text-white transition-all duration-150 active:scale-[.98]"
+                  style={{
+                    background: "rgba(255,255,255,.06)",
+                    border: "1px solid rgba(234,88,12,.4)",
+                  }}
+                >
+                  Empezar demo de 7 días <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
 
               {/* Starter */}
               <div
@@ -413,7 +479,7 @@ export default function NodoInmoPage() {
               className="text-center mt-8"
               style={{ fontSize: 13, color: "rgba(234,240,247,.4)" }}
             >
-              Ambos planes incluyen soporte técnico y actualizaciones sin costo adicional.
+              Todos los planes incluyen soporte técnico y actualizaciones sin costo adicional.
             </p>
           </div>
         </section>

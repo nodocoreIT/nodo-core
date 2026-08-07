@@ -14,7 +14,7 @@ const navLinks = [
   { label: "Contacto", id: "contacto" },
 ];
 
-const NODO_SLUGS = ["/nodo-autos", "/nodo-finanzas", "/nodo-inmo", "/nodo-clinica", "/nodo-ecommerce"];
+const NODO_SLUGS = ["/nodo-autos", "/nodo-finanzas", "/nodo-inmo", "/nodo-clinica", "/nodo-ecommerce", "/nodo-salud", "/nodo-it"];
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);

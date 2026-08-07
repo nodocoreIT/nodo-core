@@ -1,21 +1,24 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 import Link from "next/link";
-import {
-  Stethoscope,
-  Shield,
-  ArrowRight,
-  Sparkles,
-  LayoutGrid,
-  Heart,
-} from "lucide-react";
+import { Stethoscope, Shield, Heart, Check, ArrowRight } from "lucide-react";
 import Navbar from "@/components/ui/Navbar";
 import Footer from "@/components/ui/Footer";
 import { getNodeBySlug } from "@/lib/nodes";
 import { CLINICA_ACCENT, getNodoLogoSrc } from "@/lib/node-accents";
 
 const saludLogoSrc = getNodoLogoSrc("salud");
+
+const CLINICA_FEATURES = [
+  "Agenda online y turnos programados",
+  "Videoconsultas con Jitsi Meet, sin instalaciones",
+  "Historias clínicas digitalizadas",
+  "Resúmenes SOAP automáticos con IA",
+  "Recetas y pedidos de estudios con firma digital",
+  "Interconsulta interdisciplinaria entre especialistas",
+  "Entorno privado, seguro y estandarizado",
+];
 
 function IntroWithLogo({ text }: { text: string }) {
   const parts = text.split(/\bNODO\b/g);
@@ -106,21 +109,21 @@ export default function Page() {
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <Link
-                href="#submodulos"
+                href="/nodo-clinica/login"
                 className="inline-flex items-center justify-center px-7 py-3.5 text-[16px] font-semibold rounded-md text-white active:scale-[.98] transition-all duration-150 shadow-lg"
                 style={{
                   background: `linear-gradient(135deg, ${CLINICA_ACCENT.brand}, ${CLINICA_ACCENT.brand600})`,
                   boxShadow: `0 8px 24px -8px rgba(${CLINICA_ACCENT.rgb},.45)`,
                 }}
               >
-                Ver Submódulos
+                Entrar al módulo
               </Link>
-              <Link
-                href="/"
+              <a
+                href="#precios"
                 className="btn-ghost-light inline-flex items-center justify-center px-7 py-3.5 text-[16px] font-semibold rounded-md text-white"
               >
-                Volver al inicio
-              </Link>
+                Ver precios
+              </a>
             </div>
           </div>
         </section>
@@ -128,7 +131,7 @@ export default function Page() {
         {/* Intro Copy */}
         {intro && (
           <section
-            className="pt-[clamp(24px,4vw,40px)] pb-[clamp(48px,5vw,72px)]"
+            className="pt-[clamp(24px,4vw,40px)] pb-[clamp(24px,3vw,40px)]"
             style={{
               backgroundColor: "var(--color-navy)",
               borderTop: "1px solid rgba(255,255,255,.08)",
@@ -148,91 +151,190 @@ export default function Page() {
           </section>
         )}
 
-        {/* Submodules Section */}
+        {/* ── Pricing ───────────────────────────────────────────────────── */}
         <section
-          id="submodulos"
-          className="pt-[clamp(32px,4vw,56px)] pb-[clamp(64px,8vw,112px)] relative"
+          id="precios"
+          className="pt-[clamp(48px,6vw,80px)] pb-[clamp(48px,6vw,80px)]"
           style={{
             backgroundColor: "var(--color-navy-900)",
             borderTop: "1px solid rgba(255,255,255,.08)",
           }}
         >
           <div className="w-[min(1200px,92vw)] mx-auto">
-            <div className="text-center mb-12">
-              <p className="text-[13px] font-bold uppercase tracking-[.16em] text-brand mb-3">
-                Arquitectura Modular
+            <div className="text-center mb-14">
+              <p
+                className="text-[13px] font-bold uppercase tracking-[.16em] mb-3"
+                style={{ color: CLINICA_ACCENT.brand }}
+              >
+                Planes
               </p>
-              <h2 className="font-display font-extrabold text-white text-[clamp(28px,3vw,42px)]">
-                Submódulos de NODO | Salud
+              <h2
+                className="font-display font-extrabold text-white"
+                style={{ fontSize: "clamp(26px,3vw,40px)" }}
+              >
+                Empezá con NODO | Clínica
               </h2>
-              <p className="text-slate2-300 max-w-xl mx-auto mt-4 text-[15px]">
-                Desglosamos la complejidad médica en herramientas digitales
-                específicas y conectadas.
+              <p
+                className="mt-4 max-w-md mx-auto"
+                style={{ fontSize: 15, color: "rgba(234,240,247,.6)" }}
+              >
+                Probá gratis 7 días con toda la funcionalidad habilitada.
+                Después, seguí con el plan Pro sin perder nada de lo cargado.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Active Submodule: Clinica Virtual */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+              {/* Demo */}
               <div
-                className="rounded-2xl p-8 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1"
+                className="rounded-2xl p-8 flex flex-col relative overflow-hidden"
                 style={{
-                  background:
-                    "linear-gradient(135deg, var(--color-navy-700), var(--color-navy))",
-                  border: `1px solid rgba(${CLINICA_ACCENT.rgb}, 0.25)`,
-                  boxShadow: `0 10px 30px -15px rgba(${CLINICA_ACCENT.rgb}, 0.15)`,
+                  background: "linear-gradient(145deg, var(--color-navy-700), var(--color-navy))",
+                  border: `1px solid rgba(${CLINICA_ACCENT.rgb},.25)`,
                 }}
               >
-                <div>
-                  <div className="h-12 w-12 rounded-xl bg-teal-600/15 text-teal-400 flex items-center justify-center mb-6">
-                    <Sparkles className="h-6 w-6" />
-                  </div>
-                  <h3 className="font-display font-bold text-white text-[20px] mb-3">
-                    Nodo Clínica
-                  </h3>
-                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4">
-                    Disponible
-                  </span>
-                  <p className="text-[14.5px] leading-relaxed text-slate2-300 mb-6">
-                    Plataforma HealthTech para telemedicina profesional. Gestión
-                    de agenda, videoconsultas, historias clínicas y resúmenes
-                    SOAP asistidos por Inteligencia Artificial.
-                  </p>
-                </div>
-                <Link
-                  href="/nodo-clinica"
-                  className="inline-flex items-center gap-2 text-teal-400 font-semibold text-[15px] hover:text-teal-300 transition-colors"
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full"
+                  style={{
+                    background: `radial-gradient(circle, rgba(${CLINICA_ACCENT.rgb},.15), transparent 70%)`,
+                  }}
+                />
+
+                <p
+                  className="text-[13px] font-bold uppercase tracking-[.14em] mb-1"
+                  style={{ color: CLINICA_ACCENT.brand }}
                 >
-                  Acceder al módulo <ArrowRight className="h-4 w-4" />
+                  Demo
+                </p>
+                <p className="text-[13px] mb-5" style={{ color: "rgba(234,240,247,.45)" }}>
+                  Ideal para probar el consultorio virtual sin compromiso
+                </p>
+
+                <div className="flex items-end gap-2 mb-1">
+                  <span
+                    className="font-display font-extrabold text-white leading-none"
+                    style={{ fontSize: "clamp(38px,4vw,52px)" }}
+                  >
+                    Gratis
+                  </span>
+                  <span
+                    className="mb-2 font-semibold"
+                    style={{ fontSize: 15, color: "rgba(234,240,247,.5)" }}
+                  >
+                    / 7 días
+                  </span>
+                </div>
+                <p className="mb-1" style={{ fontSize: 13, color: "rgba(234,240,247,.45)" }}>
+                  Toda la funcionalidad habilitada, sin tarjeta.
+                </p>
+
+                <div className="my-6 h-px" style={{ background: "rgba(255,255,255,.08)" }} />
+
+                <ul className="flex flex-col gap-3 mb-8 flex-1">
+                  {CLINICA_FEATURES.map((f) => (
+                    <li key={f} className="flex items-start gap-3">
+                      <span
+                        className="flex-shrink-0 mt-0.5 h-5 w-5 rounded-full flex items-center justify-center"
+                        style={{
+                          backgroundColor: `rgba(${CLINICA_ACCENT.rgb},.2)`,
+                          color: CLINICA_ACCENT.brand300,
+                        }}
+                      >
+                        <Check className="h-3 w-3" strokeWidth={2.5} />
+                      </span>
+                      <span style={{ fontSize: 14, color: "rgba(234,240,247,.78)" }}>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <Link
+                  href="/nodo-clinica/login?mode=register"
+                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 text-[15px] font-bold rounded-xl text-white transition-all duration-150 active:scale-[.98]"
+                  style={{
+                    background: "rgba(255,255,255,.06)",
+                    border: `1px solid rgba(${CLINICA_ACCENT.rgb},.4)`,
+                  }}
+                >
+                  Empezar demo de 7 días <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
 
-              {/* Inactive Submodule: Proveedores */}
+              {/* Pro */}
               <div
-                className="rounded-2xl p-8 flex flex-col justify-between opacity-75"
+                className="rounded-2xl p-8 flex flex-col relative overflow-hidden"
                 style={{
-                  background: "var(--color-navy-700)",
-                  border: "1px solid rgba(255, 255, 255, 0.05)",
+                  background: "linear-gradient(145deg, #1a1a2e, #16213e)",
+                  border: `2px solid rgba(${CLINICA_ACCENT.rgb},.5)`,
+                  boxShadow: `0 20px 60px -20px rgba(${CLINICA_ACCENT.rgb},.3), 0 0 0 1px rgba(${CLINICA_ACCENT.rgb},.1)`,
                 }}
               >
-                <div>
-                  <div className="h-12 w-12 rounded-xl bg-white/5 text-slate2-300 flex items-center justify-center mb-6">
-                    <LayoutGrid className="h-6 w-6" />
-                  </div>
-                  <h3 className="font-display font-bold text-white text-[20px] mb-3">
-                    Proveedores de Salud
-                  </h3>
-                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-white/5 text-white/50 border border-white/10 mb-4">
-                    Próximamente
+                {/* Badge */}
+                <div className="absolute top-5 right-5">
+                  <span
+                    className="px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide text-white"
+                    style={{ backgroundColor: CLINICA_ACCENT.brand }}
+                  >
+                    Recomendado
                   </span>
-                  <p className="text-[14.5px] leading-relaxed text-slate2-300/80 mb-6">
-                    Ecosistema de negocios médicos: venta de prótesis, insumos
-                    clínicos y equipamiento con trazabilidad de transacciones y
-                    logística integrada.
-                  </p>
                 </div>
-                <span className="text-[14px] text-white/45 font-medium">
-                  En desarrollo
-                </span>
+
+                <p
+                  className="text-[13px] font-bold uppercase tracking-[.14em] mb-1"
+                  style={{ color: CLINICA_ACCENT.brand }}
+                >
+                  Pro
+                </p>
+                <p className="text-[13px] mb-5" style={{ color: "rgba(234,240,247,.45)" }}>
+                  Consultorio virtual completo, sin límite de tiempo
+                </p>
+
+                <div className="flex items-end gap-2 mb-1">
+                  <span
+                    className="font-display font-extrabold text-white leading-none"
+                    style={{ fontSize: "clamp(38px,4vw,52px)" }}
+                  >
+                    USD 150
+                  </span>
+                  <span
+                    className="mb-2 font-semibold"
+                    style={{ fontSize: 15, color: "rgba(234,240,247,.5)" }}
+                  >
+                    / mes
+                  </span>
+                </div>
+                <p className="mb-1" style={{ fontSize: 13, color: "rgba(234,240,247,.45)" }}>
+                  Los primeros 7 días son gratis, igual que en Demo.
+                </p>
+
+                <div className="my-6 h-px" style={{ background: "rgba(255,255,255,.08)" }} />
+
+                <ul className="flex flex-col gap-3 mb-8 flex-1">
+                  {CLINICA_FEATURES.map((f) => (
+                    <li key={f} className="flex items-start gap-3">
+                      <span
+                        className="flex-shrink-0 mt-0.5 h-5 w-5 rounded-full flex items-center justify-center"
+                        style={{
+                          backgroundColor: `rgba(${CLINICA_ACCENT.rgb},.2)`,
+                          color: CLINICA_ACCENT.brand300,
+                        }}
+                      >
+                        <Check className="h-3 w-3" strokeWidth={2.5} />
+                      </span>
+                      <span style={{ fontSize: 14, color: "rgba(234,240,247,.78)" }}>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <Link
+                  href="/nodo-clinica/login?mode=register"
+                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 text-[15px] font-bold rounded-xl text-white transition-all duration-150 active:scale-[.98]"
+                  style={{
+                    background: `linear-gradient(135deg, ${CLINICA_ACCENT.brand}, ${CLINICA_ACCENT.brand600})`,
+                    boxShadow: `0 6px 20px -6px rgba(${CLINICA_ACCENT.rgb},.45)`,
+                  }}
+                >
+                  Empezar con Nodo Clínica <ArrowRight className="h-4 w-4" />
+                </Link>
               </div>
             </div>
           </div>
@@ -241,7 +343,7 @@ export default function Page() {
         {/* Highlights / Enfoque */}
         {highlights && highlights.length > 0 && (
           <section
-            className="py-[clamp(64px,8vw,96px)]"
+            className="pt-[clamp(32px,4vw,48px)] pb-[clamp(64px,8vw,96px)]"
             style={{
               backgroundColor: "var(--color-navy)",
               borderTop: "1px solid rgba(255,255,255,.08)",
@@ -249,7 +351,10 @@ export default function Page() {
           >
             <div className="w-[min(1200px,92vw)] mx-auto">
               <div className="text-center mb-12">
-                <p className="text-[13px] font-bold uppercase tracking-[.16em] text-brand mb-3">
+                <p
+                  className="text-[13px] font-bold uppercase tracking-[.16em] mb-3"
+                  style={{ color: CLINICA_ACCENT.brand }}
+                >
                   Nuestro Enfoque
                 </p>
                 <h2 className="font-display font-bold text-white text-[28px]">
@@ -266,7 +371,10 @@ export default function Page() {
                       border: "1px solid rgba(255,255,255,.1)",
                     }}
                   >
-                    <h3 className="font-display font-bold text-brand-300 text-[17px] mb-3">
+                    <h3
+                      className="font-display font-bold text-[17px] mb-3"
+                      style={{ color: CLINICA_ACCENT.brand }}
+                    >
                       {h.title}
                     </h3>
                     <p
