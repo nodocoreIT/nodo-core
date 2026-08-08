@@ -89,6 +89,27 @@ function AdminLoginForm() {
       return;
     }
 
+    // Auth is shared across every Nodo product, so these credentials can be
+    // genuinely valid without this person being panel staff (e.g. a real
+    // customer of another product). Check right here instead of navigating
+    // to /panel and letting its layout bounce back — that round trip reads
+    // as "it tried to log in and failed" instead of an immediate answer.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", user?.id ?? "")
+      .maybeSingle();
+
+    if (!profile) {
+      await supabase.auth.signOut();
+      setGeneralError(LOGIN_ERROR_MESSAGES.sin_acceso_panel);
+      setLoading(false);
+      return;
+    }
+
     router.push("/panel");
   }
 
