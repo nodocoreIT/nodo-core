@@ -1,6 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { RoleRouter } from "@/app/auth/role-router";
-import { RequireAuth } from "@/shared/components/require-auth/require-auth";
+import { RequireAuth } from "@nodocore/shared-components";
 
 import { AuthCallbackPage } from "@/features/auth/callback/auth-callback-page";
 import { AdminPortalPage } from "@/portals/admin/admin-portal-page";
@@ -33,11 +33,12 @@ export function AppRouter() {
         {/* Role dispatch: "/" → admin/owner/tenant portal based on app_metadata.role */}
         <Route path="/" element={<RoleRouter />} />
 
-        {/* Protected portal routes */}
+        {/* Protected portal routes — allowedRoles prevents cross-portal access:
+            without it, any authenticated role could reach any portal by URL. */}
         <Route
           path="/admin/*"
           element={
-            <RequireAuth>
+            <RequireAuth allowedRoles={["super_admin", "admin", "agent"]}>
               <AdminPortalPage />
             </RequireAuth>
           }
@@ -45,7 +46,7 @@ export function AppRouter() {
         <Route
           path="/owner/*"
           element={
-            <RequireAuth>
+            <RequireAuth allowedRoles={["owner"]}>
               <OwnerPortalPage />
             </RequireAuth>
           }
@@ -53,7 +54,7 @@ export function AppRouter() {
         <Route
           path="/tenant/*"
           element={
-            <RequireAuth>
+            <RequireAuth allowedRoles={["tenant"]}>
               <TenantPortalPage />
             </RequireAuth>
           }
