@@ -40,14 +40,41 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (
-    !user &&
-    request.nextUrl.pathname.startsWith("/panel")
-  ) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+  if (request.nextUrl.pathname.startsWith("/panel")) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+
+    // Roles restricted to a subset of the panel (e.g. QA — testing access
+    // only, not the full admin surface). Team members with no entry here
+    // keep full access, same as before this check existed.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const allowedPrefixes = RESTRICTED_ROLE_PANEL_ACCESS[profile?.role ?? ""];
+    if (
+      allowedPrefixes &&
+      !allowedPrefixes.some(
+        (prefix) =>
+          request.nextUrl.pathname === prefix ||
+          request.nextUrl.pathname.startsWith(`${prefix}/`),
+      )
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = allowedPrefixes[0];
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;
 }
+
+/** Panel paths a restricted role may reach — everything else redirects to the first entry. */
+const RESTRICTED_ROLE_PANEL_ACCESS: Record<string, string[]> = {
+  qa: ["/panel/tareas", "/panel/ideas"],
+};
