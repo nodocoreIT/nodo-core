@@ -62,6 +62,7 @@ export type Task = {
   due_date: string | null;
   created_at: string;
   position: number;
+  created_by: string | null;
 };
 
 export const TASK_TYPES: Task["type"][] = [
@@ -594,6 +595,16 @@ function TaskEditModal({
             </div>
           </div>
 
+          {(() => {
+            const creator = profiles.find((p) => p.id === task.created_by);
+            if (!creator) return null;
+            return (
+              <p style={{ margin: 0, fontSize: 12, color: "var(--color-slate2)" }}>
+                Creado por <strong style={{ color: "var(--color-ink)" }}>{creator.full_name}</strong>
+              </p>
+            );
+          })()}
+
           <div>
             <label style={labelStyle}>Responsable</label>
             <SearchableSelect
@@ -757,7 +768,7 @@ function TaskCreateModal({
   profiles: Profile[];
   units: string[];
   tasks: readonly Pick<Task, "unit_code" | "title">[];
-  onCreate: (task: Omit<Task, "id" | "position">) => Promise<void> | void;
+  onCreate: (task: Omit<Task, "id" | "position" | "created_by">) => Promise<void> | void;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState("");
@@ -1249,7 +1260,7 @@ function AddTaskForm({
 }: {
   status: Task["status"];
   units: string[];
-  onAdd: (task: Omit<Task, "id" | "position">) => void;
+  onAdd: (task: Omit<Task, "id" | "position" | "created_by">) => void;
   onCancel: () => void;
 }) {
   const [title, setTitle] = useState("");
@@ -1347,7 +1358,7 @@ function KanbanColumn({
   profiles: Profile[];
   units: string[];
   isOver: boolean;
-  onAddTask: (task: Omit<Task, "id" | "position">) => void;
+  onAddTask: (task: Omit<Task, "id" | "position" | "created_by">) => void;
   onEditTask: (task: Task) => void;
 }) {
   const [showForm, setShowForm] = useState(false);
@@ -1781,6 +1792,7 @@ export default function KanbanBoard({
   const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
   const [unitFilter, setUnitFilter] = useState<string[]>([]);
   const [typeFilter, setTypeFilter] = useState<Task["type"][]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   function toggleAssignee(id: string) {
     setAssigneeFilter((prev) => prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]);
@@ -1798,6 +1810,17 @@ export default function KanbanBoard({
   }
 
   const supabase = createClient();
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled) setCurrentUserId(data.user?.id ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -1900,7 +1923,7 @@ export default function KanbanBoard({
     });
   }
 
-  async function handleAddTask(taskData: Omit<Task, "id" | "position">) {
+  async function handleAddTask(taskData: Omit<Task, "id" | "position" | "created_by">) {
     const colTasks = tasks
       .filter((t) => t.status === taskData.status)
       .sort((a, b) => a.position - b.position);
@@ -1920,6 +1943,7 @@ export default function KanbanBoard({
         title: codedTitle,
         description: formatTaskDescription(taskData.description),
         position,
+        created_by: currentUserId,
       })
       .select()
       .single();
