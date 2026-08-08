@@ -6,7 +6,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * - clinic pending registrations (RPC), when the caller can see them
  */
 export async function fetchPendingSolicitudesCount(
-  supabase: SupabaseClient,
+  // Accepts a schema-scoped client (the panel client is scoped to "nodo_core",
+  // not the default "public") — this function only does untyped .from/.rpc
+  // calls, so the schema generic doesn't matter here.
+  supabase: SupabaseClient<any, any, any, any, any>,
 ): Promise<number> {
   const { count, error } = await supabase
     .from("client_units")
