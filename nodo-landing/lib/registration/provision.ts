@@ -358,6 +358,13 @@ export async function provisionNodoAccess(params: {
             app_metadata: {
               ...currentMeta,
               role: "user",
+              // Sentinel org_id (Finanzas has no real org concept — it's
+              // multi-tenant by user_id). Without SOME org_id here, a later
+              // registration in another node sees no org_id to compare
+              // against, hasForeignMembership() returns false, and it
+              // silently overwrites this role claim — locking the user out
+              // of Finanzas with no error anywhere.
+              org_id: userId,
               plan: planToTier(plan),
               ...themePatch,
             },
@@ -464,6 +471,9 @@ export async function provisionNodoAccess(params: {
     await admin.auth.admin.updateUserById(userId, {
       app_metadata: {
         role: "user",
+        // See sentinel org_id comment in the "already exists" branch above —
+        // same reasoning applies to brand-new Finanzas signups.
+        org_id: userId,
         plan: planToTier(plan),
         ...finanzasThemeAppMetadata(),
       },
