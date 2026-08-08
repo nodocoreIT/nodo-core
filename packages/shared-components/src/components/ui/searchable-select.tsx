@@ -66,6 +66,7 @@ export function SearchableSelect({
   createNewLabel,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const [search, setSearch] = useState("");
   const [highlighted, setHighlighted] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -127,6 +128,23 @@ export function SearchableSelect({
     el?.scrollIntoView({ block: "nearest" });
   }, [highlighted, open]);
 
+  // Opens upward when there isn't enough room below the trigger (e.g. near
+  // the bottom of a tall modal) but there IS enough above — otherwise the
+  // panel renders past the visible viewport/scroll area and the options
+  // are invisible until the user scrolls the whole modal down.
+  function toggleOpen() {
+    if (!open) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const estimatedPanelHeight = 280;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        setOpenUpward(spaceBelow < estimatedPanelHeight && spaceAbove > spaceBelow);
+      }
+    }
+    setOpen((current) => !current);
+  }
+
   function handleSelect(optionValue: string) {
     onChange(optionValue);
     close();
@@ -176,7 +194,7 @@ export function SearchableSelect({
         aria-expanded={open}
         aria-haspopup="listbox"
         disabled={disabled}
-        onClick={() => setOpen((current) => !current)}
+        onClick={toggleOpen}
         className={cn(
           "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs",
           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
@@ -192,7 +210,10 @@ export function SearchableSelect({
       {open && (
         <div
           role="listbox"
-          className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+          className={cn(
+            "absolute z-50 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-md",
+            openUpward ? "bottom-full mb-1" : "top-full mt-1",
+          )}
         >
           <div className="border-b border-border px-2 py-1.5">
             <input
