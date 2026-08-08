@@ -59,11 +59,14 @@ export default async function PanelLayout({
     .eq("id", user.id)
     .maybeSingle();
 
-  // No nodo_core.profiles row = not a panel team member. RLS on panel tables
-  // already blocks their data either way, but there's no reason to render
-  // the internal admin shell for them at all.
+  // No nodo_core.profiles row = not a panel team member — e.g. a real
+  // customer of another Nodo product, since auth is shared across all of
+  // them. Their login succeeds (valid credentials elsewhere), so sign them
+  // out here and say why instead of silently bouncing back to /login with
+  // no explanation.
   if (!profile) {
-    redirect("/login");
+    await supabase.auth.signOut();
+    redirect("/login?error=sin_acceso_panel");
   }
 
   const email = user.email ?? "";

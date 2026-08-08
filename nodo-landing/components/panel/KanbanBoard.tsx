@@ -695,24 +695,72 @@ function TaskEditModal({
             </button>
           </div>
 
-          {!confirmDelete ? (
-            <button
-              onClick={() => setConfirmDelete(true)}
+          <button
+            onClick={() => setConfirmDelete(true)}
+            style={{
+              background: "transparent",
+              color: "#C0392B",
+              border: "1px solid #F5C6C2",
+              borderRadius: 8,
+              padding: "9px 16px",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "var(--font-sans)",
+            }}
+          >
+            Eliminar tarea
+          </button>
+        </div>
+      </div>
+
+      {confirmDelete && (
+        <div
+          onClick={() => setConfirmDelete(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(18,30,47,.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1200,
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "white",
+              borderRadius: 12,
+              boxShadow: "0 8px 32px rgba(18,30,47,.25)",
+              width: "100%",
+              maxWidth: 360,
+              padding: 24,
+            }}
+          >
+            <h3
               style={{
-                background: "transparent",
-                color: "#C0392B",
-                border: "1px solid #F5C6C2",
-                borderRadius: 8,
-                padding: "9px 16px",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
+                margin: "0 0 8px",
+                fontSize: 16,
+                fontWeight: 700,
+                color: "var(--color-navy)",
+                fontFamily: "var(--font-display)",
+              }}
+            >
+              ¿Eliminar esta tarea?
+            </h3>
+            <p
+              style={{
+                margin: "0 0 20px",
+                fontSize: 13.5,
+                color: "var(--color-slate2)",
+                lineHeight: 1.4,
                 fontFamily: "var(--font-sans)",
               }}
             >
-              Eliminar tarea
-            </button>
-          ) : (
+              Esta acción no se puede deshacer.
+            </p>
             <div style={{ display: "flex", gap: 10 }}>
               <button
                 onClick={handleDelete}
@@ -722,14 +770,14 @@ function TaskEditModal({
                   color: "white",
                   border: "none",
                   borderRadius: 8,
-                  padding: "9px 16px",
-                  fontSize: 13,
+                  padding: "10px 16px",
+                  fontSize: 13.5,
                   fontWeight: 600,
                   cursor: "pointer",
                   fontFamily: "var(--font-sans)",
                 }}
               >
-                Confirmar eliminación
+                Eliminar
               </button>
               <button
                 onClick={() => setConfirmDelete(false)}
@@ -739,19 +787,19 @@ function TaskEditModal({
                   color: "var(--color-slate2)",
                   border: "1px solid var(--color-mist)",
                   borderRadius: 8,
-                  padding: "9px 16px",
-                  fontSize: 13,
+                  padding: "10px 16px",
+                  fontSize: 13.5,
                   fontWeight: 600,
                   cursor: "pointer",
                   fontFamily: "var(--font-sans)",
                 }}
               >
-                No, cancelar
+                Cancelar
               </button>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -848,7 +896,7 @@ function TaskCreateModal({
         alignItems: "center",
         justifyContent: "center",
         zIndex: 1000,
-        padding: 12,
+        padding: 6,
       }}
     >
       <div
@@ -859,7 +907,7 @@ function TaskCreateModal({
           boxShadow: "0 8px 32px rgba(18,30,47,.18)",
           width: "100%",
           maxWidth: 480,
-          maxHeight: "96vh",
+          maxHeight: "99vh",
           overflowY: "auto",
           display: "flex",
           flexDirection: "column",
