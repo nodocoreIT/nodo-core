@@ -5,6 +5,7 @@ import { CheckCircle, Clock, FileImage, CreditCard, Trash2, MailCheck, AlertCirc
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
 import { NODES } from "@/lib/nodes";
+import { usePendingSolicitudesCount } from "@/hooks/use-pending-solicitudes-count";
 
 type VerificationDoc = {
   id: string;
@@ -107,6 +108,7 @@ function clinicRoleBadge(role: ClinicRegistration["role"]) {
 }
 
 export default function SolicitudesPage() {
+  const { refresh: refreshPendingBadge } = usePendingSolicitudesCount();
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -189,6 +191,7 @@ export default function SolicitudesPage() {
     }));
     setSolicitudes(rows);
     setLoading(false);
+    void refreshPendingBadge();
   }
 
   async function loadClinicRegistrations() {
@@ -197,6 +200,7 @@ export default function SolicitudesPage() {
     if (res.ok) {
       const json = await res.json();
       setClinicRegs(json.registrations ?? []);
+      void refreshPendingBadge();
     }
     setClinicLoading(false);
   }

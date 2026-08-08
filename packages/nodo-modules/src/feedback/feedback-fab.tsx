@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   Lightbulb,
@@ -9,6 +9,9 @@ import {
   Mic,
   Square,
   CheckCircle2,
+  History,
+  MessageSquarePlus,
+  Loader2,
 } from "lucide-react";
 import {
   Dialog,
@@ -21,6 +24,68 @@ import {
 } from "@nodocore/shared-components";
 
 type FeedbackCategory = "bug" | "idea" | "bloat";
+type DialogTab = "new" | "history";
+type FeedbackTicketStatus = "pendiente" | "en_proceso" | "respondido" | "resuelto";
+
+type FeedbackHistoryReply = {
+  id: string;
+  body: string;
+  status: FeedbackTicketStatus;
+  createdAt: string;
+  authorLabel: string;
+};
+
+type FeedbackHistoryItem = {
+  id: string;
+  category: string;
+  content: string | null;
+  createdAt: string;
+  status: FeedbackTicketStatus;
+  replies: FeedbackHistoryReply[];
+  sourceNode: string;
+};
+
+const STATUS_LABEL: Record<FeedbackTicketStatus, string> = {
+  pendiente: "Pendiente",
+  en_proceso: "En proceso",
+  respondido: "Respondido",
+  resuelto: "Resuelto",
+};
+
+const STATUS_CLASS: Record<FeedbackTicketStatus, string> = {
+  pendiente: "bg-blue-50 text-blue-700",
+  en_proceso: "bg-amber-50 text-amber-700",
+  respondido: "bg-emerald-50 text-emerald-700",
+  resuelto: "bg-slate-100 text-slate-600",
+};
+
+const CATEGORY_LABEL: Record<string, string> = {
+  bug: "Error",
+  idea: "Idea",
+  bloat: "De más",
+};
+
+function normalizeStatus(value: unknown): FeedbackTicketStatus {
+  if (
+    value === "pendiente" ||
+    value === "en_proceso" ||
+    value === "respondido" ||
+    value === "resuelto"
+  ) {
+    return value;
+  }
+  return "pendiente";
+}
+
+function formatShortDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 // No global `declare` on purpose: apps that already ship a native
 // SpeechRecognition DOM type (newer TS/lib.dom targets, e.g. Next.js apps)
@@ -250,6 +315,7 @@ export function FeedbackFAB({
 }
 
 function FeedbackDialog({ isOpen, onClose, supabase, sourceNode }: FeedbackDialogProps) {
+  const [tab, setTab] = useState<DialogTab>("new");
   const [category, setCategory] = useState<FeedbackCategory>("idea");
   const [pendingCategory, setPendingCategory] = useState<FeedbackCategory | null>(null);
   const [content, setContent] = useState("");
@@ -258,8 +324,108 @@ function FeedbackDialog({ isOpen, onClose, supabase, sourceNode }: FeedbackDialo
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [recognitionError, setRecognitionError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [history, setHistory] = useState<FeedbackHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setHistory([]);
+        setHistoryError("Iniciá sesión para ver tu historial.");
+        return;
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .schema("shared")
+        .from("feedback")
+        .select("id, category, content, metadata, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(30);
+
+      if (error) throw error;
+
+      const rows = (data ?? []) as Array<{
+        id: string;
+        category: string;
+        content: string | null;
+        metadata: {
+          source_node?: string;
+          status?: string;
+          replies?: Array<{
+            id?: string;
+            body?: string;
+            status?: string;
+            created_at?: string;
+            author_label?: string;
+          }>;
+        } | null;
+        created_at: string;
+      }>;
+
+      setHistory(
+        rows.map((row) => {
+          const repliesRaw = Array.isArray(row.metadata?.replies) ? row.metadata.replies : [];
+          const replies: FeedbackHistoryReply[] = repliesRaw
+            .filter((r) => typeof r?.body === "string" && r.body.trim())
+            .map((r, i) => ({
+              id: typeof r.id === "string" && r.id ? r.id : `r-${i}`,
+              body: String(r.body).trim(),
+              status: normalizeStatus(r.status),
+              createdAt: typeof r.created_at === "string" ? r.created_at : row.created_at,
+              authorLabel:
+                typeof r.author_label === "string" && r.author_label.trim()
+                  ? r.author_label.trim()
+                  : "Equipo Nodo",
+            }));
+          const statusFromMeta = normalizeStatus(row.metadata?.status);
+          const status =
+            statusFromMeta !== "pendiente"
+              ? statusFromMeta
+              : replies.length > 0
+                ? replies[replies.length - 1]?.status ?? "respondido"
+                : "pendiente";
+
+          return {
+            id: row.id,
+            category: row.category,
+            content: row.content,
+            createdAt: row.created_at,
+            status,
+            replies,
+            sourceNode: row.metadata?.source_node ?? sourceNode,
+          };
+        }),
+      );
+    } catch (err) {
+      console.error("Error loading feedback history:", err);
+      setHistoryError("No se pudo cargar el historial.");
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [supabase, sourceNode]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setTab("new");
+      setSubmitSuccess(false);
+      setSubmitError(null);
+      return;
+    }
+    if (tab === "history") {
+      void loadHistory();
+    }
+  }, [isOpen, tab, loadHistory]);
 
   function handleCategoryClick(next: FeedbackCategory) {
     if (next === category) return;
@@ -412,10 +578,109 @@ function FeedbackDialog({ isOpen, onClose, supabase, sourceNode }: FeedbackDialo
               </DialogTitle>
               <DialogDescription className="text-sm text-muted-foreground">
                 Contanos qué le falta, qué está fallando, o qué sentís que está
-                de más.
+                de más. También podés ver el historial de respuestas del equipo Nodo.
               </DialogDescription>
             </DialogHeader>
 
+            <div className="mt-4 grid grid-cols-2 gap-1 rounded-md border border-border bg-muted/40 p-1">
+              <button
+                type="button"
+                onClick={() => setTab("new")}
+                className={[
+                  "flex items-center justify-center gap-1.5 rounded-sm px-3 py-2 text-xs font-semibold transition-colors",
+                  tab === "new"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+              >
+                <MessageSquarePlus className="h-3.5 w-3.5" />
+                Nuevo
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("history")}
+                className={[
+                  "flex items-center justify-center gap-1.5 rounded-sm px-3 py-2 text-xs font-semibold transition-colors",
+                  tab === "history"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+              >
+                <History className="h-3.5 w-3.5" />
+                Historial
+              </button>
+            </div>
+
+            {tab === "history" ? (
+              <div className="mt-4 max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                {historyLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cargando historial…
+                  </div>
+                ) : historyError ? (
+                  <p className="py-6 text-center text-sm text-rose-600">{historyError}</p>
+                ) : history.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    Todavía no enviaste feedback desde esta cuenta.
+                  </p>
+                ) : (
+                  history.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-md border border-border bg-background p-3 text-left"
+                    >
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          {CATEGORY_LABEL[item.category] ?? "Feedback"}
+                        </span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_CLASS[item.status]}`}
+                        >
+                          {STATUS_LABEL[item.status]}
+                        </span>
+                        <span className="ml-auto text-[11px] text-muted-foreground">
+                          {formatShortDate(item.createdAt)}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium text-foreground whitespace-pre-wrap">
+                        {item.content ?? "—"}
+                      </p>
+                      {item.replies.length > 0 ? (
+                        <div className="mt-3 space-y-2 border-t border-border pt-2">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            Respuestas de Nodo
+                          </p>
+                          {item.replies.map((reply) => (
+                            <div
+                              key={reply.id}
+                              className="rounded-sm border border-brand/15 bg-brand/5 px-2.5 py-2"
+                            >
+                              <p className="mb-1 text-[11px] font-semibold text-brand">
+                                {reply.authorLabel}
+                                <span className="ml-2 font-normal text-muted-foreground">
+                                  {formatShortDate(reply.createdAt)}
+                                </span>
+                              </p>
+                              <p className="text-sm whitespace-pre-wrap">{reply.body}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Aún sin respuesta del equipo Nodo.
+                        </p>
+                      )}
+                    </div>
+                  ))
+                )}
+                <div className="flex justify-end border-t border-border pt-3">
+                  <Button type="button" variant="outline" onClick={onClose}>
+                    Cerrar
+                  </Button>
+                </div>
+              </div>
+            ) : (
             <form onSubmit={handleSubmit} className="mt-4 space-y-5">
               <div className="space-y-2">
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -577,6 +842,7 @@ function FeedbackDialog({ isOpen, onClose, supabase, sourceNode }: FeedbackDialo
                 </Button>
               </div>
             </form>
+            )}
           </>
         )}
       </DialogContent>

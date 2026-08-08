@@ -24,6 +24,20 @@ function normalizeFeedbackCategory(value: string): FeedbackCategory {
  */
 const FEEDBACK_FETCH_LIMIT = 500;
 
+export type FeedbackReplyStatus =
+  | "pendiente"
+  | "en_proceso"
+  | "respondido"
+  | "resuelto";
+
+export type FeedbackReply = {
+  id: string;
+  body: string;
+  status: FeedbackReplyStatus;
+  createdAt: string;
+  authorLabel: string;
+};
+
 export type FeedbackInboxRow = {
   id: string;
   category: FeedbackCategory;
@@ -37,6 +51,8 @@ export type FeedbackInboxRow = {
   createdAt: string;
   read: boolean;
   readAt: string | null;
+  status: FeedbackReplyStatus;
+  replies: FeedbackReply[];
 };
 
 /** Raw row shapes as they come back from Supabase — kept narrow on purpose. */
@@ -46,7 +62,17 @@ export type RawFeedbackRow = {
   user_id: string | null;
   category: string;
   content: string | null;
-  metadata: { source_node?: string } | null;
+  metadata: {
+    source_node?: string;
+    status?: string;
+    replies?: Array<{
+      id?: string;
+      body?: string;
+      status?: string;
+      created_at?: string;
+      author_label?: string;
+    }>;
+  } | null;
   created_at: string;
 };
 
@@ -61,6 +87,39 @@ export type RawReadStateRow = {
 };
 
 export const ORG_NAME_FALLBACK = "Sin organización";
+
+const REPLY_STATUSES: readonly FeedbackReplyStatus[] = [
+  "pendiente",
+  "en_proceso",
+  "respondido",
+  "resuelto",
+];
+
+export function normalizeFeedbackStatus(value: string | null | undefined): FeedbackReplyStatus {
+  if (value && (REPLY_STATUSES as readonly string[]).includes(value)) {
+    return value as FeedbackReplyStatus;
+  }
+  return "pendiente";
+}
+
+function parseReplies(
+  raw: RawFeedbackRow["metadata"],
+): FeedbackReply[] {
+  const list = raw?.replies;
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((r) => typeof r?.body === "string" && r.body.trim())
+    .map((r, index) => ({
+      id: typeof r.id === "string" && r.id ? r.id : `reply-${index}`,
+      body: String(r.body).trim(),
+      status: normalizeFeedbackStatus(r.status),
+      createdAt: typeof r.created_at === "string" ? r.created_at : new Date(0).toISOString(),
+      authorLabel:
+        typeof r.author_label === "string" && r.author_label.trim()
+          ? r.author_label.trim()
+          : "Equipo Nodo",
+    }));
+}
 
 /**
  * Pure merge — no I/O — so it can be unit tested without a DB. Joins
@@ -81,6 +140,14 @@ export function mergeFeedbackInbox(
   return feedback.map((row) => {
     const sourceNode = row.metadata?.source_node ?? "unknown";
     const isRead = readAtByFeedbackId.has(row.id);
+    const replies = parseReplies(row.metadata);
+    const statusFromMeta = normalizeFeedbackStatus(row.metadata?.status);
+    const status =
+      statusFromMeta !== "pendiente"
+        ? statusFromMeta
+        : replies.length > 0
+          ? replies[replies.length - 1]?.status ?? "respondido"
+          : "pendiente";
 
     return {
       id: row.id,
@@ -95,6 +162,8 @@ export function mergeFeedbackInbox(
       createdAt: row.created_at,
       read: isRead,
       readAt: isRead ? readAtByFeedbackId.get(row.id) ?? null : null,
+      status,
+      replies,
     };
   });
 }
@@ -154,6 +223,79 @@ export async function deleteFeedback(id: string): Promise<void> {
 
   const { error: feedbackError } = await admin.schema("shared").from("feedback").delete().eq("id", id);
   if (feedbackError) throw feedbackError;
+}
+
+/**
+ * Append a Nodo reply to shared.feedback.metadata.replies and bump status.
+ * Also marks the item read in feedback_read_state (panel inbox semantics).
+ */
+export async function replyToFeedback(options: {
+  feedbackId: string;
+  body: string;
+  status: FeedbackReplyStatus;
+  authorLabel?: string;
+  readBy?: string | null;
+}): Promise<FeedbackReply> {
+  const admin = createAdminClient();
+  const body = options.body.trim();
+  if (!body) throw new Error("EMPTY_REPLY");
+
+  const { data: row, error: fetchError } = await admin
+    .schema("shared")
+    .from("feedback")
+    .select("id, metadata")
+    .eq("id", options.feedbackId)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+  if (!row) throw new Error("NOT_FOUND");
+
+  const metadata =
+    row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+      ? { ...(row.metadata as Record<string, unknown>) }
+      : {};
+
+  const existingReplies = Array.isArray(metadata.replies) ? [...metadata.replies] : [];
+  const reply = {
+    id: crypto.randomUUID(),
+    body,
+    status: options.status,
+    created_at: new Date().toISOString(),
+    author_label: options.authorLabel?.trim() || "Equipo Nodo",
+  };
+  existingReplies.push(reply);
+
+  const nextMetadata = {
+    ...metadata,
+    status: options.status,
+    replies: existingReplies,
+  };
+
+  const { error: updateError } = await admin
+    .schema("shared")
+    .from("feedback")
+    .update({ metadata: nextMetadata })
+    .eq("id", options.feedbackId);
+
+  if (updateError) throw updateError;
+
+  const { error: readError } = await admin.from("feedback_read_state").upsert(
+    {
+      feedback_id: options.feedbackId,
+      read_by: options.readBy ?? null,
+      read_at: new Date().toISOString(),
+    },
+    { onConflict: "feedback_id" },
+  );
+  if (readError) throw readError;
+
+  return {
+    id: reply.id,
+    body: reply.body,
+    status: reply.status,
+    createdAt: reply.created_at,
+    authorLabel: reply.author_label,
+  };
 }
 
 /**

@@ -30,6 +30,13 @@ interface AnthropicResponse {
   error?: { message: string };
 }
 
+interface CohereResponse {
+  message?:
+    | { content?: Array<{ type?: string; text?: string }> }
+    | string;
+  error?: { message: string };
+}
+
 export interface ExtractedTask {
   title?: string;
   description?: string;
@@ -255,10 +262,50 @@ async function callGroq(apiKey: string, transcript: string, options: VoicePrompt
   return parseExtractedTask(raw);
 }
 
+async function callCohere(apiKey: string, transcript: string, options: VoicePromptOptions): Promise<ExtractedTask> {
+  const today = new Date().toISOString().split("T")[0];
+
+  const res = await fetch("https://api.cohere.com/v2/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      model: "command-a-03-2025",
+      temperature: 0.1,
+      max_tokens: 512,
+      messages: [
+        { role: "system", content: buildSystemPrompt(today, options) },
+        { role: "user", content: `Texto dictado: "${transcript}"` },
+      ],
+    }),
+  });
+
+  const data: CohereResponse = await res.json();
+
+  if (!res.ok) {
+    const msg =
+      data.error?.message ??
+      (typeof data.message === "string" ? data.message : null) ??
+      `HTTP ${res.status}`;
+    throw new Error(`Cohere API error: ${msg}`);
+  }
+
+  const message = typeof data.message === "object" && data.message ? data.message : null;
+  const raw =
+    message?.content?.find((part) => part.type === "text" || part.text)?.text ??
+    message?.content?.[0]?.text ??
+    "";
+  return parseExtractedTask(raw);
+}
+
 async function callAI(provider: AiProvider, apiKey: string, transcript: string, options: VoicePromptOptions): Promise<ExtractedTask> {
   if (provider === "openai") return callOpenAI(apiKey, transcript, options);
   if (provider === "anthropic") return callAnthropic(apiKey, transcript, options);
   if (provider === "groq") return callGroq(apiKey, transcript, options);
+  if (provider === "cohere") return callCohere(apiKey, transcript, options);
   return callGemini(apiKey, transcript, options);
 }
 

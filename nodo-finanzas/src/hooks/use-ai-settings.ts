@@ -1,30 +1,14 @@
 import { useState, useEffect, useContext, createContext, useCallback } from "react";
+import {
+  type AiProvider,
+  type AiSettings,
+  DEFAULT_AI_SETTINGS,
+  getActiveApiKey,
+} from "@nodocore/nodo-modules/settings";
 import { FinanzasService } from "@/services/finanzas-service";
 
-export type AiProvider = "gemini" | "openai" | "anthropic" | "groq";
-
-export interface AiSettings {
-  provider: AiProvider;
-  geminiApiKey: string;
-  openaiApiKey: string;
-  anthropicApiKey: string;
-  groqApiKey: string;
-}
-
-const DEFAULT_AI_SETTINGS: AiSettings = {
-  provider: "gemini",
-  geminiApiKey: "",
-  openaiApiKey: "",
-  anthropicApiKey: "",
-  groqApiKey: "",
-};
-
-export function getActiveApiKey(settings: AiSettings): string {
-  if (settings.provider === "openai") return settings.openaiApiKey;
-  if (settings.provider === "anthropic") return settings.anthropicApiKey;
-  if (settings.provider === "groq") return settings.groqApiKey;
-  return settings.geminiApiKey;
-}
+export type { AiProvider, AiSettings };
+export { getActiveApiKey };
 
 const AI_SETTINGS_KEY = "ai_settings";
 

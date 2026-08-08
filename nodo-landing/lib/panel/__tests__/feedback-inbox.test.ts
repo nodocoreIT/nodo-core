@@ -95,6 +95,41 @@ describe("mergeFeedbackInbox", () => {
     expect(row.categoryLabel).toBe("Feedback");
   });
 
+  it("parses reply thread and status from metadata", () => {
+    const [row] = mergeFeedbackInbox(
+      [
+        feedbackRow({
+          metadata: {
+            source_node: "inmo",
+            status: "respondido",
+            replies: [
+              {
+                id: "r1",
+                body: "Ya lo estamos mirando",
+                status: "respondido",
+                created_at: "2026-08-03T00:00:00.000Z",
+                author_label: "Equipo Nodo",
+              },
+            ],
+          },
+        }),
+      ],
+      [],
+      [],
+    );
+
+    expect(row.status).toBe("respondido");
+    expect(row.replies).toHaveLength(1);
+    expect(row.replies[0]?.body).toBe("Ya lo estamos mirando");
+    expect(row.replies[0]?.authorLabel).toBe("Equipo Nodo");
+  });
+
+  it("defaults status to pendiente without replies", () => {
+    const [row] = mergeFeedbackInbox([feedbackRow()], [], []);
+    expect(row.status).toBe("pendiente");
+    expect(row.replies).toEqual([]);
+  });
+
   it("computes unread count as total minus read (10 - 3 = 7)", () => {
     const feedback = Array.from({ length: 10 }, (_, i) => feedbackRow({ id: `fb-${i}` }));
     const readState: RawReadStateRow[] = Array.from({ length: 3 }, (_, i) => ({
