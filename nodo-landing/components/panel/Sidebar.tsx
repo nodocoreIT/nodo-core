@@ -49,8 +49,16 @@ export type SidebarProps = {
   userInitials: string;
   userColor: string;
   userAvatarUrl: string | null;
+  /** nodo_core.profiles.role — "qa" gets a reduced nav (Ideas + Tareas + logout only). */
+  role?: string | null;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+};
+
+/** Restricted roles see only these platform items — everything else (ecosystem,
+ *  herramientas, search, meeting link, settings) is hidden, not just unlinked. */
+const RESTRICTED_ROLE_VISIBLE_HREFS: Record<string, string[]> = {
+  qa: ["/panel/ideas", "/panel/tareas"],
 };
 
 const PLATFORM_ITEMS: NavItem[] = [
@@ -198,6 +206,7 @@ export default function Sidebar({
   userInitials,
   userColor,
   userAvatarUrl,
+  role,
   mobileOpen = false,
   onMobileClose,
 }: SidebarProps) {
@@ -208,7 +217,12 @@ export default function Sidebar({
   const { count: unreadFeedbackCount } = useUnreadFeedbackCount();
   const { count: pendingSolicitudesCount } = usePendingSolicitudesCount();
 
-  const platformItems = PLATFORM_ITEMS.map((item) => {
+  const visibleHrefs = role ? RESTRICTED_ROLE_VISIBLE_HREFS[role] : undefined;
+  const isRestricted = !!visibleHrefs;
+
+  const platformItems = PLATFORM_ITEMS.filter(
+    (item) => !visibleHrefs || visibleHrefs.includes(item.href),
+  ).map((item) => {
     if (item.href === "/panel/feedback") {
       return { ...item, badgeCount: unreadFeedbackCount };
     }
@@ -256,38 +270,44 @@ export default function Sidebar({
             onNavigate={onMobileClose}
           />
 
-          <div className="my-2 border-t border-[var(--color-sidebar-border)]" />
+          {!isRestricted && (
+            <>
+              <div className="my-2 border-t border-[var(--color-sidebar-border)]" />
 
-          <NavLinks
-            items={ECOSYSTEM_ITEMS}
-            pathname={pathname}
-            onNavigate={onMobileClose}
-          />
+              <NavLinks
+                items={ECOSYSTEM_ITEMS}
+                pathname={pathname}
+                onNavigate={onMobileClose}
+              />
 
-          <div className="my-2 border-t border-[var(--color-sidebar-border)]" />
+              <div className="my-2 border-t border-[var(--color-sidebar-border)]" />
 
-          <NavGroup
-            label="Herramientas"
-            icon={Wrench}
-            items={TOOLS_ITEMS}
-            pathname={pathname}
-            onNavigate={onMobileClose}
-          />
+              <NavGroup
+                label="Herramientas"
+                icon={Wrench}
+                items={TOOLS_ITEMS}
+                pathname={pathname}
+                onNavigate={onMobileClose}
+              />
 
-          <SidebarSearchHint onClick={openCommandPalette} />
+              <SidebarSearchHint onClick={openCommandPalette} />
+            </>
+          )}
         </nav>
 
-        <div className="px-3 pb-3">
-          <a
-            href="https://meet.google.com/fbx-yewk-dir?authuser=0&pli=1"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 rounded-sm border border-[var(--color-sidebar-border)] px-3 py-2 text-sm font-medium text-[var(--color-sidebar-text)] transition-colors hover:border-brand hover:bg-brand/10 hover:text-brand"
-          >
-            <Video className="h-4 w-4 flex-shrink-0" />
-            Unirme a reunión
-          </a>
-        </div>
+        {!isRestricted && (
+          <div className="px-3 pb-3">
+            <a
+              href="https://meet.google.com/fbx-yewk-dir?authuser=0&pli=1"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 rounded-sm border border-[var(--color-sidebar-border)] px-3 py-2 text-sm font-medium text-[var(--color-sidebar-text)] transition-colors hover:border-brand hover:bg-brand/10 hover:text-brand"
+            >
+              <Video className="h-4 w-4 flex-shrink-0" />
+              Unirme a reunión
+            </a>
+          </div>
+        )}
 
         <div className="flex-shrink-0 border-t border-[var(--color-sidebar-border)] p-3">
           <div className="flex items-center gap-3 px-1 py-1">
@@ -314,17 +334,19 @@ export default function Sidebar({
                 {userEmail}
               </p>
             </div>
-            <button
-              type="button"
-              aria-label="Configuración"
-              onClick={() => {
-                onMobileClose?.();
-                setSettingsOpen(true);
-              }}
-              className="flex-shrink-0 cursor-pointer rounded-md p-1.5 text-[var(--color-sidebar-text)] transition-colors hover:text-brand"
-            >
-              <Settings className="h-4 w-4" />
-            </button>
+            {!isRestricted && (
+              <button
+                type="button"
+                aria-label="Configuración"
+                onClick={() => {
+                  onMobileClose?.();
+                  setSettingsOpen(true);
+                }}
+                className="flex-shrink-0 cursor-pointer rounded-md p-1.5 text-[var(--color-sidebar-text)] transition-colors hover:text-brand"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+            )}
           </div>
 
           <Button

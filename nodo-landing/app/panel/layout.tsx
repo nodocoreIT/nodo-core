@@ -59,6 +59,13 @@ export default async function PanelLayout({
     .eq("id", user.id)
     .maybeSingle();
 
+  // No nodo_core.profiles row = not a panel team member. RLS on panel tables
+  // already blocks their data either way, but there's no reason to render
+  // the internal admin shell for them at all.
+  if (!profile) {
+    redirect("/login");
+  }
+
   const email = user.email ?? "";
   const fullName =
     profile?.full_name ?? user.user_metadata?.full_name ?? email.split("@")[0] ?? "Usuario";
@@ -82,6 +89,7 @@ export default async function PanelLayout({
           userInitials: initials,
           userColor: color,
           userAvatarUrl: avatarUrl,
+          role: profile.role ?? null,
         }}
       >
         <main className="flex flex-1 flex-col overflow-hidden">{children}</main>
