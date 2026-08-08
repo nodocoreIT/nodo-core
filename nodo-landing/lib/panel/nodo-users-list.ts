@@ -109,7 +109,10 @@ function uniqueNodoAdminClients(
 
 /** Batch lookup on auth.users — O(n/batch) instead of N sequential getUserById calls. */
 async function fetchAuthUserMap(
-  admin: SupabaseClient | null,
+  // Accepts a schema-scoped client too (e.g. createAdminClient()'s default
+  // "nodo_core" scope) — this only does an untyped .schema("auth") lookup,
+  // so the caller's own schema generic doesn't matter here.
+  admin: SupabaseClient<any, any, any, any, any> | null,
   userIds: string[],
 ): Promise<Map<string, AuthUserInfo>> {
   const map = new Map<string, AuthUserInfo>();
@@ -372,16 +375,81 @@ async function listFromOrgMembers(existingKeys: Set<string>): Promise<NodoUserRe
   return rows;
 }
 
+/**
+ * Staff with access to the internal panel/dashboard itself (nodo_core.profiles
+ * — same table backing /panel/equipo and the is_team_member() RPC gate).
+ * This is a distinct membership system from shared.org_members (client team
+ * invites to Inmo/Autos/Finanzas/Ecommerce) and client_units (external
+ * product provisioning) — neither of those cover the dashboard's own team,
+ * which is why panel admins were invisible on this page.
+ */
+async function listFromPanelTeam(existingKeys: Set<string>): Promise<NodoUserRecord[]> {
+  const admin = createAdminClient();
+  const unitCode = "Dashboard";
+
+  const { data: profiles, error } = await admin
+    .from("profiles")
+    .select("id, full_name, role, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[nodo-users] nodo_core.profiles", error);
+    return [];
+  }
+
+  const rows = profiles ?? [];
+  if (rows.length === 0) return [];
+
+  const authMap = await fetchAuthUserMap(
+    admin,
+    rows.map((p) => p.id as string),
+  );
+
+  const result: NodoUserRecord[] = [];
+  for (const p of rows) {
+    const userId = p.id as string;
+    const auth = authMap.get(userId);
+    const email = auth?.email ?? "";
+    if (!email) continue;
+
+    const key = userKey(email, unitCode);
+    if (existingKeys.has(key)) continue;
+    existingKeys.add(key);
+
+    result.push({
+      id: `panel:${userId}`,
+      email,
+      fullName: (p.full_name as string | null) ?? auth?.fullName ?? null,
+      unitCode,
+      unitLabel: "NODO | Dashboard",
+      role: (p.role as string | null) ?? null,
+      accessType: "invitacion_equipo",
+      status: auth?.banned ? "suspendido" : "activo",
+      clientId: null,
+      clientUnitId: null,
+      authUserId: userId,
+      orgName: null,
+      orgId: null,
+      plan: null,
+      createdAt: (p.created_at as string) ?? null,
+      authBanned: auth?.banned ?? false,
+    });
+  }
+
+  return result;
+}
+
 export async function listNodoUsers(): Promise<NodoUserRecord[]> {
   const fromAccess = await listFromClientUnits();
   const keys = new Set(fromAccess.map((u) => userKey(u.email, u.unitCode)));
 
-  const [fromClinic, fromMembers] = await Promise.all([
+  const [fromClinic, fromMembers, fromPanelTeam] = await Promise.all([
     listFromClinicaProfiles(keys),
     listFromOrgMembers(keys),
+    listFromPanelTeam(keys),
   ]);
 
-  const merged = [...fromAccess, ...fromClinic, ...fromMembers];
+  const merged = [...fromAccess, ...fromClinic, ...fromMembers, ...fromPanelTeam];
 
   const seen = new Set<string>();
   const combined = merged.filter((row) => {
