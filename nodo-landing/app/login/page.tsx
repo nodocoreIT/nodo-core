@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import LoginBrandPanel from "@/components/LoginBrandPanel";
 import { DEFAULT_ACCENT } from "@/lib/node-accents";
@@ -24,8 +24,14 @@ export default function LoginPage() {
   );
 }
 
+const LOGIN_ERROR_MESSAGES: Record<string, string> = {
+  sin_acceso_panel:
+    "No existe un usuario con ese correo en el panel de Nodo Core.",
+};
+
 function AdminLoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [authMode, setAuthMode] = useState<"login" | "forgot">("login");
   const [email, setEmail] = useState("");
@@ -36,6 +42,13 @@ function AdminLoginForm() {
   const [generalError, setGeneralError] = useState("");
   const [loading, setLoading] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
+
+  useEffect(() => {
+    const errorCode = searchParams.get("error");
+    if (errorCode && LOGIN_ERROR_MESSAGES[errorCode]) {
+      setGeneralError(LOGIN_ERROR_MESSAGES[errorCode]);
+    }
+  }, [searchParams]);
 
   const validEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
