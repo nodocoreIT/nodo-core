@@ -848,7 +848,7 @@ function TaskCreateModal({
         alignItems: "center",
         justifyContent: "center",
         zIndex: 1000,
-        padding: 12,
+        padding: 6,
       }}
     >
       <div
@@ -859,7 +859,7 @@ function TaskCreateModal({
           boxShadow: "0 8px 32px rgba(18,30,47,.18)",
           width: "100%",
           maxWidth: 480,
-          maxHeight: "96vh",
+          maxHeight: "99vh",
           overflowY: "auto",
           display: "flex",
           flexDirection: "column",
