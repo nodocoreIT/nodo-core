@@ -43,8 +43,6 @@ const PRODUCT_TO_UNIT_CODE: Record<string, string> = {
 
 const ORG_MEMBER_NODO_CODES = ["inmo", "autos", "ecommerce", "finanzas"] as const;
 
-const AUTH_BATCH_SIZE = 100;
-
 function normalizeUnitCode(unitCode: string): string {
   return unitCode.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
@@ -107,11 +105,14 @@ function uniqueNodoAdminClients(
   return [...byUrl.values()];
 }
 
-/** Batch lookup on auth.users — O(n/batch) instead of N sequential getUserById calls. */
+/**
+ * Resolves auth.users emails via the Auth Admin API (getUserById), not
+ * PostgREST — this project's exposed-schemas config doesn't include "auth"
+ * (only public/shared/nodo_* are exposed), so .schema("auth").from("users")
+ * always 404s with PGRST106. Same approach /api/team already uses for the
+ * identical email-lookup need.
+ */
 async function fetchAuthUserMap(
-  // Accepts a schema-scoped client too (e.g. createAdminClient()'s default
-  // "nodo_core" scope) — this only does an untyped .schema("auth") lookup,
-  // so the caller's own schema generic doesn't matter here.
   admin: SupabaseClient<any, any, any, any, any> | null,
   userIds: string[],
 ): Promise<Map<string, AuthUserInfo>> {
@@ -120,27 +121,19 @@ async function fetchAuthUserMap(
 
   const unique = [...new Set(userIds.filter(Boolean))];
 
-  for (let i = 0; i < unique.length; i += AUTH_BATCH_SIZE) {
-    const batch = unique.slice(i, i + AUTH_BATCH_SIZE);
-    const { data, error } = await admin
-      .schema("auth")
-      .from("users")
-      .select("id, email, raw_user_meta_data, banned_until")
-      .in("id", batch);
+  const results = await Promise.all(
+    unique.map((id) => admin.auth.admin.getUserById(id)),
+  );
 
-    if (error) {
-      console.error("[nodo-users] auth.users batch", error);
-      continue;
-    }
-
-    for (const row of data ?? []) {
-      const meta = row.raw_user_meta_data as Record<string, unknown> | undefined;
-      map.set(row.id as string, {
-        email: String(row.email ?? "").toLowerCase(),
-        fullName: typeof meta?.full_name === "string" ? meta.full_name : null,
-        banned: Boolean(row.banned_until && new Date(row.banned_until as string) > new Date()),
-      });
-    }
+  for (const { data, error } of results) {
+    if (error || !data?.user) continue;
+    const user = data.user;
+    const meta = user.user_metadata as Record<string, unknown> | undefined;
+    map.set(user.id, {
+      email: (user.email ?? "").toLowerCase(),
+      fullName: typeof meta?.full_name === "string" ? meta.full_name : null,
+      banned: Boolean(user.banned_until && new Date(user.banned_until) > new Date()),
+    });
   }
 
   return map;
