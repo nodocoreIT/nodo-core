@@ -37,6 +37,7 @@ const NODE_PILL_COLORS: Record<string, NodePillTheme> = {
   salud: { bg: "#ff0077", color: "#ffffff" },
   inmo: { bg: "#CA460D", color: "#ffffff" },
   legales: { bg: "#530403", color: "#ffffff" },
+  dashboard: { bg: "#3730A3", color: "#ffffff" },
 };
 
 function normalizeUnitCodeForPill(unitCode: string): string {
