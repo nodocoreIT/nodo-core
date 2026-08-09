@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Lightbulb,
   LogOut,
+  Map,
   MessageSquare,
   Settings,
   UserCog,
@@ -58,7 +59,7 @@ export type SidebarProps = {
 /** Restricted roles see only these platform items — everything else (ecosystem,
  *  herramientas, search, meeting link, settings) is hidden, not just unlinked. */
 const RESTRICTED_ROLE_VISIBLE_HREFS: Record<string, string[]> = {
-  qa: ["/panel/ideas", "/panel/tareas"],
+  qa: ["/panel/ideas", "/panel/tareas", "/panel/roadmap"],
 };
 
 const PLATFORM_ITEMS: NavItem[] = [
@@ -66,6 +67,7 @@ const PLATFORM_ITEMS: NavItem[] = [
   { label: "Feedback", href: "/panel/feedback", icon: MessageSquare },
   { label: "Ideas", href: "/panel/ideas", icon: Lightbulb },
   { label: "Tareas", href: "/panel/tareas", icon: LayoutDashboard },
+  { label: "Roadmap", href: "/panel/roadmap", icon: Map },
   { label: "Clientes", href: "/panel/clientes", icon: Users },
   { label: "Usuarios de Nodo", href: "/panel/usuarios-nodo", icon: UserCog },
   { label: "Caja", href: "/panel/caja", icon: Wallet },
