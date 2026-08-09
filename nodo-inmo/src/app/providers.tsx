@@ -3,6 +3,7 @@ import { useEffect, type ReactNode } from "react";
 import {
   SupabaseProvider,
   AuthProvider,
+  SessionTimeoutGuard,
   mergeThemeSettings,
 } from "@nodocore/shared-components";
 import { supabase } from "@/shared/lib/supabase";
@@ -65,6 +66,7 @@ export function AppProviders({ children }: AppProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <SupabaseProvider client={supabase}>
+        <SessionTimeoutGuard loginPath="/login" storageKeyPrefix="nodo_inmo_session" />
         <AuthProvider config={AUTH_CONFIG}>
           <OrgSwitchListener />
           <ThemeInitializer>{children}</ThemeInitializer>

@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { SupabaseProvider, AuthProvider } from "@nodocore/shared-components";
+import { SupabaseProvider, AuthProvider, SessionTimeoutGuard } from "@nodocore/shared-components";
 import { Toaster } from "sonner";
 import { supabase } from "@/shared/lib/supabase";
 import { useThemeSettings, useThemeStore } from "@/shared/hooks/use-theme-settings";
@@ -46,6 +46,7 @@ export function AppProviders({ children }: AppProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <SupabaseProvider client={supabase}>
+        <SessionTimeoutGuard loginPath="/login" storageKeyPrefix="nodo_autos_session" />
         <AuthProvider config={AUTH_CONFIG}>
           <ThemeInitializer>
             {children}
