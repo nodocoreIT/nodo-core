@@ -1,8 +1,7 @@
 /**
- * Task title convention for the panel kanban:
- *   `{PREFIX}-{NN}-{SLUG}` e.g. `IN-01-ANALIZAR-PDF`, `IT-03-FIX-LOGIN`, `OB-12-AVANCE-OBRA`
- *
- * Prefix is per unit_code; NN auto-increments from existing titles of that unit.
+ * Task titles are free text — no auto-coding. The `{PREFIX}-{SLUG}` style
+ * (e.g. `IN-CAMBIAR-TITULO-UNO`) is only ever used for the git branch name,
+ * see buildTaskBranchName below.
  */
 
 const UNIT_TASK_PREFIX: Record<string, string> = {
@@ -51,43 +50,6 @@ export function slugifyTaskTitle(title: string): string {
 export function titleHasTaskCode(title: string, unitCode: string): boolean {
   const prefix = getTaskPrefixForUnit(unitCode);
   return new RegExp(`^${prefix}-\\d+-`, "i").test(title.trim());
-}
-
-/** Next sequential number for this unit based on existing coded titles. */
-export function nextTaskSequence(
-  existingTitles: readonly string[],
-  unitCode: string,
-): number {
-  const prefix = getTaskPrefixForUnit(unitCode);
-  const re = new RegExp(`^${prefix}-(\\d+)-`, "i");
-  let max = 0;
-  for (const title of existingTitles) {
-    const match = title.trim().match(re);
-    if (!match) continue;
-    const n = Number.parseInt(match[1], 10);
-    if (Number.isFinite(n) && n > max) max = n;
-  }
-  return max + 1;
-}
-
-/**
- * Build `PREFIX-NN-SLUG` for a new task. If the title is already coded for
- * this unit, returns it unchanged (trimmed).
- */
-export function buildCodedTaskTitle(
-  unitCode: string,
-  rawTitle: string,
-  existingTitles: readonly string[],
-): string {
-  const trimmed = rawTitle.trim();
-  if (!trimmed) return trimmed;
-  if (titleHasTaskCode(trimmed, unitCode)) return trimmed;
-
-  const prefix = getTaskPrefixForUnit(unitCode);
-  const seq = nextTaskSequence(existingTitles, unitCode);
-  const nn = String(seq).padStart(2, "0");
-  const slug = slugifyTaskTitle(trimmed) || "TAREA";
-  return `${prefix}-${nn}-${slug}`;
 }
 
 /**
