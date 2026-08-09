@@ -42,23 +42,34 @@ interface StaffStore {
   removeMember: (userId: string) => Promise<void>;
 }
 
+// Module-level (not store state) so concurrent fetchMembers() calls from
+// different mounted components share the same in-flight request instead of
+// each firing its own list-org-members invocation.
+let inFlightFetch: Promise<void> | null = null;
+
 export const useStaffStore = create<StaffStore>((set, get) => ({
   users: [],
   loading: false,
   error: null,
 
   fetchMembers: async () => {
-    set({ loading: true, error: null });
-    try {
-      const data = await invokeFunction<{ members?: StaffUser[] }>("list-org-members");
-      const members = data.members ?? [];
-      set({ users: members, loading: false });
-    } catch (err) {
-      set({
-        loading: false,
-        error: err instanceof Error ? err.message : "No se pudieron cargar los usuarios",
-      });
-    }
+    if (inFlightFetch) return inFlightFetch;
+    inFlightFetch = (async () => {
+      set({ loading: true, error: null });
+      try {
+        const data = await invokeFunction<{ members?: StaffUser[] }>("list-org-members");
+        const members = data.members ?? [];
+        set({ users: members, loading: false });
+      } catch (err) {
+        set({
+          loading: false,
+          error: err instanceof Error ? err.message : "No se pudieron cargar los usuarios",
+        });
+      } finally {
+        inFlightFetch = null;
+      }
+    })();
+    return inFlightFetch;
   },
 
   inviteUser: async (name, email, role) => {
