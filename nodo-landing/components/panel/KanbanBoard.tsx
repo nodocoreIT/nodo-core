@@ -11,12 +11,13 @@ import {
   Lightbulb,
   Plus,
   Search,
+  UserRound,
   Wrench,
   X,
 } from "lucide-react";
 import {
+  foldForSearch,
   FormSelect,
-  SearchableSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -355,6 +356,176 @@ function AssigneeAvatar({
         </span>
       )}
     </span>
+  );
+}
+
+// ─── AssigneePicker (Jira-style: avatar-only trigger, searchable popover) ──────
+
+function AssigneePicker({
+  profiles,
+  value,
+  onChange,
+  size = 28,
+}: {
+  profiles: Profile[];
+  value: string;
+  onChange: (value: string) => void;
+  size?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const selected = profiles.find((p) => p.id === value) ?? null;
+  const filtered = search.trim()
+    ? profiles.filter((p) => foldForSearch(p.full_name).includes(foldForSearch(search)))
+    : profiles;
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: PointerEvent) {
+      if (!containerRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) setTimeout(() => searchRef.current?.focus(), 0);
+  }, [open]);
+
+  function select(id: string) {
+    onChange(id);
+    setOpen(false);
+    setSearch("");
+  }
+
+  const rowStyle = (active: boolean): React.CSSProperties => ({
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    width: "100%",
+    border: "none",
+    background: active ? "var(--color-paper)" : "transparent",
+    padding: "6px 8px",
+    borderRadius: 6,
+    cursor: "pointer",
+    textAlign: "left",
+    fontSize: 13,
+    color: "var(--color-ink)",
+    fontFamily: "var(--font-sans)",
+  });
+
+  return (
+    <div ref={containerRef} style={{ position: "relative", display: "inline-block" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        title={selected ? selected.full_name : "Sin asignar"}
+        style={{
+          border: "1px solid var(--color-mist)",
+          background: "white",
+          padding: 2,
+          cursor: "pointer",
+          borderRadius: "50%",
+          display: "flex",
+        }}
+      >
+        {selected ? (
+          <AssigneeAvatar profile={selected} size={size} />
+        ) : (
+          <div
+            style={{
+              width: size,
+              height: size,
+              borderRadius: "50%",
+              background: "var(--color-mist)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--color-slate2)",
+              flexShrink: 0,
+            }}
+          >
+            <UserRound size={Math.round(size * 0.58)} />
+          </div>
+        )}
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            zIndex: 1150,
+            top: "100%",
+            left: 0,
+            marginTop: 4,
+            width: 220,
+            borderRadius: 8,
+            border: "1px solid var(--color-mist)",
+            background: "white",
+            boxShadow: "0 8px 24px rgba(18,30,47,.18)",
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ borderBottom: "1px solid var(--color-mist)", padding: "6px 8px" }}>
+            <input
+              ref={searchRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar..."
+              style={{
+                width: "100%",
+                border: "none",
+                outline: "none",
+                fontSize: 13,
+                fontFamily: "var(--font-sans)",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+          <div style={{ maxHeight: 224, overflowY: "auto", padding: 4 }}>
+            <button type="button" onClick={() => select("")} style={rowStyle(!value)}>
+              <div
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: "50%",
+                  background: "var(--color-mist)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--color-slate2)",
+                  flexShrink: 0,
+                }}
+              >
+                <UserRound size={13} />
+              </div>
+              Sin asignar
+            </button>
+            {filtered.length === 0 ? (
+              <p style={{ margin: 0, padding: "10px 8px", fontSize: 12.5, color: "var(--color-slate2)" }}>
+                Sin resultados
+              </p>
+            ) : (
+              filtered.map((p) => (
+                <button key={p.id} type="button" onClick={() => select(p.id)} style={rowStyle(p.id === value)}>
+                  <AssigneeAvatar profile={p} size={22} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {p.full_name}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -734,27 +905,7 @@ function TaskEditModal({
 
             <div>
               <label style={labelStyle}>Asignado a</label>
-              <SearchableSelect
-                value={assignee}
-                onChange={setAssignee}
-                options={profiles.map((profile) => ({
-                  value: profile.id,
-                  label: profile.full_name,
-                }))}
-                allowEmpty
-                emptyLabel="Sin asignar"
-                searchPlaceholder="Buscar..."
-              />
-              {assignee && (() => {
-                const profile = profiles.find((p) => p.id === assignee);
-                if (!profile) return null;
-                return (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-                    <AssigneeAvatar profile={profile} size={24} />
-                    <span style={{ fontSize: 13, color: "var(--color-ink)" }}>{profile.full_name}</span>
-                  </div>
-                );
-              })()}
+              <AssigneePicker profiles={profiles} value={assignee} onChange={setAssignee} />
             </div>
 
             <div>
@@ -1237,17 +1388,7 @@ function TaskCreateModal({
 
             <div>
               <label style={labelStyle}>Asignado a</label>
-              <SearchableSelect
-                value={assignee}
-                onChange={setAssignee}
-                options={profiles.map((profile) => ({
-                  value: profile.id,
-                  label: profile.full_name,
-                }))}
-                allowEmpty
-                emptyLabel="Sin asignar"
-                searchPlaceholder="Buscar..."
-              />
+              <AssigneePicker profiles={profiles} value={assignee} onChange={setAssignee} />
             </div>
 
             <div>
