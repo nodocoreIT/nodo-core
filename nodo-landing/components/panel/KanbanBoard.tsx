@@ -4,8 +4,10 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import {
   AlertTriangle,
   Bug,
+  Check,
   CheckSquare,
   ChevronDown,
+  Copy,
   Lightbulb,
   Plus,
   Search,
@@ -23,6 +25,7 @@ import {
 import { ECOMMERCE_ACCENT, getNodeAccentByCode } from "@/lib/node-accents";
 import {
   buildCodedTaskTitle,
+  buildTaskBranchName,
   formatTaskDescription,
   getTaskPrefixForUnit,
 } from "@/lib/panel/task-code";
@@ -810,12 +813,14 @@ function TaskCreateModal({
   profiles,
   units,
   tasks,
+  currentUserId,
   onCreate,
   onClose,
 }: {
   profiles: Profile[];
   units: string[];
   tasks: readonly Pick<Task, "unit_code" | "title">[];
+  currentUserId: string | null;
   onCreate: (task: Omit<Task, "id" | "position" | "created_by">) => Promise<void> | void;
   onClose: () => void;
 }) {
@@ -828,6 +833,9 @@ function TaskCreateModal({
   const [dueDate, setDueDate] = useState("");
   const [assignee, setAssignee] = useState("");
   const [saving, setSaving] = useState(false);
+  const [branchCopied, setBranchCopied] = useState(false);
+
+  const reporter = profiles.find((p) => p.id === currentUserId);
 
   const existingTitles = tasks
     .filter((t) => t.unit_code === unitCode)
@@ -836,6 +844,15 @@ function TaskCreateModal({
   const codedPreview = title.trim()
     ? buildCodedTaskTitle(unitCode, title, existingTitles)
     : `${getTaskPrefixForUnit(unitCode)}-NN-…`;
+
+  const branchName = title.trim() ? buildTaskBranchName(unitCode, title) : "";
+
+  function handleCopyBranchName() {
+    if (!branchName) return;
+    void navigator.clipboard.writeText(branchName);
+    setBranchCopied(true);
+    setTimeout(() => setBranchCopied(false), 1500);
+  }
 
   const inputStyle: React.CSSProperties = {
     width: "100%",
@@ -906,7 +923,7 @@ function TaskCreateModal({
           borderRadius: 12,
           boxShadow: "0 8px 32px rgba(18,30,47,.18)",
           width: "100%",
-          maxWidth: 480,
+          maxWidth: 760,
           maxHeight: "99vh",
           overflowY: "auto",
           display: "flex",
@@ -950,15 +967,63 @@ function TaskCreateModal({
           </button>
         </div>
 
-        <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0,1fr) minmax(0,0.9fr) minmax(0,1.35fr)",
-              gap: 12,
-            }}
-          >
-            <div style={{ minWidth: 0 }}>
+        <div style={{ padding: "16px 24px", display: "flex", gap: 24, flexWrap: "wrap" }}>
+          {/* ── Columna principal: descripción + título ─────────────────── */}
+          <div style={{ flex: "1 1 380px", minWidth: 280, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Descripción</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={8}
+                placeholder="Qué hay que hacer, contexto, criterios de aceptación…"
+                autoFocus
+                style={{ ...inputStyle, resize: "vertical" }}
+              />
+              <GenerateTitleFromDescriptionButton
+                description={description}
+                unitCode={unitCode}
+                onTitle={setTitle}
+                onDescriptionNormalized={setDescription}
+              />
+            </div>
+
+            <div>
+              <label style={labelStyle}>Título</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Qué hay que hacer…"
+                style={inputStyle}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void handleCreate();
+                  }
+                }}
+              />
+              <p
+                style={{
+                  margin: "6px 0 0",
+                  fontSize: 11.5,
+                  color: "var(--color-slate2)",
+                  fontFamily: "var(--font-sans)",
+                  lineHeight: 1.4,
+                  wordBreak: "break-all",
+                }}
+              >
+                Se guardará como{" "}
+                <span style={{ fontWeight: 700, color: "var(--color-navy)" }}>
+                  {codedPreview}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          {/* ── Sidebar: metadata al estilo Jira ─────────────────────────── */}
+          <div style={{ flex: "0 1 220px", minWidth: 200, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
               <label style={labelStyle}>Unidad</label>
               <FormSelect
                 value={unitCode}
@@ -967,7 +1032,8 @@ function TaskCreateModal({
                 contentClassName={MODAL_SELECT_Z}
               />
             </div>
-            <div style={{ minWidth: 0 }}>
+
+            <div>
               <label style={labelStyle}>Prioridad</label>
               <FormSelect
                 value={priority}
@@ -980,7 +1046,8 @@ function TaskCreateModal({
                 contentClassName={MODAL_SELECT_Z}
               />
             </div>
-            <div style={{ minWidth: 0 }}>
+
+            <div>
               <label style={labelStyle}>Tipo</label>
               <TaskTypeSelect
                 value={type}
@@ -988,59 +1055,34 @@ function TaskCreateModal({
                 contentClassName={MODAL_SELECT_Z}
               />
             </div>
-          </div>
 
-          <div>
-            <label style={labelStyle}>Descripción</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              placeholder="Opcional"
-              autoFocus
-              style={{ ...inputStyle, resize: "vertical" }}
-            />
-            <GenerateTitleFromDescriptionButton
-              description={description}
-              unitCode={unitCode}
-              onTitle={setTitle}
-              onDescriptionNormalized={setDescription}
-            />
-          </div>
+            <div>
+              <label style={labelStyle}>Asignado a</label>
+              <SearchableSelect
+                value={assignee}
+                onChange={setAssignee}
+                options={profiles.map((profile) => ({
+                  value: profile.id,
+                  label: profile.full_name,
+                }))}
+                allowEmpty
+                emptyLabel="Sin asignar"
+                searchPlaceholder="Buscar..."
+              />
+            </div>
 
-          <div>
-            <label style={labelStyle}>Título</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Qué hay que hacer…"
-              style={inputStyle}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void handleCreate();
-                }
-              }}
-            />
-            <p
-              style={{
-                margin: "6px 0 0",
-                fontSize: 11.5,
-                color: "var(--color-slate2)",
-                fontFamily: "var(--font-sans)",
-                lineHeight: 1.4,
-                wordBreak: "break-all",
-              }}
-            >
-              Se guardará como{" "}
-              <span style={{ fontWeight: 700, color: "var(--color-navy)" }}>
-                {codedPreview}
-              </span>
-            </p>
-          </div>
+            <div>
+              <label style={labelStyle}>Reporter</label>
+              {reporter ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
+                  <AssigneeAvatar profile={reporter} size={24} />
+                  <span style={{ fontSize: 13, color: "var(--color-ink)" }}>{reporter.full_name}</span>
+                </div>
+              ) : (
+                <p style={{ margin: 0, fontSize: 12.5, color: "var(--color-slate2)" }}>—</p>
+              )}
+            </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <label style={labelStyle}>Fecha de creación</label>
               <input
@@ -1050,6 +1092,7 @@ function TaskCreateModal({
                 style={inputStyle}
               />
             </div>
+
             <div>
               <label style={labelStyle}>Fecha límite</label>
               <input
@@ -1059,21 +1102,54 @@ function TaskCreateModal({
                 style={inputStyle}
               />
             </div>
-          </div>
 
-          <div>
-            <label style={labelStyle}>Responsable</label>
-            <SearchableSelect
-              value={assignee}
-              onChange={setAssignee}
-              options={profiles.map((profile) => ({
-                value: profile.id,
-                label: profile.full_name,
-              }))}
-              allowEmpty
-              emptyLabel="Sin asignar"
-              searchPlaceholder="Buscar..."
-            />
+            <div>
+              <label style={labelStyle}>Branch name</label>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  border: "1px solid var(--color-mist)",
+                  borderRadius: 6,
+                  padding: "6px 8px",
+                  background: "var(--color-paper)",
+                }}
+              >
+                <code
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: 11.5,
+                    fontFamily: "var(--font-mono, monospace)",
+                    color: branchName ? "var(--color-ink)" : "var(--color-slate2)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                  title={branchName || undefined}
+                >
+                  {branchName || `${getTaskPrefixForUnit(unitCode)}-…`}
+                </code>
+                <button
+                  type="button"
+                  onClick={handleCopyBranchName}
+                  disabled={!branchName}
+                  title="Copiar nombre de rama"
+                  style={{
+                    flexShrink: 0,
+                    border: "none",
+                    background: "transparent",
+                    cursor: branchName ? "pointer" : "not-allowed",
+                    color: branchCopied ? "#1F8A5B" : "var(--color-slate2)",
+                    padding: 2,
+                    display: "flex",
+                  }}
+                >
+                  {branchCopied ? <Check size={13} /> : <Copy size={13} />}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2070,6 +2146,7 @@ export default function KanbanBoard({
           profiles={profiles}
           units={units}
           tasks={tasks}
+          currentUserId={currentUserId}
           onCreate={handleAddTask}
           onClose={() => setCreatingTask(false)}
         />

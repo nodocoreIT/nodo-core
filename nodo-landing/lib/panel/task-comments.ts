@@ -1,8 +1,11 @@
 import { createClient } from "@/lib/supabase/client";
 
 export const TASK_EVIDENCE_BUCKET = "panel-task-evidence";
-const MAX_EVIDENCE_BYTES = 5 * 1024 * 1024;
-const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
+const ALLOWED_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const ALLOWED_VIDEO_MIME = new Set(["video/mp4", "video/webm", "video/quicktime"]);
+export const ALLOWED_EVIDENCE_MIME = new Set([...ALLOWED_IMAGE_MIME, ...ALLOWED_VIDEO_MIME]);
 
 export type TaskCommentAttachment = {
   id: string;
@@ -70,13 +73,20 @@ function sanitizeFilename(name: string): string {
     .slice(0, 80);
 }
 
-function assertImageFile(file: File) {
-  if (!ALLOWED_MIME.has(file.type)) {
-    throw new Error("Solo se permiten imágenes JPG, PNG, WEBP o GIF.");
+function assertEvidenceFile(file: File) {
+  if (ALLOWED_IMAGE_MIME.has(file.type)) {
+    if (file.size > MAX_IMAGE_BYTES) {
+      throw new Error("Cada imagen puede pesar hasta 5 MB.");
+    }
+    return;
   }
-  if (file.size > MAX_EVIDENCE_BYTES) {
-    throw new Error("Cada imagen puede pesar hasta 5 MB.");
+  if (ALLOWED_VIDEO_MIME.has(file.type)) {
+    if (file.size > MAX_VIDEO_BYTES) {
+      throw new Error("Cada video puede pesar hasta 25 MB.");
+    }
+    return;
   }
+  throw new Error("Solo se permiten imágenes (JPG, PNG, WEBP, GIF) o videos (MP4, WEBM, MOV).");
 }
 
 async function signPaths(paths: string[]): Promise<Map<string, string>> {
@@ -168,9 +178,9 @@ export async function createTaskComment(options: {
   const body = options.body.trim();
   const files = options.files ?? [];
   if (!body && files.length === 0) {
-    throw new Error("Escribí un comentario o adjuntá una imagen.");
+    throw new Error("Escribí un comentario o adjuntá una imagen/video.");
   }
-  for (const file of files) assertImageFile(file);
+  for (const file of files) assertEvidenceFile(file);
 
   const supabase = createClient();
   const {
