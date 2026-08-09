@@ -129,11 +129,31 @@ export function AuthProvider({
   // effective value exposed on the context falls back to the JWT claims
   // (readClaims) whenever this is null, so client-only accounts are unaffected.
   const [nodeIdentity, setNodeIdentity] = useState<NodeIdentity | null>(null);
+  // True until the FIRST validateSession() pass finishes resolving
+  // nodeIdentity for the current session. Needed because getNodeIdentity is
+  // async and lags one render behind `session`/`isLoading` — without this,
+  // effectiveOrgId falls back to the unscoped JWT claim (app_metadata.org_id,
+  // shared across every nodo the user belongs to) for that one render. For a
+  // user with memberships in multiple products, that claim can point at a
+  // DIFFERENT product's org, so any query gated on `!!orgId` fires once with
+  // the wrong org_id (RLS then rejects it, e.g. a 403 on cash_accounts insert)
+  // before re-firing correctly once nodeIdentity resolves.
+  const [nodeIdentityLoading, setNodeIdentityLoading] = useState(
+    () => !!config.unitCode,
+  );
 
   useEffect(() => {
     let cancelled = false;
 
   async function validateSession(s: Session | null) {
+      try {
+        await validateSessionInner(s);
+      } finally {
+        if (!cancelled) setNodeIdentityLoading(false);
+      }
+    }
+
+    async function validateSessionInner(s: Session | null) {
       if (!s) {
         if (!cancelled) {
           setAccessDenied(false);
@@ -265,9 +285,15 @@ export function AuthProvider({
   }, [supabase]);
 
   const claims = readClaims(session);
-  const effectiveRole = nodeIdentity?.role ?? claims.role;
-  const effectiveOrgId = nodeIdentity?.orgId ?? claims.orgId;
-  const effectivePlan = nodeIdentity?.plan ?? claims.plan;
+  // While nodeIdentity is still resolving for a unitCode'd nodo, don't fall
+  // back to the unscoped JWT claim — it's shared across every product the
+  // user belongs to and can point at the wrong org for that one render (see
+  // nodeIdentityLoading above). Once resolved, missing nodeIdentity (no
+  // team-membership row for this nodo) still falls back to claims as before.
+  const identityPending = !!config.unitCode && nodeIdentityLoading;
+  const effectiveRole = identityPending ? null : nodeIdentity?.role ?? claims.role;
+  const effectiveOrgId = identityPending ? null : nodeIdentity?.orgId ?? claims.orgId;
+  const effectivePlan = identityPending ? null : nodeIdentity?.plan ?? claims.plan;
   const denied = accessDenied;
   const effectiveAccessReason: NodeAccessReason = denied ? "ok" : accessReason;
 
