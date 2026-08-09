@@ -1139,6 +1139,7 @@ function TaskCard({
   profiles: Profile[];
 }) {
   const assignee = profiles.find((p) => p.id === task.assignee);
+  const creator = profiles.find((p) => p.id === task.created_by);
   const priority = PRIORITY_STYLES[task.priority];
   const typeConf = getTypeConfig(task.type);
   const TypeIcon = typeConf.Icon;
@@ -1241,14 +1242,21 @@ function TaskCard({
           marginTop: 10,
         }}
       >
-        {task.due_date || task.created_at ? (
-          <span style={{ fontSize: 12, color: "var(--color-slate2)", display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {task.created_at ? <span title="Creación">📅 {formatDate(task.created_at)}</span> : null}
-            {task.due_date ? <span title="Fecha límite">🗓 {formatDate(task.due_date)}</span> : null}
-          </span>
-        ) : (
-          <span />
-        )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {task.due_date || task.created_at ? (
+            <span style={{ fontSize: 12, color: "var(--color-slate2)", display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {task.created_at ? <span title="Creación">📅 {formatDate(task.created_at)}</span> : null}
+              {task.due_date ? <span title="Fecha límite">🗓 {formatDate(task.due_date)}</span> : null}
+            </span>
+          ) : (
+            <span />
+          )}
+          {creator && (
+            <span style={{ fontSize: 11, color: "var(--color-slate2)", opacity: 0.85 }}>
+              Creado por {creator.full_name}
+            </span>
+          )}
+        </div>
         {assignee && <AssigneeAvatar profile={assignee} size={26} withInitials />}
       </div>
     </div>
