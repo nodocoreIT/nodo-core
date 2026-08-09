@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PanelSettingsModuleProvider } from "@/lib/panel/panel-settings-module";
 import { UnreadFeedbackCountProvider } from "@/hooks/use-unread-feedback-count";
 import { PendingSolicitudesCountProvider } from "@/hooks/use-pending-solicitudes-count";
+import { PanelSessionTimeoutGuard } from "./PanelSessionTimeoutGuard";
 
 const PANEL_AUTH_CONFIG = {
   roleDestinations: {
@@ -25,6 +26,7 @@ export function PanelProviders({ children }: { children: ReactNode }) {
         <PanelSettingsModuleProvider>
           <UnreadFeedbackCountProvider>
             <PendingSolicitudesCountProvider>
+              <PanelSessionTimeoutGuard />
               {children}
             </PendingSolicitudesCountProvider>
           </UnreadFeedbackCountProvider>

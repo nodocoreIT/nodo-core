@@ -27,6 +27,10 @@ export default function LoginPage() {
 const LOGIN_ERROR_MESSAGES: Record<string, string> = {
   sin_acceso_panel:
     "No existe un usuario con ese correo en el panel de Nodo Core.",
+  sesion_inactividad:
+    "Tu sesión se cerró por inactividad. Volvé a ingresar.",
+  sesion_expirada:
+    "Tu sesión expiró por seguridad. Volvé a ingresar.",
 };
 
 function AdminLoginForm() {
