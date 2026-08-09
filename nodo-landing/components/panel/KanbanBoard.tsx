@@ -382,12 +382,23 @@ function TaskEditModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [branchCopied, setBranchCopied] = useState(false);
 
   const unitOptions = useMemo(() => {
     const codes = [...units];
     if (unitCode && !codes.includes(unitCode)) codes.unshift(unitCode);
     return codes.map((unit) => ({ value: unit, label: unit }));
   }, [units, unitCode]);
+
+  const reporter = profiles.find((p) => p.id === task.created_by);
+  const branchName = title.trim() ? buildTaskBranchName(unitCode, title) : "";
+
+  function handleCopyBranchName() {
+    if (!branchName) return;
+    void navigator.clipboard.writeText(branchName);
+    setBranchCopied(true);
+    setTimeout(() => setBranchCopied(false), 1500);
+  }
 
   const inputStyle: React.CSSProperties = {
     width: "100%",
@@ -466,7 +477,7 @@ function TaskEditModal({
           borderRadius: 12,
           boxShadow: "0 8px 32px rgba(18,30,47,.18)",
           width: "100%",
-          maxWidth: 560,
+          maxWidth: 760,
           maxHeight: "96vh",
           overflowY: "auto",
           display: "flex",
@@ -509,15 +520,55 @@ function TaskEditModal({
           </button>
         </div>
 
-        <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0,1fr) minmax(0,0.9fr) minmax(0,1.35fr)",
-              gap: 12,
-            }}
-          >
-            <div style={{ minWidth: 0 }}>
+        <div style={{ padding: "16px 24px", display: "flex", gap: 24, flexWrap: "wrap" }}>
+          {/* ── Columna principal: descripción, título, comentarios ──────── */}
+          <div style={{ flex: "1 1 380px", minWidth: 280, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Descripción</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={8}
+                style={{ ...inputStyle, resize: "vertical" }}
+              />
+              <GenerateTitleFromDescriptionButton
+                description={description}
+                unitCode={unitCode}
+                onTitle={setTitle}
+                onDescriptionNormalized={setDescription}
+              />
+            </div>
+
+            <div>
+              <label style={labelStyle}>Título</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+
+            {saveError ? (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 12.5,
+                  color: "#b91c1c",
+                  fontFamily: "var(--font-sans)",
+                  lineHeight: 1.4,
+                }}
+              >
+                {saveError}
+              </p>
+            ) : null}
+
+            <TaskCommentsSection taskId={task.id} profiles={profiles} />
+          </div>
+
+          {/* ── Sidebar: metadata al estilo Jira ─────────────────────────── */}
+          <div style={{ flex: "0 1 220px", minWidth: 200, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
               <label style={labelStyle}>Unidad</label>
               <FormSelect
                 value={unitCode}
@@ -527,7 +578,7 @@ function TaskEditModal({
               />
             </div>
 
-            <div style={{ minWidth: 0 }}>
+            <div>
               <label style={labelStyle}>Prioridad</label>
               <FormSelect
                 value={priority}
@@ -541,7 +592,7 @@ function TaskEditModal({
               />
             </div>
 
-            <div style={{ minWidth: 0 }}>
+            <div>
               <label style={labelStyle}>Tipo</label>
               <TaskTypeSelect
                 value={type}
@@ -549,35 +600,44 @@ function TaskEditModal({
                 contentClassName={MODAL_SELECT_Z}
               />
             </div>
-          </div>
 
-          <div>
-            <label style={labelStyle}>Descripción</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              style={{ ...inputStyle, resize: "vertical" }}
-            />
-            <GenerateTitleFromDescriptionButton
-              description={description}
-              unitCode={unitCode}
-              onTitle={setTitle}
-              onDescriptionNormalized={setDescription}
-            />
-          </div>
+            <div>
+              <label style={labelStyle}>Asignado a</label>
+              <SearchableSelect
+                value={assignee}
+                onChange={setAssignee}
+                options={profiles.map((profile) => ({
+                  value: profile.id,
+                  label: profile.full_name,
+                }))}
+                allowEmpty
+                emptyLabel="Sin asignar"
+                searchPlaceholder="Buscar..."
+              />
+              {assignee && (() => {
+                const profile = profiles.find((p) => p.id === assignee);
+                if (!profile) return null;
+                return (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                    <AssigneeAvatar profile={profile} size={24} />
+                    <span style={{ fontSize: 13, color: "var(--color-ink)" }}>{profile.full_name}</span>
+                  </div>
+                );
+              })()}
+            </div>
 
-          <div>
-            <label style={labelStyle}>Título</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              style={inputStyle}
-            />
-          </div>
+            <div>
+              <label style={labelStyle}>Reporter</label>
+              {reporter ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
+                  <AssigneeAvatar profile={reporter} size={24} />
+                  <span style={{ fontSize: 13, color: "var(--color-ink)" }}>{reporter.full_name}</span>
+                </div>
+              ) : (
+                <p style={{ margin: 0, fontSize: 12.5, color: "var(--color-slate2)" }}>—</p>
+              )}
+            </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <label style={labelStyle}>Fecha de creación</label>
               <input
@@ -587,6 +647,7 @@ function TaskEditModal({
                 style={inputStyle}
               />
             </div>
+
             <div>
               <label style={labelStyle}>Fecha límite</label>
               <input
@@ -596,58 +657,55 @@ function TaskEditModal({
                 style={inputStyle}
               />
             </div>
+
+            <div>
+              <label style={labelStyle}>Branch name</label>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  border: "1px solid var(--color-mist)",
+                  borderRadius: 6,
+                  padding: "6px 8px",
+                  background: "var(--color-paper)",
+                }}
+              >
+                <code
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: 11.5,
+                    fontFamily: "var(--font-mono, monospace)",
+                    color: branchName ? "var(--color-ink)" : "var(--color-slate2)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                  title={branchName || undefined}
+                >
+                  {branchName || `${getTaskPrefixForUnit(unitCode)}-…`}
+                </code>
+                <button
+                  type="button"
+                  onClick={handleCopyBranchName}
+                  disabled={!branchName}
+                  title="Copiar nombre de rama"
+                  style={{
+                    flexShrink: 0,
+                    border: "none",
+                    background: "transparent",
+                    cursor: branchName ? "pointer" : "not-allowed",
+                    color: branchCopied ? "#1F8A5B" : "var(--color-slate2)",
+                    padding: 2,
+                    display: "flex",
+                  }}
+                >
+                  {branchCopied ? <Check size={13} /> : <Copy size={13} />}
+                </button>
+              </div>
+            </div>
           </div>
-
-          {(() => {
-            const creator = profiles.find((p) => p.id === task.created_by);
-            if (!creator) return null;
-            return (
-              <p style={{ margin: 0, fontSize: 12, color: "var(--color-slate2)" }}>
-                Creado por <strong style={{ color: "var(--color-ink)" }}>{creator.full_name}</strong>
-              </p>
-            );
-          })()}
-
-          <div>
-            <label style={labelStyle}>Responsable</label>
-            <SearchableSelect
-              value={assignee}
-              onChange={setAssignee}
-              options={profiles.map((profile) => ({
-                value: profile.id,
-                label: profile.full_name,
-              }))}
-              allowEmpty
-              emptyLabel="Sin asignar"
-              searchPlaceholder="Buscar..."
-            />
-            {assignee && (() => {
-              const profile = profiles.find((p) => p.id === assignee);
-              if (!profile) return null;
-              return (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-                  <AssigneeAvatar profile={profile} size={28} />
-                  <span style={{ fontSize: 13, color: "var(--color-ink)" }}>{profile.full_name}</span>
-                </div>
-              );
-            })()}
-          </div>
-
-          {saveError ? (
-            <p
-              style={{
-                margin: 0,
-                fontSize: 12.5,
-                color: "#b91c1c",
-                fontFamily: "var(--font-sans)",
-                lineHeight: 1.4,
-              }}
-            >
-              {saveError}
-            </p>
-          ) : null}
-
-          <TaskCommentsSection taskId={task.id} profiles={profiles} />
         </div>
 
         <div
