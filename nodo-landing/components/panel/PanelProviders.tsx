@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { Toaster } from "sonner";
 import { SupabaseProvider, AuthProvider } from "@nodocore/shared-components";
 import { createClient } from "@/lib/supabase/client";
 import { PanelSettingsModuleProvider } from "@/lib/panel/panel-settings-module";
@@ -28,6 +29,7 @@ export function PanelProviders({ children }: { children: ReactNode }) {
             <PendingSolicitudesCountProvider>
               <PanelSessionTimeoutGuard />
               {children}
+              <Toaster richColors position="top-right" />
             </PendingSolicitudesCountProvider>
           </UnreadFeedbackCountProvider>
         </PanelSettingsModuleProvider>

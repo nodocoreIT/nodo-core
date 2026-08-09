@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   Bug,
@@ -2040,11 +2041,13 @@ function FilterBar({
   selectedAssignees,
   selectedUnits,
   selectedTypes,
+  selectedCreatedBy,
   searchTerm,
   onSearchChange,
   onToggleAssignee,
   onToggleUnit,
   onToggleType,
+  onToggleCreatedBy,
   onClearAll,
   onAddTask,
 }: {
@@ -2053,11 +2056,13 @@ function FilterBar({
   selectedAssignees: string[];
   selectedUnits: string[];
   selectedTypes: Task["type"][];
+  selectedCreatedBy: string[];
   searchTerm: string;
   onSearchChange: (value: string) => void;
   onToggleAssignee: (id: string) => void;
   onToggleUnit: (unit: string) => void;
   onToggleType: (type: Task["type"]) => void;
+  onToggleCreatedBy: (id: string) => void;
   onClearAll: () => void;
   onAddTask: () => void;
 }) {
@@ -2065,6 +2070,7 @@ function FilterBar({
     selectedAssignees.length > 0 ||
     selectedUnits.length > 0 ||
     selectedTypes.length > 0 ||
+    selectedCreatedBy.length > 0 ||
     searchTerm.trim() !== "";
 
   return (
@@ -2174,6 +2180,19 @@ function FilterBar({
         )}
       </FilterMenu>
 
+      <FilterMenu label="Creado por" activeCount={selectedCreatedBy.length}>
+        {profiles.map((p) => (
+          <FilterMenuItem
+            key={p.id}
+            active={selectedCreatedBy.includes(p.id)}
+            onClick={() => onToggleCreatedBy(p.id)}
+          >
+            <AssigneeAvatar profile={p} size={18} />
+            {p.full_name}
+          </FilterMenuItem>
+        ))}
+      </FilterMenu>
+
       {hasFilters ? (
         <button
           type="button"
@@ -2244,6 +2263,7 @@ export default function KanbanBoard({
   const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
   const [unitFilter, setUnitFilter] = useState<string[]>([]);
   const [typeFilter, setTypeFilter] = useState<Task["type"][]>([]);
+  const [createdByFilter, setCreatedByFilter] = useState<string[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   function toggleAssignee(id: string) {
@@ -2255,10 +2275,14 @@ export default function KanbanBoard({
   function toggleType(type: Task["type"]) {
     setTypeFilter((prev) => prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]);
   }
+  function toggleCreatedBy(id: string) {
+    setCreatedByFilter((prev) => prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]);
+  }
   function clearAllFilters() {
     setAssigneeFilter([]);
     setUnitFilter([]);
     setTypeFilter([]);
+    setCreatedByFilter([]);
   }
 
   const supabase = createClient();
@@ -2290,7 +2314,10 @@ export default function KanbanBoard({
       unitFilter.length === 0 || unitFilter.includes(t.unit_code);
     const matchesType =
       typeFilter.length === 0 || typeFilter.includes(t.type ?? "task");
-    return matchesSearch && matchesAssignee && matchesUnit && matchesType;
+    const matchesCreatedBy =
+      createdByFilter.length === 0 ||
+      (t.created_by !== null && createdByFilter.includes(t.created_by));
+    return matchesSearch && matchesAssignee && matchesUnit && matchesType && matchesCreatedBy;
   });
 
   function getColumnTasks(status: Task["status"]) {
@@ -2399,8 +2426,13 @@ export default function KanbanBoard({
       throw error;
     }
     if (data) {
-      setTasks((prev) => [...prev, data as Task]);
-      return data as Task;
+      const created = data as Task;
+      setTasks((prev) => [...prev, created]);
+      toast.success("Tarea creada", {
+        description: created.title,
+        duration: 4000,
+      });
+      return created;
     }
   }
 
@@ -2544,11 +2576,13 @@ export default function KanbanBoard({
         selectedAssignees={assigneeFilter}
         selectedUnits={unitFilter}
         selectedTypes={typeFilter}
+        selectedCreatedBy={createdByFilter}
         searchTerm={searchTerm}
         onSearchChange={onSearchChange}
         onToggleAssignee={toggleAssignee}
         onToggleUnit={toggleUnit}
         onToggleType={toggleType}
+        onToggleCreatedBy={toggleCreatedBy}
         onClearAll={clearAllFilters}
         onAddTask={() => setCreatingTask(true)}
       />
