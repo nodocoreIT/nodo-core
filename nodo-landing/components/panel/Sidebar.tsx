@@ -33,6 +33,7 @@ import { SettingsDialog } from "@nodocore/nodo-modules/settings";
 import { useCommandPalette } from "@/components/CommandPaletteProvider";
 import { useUnreadFeedbackCount } from "@/hooks/use-unread-feedback-count";
 import { usePendingSolicitudesCount } from "@/hooks/use-pending-solicitudes-count";
+import { clearPanelSessionClock } from "./PanelSessionTimeoutGuard";
 import { PanelBrandMark } from "./PanelBrandMark";
 
 type NavItem = {
@@ -234,6 +235,7 @@ export default function Sidebar({
 
   async function handleSignOut() {
     const supabase = createClient();
+    clearPanelSessionClock();
     await supabase.auth.signOut({ scope: "local" });
     router.push("/login");
   }
