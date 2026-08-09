@@ -1892,10 +1892,12 @@ function KanbanColumn({
 function FilterMenu({
   label,
   activeCount,
+  menuMinWidth = 180,
   children,
 }: {
   label: string;
   activeCount: number;
+  menuMinWidth?: number;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -1964,7 +1966,7 @@ function FilterMenu({
             top: "calc(100% + 6px)",
             left: 0,
             zIndex: 40,
-            minWidth: 180,
+            minWidth: menuMinWidth,
             background: "white",
             border: "1px solid var(--color-mist)",
             borderRadius: 8,
@@ -2180,7 +2182,7 @@ function FilterBar({
         )}
       </FilterMenu>
 
-      <FilterMenu label="Creado por" activeCount={selectedCreatedBy.length}>
+      <FilterMenu label="Creado por" activeCount={selectedCreatedBy.length} menuMinWidth={240}>
         {profiles.map((p) => (
           <FilterMenuItem
             key={p.id}
@@ -2188,7 +2190,7 @@ function FilterBar({
             onClick={() => onToggleCreatedBy(p.id)}
           >
             <AssigneeAvatar profile={p} size={18} />
-            {p.full_name}
+            <span style={{ whiteSpace: "nowrap" }}>{p.full_name}</span>
           </FilterMenuItem>
         ))}
       </FilterMenu>
