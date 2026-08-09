@@ -106,7 +106,7 @@ const MODAL_SELECT_Z = "z-[1100]";
 const COLUMNS: { id: Task["status"]; label: string; color: string }[] = [
   { id: "backlog", label: "Por hacer", color: "#9DACBE" },
   { id: "doing", label: "En progreso", color: "#2A6FDB" },
-  { id: "review", label: "En revisión", color: "#DA5A0E" },
+  { id: "review", label: "Pendiente revisión QA", color: "#DA5A0E" },
   { id: "done", label: "Hecho", color: "#1F8A5B" },
 ];
 

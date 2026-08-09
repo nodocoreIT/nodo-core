@@ -92,7 +92,7 @@ const STATUS_LABELS: Record<string, string> = {
 const TASK_STATUS_LABELS: Record<Task["status"], string> = {
   backlog: "Por hacer",
   doing: "En progreso",
-  review: "En revisión",
+  review: "Pendiente revisión QA",
   done: "Hecho",
 };
 
