@@ -102,6 +102,10 @@ export {
 } from "./providers/admin-command-palette-provider";
 export { filterAdminCommandItems } from "./lib/filter-admin-command-items";
 export { RequireAuth } from "./components/require-auth";
+export {
+  SessionTimeoutGuard,
+  type SessionTimeoutGuardProps,
+} from "./components/session-timeout-guard";
 
 // ─── UI primitives ───────────────────────────────────────────────────────────
 export { Button, buttonVariants, type ButtonProps } from "./components/ui/button";
