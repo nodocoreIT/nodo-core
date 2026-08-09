@@ -11,11 +11,13 @@ import {
   Lightbulb,
   Plus,
   Search,
+  UserRound,
   Wrench,
+  X,
 } from "lucide-react";
 import {
+  foldForSearch,
   FormSelect,
-  SearchableSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -24,11 +26,14 @@ import {
 } from "@nodocore/shared-components";
 import { ECOMMERCE_ACCENT, getNodeAccentByCode } from "@/lib/node-accents";
 import {
-  buildCodedTaskTitle,
   buildTaskBranchName,
   formatTaskDescription,
   getTaskPrefixForUnit,
 } from "@/lib/panel/task-code";
+import {
+  ALLOWED_EVIDENCE_MIME,
+  createTaskComment,
+} from "@/lib/panel/task-comments";
 import { GenerateTitleFromDescriptionButton } from "@/components/panel/generate-title-button";
 import { TaskCommentsSection } from "@/components/panel/task-comments-section";
 import {
@@ -354,6 +359,284 @@ function AssigneeAvatar({
   );
 }
 
+// ─── AssigneePicker (Jira-style: avatar-only trigger, searchable popover) ──────
+
+function AssigneePicker({
+  profiles,
+  value,
+  onChange,
+  size = 28,
+}: {
+  profiles: Profile[];
+  value: string;
+  onChange: (value: string) => void;
+  size?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const selected = profiles.find((p) => p.id === value) ?? null;
+  const filtered = search.trim()
+    ? profiles.filter((p) => foldForSearch(p.full_name).includes(foldForSearch(search)))
+    : profiles;
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: PointerEvent) {
+      if (!containerRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) setTimeout(() => searchRef.current?.focus(), 0);
+  }, [open]);
+
+  function select(id: string) {
+    onChange(id);
+    setOpen(false);
+    setSearch("");
+  }
+
+  const rowStyle = (active: boolean): React.CSSProperties => ({
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    width: "100%",
+    border: "none",
+    background: active ? "var(--color-paper)" : "transparent",
+    padding: "6px 8px",
+    borderRadius: 6,
+    cursor: "pointer",
+    textAlign: "left",
+    fontSize: 13,
+    color: "var(--color-ink)",
+    fontFamily: "var(--font-sans)",
+  });
+
+  return (
+    <div ref={containerRef} style={{ position: "relative", display: "inline-block" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        title={selected ? selected.full_name : "Sin asignar"}
+        style={{
+          border: "1px solid var(--color-mist)",
+          background: "white",
+          padding: 2,
+          cursor: "pointer",
+          borderRadius: "50%",
+          display: "flex",
+        }}
+      >
+        {selected ? (
+          <AssigneeAvatar profile={selected} size={size} />
+        ) : (
+          <div
+            style={{
+              width: size,
+              height: size,
+              borderRadius: "50%",
+              background: "var(--color-mist)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--color-slate2)",
+              flexShrink: 0,
+            }}
+          >
+            <UserRound size={Math.round(size * 0.58)} />
+          </div>
+        )}
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            zIndex: 1150,
+            top: "100%",
+            left: 0,
+            marginTop: 4,
+            width: 220,
+            borderRadius: 8,
+            border: "1px solid var(--color-mist)",
+            background: "white",
+            boxShadow: "0 8px 24px rgba(18,30,47,.18)",
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ borderBottom: "1px solid var(--color-mist)", padding: "6px 8px" }}>
+            <input
+              ref={searchRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar..."
+              style={{
+                width: "100%",
+                border: "none",
+                outline: "none",
+                fontSize: 13,
+                fontFamily: "var(--font-sans)",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+          <div style={{ maxHeight: 224, overflowY: "auto", padding: 4 }}>
+            <button type="button" onClick={() => select("")} style={rowStyle(!value)}>
+              <div
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: "50%",
+                  background: "var(--color-mist)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--color-slate2)",
+                  flexShrink: 0,
+                }}
+              >
+                <UserRound size={13} />
+              </div>
+              Sin asignar
+            </button>
+            {filtered.length === 0 ? (
+              <p style={{ margin: 0, padding: "10px 8px", fontSize: 12.5, color: "var(--color-slate2)" }}>
+                Sin resultados
+              </p>
+            ) : (
+              filtered.map((p) => (
+                <button key={p.id} type="button" onClick={() => select(p.id)} style={rowStyle(p.id === value)}>
+                  <AssigneeAvatar profile={p} size={22} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {p.full_name}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Pasted evidence (description field) ───────────────────────────────────────
+
+type PendingEvidence = { id: string; file: File; previewUrl: string };
+
+/** Ctrl+V a screenshot or short screen recording straight into a description. */
+function useDescriptionEvidence() {
+  const [pending, setPending] = useState<PendingEvidence[]>([]);
+
+  function addFromClipboard(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(e.clipboardData?.files ?? []).filter((f) =>
+      ALLOWED_EVIDENCE_MIME.has(f.type),
+    );
+    if (files.length === 0) return;
+    e.preventDefault();
+    setPending((prev) =>
+      [
+        ...prev,
+        ...files.map((file) => ({
+          id: crypto.randomUUID(),
+          file,
+          previewUrl: URL.createObjectURL(file),
+        })),
+      ].slice(0, 8),
+    );
+  }
+
+  function remove(id: string) {
+    setPending((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((p) => p.id !== id);
+    });
+  }
+
+  function reset() {
+    setPending((prev) => {
+      for (const p of prev) URL.revokeObjectURL(p.previewUrl);
+      return [];
+    });
+  }
+
+  return { pending, addFromClipboard, remove, reset };
+}
+
+function PendingEvidenceRow({
+  items,
+  onRemove,
+}: {
+  items: PendingEvidence[];
+  onRemove: (id: string) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+      {items.map((item) => (
+        <div
+          key={item.id}
+          style={{
+            position: "relative",
+            width: 56,
+            height: 56,
+            borderRadius: 6,
+            overflow: "hidden",
+            border: "1px solid var(--color-mist)",
+          }}
+        >
+          {item.file.type.startsWith("video/") ? (
+            <video
+              src={item.previewUrl}
+              muted
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.previewUrl}
+              alt={item.file.name}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => onRemove(item.id)}
+            style={{
+              position: "absolute",
+              top: 2,
+              right: 2,
+              width: 16,
+              height: 16,
+              borderRadius: "50%",
+              border: "none",
+              background: "rgba(0,0,0,.55)",
+              color: "white",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            <X size={10} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── TaskEditModal ────────────────────────────────────────────────────────────
 
 function TaskEditModal({
@@ -383,6 +666,7 @@ function TaskEditModal({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [branchCopied, setBranchCopied] = useState(false);
+  const evidence = useDescriptionEvidence();
 
   const unitOptions = useMemo(() => {
     const codes = [...units];
@@ -445,7 +729,22 @@ function TaskEditModal({
     };
     try {
       const err = await onSave(updated);
-      if (err) setSaveError(err);
+      if (err) {
+        setSaveError(err);
+        return;
+      }
+      if (evidence.pending.length > 0) {
+        try {
+          await createTaskComment({
+            taskId: task.id,
+            body: "",
+            files: evidence.pending.map((p) => p.file),
+          });
+        } catch (attachErr) {
+          console.error("Error attaching description evidence:", attachErr);
+        }
+        evidence.reset();
+      }
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "No se pudo guardar la tarea.");
     } finally {
@@ -528,9 +827,12 @@ function TaskEditModal({
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                onPaste={evidence.addFromClipboard}
                 rows={8}
+                placeholder="Pegá una captura o video con Ctrl+V"
                 style={{ ...inputStyle, resize: "vertical" }}
               />
+              <PendingEvidenceRow items={evidence.pending} onRemove={evidence.remove} />
               <GenerateTitleFromDescriptionButton
                 description={description}
                 unitCode={unitCode}
@@ -603,27 +905,7 @@ function TaskEditModal({
 
             <div>
               <label style={labelStyle}>Asignado a</label>
-              <SearchableSelect
-                value={assignee}
-                onChange={setAssignee}
-                options={profiles.map((profile) => ({
-                  value: profile.id,
-                  label: profile.full_name,
-                }))}
-                allowEmpty
-                emptyLabel="Sin asignar"
-                searchPlaceholder="Buscar..."
-              />
-              {assignee && (() => {
-                const profile = profiles.find((p) => p.id === assignee);
-                if (!profile) return null;
-                return (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-                    <AssigneeAvatar profile={profile} size={24} />
-                    <span style={{ fontSize: 13, color: "var(--color-ink)" }}>{profile.full_name}</span>
-                  </div>
-                );
-              })()}
+              <AssigneePicker profiles={profiles} value={assignee} onChange={setAssignee} />
             </div>
 
             <div>
@@ -870,16 +1152,14 @@ function TaskEditModal({
 function TaskCreateModal({
   profiles,
   units,
-  tasks,
   currentUserId,
   onCreate,
   onClose,
 }: {
   profiles: Profile[];
   units: string[];
-  tasks: readonly Pick<Task, "unit_code" | "title">[];
   currentUserId: string | null;
-  onCreate: (task: Omit<Task, "id" | "position" | "created_by">) => Promise<void> | void;
+  onCreate: (task: Omit<Task, "id" | "position" | "created_by">) => Promise<Task | undefined>;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState("");
@@ -892,16 +1172,9 @@ function TaskCreateModal({
   const [assignee, setAssignee] = useState("");
   const [saving, setSaving] = useState(false);
   const [branchCopied, setBranchCopied] = useState(false);
+  const evidence = useDescriptionEvidence();
 
   const reporter = profiles.find((p) => p.id === currentUserId);
-
-  const existingTitles = tasks
-    .filter((t) => t.unit_code === unitCode)
-    .map((t) => t.title);
-
-  const codedPreview = title.trim()
-    ? buildCodedTaskTitle(unitCode, title, existingTitles)
-    : `${getTaskPrefixForUnit(unitCode)}-NN-…`;
 
   const branchName = title.trim() ? buildTaskBranchName(unitCode, title) : "";
 
@@ -944,7 +1217,7 @@ function TaskCreateModal({
       if (normalizedDescription && normalizedDescription !== description) {
         setDescription(normalizedDescription);
       }
-      await onCreate({
+      const created = await onCreate({
         title: title.trim(),
         description: normalizedDescription,
         unit_code: unitCode,
@@ -955,6 +1228,18 @@ function TaskCreateModal({
         created_at: dateInputToCreatedAt(createdDate || todayLocalDate()),
         assignee: assignee || null,
       });
+      if (created && evidence.pending.length > 0) {
+        try {
+          await createTaskComment({
+            taskId: created.id,
+            body: "",
+            files: evidence.pending.map((p) => p.file),
+          });
+        } catch (err) {
+          console.error("Error attaching description evidence:", err);
+        }
+        evidence.reset();
+      }
       onClose();
     } finally {
       setSaving(false);
@@ -1033,11 +1318,13 @@ function TaskCreateModal({
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                onPaste={evidence.addFromClipboard}
                 rows={8}
-                placeholder="Qué hay que hacer, contexto, criterios de aceptación…"
+                placeholder="Qué hay que hacer, contexto, criterios de aceptación… (pegá una captura o video con Ctrl+V)"
                 autoFocus
                 style={{ ...inputStyle, resize: "vertical" }}
               />
+              <PendingEvidenceRow items={evidence.pending} onRemove={evidence.remove} />
               <GenerateTitleFromDescriptionButton
                 description={description}
                 unitCode={unitCode}
@@ -1061,21 +1348,6 @@ function TaskCreateModal({
                   }
                 }}
               />
-              <p
-                style={{
-                  margin: "6px 0 0",
-                  fontSize: 11.5,
-                  color: "var(--color-slate2)",
-                  fontFamily: "var(--font-sans)",
-                  lineHeight: 1.4,
-                  wordBreak: "break-all",
-                }}
-              >
-                Se guardará como{" "}
-                <span style={{ fontWeight: 700, color: "var(--color-navy)" }}>
-                  {codedPreview}
-                </span>
-              </p>
             </div>
           </div>
 
@@ -1116,17 +1388,7 @@ function TaskCreateModal({
 
             <div>
               <label style={labelStyle}>Asignado a</label>
-              <SearchableSelect
-                value={assignee}
-                onChange={setAssignee}
-                options={profiles.map((profile) => ({
-                  value: profile.id,
-                  label: profile.full_name,
-                }))}
-                allowEmpty
-                emptyLabel="Sin asignar"
-                searchPlaceholder="Buscar..."
-              />
+              <AssigneePicker profiles={profiles} value={assignee} onChange={setAssignee} />
             </div>
 
             <div>
@@ -2113,24 +2375,18 @@ export default function KanbanBoard({
     });
   }
 
-  async function handleAddTask(taskData: Omit<Task, "id" | "position" | "created_by">) {
+  async function handleAddTask(
+    taskData: Omit<Task, "id" | "position" | "created_by">,
+  ): Promise<Task | undefined> {
     const colTasks = tasks
       .filter((t) => t.status === taskData.status)
       .sort((a, b) => a.position - b.position);
     const position = colTasks.length > 0 ? colTasks[colTasks.length - 1].position + 1000 : 0;
 
-    const codedTitle = buildCodedTaskTitle(
-      taskData.unit_code,
-      taskData.title,
-      // Only titles of the same unit so IN/IT/OB sequences stay independent
-      tasks.filter((t) => t.unit_code === taskData.unit_code).map((t) => t.title),
-    );
-
     const { data, error } = await supabase
       .from("tasks")
       .insert({
         ...taskData,
-        title: codedTitle,
         description: formatTaskDescription(taskData.description),
         position,
         created_by: currentUserId,
@@ -2142,7 +2398,10 @@ export default function KanbanBoard({
       console.error("Error adding task:", error);
       throw error;
     }
-    if (data) setTasks((prev) => [...prev, data as Task]);
+    if (data) {
+      setTasks((prev) => [...prev, data as Task]);
+      return data as Task;
+    }
   }
 
   async function handleSaveTask(updated: Task): Promise<string | null> {
@@ -2203,7 +2462,6 @@ export default function KanbanBoard({
         <TaskCreateModal
           profiles={profiles}
           units={units}
-          tasks={tasks}
           currentUserId={currentUserId}
           onCreate={handleAddTask}
           onClose={() => setCreatingTask(false)}
