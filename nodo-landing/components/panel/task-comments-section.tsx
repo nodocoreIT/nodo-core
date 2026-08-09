@@ -1,13 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImagePlus, Loader2, MessageSquareText, Trash2, X } from "lucide-react";
+import { ImagePlus, Loader2, MessageSquareText, Play, Trash2, X } from "lucide-react";
 import {
+  ALLOWED_EVIDENCE_MIME,
   createTaskComment,
   deleteTaskComment,
   fetchTaskComments,
   type TaskComment,
 } from "@/lib/panel/task-comments";
+
+function isVideoMime(mime: string): boolean {
+  return mime.startsWith("video/");
+}
 
 type ProfileLite = {
   id: string;
@@ -93,7 +98,7 @@ export function TaskCommentsSection({
   const [body, setBody] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; mimeType: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -121,11 +126,11 @@ export function TaskCommentsSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function addFiles(list: FileList | null) {
-    if (!list?.length) return;
+  function addFiles(files: File[]) {
+    if (files.length === 0) return;
     const next: PendingFile[] = [];
-    for (const file of Array.from(list)) {
-      if (!file.type.startsWith("image/")) continue;
+    for (const file of files) {
+      if (!ALLOWED_EVIDENCE_MIME.has(file.type)) continue;
       next.push({
         id: crypto.randomUUID(),
         file,
@@ -133,7 +138,21 @@ export function TaskCommentsSection({
       });
     }
     setPendingFiles((prev) => [...prev, ...next].slice(0, 8));
+  }
+
+  function handleFileInputChange(list: FileList | null) {
+    addFiles(list ? Array.from(list) : []);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  /** Ctrl+V a screenshot or short screen recording straight into the comment box. */
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(e.clipboardData?.files ?? []).filter((f) =>
+      ALLOWED_EVIDENCE_MIME.has(f.type),
+    );
+    if (files.length === 0) return;
+    e.preventDefault();
+    addFiles(files);
   }
 
   function removePending(id: string) {
@@ -308,9 +327,10 @@ export function TaskCommentsSection({
                       <button
                         key={att.id}
                         type="button"
-                        onClick={() => setLightbox(att.signedUrl)}
+                        onClick={() => setLightbox({ url: att.signedUrl!, mimeType: att.mimeType })}
                         title={att.fileName}
                         style={{
+                          position: "relative",
                           padding: 0,
                           border: "1px solid var(--color-mist)",
                           borderRadius: 6,
@@ -319,17 +339,39 @@ export function TaskCommentsSection({
                           background: "white",
                         }}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={att.signedUrl}
-                          alt={att.fileName}
-                          style={{
-                            width: 72,
-                            height: 72,
-                            objectFit: "cover",
-                            display: "block",
-                          }}
-                        />
+                        {isVideoMime(att.mimeType) ? (
+                          <>
+                            <video
+                              src={att.signedUrl}
+                              muted
+                              style={{ width: 72, height: 72, objectFit: "cover", display: "block" }}
+                            />
+                            <span
+                              style={{
+                                position: "absolute",
+                                inset: 0,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "rgba(18,30,47,.35)",
+                              }}
+                            >
+                              <Play size={20} color="white" fill="white" />
+                            </span>
+                          </>
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={att.signedUrl}
+                            alt={att.fileName}
+                            style={{
+                              width: 72,
+                              height: 72,
+                              objectFit: "cover",
+                              display: "block",
+                            }}
+                          />
+                        )}
                       </button>
                     ) : (
                       <span
@@ -361,8 +403,9 @@ export function TaskCommentsSection({
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          onPaste={handlePaste}
           rows={3}
-          placeholder="Escribí un comentario… (qué pasó, avances, blockers)"
+          placeholder="Escribí un comentario… (qué pasó, avances, blockers — pegá una captura o video con Ctrl+V)"
           style={{
             width: "100%",
             border: "1px solid var(--color-mist)",
@@ -390,12 +433,20 @@ export function TaskCommentsSection({
                   border: "1px solid var(--color-mist)",
                 }}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={f.previewUrl}
-                  alt={f.file.name}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
+                {isVideoMime(f.file.type) ? (
+                  <video
+                    src={f.previewUrl}
+                    muted
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={f.previewUrl}
+                    alt={f.file.name}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                )}
                 <button
                   type="button"
                   onClick={() => removePending(f.id)}
@@ -427,10 +478,10 @@ export function TaskCommentsSection({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
+            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
             multiple
             hidden
-            onChange={(e) => addFiles(e.target.files)}
+            onChange={(e) => handleFileInputChange(e.target.files)}
           />
           <button
             type="button"
@@ -497,18 +548,33 @@ export function TaskCommentsSection({
             padding: 24,
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={lightbox}
-            alt="Evidencia"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              maxWidth: "min(960px, 100%)",
-              maxHeight: "90vh",
-              borderRadius: 8,
-              boxShadow: "0 12px 40px rgba(0,0,0,.35)",
-            }}
-          />
+          {isVideoMime(lightbox.mimeType) ? (
+            <video
+              src={lightbox.url}
+              controls
+              autoPlay
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                maxWidth: "min(960px, 100%)",
+                maxHeight: "90vh",
+                borderRadius: 8,
+                boxShadow: "0 12px 40px rgba(0,0,0,.35)",
+              }}
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={lightbox.url}
+              alt="Evidencia"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                maxWidth: "min(960px, 100%)",
+                maxHeight: "90vh",
+                borderRadius: 8,
+                boxShadow: "0 12px 40px rgba(0,0,0,.35)",
+              }}
+            />
+          )}
         </div>
       ) : null}
     </div>

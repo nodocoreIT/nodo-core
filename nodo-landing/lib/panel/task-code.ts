@@ -90,6 +90,13 @@ export function buildCodedTaskTitle(
   return `${prefix}-${nn}-${slug}`;
 }
 
+/** Git-branch-friendly slug for a task: `{PREFIX}-{SLUG}` e.g. `IN-CAMBIAR-TITULO-UNO`. */
+export function buildTaskBranchName(unitCode: string, rawTitle: string): string {
+  const prefix = getTaskPrefixForUnit(unitCode);
+  const slug = slugifyTaskTitle(rawTitle.trim());
+  return slug ? `${prefix}-${slug}` : prefix;
+}
+
 /** True when most letters are uppercase (e.g. pasted ALL CAPS). */
 function isMostlyUppercase(text: string): boolean {
   const letters = text.replace(/[^\p{L}]/gu, "");
