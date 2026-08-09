@@ -90,10 +90,19 @@ export function buildCodedTaskTitle(
   return `${prefix}-${nn}-${slug}`;
 }
 
-/** Git-branch-friendly slug for a task: `{PREFIX}-{SLUG}` e.g. `IN-CAMBIAR-TITULO-UNO`. */
+/**
+ * Git-branch-friendly slug for a task: `{PREFIX}-{SLUG}` e.g. `IN-CAMBIAR-TITULO-UNO`.
+ * If the title already carries its task code (editing an existing task, whose
+ * title is already `CL-01-PRUEBA-TRES`), slugify it as-is instead of
+ * prepending the prefix again.
+ */
 export function buildTaskBranchName(unitCode: string, rawTitle: string): string {
+  const trimmed = rawTitle.trim();
+  if (titleHasTaskCode(trimmed, unitCode)) {
+    return slugifyTaskTitle(trimmed);
+  }
   const prefix = getTaskPrefixForUnit(unitCode);
-  const slug = slugifyTaskTitle(rawTitle.trim());
+  const slug = slugifyTaskTitle(trimmed);
   return slug ? `${prefix}-${slug}` : prefix;
 }
 
