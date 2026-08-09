@@ -76,5 +76,5 @@ export async function updateSession(request: NextRequest) {
 
 /** Panel paths a restricted role may reach — everything else redirects to the first entry. */
 const RESTRICTED_ROLE_PANEL_ACCESS: Record<string, string[]> = {
-  qa: ["/panel/tareas", "/panel/ideas"],
+  qa: ["/panel/tareas", "/panel/ideas", "/panel/roadmap"],
 };
