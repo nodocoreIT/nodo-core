@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ImagePlus, Loader2, MessageSquareText, Play, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, ImagePlus, Loader2, MessageSquareText, Play, Trash2, X } from "lucide-react";
 import {
   ALLOWED_EVIDENCE_MIME,
   createTaskComment,
@@ -98,8 +98,40 @@ export function TaskCommentsSection({
   const [body, setBody] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [lightbox, setLightbox] = useState<{ url: string; mimeType: string } | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Flattened, chronological across every comment on this task — lets the
+  // lightbox act as one carousel over all evidence, not just the comment
+  // the viewer happened to click into.
+  const allAttachments = useMemo(
+    () =>
+      comments.flatMap((c) =>
+        c.attachments
+          .filter((a) => a.signedUrl)
+          .map((a) => ({ url: a.signedUrl!, mimeType: a.mimeType, fileName: a.fileName })),
+      ),
+    [comments],
+  );
+  const lightbox = lightboxIndex !== null ? allAttachments[lightboxIndex] ?? null : null;
+
+  const showPrev = useCallback(() => {
+    setLightboxIndex((i) => (i === null ? i : (i - 1 + allAttachments.length) % allAttachments.length));
+  }, [allAttachments.length]);
+  const showNext = useCallback(() => {
+    setLightboxIndex((i) => (i === null ? i : (i + 1) % allAttachments.length));
+  }, [allAttachments.length]);
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setLightboxIndex(null);
+      if (e.key === "ArrowLeft") showPrev();
+      if (e.key === "ArrowRight") showNext();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [lightboxIndex, showPrev, showNext]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -327,7 +359,11 @@ export function TaskCommentsSection({
                       <button
                         key={att.id}
                         type="button"
-                        onClick={() => setLightbox({ url: att.signedUrl!, mimeType: att.mimeType })}
+                        onClick={() =>
+                          setLightboxIndex(
+                            allAttachments.findIndex((a) => a.url === att.signedUrl),
+                          )
+                        }
                         title={att.fileName}
                         style={{
                           position: "relative",
@@ -536,7 +572,7 @@ export function TaskCommentsSection({
 
       {lightbox ? (
         <div
-          onClick={() => setLightbox(null)}
+          onClick={() => setLightboxIndex(null)}
           style={{
             position: "fixed",
             inset: 0,
@@ -548,6 +584,35 @@ export function TaskCommentsSection({
             padding: 24,
           }}
         >
+          {allAttachments.length > 1 ? (
+            <button
+              type="button"
+              title="Anterior (←)"
+              onClick={(e) => {
+                e.stopPropagation();
+                showPrev();
+              }}
+              style={{
+                position: "absolute",
+                left: 16,
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                border: "none",
+                background: "rgba(255,255,255,.14)",
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+              }}
+            >
+              <ChevronLeft size={22} />
+            </button>
+          ) : null}
+
           {isVideoMime(lightbox.mimeType) ? (
             <video
               src={lightbox.url}
@@ -575,6 +640,54 @@ export function TaskCommentsSection({
               }}
             />
           )}
+
+          {allAttachments.length > 1 ? (
+            <button
+              type="button"
+              title="Siguiente (→)"
+              onClick={(e) => {
+                e.stopPropagation();
+                showNext();
+              }}
+              style={{
+                position: "absolute",
+                right: 16,
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                border: "none",
+                background: "rgba(255,255,255,.14)",
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+              }}
+            >
+              <ChevronRight size={22} />
+            </button>
+          ) : null}
+
+          {allAttachments.length > 1 ? (
+            <span
+              style={{
+                position: "absolute",
+                bottom: 20,
+                left: "50%",
+                transform: "translateX(-50%)",
+                color: "white",
+                fontSize: 12.5,
+                fontWeight: 600,
+                background: "rgba(0,0,0,.4)",
+                borderRadius: 999,
+                padding: "4px 12px",
+              }}
+            >
+              {(lightboxIndex ?? 0) + 1} / {allAttachments.length}
+            </span>
+          ) : null}
         </div>
       ) : null}
     </div>

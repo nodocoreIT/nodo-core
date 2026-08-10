@@ -1,14 +1,18 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  ArrowDownWideNarrow,
   Bug,
   Check,
   CheckSquare,
   ChevronDown,
+  ChevronUp,
   Copy,
+  Equal,
   Lightbulb,
   Plus,
   Search,
@@ -108,16 +112,20 @@ const COLUMNS: { id: Task["status"]; label: string; color: string }[] = [
   { id: "backlog", label: TASK_STATUS_LABELS.backlog, color: "#9DACBE" },
   { id: "doing", label: TASK_STATUS_LABELS.doing, color: "#2A6FDB" },
   { id: "review", label: TASK_STATUS_LABELS.review, color: "#DA5A0E" },
+  { id: "deployed_qa", label: TASK_STATUS_LABELS.deployed_qa, color: "#7C3AED" },
+  { id: "qa_testing", label: TASK_STATUS_LABELS.qa_testing, color: "#B45309" },
   { id: "done", label: TASK_STATUS_LABELS.done, color: "#1F8A5B" },
 ];
 
+const PRIORITY_ORDER: Task["priority"][] = ["alta", "media", "baja"];
+
 const PRIORITY_STYLES: Record<
   Task["priority"],
-  { bg: string; color: string; label: string }
+  { bg: string; color: string; label: string; Icon: React.ElementType }
 > = {
-  alta: { bg: "#FBE6E1", color: "#C0392B", label: "Alta" },
-  media: { bg: "#FCE9D8", color: "#B5630C", label: "Media" },
-  baja: { bg: "var(--color-mist)", color: "var(--color-slate2)", label: "Baja" },
+  alta: { bg: "#FBE6E1", color: "#C0392B", label: "Alta", Icon: ChevronUp },
+  media: { bg: "#FCE9D8", color: "#B5630C", label: "Media", Icon: Equal },
+  baja: { bg: "var(--color-mist)", color: "var(--color-slate2)", label: "Baja", Icon: ChevronDown },
 };
 
 const TYPE_CONFIG: Record<
@@ -210,6 +218,93 @@ function TaskTypeSelect({
       <SelectContent className={["z-[200]", contentClassName].filter(Boolean).join(" ")}>
         {TASK_TYPES.map((key) => {
           const conf = TYPE_CONFIG[key];
+          const Icon = conf.Icon;
+          return (
+            <SelectItem key={key} value={key} textValue={conf.label}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <Icon
+                  className="h-3.5 w-3.5 shrink-0"
+                  style={{ color: conf.color, flexShrink: 0 }}
+                  strokeWidth={2.2}
+                  aria-hidden
+                />
+                <span>{conf.label}</span>
+              </div>
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function PrioritySelect({
+  value,
+  onChange,
+  className,
+  contentClassName,
+}: {
+  value: Task["priority"];
+  onChange: (value: Task["priority"]) => void;
+  className?: string;
+  contentClassName?: string;
+}) {
+  const selected = PRIORITY_STYLES[value];
+  const SelectedIcon = selected.Icon;
+
+  return (
+    <Select
+      value={value}
+      onValueChange={(next) => onChange(next as Task["priority"])}
+    >
+      <SelectTrigger className={["rounded-md", className].filter(Boolean).join(" ")}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            flex: 1,
+            minWidth: 0,
+            overflow: "hidden",
+          }}
+        >
+          <SelectedIcon
+            className="h-3.5 w-3.5 shrink-0"
+            style={{ color: selected.color, flexShrink: 0 }}
+            strokeWidth={2.2}
+            aria-hidden
+          />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {selected.label}
+          </span>
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            width: 1,
+            height: 1,
+            padding: 0,
+            margin: -1,
+            overflow: "hidden",
+            clip: "rect(0, 0, 0, 0)",
+            whiteSpace: "nowrap",
+            border: 0,
+          }}
+        >
+          <SelectValue />
+        </div>
+      </SelectTrigger>
+      <SelectContent className={["z-[200]", contentClassName].filter(Boolean).join(" ")}>
+        {PRIORITY_ORDER.map((key) => {
+          const conf = PRIORITY_STYLES[key];
           const Icon = conf.Icon;
           return (
             <SelectItem key={key} value={key} textValue={conf.label}>
@@ -885,14 +980,9 @@ function TaskEditModal({
 
             <div>
               <label style={labelStyle}>Prioridad</label>
-              <FormSelect
+              <PrioritySelect
                 value={priority}
-                onChange={(value) => setPriority(value as Task["priority"])}
-                options={[
-                  { value: "alta", label: "Alta" },
-                  { value: "media", label: "Media" },
-                  { value: "baja", label: "Baja" },
-                ]}
+                onChange={setPriority}
                 contentClassName={MODAL_SELECT_Z}
               />
             </div>
@@ -1361,14 +1451,9 @@ function TaskCreateModal({
 
             <div>
               <label style={labelStyle}>Prioridad</label>
-              <FormSelect
+              <PrioritySelect
                 value={priority}
-                onChange={(value) => setPriority(value as Task["priority"])}
-                options={[
-                  { value: "alta", label: "Alta" },
-                  { value: "media", label: "Media" },
-                  { value: "baja", label: "Baja" },
-                ]}
+                onChange={setPriority}
                 contentClassName={MODAL_SELECT_Z}
               />
             </div>
@@ -1561,15 +1646,20 @@ function TaskCard({
           nodo | <span style={{ fontWeight: 600 }}>{task.unit_code}</span>
         </span>
         <span
+          title={priority.label}
           style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 3,
             fontSize: 11.5,
             fontWeight: 700,
             background: priority.bg,
             color: priority.color,
             borderRadius: 999,
-            padding: "2px 8px",
+            padding: "2px 8px 2px 6px",
           }}
         >
+          <priority.Icon size={11} strokeWidth={2.6} aria-hidden />
           {priority.label}
         </span>
         <span
@@ -1906,6 +1996,8 @@ function FilterBar({
   onToggleType,
   onToggleCreatedBy,
   onClearAll,
+  sortByPriority,
+  onToggleSortByPriority,
   onAddTask,
 }: {
   profiles: Profile[];
@@ -1921,6 +2013,8 @@ function FilterBar({
   onToggleType: (type: Task["type"]) => void;
   onToggleCreatedBy: (id: string) => void;
   onClearAll: () => void;
+  sortByPriority: boolean;
+  onToggleSortByPriority: () => void;
   onAddTask: () => void;
 }) {
   const hasFilters =
@@ -2073,6 +2167,31 @@ function FilterBar({
         </button>
       ) : null}
 
+      <button
+        type="button"
+        onClick={onToggleSortByPriority}
+        title="Ordenar cada columna por prioridad (Alta → Baja) sin cambiar el orden manual guardado"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          height: 32,
+          padding: "0 10px",
+          border: `1px solid ${sortByPriority ? "var(--color-brand)" : "var(--color-mist)"}`,
+          borderRadius: 6,
+          background: sortByPriority ? "var(--color-brand)" : "white",
+          color: sortByPriority ? "white" : "var(--color-slate2)",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          fontFamily: "var(--font-sans)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        <ArrowDownWideNarrow size={14} strokeWidth={2.2} />
+        Ordenar por prioridad
+      </button>
+
       <div style={{ flex: 1, minWidth: 8 }} />
 
       <button
@@ -2121,7 +2240,35 @@ export default function KanbanBoard({
   const [unitFilter, setUnitFilter] = useState<string[]>([]);
   const [typeFilter, setTypeFilter] = useState<Task["type"][]>([]);
   const [createdByFilter, setCreatedByFilter] = useState<string[]>([]);
+  const [sortByPriority, setSortByPriority] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Deep link from notifications (bell + email): /panel/tareas?task=<id>
+  // opens that task's edit modal directly instead of just landing on the
+  // board. Cleared on close so it doesn't keep re-opening after a save
+  // triggers a `tasks` state update.
+  useEffect(() => {
+    const taskId = searchParams.get("task");
+    if (!taskId) return;
+    const found = tasks.find((t) => t.id === taskId);
+    if (found) setEditingTask(found);
+  }, [searchParams, tasks]);
+
+  function closeEditingTask() {
+    setEditingTask(null);
+    if (searchParams.get("task")) router.replace(pathname, { scroll: false });
+  }
+
+  function openTask(task: Task) {
+    setEditingTask(task);
+    if (searchParams.get("task") !== task.id) {
+      router.replace(`${pathname}?task=${task.id}`, { scroll: false });
+    }
+  }
 
   function toggleAssignee(id: string) {
     setAssigneeFilter((prev) => prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]);
@@ -2178,9 +2325,16 @@ export default function KanbanBoard({
   });
 
   function getColumnTasks(status: Task["status"]) {
-    return filteredTasks
-      .filter((t) => t.status === status)
-      .sort((a, b) => a.position - b.position);
+    const columnTasks = filteredTasks.filter((t) => t.status === status);
+    if (sortByPriority) {
+      // View-only order — doesn't touch `position`, so turning this off
+      // restores whatever manual drag order was already saved.
+      return columnTasks.sort(
+        (a, b) => PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority)
+          || a.position - b.position,
+      );
+    }
+    return columnTasks.sort((a, b) => a.position - b.position);
   }
 
   const columnIds = COLUMNS.map((c) => c.id as string);
@@ -2265,7 +2419,9 @@ export default function KanbanBoard({
     const colTasks = tasks
       .filter((t) => t.status === taskData.status)
       .sort((a, b) => a.position - b.position);
-    const position = colTasks.length > 0 ? colTasks[colTasks.length - 1].position + 1000 : 0;
+    // Newest first: place above the current top of the column instead of
+    // appending at the bottom.
+    const position = colTasks.length > 0 ? colTasks[0].position - 1000 : 0;
 
     const { data, error } = await supabase
       .from("tasks")
@@ -2321,7 +2477,7 @@ export default function KanbanBoard({
       return error.message || "No se pudo guardar la tarea.";
     }
     setTasks((prev) => prev.map((t) => (t.id === normalized.id ? normalized : t)));
-    setEditingTask(null);
+    closeEditingTask();
     return null;
   }
 
@@ -2329,7 +2485,7 @@ export default function KanbanBoard({
     const { error } = await supabase.from("tasks").delete().eq("id", id);
     if (error) { console.error("Error deleting task:", error); return; }
     setTasks((prev) => prev.filter((t) => t.id !== id));
-    setEditingTask(null);
+    closeEditingTask();
   }
 
   const completedCount = tasks.filter((t) => t.status === "done").length;
@@ -2345,7 +2501,7 @@ export default function KanbanBoard({
           units={units}
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
-          onClose={() => setEditingTask(null)}
+          onClose={closeEditingTask}
         />
       )}
 
@@ -2443,6 +2599,8 @@ export default function KanbanBoard({
         onToggleType={toggleType}
         onToggleCreatedBy={toggleCreatedBy}
         onClearAll={clearAllFilters}
+        sortByPriority={sortByPriority}
+        onToggleSortByPriority={() => setSortByPriority((v) => !v)}
         onAddTask={() => setCreatingTask(true)}
       />
 
@@ -2456,8 +2614,10 @@ export default function KanbanBoard({
           className="kanban-board"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, minmax(206px, 1fr))",
+            gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(206px, 1fr))`,
             gap: 16,
+            overflowX: "auto",
+            paddingBottom: 4,
           }}
         >
           {COLUMNS.map((column) => (
@@ -2467,7 +2627,7 @@ export default function KanbanBoard({
               tasks={getColumnTasks(column.id)}
               profiles={profiles}
               isOver={overColumnId === column.id}
-              onEditTask={setEditingTask}
+              onEditTask={openTask}
             />
           ))}
         </div>

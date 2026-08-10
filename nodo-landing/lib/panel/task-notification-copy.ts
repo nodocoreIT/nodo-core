@@ -5,6 +5,7 @@ export type TaskNotificationType = "status_changed" | "reassigned";
 /** Shape of one nodo_core.task_notifications row joined with its task title and actor name. */
 export type TaskNotificationRow = {
   id: string;
+  task_id: string;
   type: TaskNotificationType;
   old_value: string | null;
   new_value: string | null;
@@ -12,6 +13,11 @@ export type TaskNotificationRow = {
   task: { title: string } | null;
   actor: { full_name: string | null } | null;
 };
+
+/** Deep link to the specific task — opens its edit modal directly (see KanbanBoard.tsx). */
+export function taskNotificationHref(row: TaskNotificationRow): string {
+  return `/panel/tareas?task=${row.task_id}`;
+}
 
 function statusLabel(status: string | null): string {
   if (!status) return "—";
