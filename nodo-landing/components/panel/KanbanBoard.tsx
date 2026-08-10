@@ -13,7 +13,9 @@ import {
   ChevronUp,
   Copy,
   Equal,
+  ImagePlus,
   Lightbulb,
+  Loader2,
   Plus,
   Search,
   UserRound,
@@ -37,6 +39,7 @@ import {
 } from "@/lib/panel/task-code";
 import {
   ALLOWED_EVIDENCE_MIME,
+  assertEvidenceFile,
   createTaskComment,
 } from "@/lib/panel/task-comments";
 import { GenerateTitleFromDescriptionButton } from "@/components/panel/generate-title-button";
@@ -630,26 +633,34 @@ function AssigneePicker({
 
 type PendingEvidence = { id: string; file: File; previewUrl: string };
 
-/** Ctrl+V a screenshot or short screen recording straight into a description. */
+/** Ctrl+V, drag-drop, or the "Adjuntar evidencia" picker — image or video into a description. */
 function useDescriptionEvidence() {
   const [pending, setPending] = useState<PendingEvidence[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  function addFiles(files: File[]) {
+    if (files.length === 0) return;
+    setError(null);
+    const accepted: PendingEvidence[] = [];
+    for (const file of files) {
+      if (!ALLOWED_EVIDENCE_MIME.has(file.type)) continue;
+      try {
+        assertEvidenceFile(file);
+        accepted.push({ id: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file) });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No se pudo adjuntar el archivo.");
+      }
+    }
+    if (accepted.length > 0) {
+      setPending((prev) => [...prev, ...accepted].slice(0, 8));
+    }
+  }
 
   function addFromClipboard(e: React.ClipboardEvent<HTMLTextAreaElement>) {
-    const files = Array.from(e.clipboardData?.files ?? []).filter((f) =>
-      ALLOWED_EVIDENCE_MIME.has(f.type),
-    );
+    const files = Array.from(e.clipboardData?.files ?? []);
     if (files.length === 0) return;
     e.preventDefault();
-    setPending((prev) =>
-      [
-        ...prev,
-        ...files.map((file) => ({
-          id: crypto.randomUUID(),
-          file,
-          previewUrl: URL.createObjectURL(file),
-        })),
-      ].slice(0, 8),
-    );
+    addFiles(files);
   }
 
   function remove(id: string) {
@@ -667,70 +678,167 @@ function useDescriptionEvidence() {
     });
   }
 
-  return { pending, addFromClipboard, remove, reset };
+  return { pending, error, addFiles, addFromClipboard, remove, reset };
+}
+
+/**
+ * One pending thumbnail. Shows a spinner from the moment it's attached until
+ * the browser actually finishes decoding it locally (onLoadedData/onLoad) —
+ * for a multi-MB video that's a real, visible gap, not instant like an
+ * image usually is. A second, separate spinner covers `uploading` (parent
+ * form is saving, i.e. the file is actually hitting the network).
+ */
+function PendingEvidenceThumb({
+  item,
+  uploading,
+  onRemove,
+}: {
+  item: PendingEvidence;
+  uploading: boolean;
+  onRemove: (id: string) => void;
+}) {
+  const [domReady, setDomReady] = useState(false);
+  // A local blob has no network latency — the browser can decode it fast
+  // enough that the spinner would flash on and off inside a single paint,
+  // never actually visible. Force a minimum on-screen time so attaching
+  // something always gives a perceptible "loading" moment.
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMinTimeElapsed(true), 400);
+    return () => clearTimeout(t);
+  }, []);
+  const showSpinner = uploading || !(domReady && minTimeElapsed);
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: 56,
+        height: 56,
+        borderRadius: 6,
+        overflow: "hidden",
+        border: "1px solid var(--color-mist)",
+        background: "var(--color-mist)",
+      }}
+    >
+      {item.file.type.startsWith("video/") ? (
+        <video
+          src={item.previewUrl}
+          muted
+          preload="auto"
+          onLoadedData={() => setDomReady(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={item.previewUrl}
+          alt={item.file.name}
+          onLoad={() => setDomReady(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      )}
+      {showSpinner ? (
+        <div
+          title={uploading ? "Subiendo…" : "Cargando…"}
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(18,30,47,.55)",
+          }}
+        >
+          <Loader2 size={18} color="white" className="animate-spin" />
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onRemove(item.id)}
+          style={{
+            position: "absolute",
+            top: 2,
+            right: 2,
+            width: 16,
+            height: 16,
+            borderRadius: "50%",
+            border: "none",
+            background: "rgba(0,0,0,.55)",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            padding: 0,
+          }}
+        >
+          <X size={10} />
+        </button>
+      )}
+    </div>
+  );
 }
 
 function PendingEvidenceRow({
   items,
   onRemove,
+  uploading = false,
 }: {
   items: PendingEvidence[];
   onRemove: (id: string) => void;
+  /** True while the parent form is saving — this is when these files actually hit the network. */
+  uploading?: boolean;
 }) {
   if (items.length === 0) return null;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
       {items.map((item) => (
-        <div
-          key={item.id}
-          style={{
-            position: "relative",
-            width: 56,
-            height: 56,
-            borderRadius: 6,
-            overflow: "hidden",
-            border: "1px solid var(--color-mist)",
-          }}
-        >
-          {item.file.type.startsWith("video/") ? (
-            <video
-              src={item.previewUrl}
-              muted
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={item.previewUrl}
-              alt={item.file.name}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          )}
-          <button
-            type="button"
-            onClick={() => onRemove(item.id)}
-            style={{
-              position: "absolute",
-              top: 2,
-              right: 2,
-              width: 16,
-              height: 16,
-              borderRadius: "50%",
-              border: "none",
-              background: "rgba(0,0,0,.55)",
-              color: "white",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            <X size={10} />
-          </button>
-        </div>
+        <PendingEvidenceThumb key={item.id} item={item} uploading={uploading} onRemove={onRemove} />
       ))}
     </div>
+  );
+}
+
+/** Jira-style "Upload" button — file picker for description evidence, same accept list as paste. */
+function EvidenceAttachButton({ onFiles }: { onFiles: (files: File[]) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+        multiple
+        hidden
+        onChange={(e) => {
+          onFiles(Array.from(e.target.files ?? []));
+          if (inputRef.current) inputRef.current.value = "";
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        title="Imagen hasta 5MB, video hasta 25MB"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          border: "1px solid var(--color-mist)",
+          borderRadius: 6,
+          background: "white",
+          padding: "6px 10px",
+          fontSize: 12.5,
+          fontWeight: 600,
+          color: "var(--color-slate2)",
+          cursor: "pointer",
+          fontFamily: "var(--font-sans)",
+        }}
+      >
+        <ImagePlus size={13} />
+        Adjuntar evidencia
+      </button>
+    </>
   );
 }
 
@@ -930,7 +1038,13 @@ function TaskEditModal({
                 placeholder="Pegá una captura o video con Ctrl+V"
                 style={{ ...inputStyle, resize: "vertical" }}
               />
-              <PendingEvidenceRow items={evidence.pending} onRemove={evidence.remove} />
+              <PendingEvidenceRow items={evidence.pending} onRemove={evidence.remove} uploading={saving} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                <EvidenceAttachButton onFiles={evidence.addFiles} />
+              </div>
+              {evidence.error ? (
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#b91c1c" }}>{evidence.error}</p>
+              ) : null}
               <GenerateTitleFromDescriptionButton
                 description={description}
                 unitCode={unitCode}
@@ -1410,7 +1524,13 @@ function TaskCreateModal({
                 autoFocus
                 style={{ ...inputStyle, resize: "vertical" }}
               />
-              <PendingEvidenceRow items={evidence.pending} onRemove={evidence.remove} />
+              <PendingEvidenceRow items={evidence.pending} onRemove={evidence.remove} uploading={saving} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                <EvidenceAttachButton onFiles={evidence.addFiles} />
+              </div>
+              {evidence.error ? (
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#b91c1c" }}>{evidence.error}</p>
+              ) : null}
               <GenerateTitleFromDescriptionButton
                 description={description}
                 unitCode={unitCode}
