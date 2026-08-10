@@ -664,6 +664,7 @@ function TaskEditModal({
   const [dueDate, setDueDate] = useState(task.due_date ?? "");
   const [createdDate, setCreatedDate] = useState(toDateInputValue(task.created_at));
   const [assignee, setAssignee] = useState(task.assignee ?? "");
+  const [createdBy, setCreatedBy] = useState(task.created_by ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -676,7 +677,6 @@ function TaskEditModal({
     return codes.map((unit) => ({ value: unit, label: unit }));
   }, [units, unitCode]);
 
-  const reporter = profiles.find((p) => p.id === task.created_by);
   const branchName = title.trim() ? buildTaskBranchName(unitCode, title) : "";
 
   function handleCopyBranchName() {
@@ -728,6 +728,7 @@ function TaskEditModal({
       due_date: dueDate || null,
       created_at: createdDate ? dateInputToCreatedAt(createdDate) : task.created_at,
       assignee: assignee || null,
+      created_by: createdBy || null,
     };
     try {
       const err = await onSave(updated);
@@ -912,14 +913,7 @@ function TaskEditModal({
 
             <div>
               <label style={labelStyle}>Reporter</label>
-              {reporter ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
-                  <AssigneeAvatar profile={reporter} size={24} />
-                  <span style={{ fontSize: 13, color: "var(--color-ink)" }}>{reporter.full_name}</span>
-                </div>
-              ) : (
-                <p style={{ margin: 0, fontSize: 12.5, color: "var(--color-slate2)" }}>—</p>
-              )}
+              <AssigneePicker profiles={profiles} value={createdBy} onChange={setCreatedBy} />
             </div>
 
             <div>
@@ -1161,7 +1155,7 @@ function TaskCreateModal({
   profiles: Profile[];
   units: string[];
   currentUserId: string | null;
-  onCreate: (task: Omit<Task, "id" | "position" | "created_by">) => Promise<Task | undefined>;
+  onCreate: (task: Omit<Task, "id" | "position">) => Promise<Task | undefined>;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState("");
@@ -1172,11 +1166,10 @@ function TaskCreateModal({
   const [createdDate, setCreatedDate] = useState(todayLocalDate);
   const [dueDate, setDueDate] = useState("");
   const [assignee, setAssignee] = useState("");
+  const [createdBy, setCreatedBy] = useState(currentUserId ?? "");
   const [saving, setSaving] = useState(false);
   const [branchCopied, setBranchCopied] = useState(false);
   const evidence = useDescriptionEvidence();
-
-  const reporter = profiles.find((p) => p.id === currentUserId);
 
   const branchName = title.trim() ? buildTaskBranchName(unitCode, title) : "";
 
@@ -1229,6 +1222,7 @@ function TaskCreateModal({
         due_date: dueDate || null,
         created_at: dateInputToCreatedAt(createdDate || todayLocalDate()),
         assignee: assignee || null,
+        created_by: createdBy || null,
       });
       if (created && evidence.pending.length > 0) {
         try {
@@ -1395,14 +1389,7 @@ function TaskCreateModal({
 
             <div>
               <label style={labelStyle}>Reporter</label>
-              {reporter ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
-                  <AssigneeAvatar profile={reporter} size={24} />
-                  <span style={{ fontSize: 13, color: "var(--color-ink)" }}>{reporter.full_name}</span>
-                </div>
-              ) : (
-                <p style={{ margin: 0, fontSize: 12.5, color: "var(--color-slate2)" }}>—</p>
-              )}
+              <AssigneePicker profiles={profiles} value={createdBy} onChange={setCreatedBy} />
             </div>
 
             <div>
@@ -1704,118 +1691,21 @@ function SortableCard({
   );
 }
 
-// ─── AddTaskForm ──────────────────────────────────────────────────────────────
-
-function AddTaskForm({
-  status,
-  units,
-  onAdd,
-  onCancel,
-}: {
-  status: Task["status"];
-  units: string[];
-  onAdd: (task: Omit<Task, "id" | "position" | "created_by">) => void;
-  onCancel: () => void;
-}) {
-  const [title, setTitle] = useState("");
-  const [unit, setUnit] = useState(units[0] ?? "");
-  const [priority, setPriority] = useState<Task["priority"]>("media");
-  const [type, setType] = useState<Task["type"]>("task");
-
-  function handleSubmit() {
-    if (!title.trim()) return;
-    onAdd({
-      title: title.trim(),
-      description: null,
-      unit_code: unit,
-      status,
-      priority,
-      type,
-      assignee: null,
-      due_date: null,
-      created_at: dateInputToCreatedAt(todayLocalDate()),
-    });
-  }
-
-  return (
-    <div style={{ background: "white", border: "1px solid var(--color-mist)", borderRadius: 8, padding: 12, marginBottom: 8 }}>
-      <textarea
-        autoFocus
-        placeholder="Título de la tarea..."
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        rows={2}
-        style={{
-          width: "100%", border: "1px solid var(--color-mist)", borderRadius: 6,
-          padding: "6px 10px", fontSize: 13.5, fontFamily: "var(--font-sans)",
-          resize: "none", outline: "none", marginBottom: 8, boxSizing: "border-box",
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
-          if (e.key === "Escape") onCancel();
-        }}
-      />
-      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-        <FormSelect
-          value={unit}
-          onChange={setUnit}
-          options={units.map((unitOption) => ({ value: unitOption, label: unitOption }))}
-          className="flex-1"
-        />
-        <FormSelect
-          value={priority}
-          onChange={(value) => setPriority(value as Task["priority"])}
-          options={[
-            { value: "alta", label: "Alta" },
-            { value: "media", label: "Media" },
-            { value: "baja", label: "Baja" },
-          ]}
-          className="flex-1"
-        />
-        <TaskTypeSelect
-          value={type}
-          onChange={setType}
-          className="flex-1"
-        />
-      </div>
-      <div style={{ display: "flex", gap: 6 }}>
-        <button
-          onClick={handleSubmit}
-          style={{ flex: 1, background: "var(--color-brand)", color: "white", border: "none", borderRadius: 6, padding: "7px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}
-        >
-          Agregar
-        </button>
-        <button
-          onClick={onCancel}
-          style={{ flex: 1, background: "transparent", color: "var(--color-slate2)", border: "1px solid var(--color-mist)", borderRadius: 6, padding: "7px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}
-        >
-          Cancelar
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ─── KanbanColumn ─────────────────────────────────────────────────────────────
 
 function KanbanColumn({
   column,
   tasks,
   profiles,
-  units,
   isOver,
-  onAddTask,
   onEditTask,
 }: {
   column: (typeof COLUMNS)[number];
   tasks: Task[];
   profiles: Profile[];
-  units: string[];
   isOver: boolean;
-  onAddTask: (task: Omit<Task, "id" | "position" | "created_by">) => void;
   onEditTask: (task: Task) => void;
 }) {
-  const [showForm, setShowForm] = useState(false);
   const { setNodeRef: setDropRef } = useDroppable({ id: column.id });
 
   return (
@@ -1842,40 +1732,6 @@ function KanbanColumn({
           {tasks.length}
         </span>
       </div>
-
-      {column.id === "done" ? null : showForm ? (
-        <AddTaskForm
-          status={column.id}
-          units={units}
-          onAdd={(task) => { onAddTask(task); setShowForm(false); }}
-          onCancel={() => setShowForm(false)}
-        />
-      ) : (
-        <button
-          onClick={() => setShowForm(true)}
-          style={{
-            width: "100%", padding: "8px 12px", borderRadius: 8,
-            border: "1.5px dashed var(--color-slate2-300)", background: "transparent",
-            color: "var(--color-slate2)", fontSize: 13, fontWeight: 600,
-            cursor: "pointer", fontFamily: "var(--font-sans)", marginBottom: 10,
-            transition: "border-color 150ms, color 150ms, background 150ms",
-          }}
-          onMouseEnter={(e) => {
-            const el = e.currentTarget;
-            el.style.borderColor = "var(--color-brand)";
-            el.style.color = "var(--color-brand)";
-            el.style.background = "white";
-          }}
-          onMouseLeave={(e) => {
-            const el = e.currentTarget;
-            el.style.borderColor = "var(--color-slate2-300)";
-            el.style.color = "var(--color-slate2)";
-            el.style.background = "transparent";
-          }}
-        >
-          + Agregar tarea
-        </button>
-      )}
 
       <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <div style={{ flex: 1, minHeight: 40 }}>
@@ -2404,7 +2260,7 @@ export default function KanbanBoard({
   }
 
   async function handleAddTask(
-    taskData: Omit<Task, "id" | "position" | "created_by">,
+    taskData: Omit<Task, "id" | "position">,
   ): Promise<Task | undefined> {
     const colTasks = tasks
       .filter((t) => t.status === taskData.status)
@@ -2417,7 +2273,7 @@ export default function KanbanBoard({
         ...taskData,
         description: formatTaskDescription(taskData.description),
         position,
-        created_by: currentUserId,
+        created_by: taskData.created_by ?? currentUserId,
       })
       .select()
       .single();
@@ -2443,6 +2299,7 @@ export default function KanbanBoard({
       description: formatTaskDescription(updated.description),
       assignee: updated.assignee?.trim() ? updated.assignee : null,
       due_date: updated.due_date?.trim() ? updated.due_date : null,
+      created_by: updated.created_by?.trim() ? updated.created_by : null,
     };
     const { error } = await supabase
       .from("tasks")
@@ -2455,6 +2312,7 @@ export default function KanbanBoard({
         due_date: normalized.due_date,
         created_at: normalized.created_at,
         assignee: normalized.assignee,
+        created_by: normalized.created_by,
       })
       .eq("id", normalized.id);
 
@@ -2608,9 +2466,7 @@ export default function KanbanBoard({
               column={column}
               tasks={getColumnTasks(column.id)}
               profiles={profiles}
-              units={units}
               isOver={overColumnId === column.id}
-              onAddTask={handleAddTask}
               onEditTask={setEditingTask}
             />
           ))}
