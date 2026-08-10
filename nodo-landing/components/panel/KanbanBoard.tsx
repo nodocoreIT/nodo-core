@@ -778,7 +778,7 @@ function TaskEditModal({
           borderRadius: 12,
           boxShadow: "0 8px 32px rgba(18,30,47,.18)",
           width: "100%",
-          maxWidth: 760,
+          maxWidth: 960,
           maxHeight: "96vh",
           overflowY: "auto",
           display: "flex",
@@ -823,7 +823,7 @@ function TaskEditModal({
 
         <div style={{ padding: "16px 24px", display: "flex", gap: 24, flexWrap: "wrap" }}>
           {/* ── Columna principal: descripción, título, comentarios ──────── */}
-          <div style={{ flex: "1 1 380px", minWidth: 280, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ flex: "1 1 460px", minWidth: 280, display: "flex", flexDirection: "column", gap: 12 }}>
             <div>
               <label style={labelStyle}>Descripción</label>
               <textarea
@@ -1843,7 +1843,7 @@ function KanbanColumn({
         </span>
       </div>
 
-      {showForm ? (
+      {column.id === "done" ? null : showForm ? (
         <AddTaskForm
           status={column.id}
           units={units}
