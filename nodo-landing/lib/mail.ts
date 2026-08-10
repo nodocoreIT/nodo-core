@@ -1,5 +1,6 @@
 import "server-only";
 import nodemailer from "nodemailer";
+import type { TaskNotificationType } from "@/lib/panel/task-notification-copy";
 
 // Zoho SMTP transport. Credentials live in env vars so they never ship to the
 // client. Host/port default to Zoho's standard SSL endpoint.
@@ -874,6 +875,12 @@ function escapeHtml(value: string): string {
 }
 
 /** Sent by the send-task-notification-emails cron for unsent nodo_core.task_notifications rows. */
+const TASK_NOTIFICATION_SUBJECT_PREFIX: Record<TaskNotificationType, string> = {
+  status_changed: "Cambio de estado",
+  reassigned: "Tarea reasignada",
+  mentioned: "Te mencionaron",
+};
+
 export async function sendTaskNotificationEmail({
   to,
   taskId,
@@ -885,14 +892,14 @@ export async function sendTaskNotificationEmail({
   to: string;
   taskId: string;
   taskTitle: string;
-  type: "status_changed" | "reassigned";
+  type: TaskNotificationType;
   /** Already-formatted copy, same text shown in the in-app bell (see use-panel-notifications.ts). */
   description: string;
   origin: string;
 }): Promise<void> {
   const transporter = createTransporter();
   const panelUrl = `${origin}/panel/tareas?task=${taskId}`;
-  const subjectPrefix = type === "status_changed" ? "Cambio de estado" : "Tarea reasignada";
+  const subjectPrefix = TASK_NOTIFICATION_SUBJECT_PREFIX[type];
   const theme = resolveNodeBrand("");
 
   await transporter.sendMail({

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   ArrowRightLeft,
+  AtSign,
   Calendar,
   ClipboardList,
   CreditCard,
@@ -64,6 +65,10 @@ export const PANEL_NOTIFICATION_KIND_STYLES = {
   reassigned: {
     icon: UserCheck,
     iconColor: "text-emerald-600 bg-emerald-50",
+  },
+  mentioned: {
+    icon: AtSign,
+    iconColor: "text-violet-600 bg-violet-50",
   },
   default: {
     icon: AlertTriangle,
