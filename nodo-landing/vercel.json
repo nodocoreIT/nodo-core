@@ -16,7 +16,7 @@
     },
     {
       "path": "/api/cron/send-task-notification-emails",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 12 * * *"
     }
   ]
 }
