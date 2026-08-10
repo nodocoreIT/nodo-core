@@ -108,16 +108,20 @@ const COLUMNS: { id: Task["status"]; label: string; color: string }[] = [
   { id: "backlog", label: TASK_STATUS_LABELS.backlog, color: "#9DACBE" },
   { id: "doing", label: TASK_STATUS_LABELS.doing, color: "#2A6FDB" },
   { id: "review", label: TASK_STATUS_LABELS.review, color: "#DA5A0E" },
+  { id: "deployed_qa", label: TASK_STATUS_LABELS.deployed_qa, color: "#7C3AED" },
+  { id: "qa_testing", label: TASK_STATUS_LABELS.qa_testing, color: "#B45309" },
   { id: "done", label: TASK_STATUS_LABELS.done, color: "#1F8A5B" },
 ];
 
+const PRIORITY_ORDER: Task["priority"][] = ["alta", "media", "baja"];
+
 const PRIORITY_STYLES: Record<
   Task["priority"],
-  { bg: string; color: string; label: string }
+  { bg: string; color: string; label: string; Icon: React.ElementType }
 > = {
-  alta: { bg: "#FBE6E1", color: "#C0392B", label: "Alta" },
-  media: { bg: "#FCE9D8", color: "#B5630C", label: "Media" },
-  baja: { bg: "var(--color-mist)", color: "var(--color-slate2)", label: "Baja" },
+  alta: { bg: "#FBE6E1", color: "#C0392B", label: "Alta", Icon: ChevronUp },
+  media: { bg: "#FCE9D8", color: "#B5630C", label: "Media", Icon: Equal },
+  baja: { bg: "var(--color-mist)", color: "var(--color-slate2)", label: "Baja", Icon: ChevronDown },
 };
 
 const TYPE_CONFIG: Record<
@@ -2458,8 +2462,10 @@ export default function KanbanBoard({
           className="kanban-board"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, minmax(206px, 1fr))",
+            gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(206px, 1fr))`,
             gap: 16,
+            overflowX: "auto",
+            paddingBottom: 4,
           }}
         >
           {COLUMNS.map((column) => (

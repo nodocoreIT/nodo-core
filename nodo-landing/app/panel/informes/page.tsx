@@ -15,6 +15,7 @@ import {
 import Topbar from "@/components/panel/Topbar";
 import { createClient } from "@/lib/supabase/client";
 import { NODES } from "@/lib/nodes";
+import { TASK_STATUS_LABELS, type TaskStatus } from "@/lib/panel/task-status";
 
 type Profile = {
   id: string;
@@ -61,7 +62,7 @@ type Task = {
   id: string;
   title: string;
   unit_code: string;
-  status: "backlog" | "doing" | "review" | "done";
+  status: TaskStatus;
   priority: "alta" | "media" | "baja";
   type: "task" | "bug" | "idea";
 };
@@ -87,13 +88,6 @@ const STATUS_LABELS: Record<string, string> = {
   pausado: "Pausado",
   pending_review: "Pendiente revisión",
   pending_onboarding: "Onboarding pendiente",
-};
-
-const TASK_STATUS_LABELS: Record<Task["status"], string> = {
-  backlog: "Por hacer",
-  doing: "En progreso",
-  review: "En revisión",
-  done: "Hecho",
 };
 
 const moneyFmt = new Intl.NumberFormat("es-AR", {
