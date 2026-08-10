@@ -2265,7 +2265,9 @@ export default function KanbanBoard({
     const colTasks = tasks
       .filter((t) => t.status === taskData.status)
       .sort((a, b) => a.position - b.position);
-    const position = colTasks.length > 0 ? colTasks[colTasks.length - 1].position + 1000 : 0;
+    // Newest first: place above the current top of the column instead of
+    // appending at the bottom.
+    const position = colTasks.length > 0 ? colTasks[0].position - 1000 : 0;
 
     const { data, error } = await supabase
       .from("tasks")
