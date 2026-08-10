@@ -131,6 +131,12 @@ export function PatientSettingsDialog({
       });
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** Only the X button (close-press) may close this dialog — outside clicks and Escape are ignored. */
+  const handleOpenChange = (nextOpen: boolean, eventDetails?: { reason?: string }) => {
+    if (!nextOpen && eventDetails?.reason !== "close-press") return;
+    onOpenChange(nextOpen);
+  };
+
   const sectionDescription =
     activeSection === "perfil"
       ? "Actualizá tus datos personales y contraseña."
@@ -143,8 +149,8 @@ export function PatientSettingsDialog({
             : "Información de tu plan de paciente en Nodo Clínica.";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[800px] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden bg-white">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[min(800px,90vh)] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden bg-white">
         <SettingsDesktopNav
           items={PATIENT_SETTINGS_NAV}
           activeId={activeSection}

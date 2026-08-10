@@ -432,6 +432,12 @@ export function DoctorSettingsDialog({
     setNewBlockDate("");
   };
 
+  /** Only the X button (close-press) may close this dialog — outside clicks and Escape are ignored. */
+  const handleOpenChange = (nextOpen: boolean, eventDetails?: { reason?: string }) => {
+    if (!nextOpen && eventDetails?.reason !== "close-press") return;
+    onOpenChange(nextOpen);
+  };
+
   const handleTestReminder = async () => {
     setTestingReminder(true);
     try {
@@ -444,8 +450,8 @@ export function DoctorSettingsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[800px] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden bg-white">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[min(800px,90vh)] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden bg-white">
         <SettingsDesktopNav
           items={CLINICA_SETTINGS_NAV}
           activeId={activeSection}
