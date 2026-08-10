@@ -13,6 +13,10 @@
     {
       "path": "/api/cron/generate-rent-installments",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/send-task-notification-emails",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

@@ -8,6 +8,7 @@ import {
 } from "@nodocore/shared-components";
 import { usePanelShell } from "./PanelChrome";
 import { NotificationsBell } from "./NotificationsBell";
+import { usePanelNotifications } from "@/hooks/use-panel-notifications";
 
 type TopbarProps = {
   breadcrumb: string;
@@ -26,6 +27,22 @@ export default function Topbar({
 }: TopbarProps) {
   const shell = usePanelShell();
   const hasSearch = onSearchChange !== undefined;
+  const {
+    items: notificationItems,
+    loading: notificationsLoading,
+    error: notificationsError,
+    dismissedFromServer,
+    dismissNotification,
+    deleteNotification,
+  } = usePanelNotifications();
+  const bellProps = {
+    items: notificationItems,
+    loading: notificationsLoading,
+    error: notificationsError,
+    dismissedFromServer,
+    onDismiss: dismissNotification,
+    onDelete: deleteNotification,
+  };
 
   return (
     <header
@@ -51,7 +68,7 @@ export default function Topbar({
           </div>
         </div>
 
-        <PortalHeaderMobileActions notifications={<NotificationsBell />} />
+        <PortalHeaderMobileActions notifications={<NotificationsBell {...bellProps} />} />
       </div>
 
       <PortalHeaderActions
@@ -65,7 +82,7 @@ export default function Topbar({
             />
           ) : undefined
         }
-        notifications={<NotificationsBell />}
+        notifications={<NotificationsBell {...bellProps} />}
       />
     </header>
   );

@@ -56,6 +56,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { createClient } from "@/lib/supabase/client";
+import { TASK_STATUS_LABELS, type TaskStatus } from "@/lib/panel/task-status";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,7 +65,7 @@ export type Task = {
   title: string;
   description: string | null;
   unit_code: string;
-  status: "backlog" | "doing" | "review" | "done";
+  status: TaskStatus;
   priority: "alta" | "media" | "baja";
   type: "task" | "bug" | "idea" | "debt" | "known_issue";
   assignee: string | null;
@@ -104,10 +105,10 @@ const MODAL_SELECT_Z = "z-[1100]";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const COLUMNS: { id: Task["status"]; label: string; color: string }[] = [
-  { id: "backlog", label: "Por hacer", color: "#9DACBE" },
-  { id: "doing", label: "En progreso", color: "#2A6FDB" },
-  { id: "review", label: "En revisión", color: "#DA5A0E" },
-  { id: "done", label: "Hecho", color: "#1F8A5B" },
+  { id: "backlog", label: TASK_STATUS_LABELS.backlog, color: "#9DACBE" },
+  { id: "doing", label: TASK_STATUS_LABELS.doing, color: "#2A6FDB" },
+  { id: "review", label: TASK_STATUS_LABELS.review, color: "#DA5A0E" },
+  { id: "done", label: TASK_STATUS_LABELS.done, color: "#1F8A5B" },
 ];
 
 const PRIORITY_STYLES: Record<
