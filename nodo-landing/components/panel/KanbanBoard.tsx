@@ -335,6 +335,76 @@ function PrioritySelect({
   );
 }
 
+/** Jira-style solid colored pill — change status without dragging the card between columns. */
+function StatusSelect({
+  value,
+  onChange,
+  className,
+  contentClassName,
+}: {
+  value: Task["status"];
+  onChange: (value: Task["status"]) => void;
+  className?: string;
+  contentClassName?: string;
+}) {
+  const selected = COLUMNS.find((c) => c.id === value) ?? COLUMNS[0];
+
+  return (
+    <Select
+      value={value}
+      onValueChange={(next) => onChange(next as Task["status"])}
+    >
+      <SelectTrigger
+        className={["rounded-full border-none", className].filter(Boolean).join(" ")}
+        style={{
+          background: selected.color,
+          color: "white",
+          fontWeight: 700,
+          fontSize: 13,
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {selected.label}
+        </span>
+        {/* Radix requires SelectValue; hide mirrored item content (avoids double icon) */}
+        <div
+          style={{
+            position: "absolute",
+            width: 1,
+            height: 1,
+            padding: 0,
+            margin: -1,
+            overflow: "hidden",
+            clip: "rect(0, 0, 0, 0)",
+            whiteSpace: "nowrap",
+            border: 0,
+          }}
+        >
+          <SelectValue />
+        </div>
+      </SelectTrigger>
+      <SelectContent className={["z-[200]", contentClassName].filter(Boolean).join(" ")}>
+        {COLUMNS.map((column) => (
+          <SelectItem key={column.id} value={column.id} textValue={column.label}>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <span
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: "50%",
+                  background: column.color,
+                  flexShrink: 0,
+                }}
+              />
+              <span>{column.label}</span>
+            </div>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 const MONTH_NAMES = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
   "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
@@ -861,6 +931,7 @@ function TaskEditModal({
 }) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
+  const [status, setStatus] = useState<Task["status"]>(task.status);
   const [unitCode, setUnitCode] = useState(task.unit_code);
   const [priority, setPriority] = useState<Task["priority"]>(task.priority);
   const [type, setType] = useState<Task["type"]>(task.type ?? "task");
@@ -932,6 +1003,7 @@ function TaskEditModal({
       created_at: createdDate ? dateInputToCreatedAt(createdDate) : task.created_at,
       assignee: assignee || null,
       created_by: createdBy || null,
+      status,
     };
     try {
       const err = await onSave(updated);
@@ -1082,6 +1154,10 @@ function TaskEditModal({
 
           {/* ── Sidebar: metadata al estilo Jira ─────────────────────────── */}
           <div style={{ flex: "0 1 220px", minWidth: 200, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <StatusSelect value={status} onChange={setStatus} contentClassName={MODAL_SELECT_Z} />
+            </div>
+
             <div>
               <label style={labelStyle}>Unidad</label>
               <FormSelect
@@ -2570,12 +2646,27 @@ export default function KanbanBoard({
   }
 
   async function handleSaveTask(updated: Task): Promise<string | null> {
+    const previous = tasks.find((t) => t.id === updated.id);
+    const statusChanged = previous != null && previous.status !== updated.status;
+
+    let position = previous?.position ?? updated.position;
+    if (statusChanged) {
+      // Changed from the sidebar dropdown, not by dragging — there's no
+      // "dropped position" to honor, so land it at the top of the new
+      // column, same convention as a freshly created task.
+      const colTasks = tasks
+        .filter((t) => t.status === updated.status && t.id !== updated.id)
+        .sort((a, b) => a.position - b.position);
+      position = colTasks.length > 0 ? colTasks[0].position - 1000 : 0;
+    }
+
     const normalized: Task = {
       ...updated,
       description: formatTaskDescription(updated.description),
       assignee: updated.assignee?.trim() ? updated.assignee : null,
       due_date: updated.due_date?.trim() ? updated.due_date : null,
       created_by: updated.created_by?.trim() ? updated.created_by : null,
+      position,
     };
     const { error } = await supabase
       .from("tasks")
@@ -2583,12 +2674,14 @@ export default function KanbanBoard({
         title: normalized.title,
         description: normalized.description,
         unit_code: normalized.unit_code,
+        status: normalized.status,
         priority: normalized.priority,
         type: normalized.type,
         due_date: normalized.due_date,
         created_at: normalized.created_at,
         assignee: normalized.assignee,
         created_by: normalized.created_by,
+        position: normalized.position,
       })
       .eq("id", normalized.id);
 
