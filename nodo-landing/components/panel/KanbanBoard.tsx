@@ -4,11 +4,14 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  ArrowDownWideNarrow,
   Bug,
   Check,
   CheckSquare,
   ChevronDown,
+  ChevronUp,
   Copy,
+  Equal,
   Lightbulb,
   Plus,
   Search,
@@ -214,6 +217,93 @@ function TaskTypeSelect({
       <SelectContent className={["z-[200]", contentClassName].filter(Boolean).join(" ")}>
         {TASK_TYPES.map((key) => {
           const conf = TYPE_CONFIG[key];
+          const Icon = conf.Icon;
+          return (
+            <SelectItem key={key} value={key} textValue={conf.label}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <Icon
+                  className="h-3.5 w-3.5 shrink-0"
+                  style={{ color: conf.color, flexShrink: 0 }}
+                  strokeWidth={2.2}
+                  aria-hidden
+                />
+                <span>{conf.label}</span>
+              </div>
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function PrioritySelect({
+  value,
+  onChange,
+  className,
+  contentClassName,
+}: {
+  value: Task["priority"];
+  onChange: (value: Task["priority"]) => void;
+  className?: string;
+  contentClassName?: string;
+}) {
+  const selected = PRIORITY_STYLES[value];
+  const SelectedIcon = selected.Icon;
+
+  return (
+    <Select
+      value={value}
+      onValueChange={(next) => onChange(next as Task["priority"])}
+    >
+      <SelectTrigger className={["rounded-md", className].filter(Boolean).join(" ")}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            flex: 1,
+            minWidth: 0,
+            overflow: "hidden",
+          }}
+        >
+          <SelectedIcon
+            className="h-3.5 w-3.5 shrink-0"
+            style={{ color: selected.color, flexShrink: 0 }}
+            strokeWidth={2.2}
+            aria-hidden
+          />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {selected.label}
+          </span>
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            width: 1,
+            height: 1,
+            padding: 0,
+            margin: -1,
+            overflow: "hidden",
+            clip: "rect(0, 0, 0, 0)",
+            whiteSpace: "nowrap",
+            border: 0,
+          }}
+        >
+          <SelectValue />
+        </div>
+      </SelectTrigger>
+      <SelectContent className={["z-[200]", contentClassName].filter(Boolean).join(" ")}>
+        {PRIORITY_ORDER.map((key) => {
+          const conf = PRIORITY_STYLES[key];
           const Icon = conf.Icon;
           return (
             <SelectItem key={key} value={key} textValue={conf.label}>
@@ -889,14 +979,9 @@ function TaskEditModal({
 
             <div>
               <label style={labelStyle}>Prioridad</label>
-              <FormSelect
+              <PrioritySelect
                 value={priority}
-                onChange={(value) => setPriority(value as Task["priority"])}
-                options={[
-                  { value: "alta", label: "Alta" },
-                  { value: "media", label: "Media" },
-                  { value: "baja", label: "Baja" },
-                ]}
+                onChange={setPriority}
                 contentClassName={MODAL_SELECT_Z}
               />
             </div>
@@ -1365,14 +1450,9 @@ function TaskCreateModal({
 
             <div>
               <label style={labelStyle}>Prioridad</label>
-              <FormSelect
+              <PrioritySelect
                 value={priority}
-                onChange={(value) => setPriority(value as Task["priority"])}
-                options={[
-                  { value: "alta", label: "Alta" },
-                  { value: "media", label: "Media" },
-                  { value: "baja", label: "Baja" },
-                ]}
+                onChange={setPriority}
                 contentClassName={MODAL_SELECT_Z}
               />
             </div>
@@ -1565,15 +1645,20 @@ function TaskCard({
           nodo | <span style={{ fontWeight: 600 }}>{task.unit_code}</span>
         </span>
         <span
+          title={priority.label}
           style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 3,
             fontSize: 11.5,
             fontWeight: 700,
             background: priority.bg,
             color: priority.color,
             borderRadius: 999,
-            padding: "2px 8px",
+            padding: "2px 8px 2px 6px",
           }}
         >
+          <priority.Icon size={11} strokeWidth={2.6} aria-hidden />
           {priority.label}
         </span>
         <span
@@ -1910,6 +1995,8 @@ function FilterBar({
   onToggleType,
   onToggleCreatedBy,
   onClearAll,
+  sortByPriority,
+  onToggleSortByPriority,
   onAddTask,
 }: {
   profiles: Profile[];
@@ -1925,6 +2012,8 @@ function FilterBar({
   onToggleType: (type: Task["type"]) => void;
   onToggleCreatedBy: (id: string) => void;
   onClearAll: () => void;
+  sortByPriority: boolean;
+  onToggleSortByPriority: () => void;
   onAddTask: () => void;
 }) {
   const hasFilters =
@@ -2077,6 +2166,31 @@ function FilterBar({
         </button>
       ) : null}
 
+      <button
+        type="button"
+        onClick={onToggleSortByPriority}
+        title="Ordenar cada columna por prioridad (Alta → Baja) sin cambiar el orden manual guardado"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          height: 32,
+          padding: "0 10px",
+          border: `1px solid ${sortByPriority ? "var(--color-brand)" : "var(--color-mist)"}`,
+          borderRadius: 6,
+          background: sortByPriority ? "var(--color-brand)" : "white",
+          color: sortByPriority ? "white" : "var(--color-slate2)",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          fontFamily: "var(--font-sans)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        <ArrowDownWideNarrow size={14} strokeWidth={2.2} />
+        Ordenar por prioridad
+      </button>
+
       <div style={{ flex: 1, minWidth: 8 }} />
 
       <button
@@ -2125,6 +2239,7 @@ export default function KanbanBoard({
   const [unitFilter, setUnitFilter] = useState<string[]>([]);
   const [typeFilter, setTypeFilter] = useState<Task["type"][]>([]);
   const [createdByFilter, setCreatedByFilter] = useState<string[]>([]);
+  const [sortByPriority, setSortByPriority] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   function toggleAssignee(id: string) {
@@ -2182,9 +2297,16 @@ export default function KanbanBoard({
   });
 
   function getColumnTasks(status: Task["status"]) {
-    return filteredTasks
-      .filter((t) => t.status === status)
-      .sort((a, b) => a.position - b.position);
+    const columnTasks = filteredTasks.filter((t) => t.status === status);
+    if (sortByPriority) {
+      // View-only order — doesn't touch `position`, so turning this off
+      // restores whatever manual drag order was already saved.
+      return columnTasks.sort(
+        (a, b) => PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority)
+          || a.position - b.position,
+      );
+    }
+    return columnTasks.sort((a, b) => a.position - b.position);
   }
 
   const columnIds = COLUMNS.map((c) => c.id as string);
@@ -2449,6 +2571,8 @@ export default function KanbanBoard({
         onToggleType={toggleType}
         onToggleCreatedBy={toggleCreatedBy}
         onClearAll={clearAllFilters}
+        sortByPriority={sortByPriority}
+        onToggleSortByPriority={() => setSortByPriority((v) => !v)}
         onAddTask={() => setCreatingTask(true)}
       />
 
