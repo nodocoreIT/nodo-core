@@ -1,6 +1,6 @@
 import { TASK_STATUS_LABELS, type TaskStatus } from "@/lib/panel/task-status";
 
-export type TaskNotificationType = "status_changed" | "reassigned";
+export type TaskNotificationType = "status_changed" | "reassigned" | "mentioned";
 
 /** Shape of one nodo_core.task_notifications row joined with its task title and actor name. */
 export type TaskNotificationRow = {
@@ -40,6 +40,13 @@ export function describeTaskNotification(
     return {
       title: "Cambio de estado",
       description: `${actorName} movió "${taskTitle}" a ${statusLabel(row.new_value)}`,
+    };
+  }
+
+  if (row.type === "mentioned") {
+    return {
+      title: "Te mencionaron",
+      description: `${actorName} te mencionó en un comentario de "${taskTitle}"`,
     };
   }
 
