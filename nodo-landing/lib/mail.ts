@@ -862,3 +862,51 @@ export async function sendPausedNodeAccessEmail({
     `,
   });
 }
+
+/** Escapes user-controlled text (task titles, profile names) before it lands in an HTML email body. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Sent by the send-task-notification-emails cron for unsent nodo_core.task_notifications rows. */
+export async function sendTaskNotificationEmail({
+  to,
+  taskTitle,
+  type,
+  description,
+  origin,
+}: {
+  to: string;
+  taskTitle: string;
+  type: "status_changed" | "reassigned";
+  /** Already-formatted copy, same text shown in the in-app bell (see use-panel-notifications.ts). */
+  description: string;
+  origin: string;
+}): Promise<void> {
+  const transporter = createTransporter();
+  const panelUrl = `${origin}/panel/tareas`;
+  const subjectPrefix = type === "status_changed" ? "Cambio de estado" : "Tarea reasignada";
+  const theme = resolveNodeBrand("");
+
+  await transporter.sendMail({
+    from: `"NODO Core · Panel" <${USER}>`,
+    to,
+    subject: `${subjectPrefix}: ${taskTitle}`,
+    text: `${description}\n\nVer en el panel: ${panelUrl}`,
+    html: renderNodoEmailShell({
+      brandColor: theme.brand,
+      buttonText: theme.buttonText,
+      linkColor: theme.linkColor,
+      title: subjectPrefix,
+      bodyHtml: `<p style="margin:0;">${escapeHtml(description)}</p>`,
+      ctaLabel: "Ver en el panel",
+      ctaUrl: panelUrl,
+      footerNote: "Recibís este correo porque sos parte de una tarea en el panel de NODO Core.",
+    }),
+  });
+}

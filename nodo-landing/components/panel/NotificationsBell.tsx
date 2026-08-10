@@ -3,16 +3,18 @@
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  ArrowRightLeft,
   Calendar,
   ClipboardList,
   CreditCard,
   Lightbulb,
   MessageSquare,
+  UserCheck,
   UserPlus,
   Wallet,
 } from "lucide-react";
 import { NotificationsDropdown } from "@nodocore/nodo-modules/notifications";
-import { usePanelNotifications } from "@/hooks/use-panel-notifications";
+import type { AppNotification, DismissedNotification } from "@nodocore/nodo-modules/notifications";
 
 export const PANEL_NOTIFICATION_KIND_STYLES = {
   pending_registration: {
@@ -55,22 +57,46 @@ export const PANEL_NOTIFICATION_KIND_STYLES = {
     icon: MessageSquare,
     iconColor: "text-indigo-600 bg-indigo-50",
   },
+  status_changed: {
+    icon: ArrowRightLeft,
+    iconColor: "text-brand bg-brand/10",
+  },
+  reassigned: {
+    icon: UserCheck,
+    iconColor: "text-emerald-600 bg-emerald-50",
+  },
   default: {
     icon: AlertTriangle,
     iconColor: "text-slate2 bg-slate-100",
   },
 };
 
-export function NotificationsBell() {
+export interface NotificationsBellProps {
+  items: AppNotification[];
+  loading: boolean;
+  error: string | null;
+  dismissedFromServer: DismissedNotification[];
+  onDismiss: (notification: AppNotification) => void;
+  onDelete: (id: string) => void;
+}
+
+/**
+ * Presentational only — the data comes from a single usePanelNotifications()
+ * call in Topbar.tsx, shared by both the mobile and desktop bell instances.
+ * They can't share the hook call itself: the two header layouts are
+ * CSS-only responsive (both always mounted), so calling the hook inside
+ * this component would poll, subscribe to realtime, and toast twice per
+ * event for every panel page.
+ */
+export function NotificationsBell({
+  items,
+  loading,
+  error,
+  dismissedFromServer,
+  onDismiss,
+  onDelete,
+}: NotificationsBellProps) {
   const router = useRouter();
-  const {
-    items,
-    loading,
-    error,
-    dismissedFromServer,
-    dismissNotification,
-    deleteNotification,
-  } = usePanelNotifications();
 
   return (
     <NotificationsDropdown
@@ -82,8 +108,8 @@ export function NotificationsBell() {
       headerRingClass="ring-[#EEF3F8]"
       storageKey="panel"
       initialDismissed={dismissedFromServer}
-      onDismiss={dismissNotification}
-      onDelete={deleteNotification}
+      onDismiss={onDismiss}
+      onDelete={onDelete}
     />
   );
 }
