@@ -15,6 +15,7 @@ import {
 import {
   collectAssigneeIds,
   describeTaskNotification,
+  taskNotificationHref,
   type TaskNotificationRow,
 } from "@/lib/panel/task-notification-copy";
 import type { AppNotification } from "@nodocore/nodo-modules/notifications";
@@ -58,7 +59,7 @@ function buildTaskEventAppNotification(
     kind: row.type,
     title,
     description,
-    href: "/panel/tareas",
+    href: taskNotificationHref(row),
     priority: 4,
   };
 }
@@ -109,7 +110,7 @@ export function usePanelNotifications() {
         supabase
           .from("task_notifications")
           .select(
-            "id, type, old_value, new_value, recipient_id, created_at, task:tasks!task_notifications_task_id_fkey(title), actor:profiles!task_notifications_actor_id_fkey(full_name)",
+            "id, task_id, type, old_value, new_value, recipient_id, created_at, task:tasks!task_notifications_task_id_fkey(title), actor:profiles!task_notifications_actor_id_fkey(full_name)",
           )
           .gte("created_at", taskEventsSince)
           .order("created_at", { ascending: false })

@@ -876,12 +876,14 @@ function escapeHtml(value: string): string {
 /** Sent by the send-task-notification-emails cron for unsent nodo_core.task_notifications rows. */
 export async function sendTaskNotificationEmail({
   to,
+  taskId,
   taskTitle,
   type,
   description,
   origin,
 }: {
   to: string;
+  taskId: string;
   taskTitle: string;
   type: "status_changed" | "reassigned";
   /** Already-formatted copy, same text shown in the in-app bell (see use-panel-notifications.ts). */
@@ -889,7 +891,7 @@ export async function sendTaskNotificationEmail({
   origin: string;
 }): Promise<void> {
   const transporter = createTransporter();
-  const panelUrl = `${origin}/panel/tareas`;
+  const panelUrl = `${origin}/panel/tareas?task=${taskId}`;
   const subjectPrefix = type === "status_changed" ? "Cambio de estado" : "Tarea reasignada";
   const theme = resolveNodeBrand("");
 

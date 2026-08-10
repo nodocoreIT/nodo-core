@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -2242,6 +2243,33 @@ export default function KanbanBoard({
   const [sortByPriority, setSortByPriority] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Deep link from notifications (bell + email): /panel/tareas?task=<id>
+  // opens that task's edit modal directly instead of just landing on the
+  // board. Cleared on close so it doesn't keep re-opening after a save
+  // triggers a `tasks` state update.
+  useEffect(() => {
+    const taskId = searchParams.get("task");
+    if (!taskId) return;
+    const found = tasks.find((t) => t.id === taskId);
+    if (found) setEditingTask(found);
+  }, [searchParams, tasks]);
+
+  function closeEditingTask() {
+    setEditingTask(null);
+    if (searchParams.get("task")) router.replace(pathname, { scroll: false });
+  }
+
+  function openTask(task: Task) {
+    setEditingTask(task);
+    if (searchParams.get("task") !== task.id) {
+      router.replace(`${pathname}?task=${task.id}`, { scroll: false });
+    }
+  }
+
   function toggleAssignee(id: string) {
     setAssigneeFilter((prev) => prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]);
   }
@@ -2449,7 +2477,7 @@ export default function KanbanBoard({
       return error.message || "No se pudo guardar la tarea.";
     }
     setTasks((prev) => prev.map((t) => (t.id === normalized.id ? normalized : t)));
-    setEditingTask(null);
+    closeEditingTask();
     return null;
   }
 
@@ -2457,7 +2485,7 @@ export default function KanbanBoard({
     const { error } = await supabase.from("tasks").delete().eq("id", id);
     if (error) { console.error("Error deleting task:", error); return; }
     setTasks((prev) => prev.filter((t) => t.id !== id));
-    setEditingTask(null);
+    closeEditingTask();
   }
 
   const completedCount = tasks.filter((t) => t.status === "done").length;
@@ -2473,7 +2501,7 @@ export default function KanbanBoard({
           units={units}
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
-          onClose={() => setEditingTask(null)}
+          onClose={closeEditingTask}
         />
       )}
 
@@ -2599,7 +2627,7 @@ export default function KanbanBoard({
               tasks={getColumnTasks(column.id)}
               profiles={profiles}
               isOver={overColumnId === column.id}
-              onEditTask={setEditingTask}
+              onEditTask={openTask}
             />
           ))}
         </div>

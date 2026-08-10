@@ -24,7 +24,7 @@ import { collectAssigneeIds, describeTaskNotification, type TaskNotificationRow 
  */
 
 const TASK_NOTIFICATION_SELECT =
-  "id, type, old_value, new_value, recipient_id, task:tasks!task_notifications_task_id_fkey(title), actor:profiles!task_notifications_actor_id_fkey(full_name)";
+  "id, task_id, type, old_value, new_value, recipient_id, task:tasks!task_notifications_task_id_fkey(title), actor:profiles!task_notifications_actor_id_fkey(full_name)";
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -123,6 +123,7 @@ export async function GET(request: NextRequest) {
 
       await sendTaskNotificationEmail({
         to: email,
+        taskId: row.task_id,
         taskTitle: row.task?.title ?? "una tarea",
         type: row.type,
         description,

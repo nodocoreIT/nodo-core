@@ -218,7 +218,7 @@ export function buildPanelNotifications({
         kind: "overdue_task",
         title: "Tarea vencida",
         description: baseDesc,
-        href: "/panel/tareas",
+        href: `/panel/tareas?task=${task.id}`,
         priority: 6,
       });
     } else if (task.due_date === todayKey) {
@@ -227,7 +227,7 @@ export function buildPanelNotifications({
         kind: "today_task",
         title: "Tarea para hoy",
         description: baseDesc,
-        href: "/panel/tareas",
+        href: `/panel/tareas?task=${task.id}`,
         priority: 14,
       });
     } else if (task.due_date <= horizon) {
@@ -236,7 +236,7 @@ export function buildPanelNotifications({
         kind: "upcoming_task",
         title: "Tarea próxima",
         description: `${baseDesc} — vence ${task.due_date}`,
-        href: "/panel/tareas",
+        href: `/panel/tareas?task=${task.id}`,
         priority: 25,
       });
     }
