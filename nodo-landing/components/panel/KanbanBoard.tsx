@@ -13,7 +13,9 @@ import {
   ChevronUp,
   Copy,
   Equal,
+  ImagePlus,
   Lightbulb,
+  Loader2,
   Plus,
   Search,
   UserRound,
@@ -37,6 +39,7 @@ import {
 } from "@/lib/panel/task-code";
 import {
   ALLOWED_EVIDENCE_MIME,
+  assertEvidenceFile,
   createTaskComment,
 } from "@/lib/panel/task-comments";
 import { GenerateTitleFromDescriptionButton } from "@/components/panel/generate-title-button";
@@ -327,6 +330,76 @@ function PrioritySelect({
             </SelectItem>
           );
         })}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** Jira-style solid colored pill — change status without dragging the card between columns. */
+function StatusSelect({
+  value,
+  onChange,
+  className,
+  contentClassName,
+}: {
+  value: Task["status"];
+  onChange: (value: Task["status"]) => void;
+  className?: string;
+  contentClassName?: string;
+}) {
+  const selected = COLUMNS.find((c) => c.id === value) ?? COLUMNS[0];
+
+  return (
+    <Select
+      value={value}
+      onValueChange={(next) => onChange(next as Task["status"])}
+    >
+      <SelectTrigger
+        className={["rounded-full border-none", className].filter(Boolean).join(" ")}
+        style={{
+          background: selected.color,
+          color: "white",
+          fontWeight: 700,
+          fontSize: 13,
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {selected.label}
+        </span>
+        {/* Radix requires SelectValue; hide mirrored item content (avoids double icon) */}
+        <div
+          style={{
+            position: "absolute",
+            width: 1,
+            height: 1,
+            padding: 0,
+            margin: -1,
+            overflow: "hidden",
+            clip: "rect(0, 0, 0, 0)",
+            whiteSpace: "nowrap",
+            border: 0,
+          }}
+        >
+          <SelectValue />
+        </div>
+      </SelectTrigger>
+      <SelectContent className={["z-[200]", contentClassName].filter(Boolean).join(" ")}>
+        {COLUMNS.map((column) => (
+          <SelectItem key={column.id} value={column.id} textValue={column.label}>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <span
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: "50%",
+                  background: column.color,
+                  flexShrink: 0,
+                }}
+              />
+              <span>{column.label}</span>
+            </div>
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );
@@ -630,26 +703,34 @@ function AssigneePicker({
 
 type PendingEvidence = { id: string; file: File; previewUrl: string };
 
-/** Ctrl+V a screenshot or short screen recording straight into a description. */
+/** Ctrl+V, drag-drop, or the "Adjuntar evidencia" picker — image or video into a description. */
 function useDescriptionEvidence() {
   const [pending, setPending] = useState<PendingEvidence[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  function addFiles(files: File[]) {
+    if (files.length === 0) return;
+    setError(null);
+    const accepted: PendingEvidence[] = [];
+    for (const file of files) {
+      if (!ALLOWED_EVIDENCE_MIME.has(file.type)) continue;
+      try {
+        assertEvidenceFile(file);
+        accepted.push({ id: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file) });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No se pudo adjuntar el archivo.");
+      }
+    }
+    if (accepted.length > 0) {
+      setPending((prev) => [...prev, ...accepted].slice(0, 8));
+    }
+  }
 
   function addFromClipboard(e: React.ClipboardEvent<HTMLTextAreaElement>) {
-    const files = Array.from(e.clipboardData?.files ?? []).filter((f) =>
-      ALLOWED_EVIDENCE_MIME.has(f.type),
-    );
+    const files = Array.from(e.clipboardData?.files ?? []);
     if (files.length === 0) return;
     e.preventDefault();
-    setPending((prev) =>
-      [
-        ...prev,
-        ...files.map((file) => ({
-          id: crypto.randomUUID(),
-          file,
-          previewUrl: URL.createObjectURL(file),
-        })),
-      ].slice(0, 8),
-    );
+    addFiles(files);
   }
 
   function remove(id: string) {
@@ -667,70 +748,167 @@ function useDescriptionEvidence() {
     });
   }
 
-  return { pending, addFromClipboard, remove, reset };
+  return { pending, error, addFiles, addFromClipboard, remove, reset };
+}
+
+/**
+ * One pending thumbnail. Shows a spinner from the moment it's attached until
+ * the browser actually finishes decoding it locally (onLoadedData/onLoad) —
+ * for a multi-MB video that's a real, visible gap, not instant like an
+ * image usually is. A second, separate spinner covers `uploading` (parent
+ * form is saving, i.e. the file is actually hitting the network).
+ */
+function PendingEvidenceThumb({
+  item,
+  uploading,
+  onRemove,
+}: {
+  item: PendingEvidence;
+  uploading: boolean;
+  onRemove: (id: string) => void;
+}) {
+  const [domReady, setDomReady] = useState(false);
+  // A local blob has no network latency — the browser can decode it fast
+  // enough that the spinner would flash on and off inside a single paint,
+  // never actually visible. Force a minimum on-screen time so attaching
+  // something always gives a perceptible "loading" moment.
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMinTimeElapsed(true), 400);
+    return () => clearTimeout(t);
+  }, []);
+  const showSpinner = uploading || !(domReady && minTimeElapsed);
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: 56,
+        height: 56,
+        borderRadius: 6,
+        overflow: "hidden",
+        border: "1px solid var(--color-mist)",
+        background: "var(--color-mist)",
+      }}
+    >
+      {item.file.type.startsWith("video/") ? (
+        <video
+          src={item.previewUrl}
+          muted
+          preload="auto"
+          onLoadedData={() => setDomReady(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={item.previewUrl}
+          alt={item.file.name}
+          onLoad={() => setDomReady(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      )}
+      {showSpinner ? (
+        <div
+          title={uploading ? "Subiendo…" : "Cargando…"}
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(18,30,47,.55)",
+          }}
+        >
+          <Loader2 size={18} color="white" className="animate-spin" />
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onRemove(item.id)}
+          style={{
+            position: "absolute",
+            top: 2,
+            right: 2,
+            width: 16,
+            height: 16,
+            borderRadius: "50%",
+            border: "none",
+            background: "rgba(0,0,0,.55)",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            padding: 0,
+          }}
+        >
+          <X size={10} />
+        </button>
+      )}
+    </div>
+  );
 }
 
 function PendingEvidenceRow({
   items,
   onRemove,
+  uploading = false,
 }: {
   items: PendingEvidence[];
   onRemove: (id: string) => void;
+  /** True while the parent form is saving — this is when these files actually hit the network. */
+  uploading?: boolean;
 }) {
   if (items.length === 0) return null;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
       {items.map((item) => (
-        <div
-          key={item.id}
-          style={{
-            position: "relative",
-            width: 56,
-            height: 56,
-            borderRadius: 6,
-            overflow: "hidden",
-            border: "1px solid var(--color-mist)",
-          }}
-        >
-          {item.file.type.startsWith("video/") ? (
-            <video
-              src={item.previewUrl}
-              muted
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={item.previewUrl}
-              alt={item.file.name}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          )}
-          <button
-            type="button"
-            onClick={() => onRemove(item.id)}
-            style={{
-              position: "absolute",
-              top: 2,
-              right: 2,
-              width: 16,
-              height: 16,
-              borderRadius: "50%",
-              border: "none",
-              background: "rgba(0,0,0,.55)",
-              color: "white",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            <X size={10} />
-          </button>
-        </div>
+        <PendingEvidenceThumb key={item.id} item={item} uploading={uploading} onRemove={onRemove} />
       ))}
     </div>
+  );
+}
+
+/** Jira-style "Upload" button — file picker for description evidence, same accept list as paste. */
+function EvidenceAttachButton({ onFiles }: { onFiles: (files: File[]) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+        multiple
+        hidden
+        onChange={(e) => {
+          onFiles(Array.from(e.target.files ?? []));
+          if (inputRef.current) inputRef.current.value = "";
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        title="Imagen hasta 5MB, video hasta 25MB"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          border: "1px solid var(--color-mist)",
+          borderRadius: 6,
+          background: "white",
+          padding: "6px 10px",
+          fontSize: 12.5,
+          fontWeight: 600,
+          color: "var(--color-slate2)",
+          cursor: "pointer",
+          fontFamily: "var(--font-sans)",
+        }}
+      >
+        <ImagePlus size={13} />
+        Adjuntar evidencia
+      </button>
+    </>
   );
 }
 
@@ -753,6 +931,7 @@ function TaskEditModal({
 }) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
+  const [status, setStatus] = useState<Task["status"]>(task.status);
   const [unitCode, setUnitCode] = useState(task.unit_code);
   const [priority, setPriority] = useState<Task["priority"]>(task.priority);
   const [type, setType] = useState<Task["type"]>(task.type ?? "task");
@@ -824,6 +1003,7 @@ function TaskEditModal({
       created_at: createdDate ? dateInputToCreatedAt(createdDate) : task.created_at,
       assignee: assignee || null,
       created_by: createdBy || null,
+      status,
     };
     try {
       const err = await onSave(updated);
@@ -930,7 +1110,13 @@ function TaskEditModal({
                 placeholder="Pegá una captura o video con Ctrl+V"
                 style={{ ...inputStyle, resize: "vertical" }}
               />
-              <PendingEvidenceRow items={evidence.pending} onRemove={evidence.remove} />
+              <PendingEvidenceRow items={evidence.pending} onRemove={evidence.remove} uploading={saving} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                <EvidenceAttachButton onFiles={evidence.addFiles} />
+              </div>
+              {evidence.error ? (
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#b91c1c" }}>{evidence.error}</p>
+              ) : null}
               <GenerateTitleFromDescriptionButton
                 description={description}
                 unitCode={unitCode}
@@ -968,6 +1154,10 @@ function TaskEditModal({
 
           {/* ── Sidebar: metadata al estilo Jira ─────────────────────────── */}
           <div style={{ flex: "0 1 220px", minWidth: 200, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <StatusSelect value={status} onChange={setStatus} contentClassName={MODAL_SELECT_Z} />
+            </div>
+
             <div>
               <label style={labelStyle}>Unidad</label>
               <FormSelect
@@ -1410,7 +1600,13 @@ function TaskCreateModal({
                 autoFocus
                 style={{ ...inputStyle, resize: "vertical" }}
               />
-              <PendingEvidenceRow items={evidence.pending} onRemove={evidence.remove} />
+              <PendingEvidenceRow items={evidence.pending} onRemove={evidence.remove} uploading={saving} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                <EvidenceAttachButton onFiles={evidence.addFiles} />
+              </div>
+              {evidence.error ? (
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#b91c1c" }}>{evidence.error}</p>
+              ) : null}
               <GenerateTitleFromDescriptionButton
                 description={description}
                 unitCode={unitCode}
@@ -2450,12 +2646,27 @@ export default function KanbanBoard({
   }
 
   async function handleSaveTask(updated: Task): Promise<string | null> {
+    const previous = tasks.find((t) => t.id === updated.id);
+    const statusChanged = previous != null && previous.status !== updated.status;
+
+    let position = previous?.position ?? updated.position;
+    if (statusChanged) {
+      // Changed from the sidebar dropdown, not by dragging — there's no
+      // "dropped position" to honor, so land it at the top of the new
+      // column, same convention as a freshly created task.
+      const colTasks = tasks
+        .filter((t) => t.status === updated.status && t.id !== updated.id)
+        .sort((a, b) => a.position - b.position);
+      position = colTasks.length > 0 ? colTasks[0].position - 1000 : 0;
+    }
+
     const normalized: Task = {
       ...updated,
       description: formatTaskDescription(updated.description),
       assignee: updated.assignee?.trim() ? updated.assignee : null,
       due_date: updated.due_date?.trim() ? updated.due_date : null,
       created_by: updated.created_by?.trim() ? updated.created_by : null,
+      position,
     };
     const { error } = await supabase
       .from("tasks")
@@ -2463,12 +2674,14 @@ export default function KanbanBoard({
         title: normalized.title,
         description: normalized.description,
         unit_code: normalized.unit_code,
+        status: normalized.status,
         priority: normalized.priority,
         type: normalized.type,
         due_date: normalized.due_date,
         created_at: normalized.created_at,
         assignee: normalized.assignee,
         created_by: normalized.created_by,
+        position: normalized.position,
       })
       .eq("id", normalized.id);
 
