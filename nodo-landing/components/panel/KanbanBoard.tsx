@@ -664,6 +664,7 @@ function TaskEditModal({
   const [dueDate, setDueDate] = useState(task.due_date ?? "");
   const [createdDate, setCreatedDate] = useState(toDateInputValue(task.created_at));
   const [assignee, setAssignee] = useState(task.assignee ?? "");
+  const [createdBy, setCreatedBy] = useState(task.created_by ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -676,7 +677,6 @@ function TaskEditModal({
     return codes.map((unit) => ({ value: unit, label: unit }));
   }, [units, unitCode]);
 
-  const reporter = profiles.find((p) => p.id === task.created_by);
   const branchName = title.trim() ? buildTaskBranchName(unitCode, title) : "";
 
   function handleCopyBranchName() {
@@ -728,6 +728,7 @@ function TaskEditModal({
       due_date: dueDate || null,
       created_at: createdDate ? dateInputToCreatedAt(createdDate) : task.created_at,
       assignee: assignee || null,
+      created_by: createdBy || null,
     };
     try {
       const err = await onSave(updated);
@@ -912,14 +913,7 @@ function TaskEditModal({
 
             <div>
               <label style={labelStyle}>Reporter</label>
-              {reporter ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
-                  <AssigneeAvatar profile={reporter} size={24} />
-                  <span style={{ fontSize: 13, color: "var(--color-ink)" }}>{reporter.full_name}</span>
-                </div>
-              ) : (
-                <p style={{ margin: 0, fontSize: 12.5, color: "var(--color-slate2)" }}>—</p>
-              )}
+              <AssigneePicker profiles={profiles} value={createdBy} onChange={setCreatedBy} />
             </div>
 
             <div>
@@ -1161,7 +1155,7 @@ function TaskCreateModal({
   profiles: Profile[];
   units: string[];
   currentUserId: string | null;
-  onCreate: (task: Omit<Task, "id" | "position" | "created_by">) => Promise<Task | undefined>;
+  onCreate: (task: Omit<Task, "id" | "position">) => Promise<Task | undefined>;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState("");
@@ -1172,11 +1166,10 @@ function TaskCreateModal({
   const [createdDate, setCreatedDate] = useState(todayLocalDate);
   const [dueDate, setDueDate] = useState("");
   const [assignee, setAssignee] = useState("");
+  const [createdBy, setCreatedBy] = useState(currentUserId ?? "");
   const [saving, setSaving] = useState(false);
   const [branchCopied, setBranchCopied] = useState(false);
   const evidence = useDescriptionEvidence();
-
-  const reporter = profiles.find((p) => p.id === currentUserId);
 
   const branchName = title.trim() ? buildTaskBranchName(unitCode, title) : "";
 
@@ -1229,6 +1222,7 @@ function TaskCreateModal({
         due_date: dueDate || null,
         created_at: dateInputToCreatedAt(createdDate || todayLocalDate()),
         assignee: assignee || null,
+        created_by: createdBy || null,
       });
       if (created && evidence.pending.length > 0) {
         try {
@@ -1395,14 +1389,7 @@ function TaskCreateModal({
 
             <div>
               <label style={labelStyle}>Reporter</label>
-              {reporter ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
-                  <AssigneeAvatar profile={reporter} size={24} />
-                  <span style={{ fontSize: 13, color: "var(--color-ink)" }}>{reporter.full_name}</span>
-                </div>
-              ) : (
-                <p style={{ margin: 0, fontSize: 12.5, color: "var(--color-slate2)" }}>—</p>
-              )}
+              <AssigneePicker profiles={profiles} value={createdBy} onChange={setCreatedBy} />
             </div>
 
             <div>
@@ -2404,7 +2391,7 @@ export default function KanbanBoard({
   }
 
   async function handleAddTask(
-    taskData: Omit<Task, "id" | "position" | "created_by">,
+    taskData: Omit<Task, "id" | "position">,
   ): Promise<Task | undefined> {
     const colTasks = tasks
       .filter((t) => t.status === taskData.status)
@@ -2417,7 +2404,7 @@ export default function KanbanBoard({
         ...taskData,
         description: formatTaskDescription(taskData.description),
         position,
-        created_by: currentUserId,
+        created_by: taskData.created_by ?? currentUserId,
       })
       .select()
       .single();
@@ -2443,6 +2430,7 @@ export default function KanbanBoard({
       description: formatTaskDescription(updated.description),
       assignee: updated.assignee?.trim() ? updated.assignee : null,
       due_date: updated.due_date?.trim() ? updated.due_date : null,
+      created_by: updated.created_by?.trim() ? updated.created_by : null,
     };
     const { error } = await supabase
       .from("tasks")
@@ -2455,6 +2443,7 @@ export default function KanbanBoard({
         due_date: normalized.due_date,
         created_at: normalized.created_at,
         assignee: normalized.assignee,
+        created_by: normalized.created_by,
       })
       .eq("id", normalized.id);
 
