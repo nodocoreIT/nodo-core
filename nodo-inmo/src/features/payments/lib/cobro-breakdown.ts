@@ -35,11 +35,11 @@ export function buildCobroBreakdown(
   const commissionAmount =
     commissionAmountFromCaja != null
       ? commissionAmountFromCaja
-      : Math.round(grossAmount * commissionRate) / 100;
+      : Math.round(rentAmount * commissionRate) / 100;
 
   const effectiveRate =
-    grossAmount > 0
-      ? Math.round((commissionAmount / grossAmount) * 10000) / 100
+    rentAmount > 0
+      ? Math.round((commissionAmount / rentAmount) * 10000) / 100
       : commissionRate;
 
   return {

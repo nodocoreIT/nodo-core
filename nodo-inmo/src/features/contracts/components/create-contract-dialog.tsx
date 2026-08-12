@@ -26,7 +26,6 @@ export function CreateContractDialog({
     rent_amount: number;
     currency: string;
     status: string;
-    expenses_amount: number;
   } | null>(null);
 
   useEffect(() => {
@@ -51,7 +50,6 @@ export function CreateContractDialog({
             rent_amount: contract.rent_amount,
             currency: contract.currency,
             status: contract.status,
-            expenses_amount: contract.expenses_amount ?? 0,
           });
         }}
         isPending={isPending}

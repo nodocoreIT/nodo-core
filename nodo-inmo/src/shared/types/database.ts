@@ -305,6 +305,53 @@ export type Database = {
           },
         ]
       }
+      contract_charge_concepts: {
+        Row: {
+          active: boolean
+          contract_id: string
+          created_at: string
+          default_amount: number | null
+          id: string
+          label: string
+          org_id: string
+          retained_by_agency: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          contract_id: string
+          created_at?: string
+          default_amount?: number | null
+          id?: string
+          label: string
+          org_id: string
+          retained_by_agency?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          contract_id?: string
+          created_at?: string
+          default_amount?: number | null
+          id?: string
+          label?: string
+          org_id?: string
+          retained_by_agency?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_charge_concepts_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contracts: {
         Row: {
           adjustment_index: string
@@ -636,6 +683,51 @@ export type Database = {
           },
         ]
       }
+      payment_charges: {
+        Row: {
+          amount: number
+          concept_id: string
+          created_at: string
+          id: string
+          org_id: string
+          payment_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          concept_id: string
+          created_at?: string
+          id?: string
+          org_id: string
+          payment_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          concept_id?: string
+          created_at?: string
+          id?: string
+          org_id?: string
+          payment_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_charges_concept_id_fkey"
+            columns: ["concept_id"]
+            isOneToOne: false
+            referencedRelation: "contract_charge_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_charges_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -829,6 +921,7 @@ export type Database = {
           expense_date: string
           id: string
           org_id: string
+          payment_charge_id: string | null
           property_id: string
           receipt_path: string | null
           type: string
@@ -844,6 +937,7 @@ export type Database = {
           expense_date?: string
           id?: string
           org_id: string
+          payment_charge_id?: string | null
           property_id: string
           receipt_path?: string | null
           type: string
@@ -859,6 +953,7 @@ export type Database = {
           expense_date?: string
           id?: string
           org_id?: string
+          payment_charge_id?: string | null
           property_id?: string
           receipt_path?: string | null
           type?: string
@@ -870,6 +965,13 @@ export type Database = {
             columns: ["applied_settlement_id"]
             isOneToOne: false
             referencedRelation: "owner_settlements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_expenses_payment_charge_id_fkey"
+            columns: ["payment_charge_id"]
+            isOneToOne: false
+            referencedRelation: "payment_charges"
             referencedColumns: ["id"]
           },
           {

@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useScrollToError } from "@/shared/hooks/use-scroll-to-error";
 import { z } from "zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import { Input } from "@nodocore/shared-components";
 import { Textarea } from "@nodocore/shared-components";
@@ -57,7 +57,6 @@ const schema = z.object({
   currency: z.enum(["ARS", "USD"]),
   deposit_amount: z.string().optional(),
   commission_rate: z.string().optional(),
-  expenses_amount: z.string().optional(),
   expenses_paid_by: z.enum(["tenant", "owner"]),
   adjustment_index: z.enum(["IPC", "ICL", "fixed", "USD"]),
   adjustment_period_months: z.string().min(1, "Periodicidad requerida"),
@@ -95,7 +94,18 @@ function commissionRateFromContract(contract?: ContractWithRelations): string {
   return String(rate);
 }
 
-function buildPayload(values: ContractFormValues, guarantorIds: string[]) {
+interface ChargeConceptFormRow {
+  id?: string;
+  label: string;
+  retained_by_agency: boolean;
+  default_amount?: string;
+}
+
+function buildPayload(
+  values: ContractFormValues,
+  guarantorIds: string[],
+  chargeConcepts: ChargeConceptFormRow[],
+) {
   const rent = parseCurrencyInput(values.rent_amount) || 0;
   const rate = Number(values.commission_rate?.replace(",", ".") || 0);
   const commissionAmount =
@@ -110,13 +120,20 @@ function buildPayload(values: ContractFormValues, guarantorIds: string[]) {
     currency: values.currency,
     deposit_amount: parseCurrencyInput(values.deposit_amount),
     commission_amount: commissionAmount,
-    expenses_amount: parseCurrencyInput(values.expenses_amount) ?? 0,
     expenses_paid_by: values.expenses_paid_by,
     adjustment_index: values.adjustment_index,
     adjustment_period_months: Number(values.adjustment_period_months),
     status: values.status,
     notes: values.notes || null,
     guarantor_ids: guarantorIds,
+    charge_concepts: chargeConcepts
+      .filter((cc) => cc.label.trim().length > 0)
+      .map((cc) => ({
+        id: cc.id,
+        label: cc.label.trim(),
+        retained_by_agency: cc.retained_by_agency,
+        default_amount: parseCurrencyInput(cc.default_amount) ?? null,
+      })),
     contract_type: values.contract_type,
     signing_date: values.signing_date || null,
     signing_city: null,
@@ -168,6 +185,23 @@ export function ContractFormDialog({
     contract?.guarantors?.map((g) => g.guarantor_id) ?? [],
   );
 
+  const [chargeConcepts, setChargeConcepts] = useState<ChargeConceptFormRow[]>(
+    contract?.charge_concepts
+      ? contract.charge_concepts.map((cc) => ({
+          id: cc.id,
+          label: cc.label,
+          retained_by_agency: cc.retained_by_agency,
+          default_amount: formatCurrencyInput(
+            cc.default_amount,
+            (contract?.currency as any) ?? "ARS",
+          ),
+        }))
+      : // New contract: seed "Expensas" as the first concept by default — it's
+        // the most common one and tends to be a fixed monthly amount, unlike
+        // Municipal/Gas/Luz. Still editable/removable like any other row.
+        [{ label: "Expensas", retained_by_agency: false, default_amount: "" }],
+  );
+
   const form = useForm<ContractFormValues>({
     resolver: zodResolver(schema) as any,
     defaultValues: {
@@ -179,10 +213,6 @@ export function ContractFormDialog({
       currency: (contract?.currency as any) ?? "ARS",
       deposit_amount: formatCurrencyInput(contract?.deposit_amount, contract?.currency as any ?? "ARS"),
       commission_rate: commissionRateFromContract(contract),
-      expenses_amount: formatCurrencyInput(
-        (contract as { expenses_amount?: number | null } | undefined)?.expenses_amount,
-        (contract?.currency as any) ?? "ARS",
-      ),
       expenses_paid_by: (contract?.expenses_paid_by as any) ?? "tenant",
       adjustment_index: (contract?.adjustment_index as any) ?? "IPC",
       adjustment_period_months: toStr(contract?.adjustment_period_months) || "12",
@@ -231,7 +261,6 @@ export function ContractFormDialog({
     if (prevCurrencyRef.current !== currency) {
       const rent = form.getValues("rent_amount");
       const deposit = form.getValues("deposit_amount");
-      const expenses = form.getValues("expenses_amount");
 
       if (rent) {
         form.setValue("rent_amount", formatCurrencyInput(rent.replace(/\D/g, ""), currency));
@@ -239,12 +268,13 @@ export function ContractFormDialog({
       if (deposit) {
         form.setValue("deposit_amount", formatCurrencyInput(deposit.replace(/\D/g, ""), currency));
       }
-      if (expenses) {
-        form.setValue(
-          "expenses_amount",
-          formatCurrencyInput(expenses.replace(/\D/g, ""), currency),
-        );
-      }
+      setChargeConcepts((prev) =>
+        prev.map((cc) =>
+          cc.default_amount
+            ? { ...cc, default_amount: formatCurrencyInput(cc.default_amount.replace(/\D/g, ""), currency) }
+            : cc,
+        ),
+      );
       prevCurrencyRef.current = currency;
     }
   }, [currency, form]);
@@ -273,11 +303,44 @@ export function ContractFormDialog({
     );
   }
 
+  function addChargeConcept() {
+    setChargeConcepts((prev) => [...prev, { label: "", retained_by_agency: false }]);
+  }
+
+  function updateChargeConceptLabel(index: number, label: string) {
+    setChargeConcepts((prev) =>
+      prev.map((cc, i) => (i === index ? { ...cc, label } : cc)),
+    );
+  }
+
+  function toggleChargeConceptRetained(index: number) {
+    setChargeConcepts((prev) =>
+      prev.map((cc, i) =>
+        i === index ? { ...cc, retained_by_agency: !cc.retained_by_agency } : cc,
+      ),
+    );
+  }
+
+  function updateChargeConceptDefaultAmount(index: number, raw: string) {
+    setChargeConcepts((prev) =>
+      prev.map((cc, i) => {
+        if (i !== index) return cc;
+        const digits = raw.replace(/\D/g, "");
+        return { ...cc, default_amount: digits ? formatCurrencyInput(digits, currency) : "" };
+      }),
+    );
+  }
+
+  function removeChargeConcept(index: number) {
+    setChargeConcepts((prev) => prev.filter((_, i) => i !== index));
+  }
+
   async function handleSubmit(values: ContractFormValues) {
-    await onSubmit(buildPayload(values, guarantorIds));
+    await onSubmit(buildPayload(values, guarantorIds, chargeConcepts));
     if (!isEdit) {
       form.reset();
       setGuarantorIds([]);
+      setChargeConcepts([]);
       propertyChangedRef.current = false;
     }
     onSuccess?.();
@@ -622,53 +685,7 @@ export function ContractFormDialog({
               />
             </div>
 
-            {/* Expenses + status */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control as any}
-                name="expenses_paid_by"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel htmlFor="expenses-trigger">Expensas a cargo de</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger id="expenses-trigger" aria-label="Expensas a cargo de">
-                          <SelectValue placeholder="Inquilino" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className={SELECT_IN_DIALOG_CLASS}>
-                        <SelectItem value="tenant">Inquilino</SelectItem>
-                        <SelectItem value="owner">Propietario</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control as any}
-                name="expenses_amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel htmlFor="expenses-amount-input">Valor de expensas</FormLabel>
-                    <FormControl>
-                      <Input
-                        id="expenses-amount-input"
-                        aria-label="Valor de expensas"
-                        type="text"
-                        placeholder={currency === "ARS" ? "$ 0" : "US$ 0"}
-                        value={field.value}
-                        onChange={(e) => {
-                          const raw = e.target.value.replace(/\D/g, "");
-                          field.onChange(formatCurrencyInput(raw, currency));
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+          
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -810,6 +827,74 @@ export function ContractFormDialog({
                   </Label>
                 </div>
               ))}
+            </fieldset>
+
+            {/* Charge concepts (impuestos y conceptos adicionales) */}
+            <fieldset className="flex flex-col gap-2">
+              <legend className="text-sm font-medium">Impuestos y conceptos adicionales</legend>
+              <p className="text-xs text-slate2">
+                Conceptos que se cobran junto al alquiler (ej. Expensas, Municipal, Gas). El
+                &quot;Valor&quot; es opcional — si lo cargás, precarga ese monto en cada cuota
+                generada (útil para conceptos fijos como Expensas); si lo dejás vacío, se carga a
+                mano en cada cobro. Si &quot;la retiene la inmobiliaria&quot; está tildado, el
+                monto cobrado se descuenta automáticamente al rendir al propietario.
+              </p>
+              {chargeConcepts.length === 0 && (
+                <p className="text-xs text-slate2">No hay conceptos adicionales configurados.</p>
+              )}
+              {chargeConcepts.map((cc, index) => (
+                <div key={cc.id ?? `new-${index}`} className="flex items-center gap-2">
+                  <Input
+                    aria-label={`Concepto ${index + 1}`}
+                    placeholder="Ej. Municipal"
+                    value={cc.label}
+                    onChange={(e) => updateChargeConceptLabel(index, e.target.value)}
+                    className="flex-1"
+                  />
+                  <Input
+                    aria-label={`Valor de ${cc.label || `concepto ${index + 1}`}`}
+                    placeholder={currency === "ARS" ? "$ 0 (opcional)" : "US$ 0 (opcional)"}
+                    value={cc.default_amount ?? ""}
+                    onChange={(e) => updateChargeConceptDefaultAmount(index, e.target.value)}
+                    className="w-30"
+                  />
+                  <div className="flex items-center gap-1.5 whitespace-nowrap">
+                    <input
+                      id={`charge-concept-retained-${index}`}
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-mist text-brand"
+                      checked={cc.retained_by_agency}
+                      onChange={() => toggleChargeConceptRetained(index)}
+                    />
+                    <Label
+                      htmlFor={`charge-concept-retained-${index}`}
+                      className="font-normal text-xs"
+                    >
+                      La retiene la inmobiliaria
+                    </Label>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Quitar concepto ${index + 1}`}
+                    title="Quitar"
+                    onClick={() => removeChargeConcept(index)}
+                    className="shrink-0 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="self-start"
+                onClick={addChargeConcept}
+              >
+                Agregar concepto
+              </Button>
             </fieldset>
 
             {/* Notes */}

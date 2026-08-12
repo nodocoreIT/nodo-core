@@ -40,13 +40,19 @@ describe("resolveCommissionRatePercent", () => {
 });
 
 describe("buildCobroBreakdown", () => {
-  it("computes commission on rent + expenses", () => {
-    const result = buildCobroBreakdown(samplePayment(), 49000);
+  it("computes commission on rent only, never on expenses", () => {
+    const result = buildCobroBreakdown(samplePayment(), 44000);
     expect(result.rentAmount).toBe(440000);
     expect(result.expensesAmount).toBe(50000);
     expect(result.grossAmount).toBe(490000);
-    expect(result.commissionAmount).toBe(49000);
+    expect(result.commissionAmount).toBe(44000);
     expect(result.commissionRate).toBe(10);
-    expect(result.ownerShare).toBe(441000);
+    expect(result.ownerShare).toBe(446000);
+  });
+
+  it("falls back to rent × rate when no commissionAmountFromCaja is given", () => {
+    const result = buildCobroBreakdown(samplePayment(), null);
+    expect(result.commissionAmount).toBe(44000);
+    expect(result.ownerShare).toBe(446000);
   });
 });

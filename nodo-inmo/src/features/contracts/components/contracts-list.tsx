@@ -64,7 +64,6 @@ export function ContractsList() {
     rent_amount: number;
     currency: string;
     status: string;
-    expenses_amount: number;
   } | null>(null);
   const [page, setPage] = useState(0);
   const [sortConfig, setSortConfig] = useState<{
@@ -406,7 +405,6 @@ export function ContractsList() {
               rent_amount: payload.rent_amount,
               currency: payload.currency,
               status: payload.status,
-              expenses_amount: payload.expenses_amount ?? 0,
             });
           }}
           isPending={updateContract.isPending}
@@ -417,6 +415,7 @@ export function ContractsList() {
         open={!!generateForContract}
         contract={generateForContract}
         onClose={() => setGenerateForContract(null)}
+        isEdit
       />
 
       {/* PDF viewer dialog */}

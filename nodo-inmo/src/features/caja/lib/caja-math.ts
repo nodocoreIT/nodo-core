@@ -109,6 +109,55 @@ export function groupPendingByProperty(settlements: any[]): PropertyGroup[] {
   return Array.from(map.values());
 }
 
+export interface OwnerPropertyGroup {
+  owner_id: string;
+  owner_name: string;
+  currency: string;
+  /** Net owner share before property-expense deductions, summed across properties. */
+  total: number;
+  gross_collected: number;
+  commission: number;
+  settlement_ids: string[];
+  properties: PropertyGroup[];
+}
+
+/**
+ * Group PENDING settlements by owner (and currency), retaining a per-property
+ * breakdown so the UI can show one row per owner while the PDF can still list
+ * each property. Built on top of groupPendingByProperty.
+ */
+export function groupPendingByOwnerWithProperties(
+  settlements: any[],
+): OwnerPropertyGroup[] {
+  const propertyGroups = groupPendingByProperty(settlements);
+  const map = new Map<string, OwnerPropertyGroup>();
+
+  for (const p of propertyGroups) {
+    const key = `${p.owner_id}:${p.currency}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.total += p.total;
+      existing.gross_collected += p.gross_collected;
+      existing.commission += p.commission;
+      existing.settlement_ids.push(...p.settlement_ids);
+      existing.properties.push(p);
+    } else {
+      map.set(key, {
+        owner_id: p.owner_id,
+        owner_name: p.owner_name,
+        currency: p.currency,
+        total: p.total,
+        gross_collected: p.gross_collected,
+        commission: p.commission,
+        settlement_ids: [...p.settlement_ids],
+        properties: [p],
+      });
+    }
+  }
+
+  return Array.from(map.values());
+}
+
 export interface OwnerGroup {
   owner_id: string;
   owner_name: string;
@@ -163,6 +212,11 @@ export interface BreakdownDeduction {
   type: string;
 }
 
+export interface BreakdownCharge {
+  label: string;
+  amount: number;
+}
+
 export interface SettlementBreakdown {
   gross: number;
   rent_gross?: number;
@@ -171,6 +225,10 @@ export interface SettlementBreakdown {
   commission: number;
   /** gross - commission; the owner's share before expense deductions */
   owner_share: number;
+  /** rent_gross - commission; declared at the end of the statement, after all charge/deduction rows */
+  rent_net_of_commission: number;
+  /** Non-retained contract charge concepts (e.g. Expensas), summed by label — pass through to the owner in full. */
+  charges: BreakdownCharge[];
   deductions: BreakdownDeduction[];
   /** sum of all deduction amounts */
   deduction_total: number;
@@ -193,6 +251,12 @@ export function computeSettlementBreakdown(
   expenses: { id: string; amount: number; currency: string; expense_date: string; description: string; type: string }[],
   commissionRate: number,
   currency: string,
+  paymentCharges: {
+    payment_id: string;
+    concept_label: string;
+    retained_by_agency: boolean;
+    amount: number;
+  }[] = [],
 ): SettlementBreakdown {
   const paymentIds = new Set(payments.map((p) => p.id));
 
@@ -208,6 +272,19 @@ export function computeSettlementBreakdown(
     .filter((cm) => paymentIds.has(cm.payment_id))
     .reduce((sum, cm) => sum + cm.amount, 0);
 
+  // Non-retained concepts pass through to the owner in full — summed by
+  // label, mirroring the SQL's `group by cc.label`. Retained concepts are
+  // NOT included here: they already show up in `deductions` (via the
+  // property_expenses row the sync trigger generates for them).
+  const chargesByLabel = new Map<string, number>();
+  for (const pc of paymentCharges) {
+    if (!paymentIds.has(pc.payment_id) || pc.retained_by_agency || pc.amount <= 0) continue;
+    chargesByLabel.set(pc.concept_label, (chargesByLabel.get(pc.concept_label) ?? 0) + pc.amount);
+  }
+  const charges: BreakdownCharge[] = Array.from(chargesByLabel.entries())
+    .map(([label, amount]) => ({ label, amount }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
   // deductions = chargeable expenses matching this currency
   const deductions: BreakdownDeduction[] = expenses
     .filter((e) => e.currency === currency)
@@ -219,7 +296,23 @@ export function computeSettlementBreakdown(
       type: e.type,
     }));
 
+  // Reconcile: expensesGross (payments.expenses_amount) should always equal
+  // charges + retained-concept deductions. If it doesn't — e.g. a pending
+  // installment generated before a concept existed on its contract, so it
+  // never got a matching payment_charges row — the gap would otherwise be
+  // silently invisible even though it's still counted in gross/net. Surface
+  // it as a generic line so the statement always explains 100% of the money.
+  const retainedConceptTotal = deductions
+    .filter((d) => d.type === "concepto_contrato")
+    .reduce((sum, d) => sum + d.amount, 0);
+  const chargesTotal = charges.reduce((sum, c) => sum + c.amount, 0);
+  const untracked = parseFloat((expensesGross - chargesTotal - retainedConceptTotal).toFixed(2));
+  if (untracked > 0.01) {
+    charges.push({ label: "Expensas / Otros (sin discriminar)", amount: untracked });
+  }
+
   const ownerShare = gross - commission;
+  const rentNetOfCommission = rentGross - commission;
   const deductionTotal = deductions.reduce((sum, d) => sum + d.amount, 0);
   const net = parseFloat((ownerShare - deductionTotal).toFixed(2));
 
@@ -230,6 +323,8 @@ export function computeSettlementBreakdown(
     commission_rate: commissionRate,
     commission,
     owner_share: ownerShare,
+    rent_net_of_commission: rentNetOfCommission,
+    charges,
     deductions,
     deduction_total: deductionTotal,
     net,

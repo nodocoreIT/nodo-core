@@ -1,10 +1,12 @@
 import { supabase } from "@/shared/lib/supabase";
 import {
   computeSettlementBreakdown,
+  type OwnerPropertyGroup,
   type PropertyGroup,
 } from "@/features/caja/lib/caja-math";
 import {
   buildStatementData,
+  combineSealedBreakdowns,
   type SealedBreakdown,
   type StatementData,
 } from "@/features/caja/lib/settlement-statement-data";
@@ -12,15 +14,13 @@ import type { OrgProfileRow } from "@/features/agency-profile/hooks/use-org-prof
 import type { SettlementWithOwner } from "@/features/caja/hooks/use-owner-settlements";
 
 /**
- * Build a projected statement for pending settlements (pre-finalizar).
+ * Project the pending breakdown for a single property (pre-finalizar).
  * Uses computeSettlementBreakdown — display only, not the sealed snapshot.
  */
-export async function buildPendingStatementData(
+async function computePendingPropertyBreakdown(
   group: PropertyGroup,
   settlements: SettlementWithOwner[],
-  agency: OrgProfileRow | null,
-  logoUrl: string | null,
-): Promise<StatementData> {
+): Promise<SealedBreakdown> {
   const batch = settlements.filter(
     (s) =>
       s.status === "pending" &&
@@ -62,6 +62,14 @@ export async function buildPendingStatementData(
 
   const ownerExpenses = expenses ?? [];
 
+  const { data: charges, error: chargesError } = await supabase
+    .schema("nodo_inmo")
+    .from("payment_charges")
+    .select("payment_id, amount, concept:contract_charge_concepts(label, retained_by_agency)")
+    .in("payment_id", paymentIds);
+
+  if (chargesError) throw chargesError;
+
   const breakdown = computeSettlementBreakdown(
     (payments ?? []).map((p) => ({
       id: p.id,
@@ -82,11 +90,22 @@ export async function buildPendingStatementData(
     })),
     0,
     group.currency,
+    (charges ?? [])
+      .filter((c) => c.concept)
+      .map((c) => ({
+        payment_id: c.payment_id,
+        concept_label: (c.concept as unknown as { label: string }).label,
+        retained_by_agency: (c.concept as unknown as { retained_by_agency: boolean })
+          .retained_by_agency,
+        amount: c.amount,
+      })),
   );
 
+  // Commission is computed on rent only (never on gross) — the displayed
+  // rate must divide by rent_gross too, or it understates the real %.
   const effectiveRate =
-    breakdown.gross > 0
-      ? Math.round((breakdown.commission / breakdown.gross) * 10000) / 100
+    breakdown.rent_gross && breakdown.rent_gross > 0
+      ? Math.round((breakdown.commission / breakdown.rent_gross) * 10000) / 100
       : 0;
 
   const cobros_detail = (payments ?? [])
@@ -104,16 +123,37 @@ export async function buildPendingStatementData(
       };
     });
 
-  const sealedLike: SealedBreakdown = {
+  return {
     ...breakdown,
     commission_rate: effectiveRate,
     currency: group.currency,
     cobro_count: batch.length,
     cobros_detail,
   };
+}
+
+/**
+ * Build a projected statement for all pending settlements of an owner
+ * (pre-finalizar), combining every property's breakdown into one PDF.
+ */
+export async function buildPendingStatementDataForOwner(
+  group: OwnerPropertyGroup,
+  settlements: SettlementWithOwner[],
+  agency: OrgProfileRow | null,
+  logoUrl: string | null,
+): Promise<StatementData> {
+  const perProperty = await Promise.all(
+    group.properties.map(async (property) => ({
+      property_id: property.property_id,
+      property_address: property.property_address,
+      breakdown: await computePendingPropertyBreakdown(property, settlements),
+    })),
+  );
+
+  const breakdown = combineSealedBreakdowns(perProperty);
 
   return buildStatementData({
-    breakdown: sealedLike,
+    breakdown,
     agency,
     logoUrl,
     ownerName: group.owner_name,

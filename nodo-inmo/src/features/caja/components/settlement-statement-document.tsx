@@ -12,7 +12,7 @@
  */
 
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
-import type { StatementData } from "@/features/caja/lib/settlement-statement-data";
+import type { SealedBreakdown, StatementData } from "@/features/caja/lib/settlement-statement-data";
 import { administracionInmobiliariaLabel } from "@/features/caja/lib/settlement-labels";
 import { formatDate } from "@/features/contracts/lib/contract-labels";
 
@@ -70,6 +70,14 @@ const styles = StyleSheet.create({
       fontSize: 10,
       color: "#475569",
       marginBottom: 2,
+    },
+    // Property section heading (multi-property statements)
+    propertyHeading: {
+      fontSize: 11,
+      fontFamily: "Helvetica-Bold",
+      color: "#000000",
+      marginTop: 16,
+      marginBottom: 4,
     },
     // Table
     table: {
@@ -132,6 +140,12 @@ const styles = StyleSheet.create({
       textAlign: "right",
       minWidth: 100,
     },
+    cellAmountNegative: {
+      fontSize: 10,
+      color: "#dc2626",
+      textAlign: "right",
+      minWidth: 100,
+    },
     cellAmountBold: {
       fontSize: 11,
       fontFamily: "Helvetica-Bold",
@@ -141,7 +155,7 @@ const styles = StyleSheet.create({
     },
     cellAmountDeduction: {
       fontSize: 9,
-      color: "#64748b",
+      color: "#dc2626",
       textAlign: "right",
       minWidth: 100,
     },
@@ -173,6 +187,79 @@ function fmtAmount(amount: number, currency: string): string {
     maximumFractionDigits: 2,
   });
   return `${symbol}${formatted} ${currency}`;
+}
+
+// ─── Breakdown table ────────────────────────────────────────────────────────
+//
+// One section per property: rent, commission (with that property's own
+// rate), then its own charge/deduction concepts, signed (non-retained add,
+// retained/manual deduct). No subtotal row here — there's exactly one final
+// total for the whole statement, rendered once after every section.
+
+function PropertySection({
+  breakdown,
+  currency,
+  heading,
+}: {
+  breakdown: SealedBreakdown;
+  currency: string;
+  heading?: string;
+}) {
+  return (
+    <>
+      {heading ? <Text style={styles.propertyHeading}>{heading}</Text> : null}
+      <View style={styles.table}>
+        {(breakdown.rent_gross ?? breakdown.gross) > 0 ? (
+          <View style={styles.tableRow}>
+            <Text style={styles.cellLabel}>Alquiler cobrado</Text>
+            <Text style={styles.cellAmount}>
+              {fmtAmount(breakdown.rent_gross ?? breakdown.gross, currency)}
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={styles.tableRow}>
+          <Text style={styles.cellLabel}>
+            {administracionInmobiliariaLabel(breakdown.commission_rate)}
+          </Text>
+          <Text style={styles.cellAmountNegative}>
+            - {fmtAmount(breakdown.commission, currency)}
+          </Text>
+        </View>
+
+        {/* Non-retained concepts (e.g. Expensas) — pass through to the owner in full */}
+        {breakdown.charges.map((c, i) => (
+          <View key={i} style={styles.tableRow}>
+            <Text style={styles.cellLabel}>{c.label}</Text>
+            <Text style={styles.cellAmount}>{fmtAmount(c.amount, currency)}</Text>
+          </View>
+        ))}
+
+        {/* Retained concepts + manual property expenses — deducted from the owner */}
+        {breakdown.deductions.map((d, i) => (
+          <View key={d.id ?? i} style={styles.tableRowDeduction}>
+            <Text style={styles.cellLabelDeduction}>
+              {d.description} ({formatDate(d.expense_date)})
+            </Text>
+            <Text style={styles.cellAmountDeduction}>
+              - {fmtAmount(d.amount, currency)}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </>
+  );
+}
+
+function NetTotalRow({ net, currency }: { net: number; currency: string }) {
+  return (
+    <View style={styles.table}>
+      <View style={styles.tableRowTotal}>
+        <Text style={styles.cellLabelBold}>SALDO NETO A PERCIBIR</Text>
+        <Text style={styles.cellAmountBold}>{fmtAmount(net, currency)}</Text>
+      </View>
+    </View>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -240,101 +327,20 @@ export function SettlementStatementDocument(props: StatementData) {
           </Text>
         </View>
 
-        {/* ── Breakdown table ─────────────────────────────────────────────── */}
-        <View style={styles.table}>
-          {/* Per-period detail (version 2+) */}
-          {breakdown.cobros_detail && breakdown.cobros_detail.length > 0 ? (
-            breakdown.cobros_detail.map((cobro, i) => (
-              <View key={i} style={styles.tableRow}>
-                <Text style={styles.cellLabel}>
-                  Cobro {cobro.period_label} — Alquiler{cobro.expenses_amount > 0 ? ` + Expensas` : ""}
-                </Text>
-                <Text style={styles.cellAmount}>
-                  {fmtAmount(cobro.amount + cobro.expenses_amount, currency)}
-                </Text>
-              </View>
-            ))
-          ) : (
-            <>
-              {(breakdown.rent_gross ?? breakdown.gross) > 0 ? (
-                <View style={styles.tableRow}>
-                  <Text style={styles.cellLabel}>Alquileres cobrados</Text>
-                  <Text style={styles.cellAmount}>
-                    {fmtAmount(breakdown.rent_gross ?? breakdown.gross, currency)}
-                  </Text>
-                </View>
-              ) : null}
-
-              {(breakdown.expenses_gross ?? 0) > 0 ? (
-                <View style={styles.tableRow}>
-                  <Text style={styles.cellLabel}>Expensas / Otros cobrados</Text>
-                  <Text style={styles.cellAmount}>
-                    {fmtAmount(breakdown.expenses_gross ?? 0, currency)}
-                  </Text>
-                </View>
-              ) : null}
-            </>
-          )}
-
-          {/* Row 1: Gross */}
-          <View style={styles.tableRow}>
-            <Text style={styles.cellLabelBold}>Bruto cobrado (total)</Text>
-            <Text style={styles.cellAmount}>
-              {fmtAmount(breakdown.gross, currency)}
-            </Text>
-          </View>
-
-          {/* Row 2: Agency administration fee */}
-          <View style={styles.tableRow}>
-            <Text style={styles.cellLabel}>
-              {administracionInmobiliariaLabel(breakdown.commission_rate)}
-            </Text>
-            <Text style={styles.cellAmount}>
-              − {fmtAmount(breakdown.commission, currency)}
-            </Text>
-          </View>
-
-          {/* Row 3: Owner share subtotal */}
-          <View style={styles.tableRow}>
-            <Text style={styles.cellLabel}>Subtotal propietario</Text>
-            <Text style={styles.cellAmount}>
-              {fmtAmount(breakdown.owner_share, currency)}
-            </Text>
-          </View>
-
-          {/* Deductions */}
-          {breakdown.deductions.map((d, i) => (
-            <View
-              key={d.id ?? i}
-              style={styles.tableRowDeduction}
-            >
-              <Text style={styles.cellLabelDeduction}>
-                {d.description} ({formatDate(d.expense_date)})
-              </Text>
-              <Text style={styles.cellAmountDeduction}>
-                − {fmtAmount(d.amount, currency)}
-              </Text>
-            </View>
-          ))}
-
-          {/* Deduction total (only if there are deductions) */}
-          {breakdown.deductions.length > 0 && (
-            <View style={styles.tableRow}>
-              <Text style={styles.cellLabel}>Total deducciones</Text>
-              <Text style={styles.cellAmount}>
-                − {fmtAmount(breakdown.deduction_total, currency)}
-              </Text>
-            </View>
-          )}
-
-          {/* Net total (bold, highlighted) */}
-          <View style={styles.tableRowTotal}>
-            <Text style={styles.cellLabelBold}>SALDO NETO A PERCIBIR</Text>
-            <Text style={styles.cellAmountBold}>
-              {fmtAmount(breakdown.net, currency)}
-            </Text>
-          </View>
-        </View>
+        {/* ── Breakdown ────────────────────────────────────────────────────── */}
+        {breakdown.properties_detail && breakdown.properties_detail.length > 1 ? (
+          breakdown.properties_detail.map((p) => (
+            <PropertySection
+              key={p.property_id}
+              breakdown={p.breakdown}
+              currency={currency}
+              heading={p.property_address}
+            />
+          ))
+        ) : (
+          <PropertySection breakdown={breakdown} currency={currency} />
+        )}
+        <NetTotalRow net={breakdown.net} currency={currency} />
 
         {/* ── Footer ─────────────────────────────────────────────────────── */}
         <View style={styles.footer}>

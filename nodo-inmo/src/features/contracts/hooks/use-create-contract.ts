@@ -6,9 +6,17 @@ import { CONTRACTS_QUERY_KEY } from "./use-contracts";
 
 type ContractInsert = Database["nodo_inmo"]["Tables"]["contracts"]["Insert"];
 
+export interface ChargeConceptInput {
+  label: string;
+  retained_by_agency: boolean;
+  default_amount?: number | null;
+}
+
 export type CreateContractInput = Omit<ContractInsert, "org_id"> & {
   /** Contact ids playing the guarantor role on this contract. */
   guarantor_ids?: string[];
+  /** Charge concepts to create for this contract (e.g. "Municipal", "Expensas"). */
+  charge_concepts?: ChargeConceptInput[];
 };
 
 export function useCreateContract() {
@@ -16,7 +24,11 @@ export function useCreateContract() {
   const { orgId } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ guarantor_ids = [], ...fields }: CreateContractInput) => {
+    mutationFn: async ({
+      guarantor_ids = [],
+      charge_concepts = [],
+      ...fields
+    }: CreateContractInput) => {
       if (!orgId) throw new Error("No org_id — user not fully provisioned");
 
       const { data: contract, error } = await supabase
@@ -41,6 +53,24 @@ export function useCreateContract() {
           .insert(links);
 
         if (linkError) throw linkError;
+      }
+
+      if (charge_concepts.length > 0) {
+        const concepts = charge_concepts.map((cc, index) => ({
+          org_id: orgId,
+          contract_id: contract.id,
+          label: cc.label,
+          retained_by_agency: cc.retained_by_agency,
+          default_amount: cc.default_amount ?? null,
+          sort_order: index,
+        }));
+
+        const { error: conceptsError } = await supabase
+          .schema("nodo_inmo")
+          .from("contract_charge_concepts")
+          .insert(concepts);
+
+        if (conceptsError) throw conceptsError;
       }
 
       return contract;

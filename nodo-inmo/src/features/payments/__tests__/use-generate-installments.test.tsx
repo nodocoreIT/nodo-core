@@ -8,6 +8,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const mockUpsert = vi.fn();
+const mockUpdateEq2 = vi.fn();
+const mockUpdateEq1 = vi.fn();
+const mockUpdate = vi.fn();
 const mockFrom = vi.fn();
 const mockSchema = vi.fn();
 
@@ -36,7 +39,11 @@ describe("useGenerateInstallments", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUpsert.mockResolvedValue({ error: null });
-    mockFrom.mockReturnValue({ upsert: mockUpsert });
+    // .update({...}).eq("contract_id", ...).eq("status", "pending") — pending-rent-sync chain.
+    mockUpdateEq2.mockResolvedValue({ error: null });
+    mockUpdateEq1.mockReturnValue({ eq: mockUpdateEq2 });
+    mockUpdate.mockReturnValue({ eq: mockUpdateEq1 });
+    mockFrom.mockReturnValue({ upsert: mockUpsert, update: mockUpdate });
     mockSchema.mockReturnValue({ from: mockFrom });
   });
 
