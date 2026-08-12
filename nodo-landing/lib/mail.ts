@@ -1,5 +1,6 @@
 import "server-only";
 import nodemailer from "nodemailer";
+import type { TaskNotificationType } from "@/lib/panel/task-notification-copy";
 
 // Zoho SMTP transport. Credentials live in env vars so they never ship to the
 // client. Host/port default to Zoho's standard SSL endpoint.
@@ -860,5 +861,61 @@ export async function sendPausedNodeAccessEmail({
         </div>
       </div>
     `,
+  });
+}
+
+/** Escapes user-controlled text (task titles, profile names) before it lands in an HTML email body. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Sent by the send-task-notification-emails cron for unsent nodo_core.task_notifications rows. */
+const TASK_NOTIFICATION_SUBJECT_PREFIX: Record<TaskNotificationType, string> = {
+  status_changed: "Cambio de estado",
+  reassigned: "Tarea reasignada",
+  mentioned: "Te mencionaron",
+};
+
+export async function sendTaskNotificationEmail({
+  to,
+  taskId,
+  taskTitle,
+  type,
+  description,
+  origin,
+}: {
+  to: string;
+  taskId: string;
+  taskTitle: string;
+  type: TaskNotificationType;
+  /** Already-formatted copy, same text shown in the in-app bell (see use-panel-notifications.ts). */
+  description: string;
+  origin: string;
+}): Promise<void> {
+  const transporter = createTransporter();
+  const panelUrl = `${origin}/panel/tareas?task=${taskId}`;
+  const subjectPrefix = TASK_NOTIFICATION_SUBJECT_PREFIX[type];
+  const theme = resolveNodeBrand("");
+
+  await transporter.sendMail({
+    from: `"NODO Core · Panel" <${USER}>`,
+    to,
+    subject: `${subjectPrefix}: ${taskTitle}`,
+    text: `${description}\n\nVer en el panel: ${panelUrl}`,
+    html: renderNodoEmailShell({
+      brandColor: theme.brand,
+      buttonText: theme.buttonText,
+      linkColor: theme.linkColor,
+      title: subjectPrefix,
+      bodyHtml: `<p style="margin:0;">${escapeHtml(description)}</p>`,
+      ctaLabel: "Ver en el panel",
+      ctaUrl: panelUrl,
+      footerNote: "Recibís este correo porque sos parte de una tarea en el panel de NODO Core.",
+    }),
   });
 }

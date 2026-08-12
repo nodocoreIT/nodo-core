@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ImagePlus, Loader2, MessageSquareText, Play, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, ImagePlus, Loader2, MessageSquareText, Play, Trash2, X } from "lucide-react";
+import { foldForSearch } from "@nodocore/shared-components";
 import {
   ALLOWED_EVIDENCE_MIME,
   createTaskComment,
@@ -14,6 +15,18 @@ function isVideoMime(mime: string): boolean {
   return mime.startsWith("video/");
 }
 
+/** Single alnum token, no spaces — matches what nodo_core.notify_comment_mentions() can parse out of @word. */
+function firstNameToken(fullName: string): string {
+  return fullName.trim().split(/\s+/)[0] ?? fullName;
+}
+
+/** Active "@partial" right before the cursor, or null if the cursor isn't inside one. */
+function detectMentionQuery(value: string, cursorPos: number): string | null {
+  const upToCursor = value.slice(0, cursorPos);
+  const match = upToCursor.match(/(?:^|\s)@(\w*)$/);
+  return match ? match[1] : null;
+}
+
 type ProfileLite = {
   id: string;
   full_name: string;
@@ -21,6 +34,29 @@ type ProfileLite = {
   color: string;
   avatar_url?: string | null;
 };
+
+/**
+ * Bolds @mentions that actually resolve to a team member, same
+ * case-insensitive prefix match nodo_core.notify_comment_mentions() uses
+ * against profiles.full_name, so what's highlighted here is exactly what
+ * triggered a notification — not just anything starting with "@".
+ */
+function renderCommentBody(body: string, profiles: ProfileLite[]): React.ReactNode {
+  return body.split(/(@\w+)/g).map((part, i) => {
+    if (part.startsWith("@")) {
+      const name = part.slice(1).toLowerCase();
+      const isMention = profiles.some((p) => p.full_name.toLowerCase().startsWith(name));
+      if (isMention) {
+        return (
+          <span key={i} style={{ color: "var(--color-brand)", fontWeight: 700 }}>
+            {part}
+          </span>
+        );
+      }
+    }
+    return part;
+  });
+}
 
 function formatCommentDate(iso: string): string {
   const d = new Date(iso);
@@ -98,8 +134,86 @@ export function TaskCommentsSection({
   const [body, setBody] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [lightbox, setLightbox] = useState<{ url: string; mimeType: string } | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const composeRef = useRef<HTMLTextAreaElement>(null);
+
+  const mentionSuggestions = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const query = foldForSearch(mentionQuery);
+    return profiles.filter((p) => foldForSearch(p.full_name).includes(query)).slice(0, 6);
+  }, [mentionQuery, profiles]);
+
+  function handleBodyChange(value: string, cursorPos: number) {
+    setBody(value);
+    setMentionQuery(detectMentionQuery(value, cursorPos));
+    setMentionIndex(0);
+  }
+
+  function selectMention(profile: ProfileLite) {
+    const textarea = composeRef.current;
+    const cursorPos = textarea?.selectionStart ?? body.length;
+    const upToCursor = body.slice(0, cursorPos);
+    const afterCursor = body.slice(cursorPos);
+    const replaced = upToCursor.replace(/@(\w*)$/, `@${firstNameToken(profile.full_name)} `);
+    const nextValue = replaced + afterCursor;
+    setBody(nextValue);
+    setMentionQuery(null);
+    requestAnimationFrame(() => {
+      textarea?.focus();
+      textarea?.setSelectionRange(replaced.length, replaced.length);
+    });
+  }
+
+  function handleComposeKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (mentionQuery === null || mentionSuggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setMentionIndex((i) => (i + 1) % mentionSuggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setMentionIndex((i) => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length);
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      selectMention(mentionSuggestions[mentionIndex]);
+    } else if (e.key === "Escape") {
+      setMentionQuery(null);
+    }
+  }
+
+  // Flattened, chronological across every comment on this task — lets the
+  // lightbox act as one carousel over all evidence, not just the comment
+  // the viewer happened to click into.
+  const allAttachments = useMemo(
+    () =>
+      comments.flatMap((c) =>
+        c.attachments
+          .filter((a) => a.signedUrl)
+          .map((a) => ({ url: a.signedUrl!, mimeType: a.mimeType, fileName: a.fileName })),
+      ),
+    [comments],
+  );
+  const lightbox = lightboxIndex !== null ? allAttachments[lightboxIndex] ?? null : null;
+
+  const showPrev = useCallback(() => {
+    setLightboxIndex((i) => (i === null ? i : (i - 1 + allAttachments.length) % allAttachments.length));
+  }, [allAttachments.length]);
+  const showNext = useCallback(() => {
+    setLightboxIndex((i) => (i === null ? i : (i + 1) % allAttachments.length));
+  }, [allAttachments.length]);
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setLightboxIndex(null);
+      if (e.key === "ArrowLeft") showPrev();
+      if (e.key === "ArrowRight") showNext();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [lightboxIndex, showPrev, showNext]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -176,6 +290,7 @@ export function TaskCommentsSection({
       });
       setComments((prev) => [...prev, created]);
       setBody("");
+      setMentionQuery(null);
       for (const f of pendingFiles) URL.revokeObjectURL(f.previewUrl);
       setPendingFiles([]);
     } catch (err) {
@@ -310,7 +425,7 @@ export function TaskCommentsSection({
                     lineHeight: 1.45,
                   }}
                 >
-                  {comment.body}
+                  {renderCommentBody(comment.body, profiles)}
                 </p>
               ) : null}
               {comment.attachments.length > 0 ? (
@@ -327,7 +442,11 @@ export function TaskCommentsSection({
                       <button
                         key={att.id}
                         type="button"
-                        onClick={() => setLightbox({ url: att.signedUrl!, mimeType: att.mimeType })}
+                        onClick={() =>
+                          setLightboxIndex(
+                            allAttachments.findIndex((a) => a.url === att.signedUrl),
+                          )
+                        }
                         title={att.fileName}
                         style={{
                           position: "relative",
@@ -400,24 +519,106 @@ export function TaskCommentsSection({
           gap: 8,
         }}
       >
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          onPaste={handlePaste}
-          rows={3}
-          placeholder="Escribí un comentario… (qué pasó, avances, blockers — pegá una captura o video con Ctrl+V)"
-          style={{
-            width: "100%",
-            border: "1px solid var(--color-mist)",
-            borderRadius: 6,
-            padding: "8px 10px",
-            fontSize: 13.5,
-            fontFamily: "var(--font-sans)",
-            resize: "vertical",
-            outline: "none",
-            boxSizing: "border-box",
-          }}
-        />
+        <div style={{ position: "relative" }}>
+          <textarea
+            ref={composeRef}
+            value={body}
+            onChange={(e) => handleBodyChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+            onKeyDown={handleComposeKeyDown}
+            onPaste={handlePaste}
+            onBlur={() => setMentionQuery(null)}
+            rows={3}
+            placeholder="Escribí un comentario… (@nombre para avisarle a alguien — pegá una captura o video con Ctrl+V)"
+            style={{
+              width: "100%",
+              border: "1px solid var(--color-mist)",
+              borderRadius: 6,
+              padding: "8px 10px",
+              fontSize: 13.5,
+              fontFamily: "var(--font-sans)",
+              resize: "vertical",
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+
+          {mentionQuery !== null && mentionSuggestions.length > 0 ? (
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                marginTop: 4,
+                width: 220,
+                maxWidth: "100%",
+                background: "white",
+                border: "1px solid var(--color-mist)",
+                borderRadius: 8,
+                boxShadow: "0 8px 24px rgba(18,30,47,.14)",
+                padding: 4,
+                zIndex: 50,
+              }}
+            >
+              {mentionSuggestions.map((p, i) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onMouseDown={(e) => {
+                    // mousedown, not click — fires before the textarea's blur
+                    e.preventDefault();
+                    selectMention(p);
+                  }}
+                  onMouseEnter={() => setMentionIndex(i)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    width: "100%",
+                    border: "none",
+                    background: i === mentionIndex ? "var(--color-paper)" : "transparent",
+                    padding: "6px 8px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    fontSize: 13,
+                    color: "var(--color-ink)",
+                    fontFamily: "var(--font-sans)",
+                  }}
+                >
+                  {p.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.avatar_url}
+                      alt={p.full_name}
+                      style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+                    />
+                  ) : (
+                    <span
+                      style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: "50%",
+                        background: p.color,
+                        color: "white",
+                        fontSize: 9,
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {p.initials}
+                    </span>
+                  )}
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {p.full_name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
 
         {pendingFiles.length > 0 ? (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -536,7 +737,7 @@ export function TaskCommentsSection({
 
       {lightbox ? (
         <div
-          onClick={() => setLightbox(null)}
+          onClick={() => setLightboxIndex(null)}
           style={{
             position: "fixed",
             inset: 0,
@@ -548,6 +749,35 @@ export function TaskCommentsSection({
             padding: 24,
           }}
         >
+          {allAttachments.length > 1 ? (
+            <button
+              type="button"
+              title="Anterior (←)"
+              onClick={(e) => {
+                e.stopPropagation();
+                showPrev();
+              }}
+              style={{
+                position: "absolute",
+                left: 16,
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                border: "none",
+                background: "rgba(255,255,255,.14)",
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+              }}
+            >
+              <ChevronLeft size={22} />
+            </button>
+          ) : null}
+
           {isVideoMime(lightbox.mimeType) ? (
             <video
               src={lightbox.url}
@@ -575,6 +805,54 @@ export function TaskCommentsSection({
               }}
             />
           )}
+
+          {allAttachments.length > 1 ? (
+            <button
+              type="button"
+              title="Siguiente (→)"
+              onClick={(e) => {
+                e.stopPropagation();
+                showNext();
+              }}
+              style={{
+                position: "absolute",
+                right: 16,
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                border: "none",
+                background: "rgba(255,255,255,.14)",
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+              }}
+            >
+              <ChevronRight size={22} />
+            </button>
+          ) : null}
+
+          {allAttachments.length > 1 ? (
+            <span
+              style={{
+                position: "absolute",
+                bottom: 20,
+                left: "50%",
+                transform: "translateX(-50%)",
+                color: "white",
+                fontSize: 12.5,
+                fontWeight: 600,
+                background: "rgba(0,0,0,.4)",
+                borderRadius: 999,
+                padding: "4px 12px",
+              }}
+            >
+              {(lightboxIndex ?? 0) + 1} / {allAttachments.length}
+            </span>
+          ) : null}
         </div>
       ) : null}
     </div>

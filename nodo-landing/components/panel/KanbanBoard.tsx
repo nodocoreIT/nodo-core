@@ -1,15 +1,21 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  ArrowDownWideNarrow,
   Bug,
   Check,
   CheckSquare,
   ChevronDown,
+  ChevronUp,
   Copy,
+  Equal,
+  ImagePlus,
   Lightbulb,
+  Loader2,
   Plus,
   Search,
   UserRound,
@@ -33,6 +39,7 @@ import {
 } from "@/lib/panel/task-code";
 import {
   ALLOWED_EVIDENCE_MIME,
+  assertEvidenceFile,
   createTaskComment,
 } from "@/lib/panel/task-comments";
 import { GenerateTitleFromDescriptionButton } from "@/components/panel/generate-title-button";
@@ -56,6 +63,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { createClient } from "@/lib/supabase/client";
+import { TASK_STATUS_LABELS, type TaskStatus } from "@/lib/panel/task-status";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,7 +72,7 @@ export type Task = {
   title: string;
   description: string | null;
   unit_code: string;
-  status: "backlog" | "doing" | "review" | "done";
+  status: TaskStatus;
   priority: "alta" | "media" | "baja";
   type: "task" | "bug" | "idea" | "debt" | "known_issue";
   assignee: string | null;
@@ -104,19 +112,23 @@ const MODAL_SELECT_Z = "z-[1100]";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const COLUMNS: { id: Task["status"]; label: string; color: string }[] = [
-  { id: "backlog", label: "Por hacer", color: "#9DACBE" },
-  { id: "doing", label: "En progreso", color: "#2A6FDB" },
-  { id: "review", label: "En revisión", color: "#DA5A0E" },
-  { id: "done", label: "Hecho", color: "#1F8A5B" },
+  { id: "backlog", label: TASK_STATUS_LABELS.backlog, color: "#9DACBE" },
+  { id: "doing", label: TASK_STATUS_LABELS.doing, color: "#2A6FDB" },
+  { id: "review", label: TASK_STATUS_LABELS.review, color: "#DA5A0E" },
+  { id: "deployed_qa", label: TASK_STATUS_LABELS.deployed_qa, color: "#7C3AED" },
+  { id: "qa_testing", label: TASK_STATUS_LABELS.qa_testing, color: "#B45309" },
+  { id: "done", label: TASK_STATUS_LABELS.done, color: "#1F8A5B" },
 ];
+
+const PRIORITY_ORDER: Task["priority"][] = ["alta", "media", "baja"];
 
 const PRIORITY_STYLES: Record<
   Task["priority"],
-  { bg: string; color: string; label: string }
+  { bg: string; color: string; label: string; Icon: React.ElementType }
 > = {
-  alta: { bg: "#FBE6E1", color: "#C0392B", label: "Alta" },
-  media: { bg: "#FCE9D8", color: "#B5630C", label: "Media" },
-  baja: { bg: "var(--color-mist)", color: "var(--color-slate2)", label: "Baja" },
+  alta: { bg: "#FBE6E1", color: "#C0392B", label: "Alta", Icon: ChevronUp },
+  media: { bg: "#FCE9D8", color: "#B5630C", label: "Media", Icon: Equal },
+  baja: { bg: "var(--color-mist)", color: "var(--color-slate2)", label: "Baja", Icon: ChevronDown },
 };
 
 const TYPE_CONFIG: Record<
@@ -231,6 +243,163 @@ function TaskTypeSelect({
             </SelectItem>
           );
         })}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function PrioritySelect({
+  value,
+  onChange,
+  className,
+  contentClassName,
+}: {
+  value: Task["priority"];
+  onChange: (value: Task["priority"]) => void;
+  className?: string;
+  contentClassName?: string;
+}) {
+  const selected = PRIORITY_STYLES[value];
+  const SelectedIcon = selected.Icon;
+
+  return (
+    <Select
+      value={value}
+      onValueChange={(next) => onChange(next as Task["priority"])}
+    >
+      <SelectTrigger className={["rounded-md", className].filter(Boolean).join(" ")}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            flex: 1,
+            minWidth: 0,
+            overflow: "hidden",
+          }}
+        >
+          <SelectedIcon
+            className="h-3.5 w-3.5 shrink-0"
+            style={{ color: selected.color, flexShrink: 0 }}
+            strokeWidth={2.2}
+            aria-hidden
+          />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {selected.label}
+          </span>
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            width: 1,
+            height: 1,
+            padding: 0,
+            margin: -1,
+            overflow: "hidden",
+            clip: "rect(0, 0, 0, 0)",
+            whiteSpace: "nowrap",
+            border: 0,
+          }}
+        >
+          <SelectValue />
+        </div>
+      </SelectTrigger>
+      <SelectContent className={["z-[200]", contentClassName].filter(Boolean).join(" ")}>
+        {PRIORITY_ORDER.map((key) => {
+          const conf = PRIORITY_STYLES[key];
+          const Icon = conf.Icon;
+          return (
+            <SelectItem key={key} value={key} textValue={conf.label}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <Icon
+                  className="h-3.5 w-3.5 shrink-0"
+                  style={{ color: conf.color, flexShrink: 0 }}
+                  strokeWidth={2.2}
+                  aria-hidden
+                />
+                <span>{conf.label}</span>
+              </div>
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** Jira-style solid colored pill — change status without dragging the card between columns. */
+function StatusSelect({
+  value,
+  onChange,
+  className,
+  contentClassName,
+}: {
+  value: Task["status"];
+  onChange: (value: Task["status"]) => void;
+  className?: string;
+  contentClassName?: string;
+}) {
+  const selected = COLUMNS.find((c) => c.id === value) ?? COLUMNS[0];
+
+  return (
+    <Select
+      value={value}
+      onValueChange={(next) => onChange(next as Task["status"])}
+    >
+      <SelectTrigger
+        className={["rounded-full border-none", className].filter(Boolean).join(" ")}
+        style={{
+          background: selected.color,
+          color: "white",
+          fontWeight: 700,
+          fontSize: 13,
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {selected.label}
+        </span>
+        {/* Radix requires SelectValue; hide mirrored item content (avoids double icon) */}
+        <div
+          style={{
+            position: "absolute",
+            width: 1,
+            height: 1,
+            padding: 0,
+            margin: -1,
+            overflow: "hidden",
+            clip: "rect(0, 0, 0, 0)",
+            whiteSpace: "nowrap",
+            border: 0,
+          }}
+        >
+          <SelectValue />
+        </div>
+      </SelectTrigger>
+      <SelectContent className={["z-[200]", contentClassName].filter(Boolean).join(" ")}>
+        {COLUMNS.map((column) => (
+          <SelectItem key={column.id} value={column.id} textValue={column.label}>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <span
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: "50%",
+                  background: column.color,
+                  flexShrink: 0,
+                }}
+              />
+              <span>{column.label}</span>
+            </div>
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );
@@ -534,26 +703,34 @@ function AssigneePicker({
 
 type PendingEvidence = { id: string; file: File; previewUrl: string };
 
-/** Ctrl+V a screenshot or short screen recording straight into a description. */
+/** Ctrl+V, drag-drop, or the "Adjuntar evidencia" picker — image or video into a description. */
 function useDescriptionEvidence() {
   const [pending, setPending] = useState<PendingEvidence[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  function addFiles(files: File[]) {
+    if (files.length === 0) return;
+    setError(null);
+    const accepted: PendingEvidence[] = [];
+    for (const file of files) {
+      if (!ALLOWED_EVIDENCE_MIME.has(file.type)) continue;
+      try {
+        assertEvidenceFile(file);
+        accepted.push({ id: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file) });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No se pudo adjuntar el archivo.");
+      }
+    }
+    if (accepted.length > 0) {
+      setPending((prev) => [...prev, ...accepted].slice(0, 8));
+    }
+  }
 
   function addFromClipboard(e: React.ClipboardEvent<HTMLTextAreaElement>) {
-    const files = Array.from(e.clipboardData?.files ?? []).filter((f) =>
-      ALLOWED_EVIDENCE_MIME.has(f.type),
-    );
+    const files = Array.from(e.clipboardData?.files ?? []);
     if (files.length === 0) return;
     e.preventDefault();
-    setPending((prev) =>
-      [
-        ...prev,
-        ...files.map((file) => ({
-          id: crypto.randomUUID(),
-          file,
-          previewUrl: URL.createObjectURL(file),
-        })),
-      ].slice(0, 8),
-    );
+    addFiles(files);
   }
 
   function remove(id: string) {
@@ -571,70 +748,167 @@ function useDescriptionEvidence() {
     });
   }
 
-  return { pending, addFromClipboard, remove, reset };
+  return { pending, error, addFiles, addFromClipboard, remove, reset };
+}
+
+/**
+ * One pending thumbnail. Shows a spinner from the moment it's attached until
+ * the browser actually finishes decoding it locally (onLoadedData/onLoad) —
+ * for a multi-MB video that's a real, visible gap, not instant like an
+ * image usually is. A second, separate spinner covers `uploading` (parent
+ * form is saving, i.e. the file is actually hitting the network).
+ */
+function PendingEvidenceThumb({
+  item,
+  uploading,
+  onRemove,
+}: {
+  item: PendingEvidence;
+  uploading: boolean;
+  onRemove: (id: string) => void;
+}) {
+  const [domReady, setDomReady] = useState(false);
+  // A local blob has no network latency — the browser can decode it fast
+  // enough that the spinner would flash on and off inside a single paint,
+  // never actually visible. Force a minimum on-screen time so attaching
+  // something always gives a perceptible "loading" moment.
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMinTimeElapsed(true), 400);
+    return () => clearTimeout(t);
+  }, []);
+  const showSpinner = uploading || !(domReady && minTimeElapsed);
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: 56,
+        height: 56,
+        borderRadius: 6,
+        overflow: "hidden",
+        border: "1px solid var(--color-mist)",
+        background: "var(--color-mist)",
+      }}
+    >
+      {item.file.type.startsWith("video/") ? (
+        <video
+          src={item.previewUrl}
+          muted
+          preload="auto"
+          onLoadedData={() => setDomReady(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={item.previewUrl}
+          alt={item.file.name}
+          onLoad={() => setDomReady(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      )}
+      {showSpinner ? (
+        <div
+          title={uploading ? "Subiendo…" : "Cargando…"}
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(18,30,47,.55)",
+          }}
+        >
+          <Loader2 size={18} color="white" className="animate-spin" />
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onRemove(item.id)}
+          style={{
+            position: "absolute",
+            top: 2,
+            right: 2,
+            width: 16,
+            height: 16,
+            borderRadius: "50%",
+            border: "none",
+            background: "rgba(0,0,0,.55)",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            padding: 0,
+          }}
+        >
+          <X size={10} />
+        </button>
+      )}
+    </div>
+  );
 }
 
 function PendingEvidenceRow({
   items,
   onRemove,
+  uploading = false,
 }: {
   items: PendingEvidence[];
   onRemove: (id: string) => void;
+  /** True while the parent form is saving — this is when these files actually hit the network. */
+  uploading?: boolean;
 }) {
   if (items.length === 0) return null;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
       {items.map((item) => (
-        <div
-          key={item.id}
-          style={{
-            position: "relative",
-            width: 56,
-            height: 56,
-            borderRadius: 6,
-            overflow: "hidden",
-            border: "1px solid var(--color-mist)",
-          }}
-        >
-          {item.file.type.startsWith("video/") ? (
-            <video
-              src={item.previewUrl}
-              muted
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={item.previewUrl}
-              alt={item.file.name}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          )}
-          <button
-            type="button"
-            onClick={() => onRemove(item.id)}
-            style={{
-              position: "absolute",
-              top: 2,
-              right: 2,
-              width: 16,
-              height: 16,
-              borderRadius: "50%",
-              border: "none",
-              background: "rgba(0,0,0,.55)",
-              color: "white",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            <X size={10} />
-          </button>
-        </div>
+        <PendingEvidenceThumb key={item.id} item={item} uploading={uploading} onRemove={onRemove} />
       ))}
     </div>
+  );
+}
+
+/** Jira-style "Upload" button — file picker for description evidence, same accept list as paste. */
+function EvidenceAttachButton({ onFiles }: { onFiles: (files: File[]) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+        multiple
+        hidden
+        onChange={(e) => {
+          onFiles(Array.from(e.target.files ?? []));
+          if (inputRef.current) inputRef.current.value = "";
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        title="Imagen hasta 5MB, video hasta 25MB"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          border: "1px solid var(--color-mist)",
+          borderRadius: 6,
+          background: "white",
+          padding: "6px 10px",
+          fontSize: 12.5,
+          fontWeight: 600,
+          color: "var(--color-slate2)",
+          cursor: "pointer",
+          fontFamily: "var(--font-sans)",
+        }}
+      >
+        <ImagePlus size={13} />
+        Adjuntar evidencia
+      </button>
+    </>
   );
 }
 
@@ -657,12 +931,14 @@ function TaskEditModal({
 }) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
+  const [status, setStatus] = useState<Task["status"]>(task.status);
   const [unitCode, setUnitCode] = useState(task.unit_code);
   const [priority, setPriority] = useState<Task["priority"]>(task.priority);
   const [type, setType] = useState<Task["type"]>(task.type ?? "task");
   const [dueDate, setDueDate] = useState(task.due_date ?? "");
   const [createdDate, setCreatedDate] = useState(toDateInputValue(task.created_at));
   const [assignee, setAssignee] = useState(task.assignee ?? "");
+  const [createdBy, setCreatedBy] = useState(task.created_by ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -675,7 +951,6 @@ function TaskEditModal({
     return codes.map((unit) => ({ value: unit, label: unit }));
   }, [units, unitCode]);
 
-  const reporter = profiles.find((p) => p.id === task.created_by);
   const branchName = title.trim() ? buildTaskBranchName(unitCode, title) : "";
 
   function handleCopyBranchName() {
@@ -727,6 +1002,8 @@ function TaskEditModal({
       due_date: dueDate || null,
       created_at: createdDate ? dateInputToCreatedAt(createdDate) : task.created_at,
       assignee: assignee || null,
+      created_by: createdBy || null,
+      status,
     };
     try {
       const err = await onSave(updated);
@@ -777,7 +1054,7 @@ function TaskEditModal({
           borderRadius: 12,
           boxShadow: "0 8px 32px rgba(18,30,47,.18)",
           width: "100%",
-          maxWidth: 760,
+          maxWidth: 960,
           maxHeight: "96vh",
           overflowY: "auto",
           display: "flex",
@@ -822,7 +1099,7 @@ function TaskEditModal({
 
         <div style={{ padding: "16px 24px", display: "flex", gap: 24, flexWrap: "wrap" }}>
           {/* ── Columna principal: descripción, título, comentarios ──────── */}
-          <div style={{ flex: "1 1 380px", minWidth: 280, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ flex: "1 1 460px", minWidth: 280, display: "flex", flexDirection: "column", gap: 12 }}>
             <div>
               <label style={labelStyle}>Descripción</label>
               <textarea
@@ -833,7 +1110,13 @@ function TaskEditModal({
                 placeholder="Pegá una captura o video con Ctrl+V"
                 style={{ ...inputStyle, resize: "vertical" }}
               />
-              <PendingEvidenceRow items={evidence.pending} onRemove={evidence.remove} />
+              <PendingEvidenceRow items={evidence.pending} onRemove={evidence.remove} uploading={saving} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                <EvidenceAttachButton onFiles={evidence.addFiles} />
+              </div>
+              {evidence.error ? (
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#b91c1c" }}>{evidence.error}</p>
+              ) : null}
               <GenerateTitleFromDescriptionButton
                 description={description}
                 unitCode={unitCode}
@@ -872,6 +1155,10 @@ function TaskEditModal({
           {/* ── Sidebar: metadata al estilo Jira ─────────────────────────── */}
           <div style={{ flex: "0 1 220px", minWidth: 200, display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
+              <StatusSelect value={status} onChange={setStatus} contentClassName={MODAL_SELECT_Z} />
+            </div>
+
+            <div>
               <label style={labelStyle}>Unidad</label>
               <FormSelect
                 value={unitCode}
@@ -883,14 +1170,9 @@ function TaskEditModal({
 
             <div>
               <label style={labelStyle}>Prioridad</label>
-              <FormSelect
+              <PrioritySelect
                 value={priority}
-                onChange={(value) => setPriority(value as Task["priority"])}
-                options={[
-                  { value: "alta", label: "Alta" },
-                  { value: "media", label: "Media" },
-                  { value: "baja", label: "Baja" },
-                ]}
+                onChange={setPriority}
                 contentClassName={MODAL_SELECT_Z}
               />
             </div>
@@ -911,14 +1193,7 @@ function TaskEditModal({
 
             <div>
               <label style={labelStyle}>Reporter</label>
-              {reporter ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
-                  <AssigneeAvatar profile={reporter} size={24} />
-                  <span style={{ fontSize: 13, color: "var(--color-ink)" }}>{reporter.full_name}</span>
-                </div>
-              ) : (
-                <p style={{ margin: 0, fontSize: 12.5, color: "var(--color-slate2)" }}>—</p>
-              )}
+              <AssigneePicker profiles={profiles} value={createdBy} onChange={setCreatedBy} />
             </div>
 
             <div>
@@ -1160,7 +1435,7 @@ function TaskCreateModal({
   profiles: Profile[];
   units: string[];
   currentUserId: string | null;
-  onCreate: (task: Omit<Task, "id" | "position" | "created_by">) => Promise<Task | undefined>;
+  onCreate: (task: Omit<Task, "id" | "position">) => Promise<Task | undefined>;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState("");
@@ -1171,11 +1446,10 @@ function TaskCreateModal({
   const [createdDate, setCreatedDate] = useState(todayLocalDate);
   const [dueDate, setDueDate] = useState("");
   const [assignee, setAssignee] = useState("");
+  const [createdBy, setCreatedBy] = useState(currentUserId ?? "");
   const [saving, setSaving] = useState(false);
   const [branchCopied, setBranchCopied] = useState(false);
   const evidence = useDescriptionEvidence();
-
-  const reporter = profiles.find((p) => p.id === currentUserId);
 
   const branchName = title.trim() ? buildTaskBranchName(unitCode, title) : "";
 
@@ -1228,6 +1502,7 @@ function TaskCreateModal({
         due_date: dueDate || null,
         created_at: dateInputToCreatedAt(createdDate || todayLocalDate()),
         assignee: assignee || null,
+        created_by: createdBy || null,
       });
       if (created && evidence.pending.length > 0) {
         try {
@@ -1325,7 +1600,13 @@ function TaskCreateModal({
                 autoFocus
                 style={{ ...inputStyle, resize: "vertical" }}
               />
-              <PendingEvidenceRow items={evidence.pending} onRemove={evidence.remove} />
+              <PendingEvidenceRow items={evidence.pending} onRemove={evidence.remove} uploading={saving} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                <EvidenceAttachButton onFiles={evidence.addFiles} />
+              </div>
+              {evidence.error ? (
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#b91c1c" }}>{evidence.error}</p>
+              ) : null}
               <GenerateTitleFromDescriptionButton
                 description={description}
                 unitCode={unitCode}
@@ -1366,14 +1647,9 @@ function TaskCreateModal({
 
             <div>
               <label style={labelStyle}>Prioridad</label>
-              <FormSelect
+              <PrioritySelect
                 value={priority}
-                onChange={(value) => setPriority(value as Task["priority"])}
-                options={[
-                  { value: "alta", label: "Alta" },
-                  { value: "media", label: "Media" },
-                  { value: "baja", label: "Baja" },
-                ]}
+                onChange={setPriority}
                 contentClassName={MODAL_SELECT_Z}
               />
             </div>
@@ -1394,14 +1670,7 @@ function TaskCreateModal({
 
             <div>
               <label style={labelStyle}>Reporter</label>
-              {reporter ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
-                  <AssigneeAvatar profile={reporter} size={24} />
-                  <span style={{ fontSize: 13, color: "var(--color-ink)" }}>{reporter.full_name}</span>
-                </div>
-              ) : (
-                <p style={{ margin: 0, fontSize: 12.5, color: "var(--color-slate2)" }}>—</p>
-              )}
+              <AssigneePicker profiles={profiles} value={createdBy} onChange={setCreatedBy} />
             </div>
 
             <div>
@@ -1573,15 +1842,20 @@ function TaskCard({
           nodo | <span style={{ fontWeight: 600 }}>{task.unit_code}</span>
         </span>
         <span
+          title={priority.label}
           style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 3,
             fontSize: 11.5,
             fontWeight: 700,
             background: priority.bg,
             color: priority.color,
             borderRadius: 999,
-            padding: "2px 8px",
+            padding: "2px 8px 2px 6px",
           }}
         >
+          <priority.Icon size={11} strokeWidth={2.6} aria-hidden />
           {priority.label}
         </span>
         <span
@@ -1703,118 +1977,21 @@ function SortableCard({
   );
 }
 
-// ─── AddTaskForm ──────────────────────────────────────────────────────────────
-
-function AddTaskForm({
-  status,
-  units,
-  onAdd,
-  onCancel,
-}: {
-  status: Task["status"];
-  units: string[];
-  onAdd: (task: Omit<Task, "id" | "position" | "created_by">) => void;
-  onCancel: () => void;
-}) {
-  const [title, setTitle] = useState("");
-  const [unit, setUnit] = useState(units[0] ?? "");
-  const [priority, setPriority] = useState<Task["priority"]>("media");
-  const [type, setType] = useState<Task["type"]>("task");
-
-  function handleSubmit() {
-    if (!title.trim()) return;
-    onAdd({
-      title: title.trim(),
-      description: null,
-      unit_code: unit,
-      status,
-      priority,
-      type,
-      assignee: null,
-      due_date: null,
-      created_at: dateInputToCreatedAt(todayLocalDate()),
-    });
-  }
-
-  return (
-    <div style={{ background: "white", border: "1px solid var(--color-mist)", borderRadius: 8, padding: 12, marginBottom: 8 }}>
-      <textarea
-        autoFocus
-        placeholder="Título de la tarea..."
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        rows={2}
-        style={{
-          width: "100%", border: "1px solid var(--color-mist)", borderRadius: 6,
-          padding: "6px 10px", fontSize: 13.5, fontFamily: "var(--font-sans)",
-          resize: "none", outline: "none", marginBottom: 8, boxSizing: "border-box",
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
-          if (e.key === "Escape") onCancel();
-        }}
-      />
-      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-        <FormSelect
-          value={unit}
-          onChange={setUnit}
-          options={units.map((unitOption) => ({ value: unitOption, label: unitOption }))}
-          className="flex-1"
-        />
-        <FormSelect
-          value={priority}
-          onChange={(value) => setPriority(value as Task["priority"])}
-          options={[
-            { value: "alta", label: "Alta" },
-            { value: "media", label: "Media" },
-            { value: "baja", label: "Baja" },
-          ]}
-          className="flex-1"
-        />
-        <TaskTypeSelect
-          value={type}
-          onChange={setType}
-          className="flex-1"
-        />
-      </div>
-      <div style={{ display: "flex", gap: 6 }}>
-        <button
-          onClick={handleSubmit}
-          style={{ flex: 1, background: "var(--color-brand)", color: "white", border: "none", borderRadius: 6, padding: "7px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}
-        >
-          Agregar
-        </button>
-        <button
-          onClick={onCancel}
-          style={{ flex: 1, background: "transparent", color: "var(--color-slate2)", border: "1px solid var(--color-mist)", borderRadius: 6, padding: "7px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}
-        >
-          Cancelar
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ─── KanbanColumn ─────────────────────────────────────────────────────────────
 
 function KanbanColumn({
   column,
   tasks,
   profiles,
-  units,
   isOver,
-  onAddTask,
   onEditTask,
 }: {
   column: (typeof COLUMNS)[number];
   tasks: Task[];
   profiles: Profile[];
-  units: string[];
   isOver: boolean;
-  onAddTask: (task: Omit<Task, "id" | "position" | "created_by">) => void;
   onEditTask: (task: Task) => void;
 }) {
-  const [showForm, setShowForm] = useState(false);
   const { setNodeRef: setDropRef } = useDroppable({ id: column.id });
 
   return (
@@ -1841,40 +2018,6 @@ function KanbanColumn({
           {tasks.length}
         </span>
       </div>
-
-      {showForm ? (
-        <AddTaskForm
-          status={column.id}
-          units={units}
-          onAdd={(task) => { onAddTask(task); setShowForm(false); }}
-          onCancel={() => setShowForm(false)}
-        />
-      ) : (
-        <button
-          onClick={() => setShowForm(true)}
-          style={{
-            width: "100%", padding: "8px 12px", borderRadius: 8,
-            border: "1.5px dashed var(--color-slate2-300)", background: "transparent",
-            color: "var(--color-slate2)", fontSize: 13, fontWeight: 600,
-            cursor: "pointer", fontFamily: "var(--font-sans)", marginBottom: 10,
-            transition: "border-color 150ms, color 150ms, background 150ms",
-          }}
-          onMouseEnter={(e) => {
-            const el = e.currentTarget;
-            el.style.borderColor = "var(--color-brand)";
-            el.style.color = "var(--color-brand)";
-            el.style.background = "white";
-          }}
-          onMouseLeave={(e) => {
-            const el = e.currentTarget;
-            el.style.borderColor = "var(--color-slate2-300)";
-            el.style.color = "var(--color-slate2)";
-            el.style.background = "transparent";
-          }}
-        >
-          + Agregar tarea
-        </button>
-      )}
 
       <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <div style={{ flex: 1, minHeight: 40 }}>
@@ -2049,6 +2192,8 @@ function FilterBar({
   onToggleType,
   onToggleCreatedBy,
   onClearAll,
+  sortByPriority,
+  onToggleSortByPriority,
   onAddTask,
 }: {
   profiles: Profile[];
@@ -2064,6 +2209,8 @@ function FilterBar({
   onToggleType: (type: Task["type"]) => void;
   onToggleCreatedBy: (id: string) => void;
   onClearAll: () => void;
+  sortByPriority: boolean;
+  onToggleSortByPriority: () => void;
   onAddTask: () => void;
 }) {
   const hasFilters =
@@ -2216,6 +2363,31 @@ function FilterBar({
         </button>
       ) : null}
 
+      <button
+        type="button"
+        onClick={onToggleSortByPriority}
+        title="Ordenar cada columna por prioridad (Alta → Baja) sin cambiar el orden manual guardado"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          height: 32,
+          padding: "0 10px",
+          border: `1px solid ${sortByPriority ? "var(--color-brand)" : "var(--color-mist)"}`,
+          borderRadius: 6,
+          background: sortByPriority ? "var(--color-brand)" : "white",
+          color: sortByPriority ? "white" : "var(--color-slate2)",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          fontFamily: "var(--font-sans)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        <ArrowDownWideNarrow size={14} strokeWidth={2.2} />
+        Ordenar por prioridad
+      </button>
+
       <div style={{ flex: 1, minWidth: 8 }} />
 
       <button
@@ -2264,7 +2436,35 @@ export default function KanbanBoard({
   const [unitFilter, setUnitFilter] = useState<string[]>([]);
   const [typeFilter, setTypeFilter] = useState<Task["type"][]>([]);
   const [createdByFilter, setCreatedByFilter] = useState<string[]>([]);
+  const [sortByPriority, setSortByPriority] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Deep link from notifications (bell + email): /panel/tareas?task=<id>
+  // opens that task's edit modal directly instead of just landing on the
+  // board. Cleared on close so it doesn't keep re-opening after a save
+  // triggers a `tasks` state update.
+  useEffect(() => {
+    const taskId = searchParams.get("task");
+    if (!taskId) return;
+    const found = tasks.find((t) => t.id === taskId);
+    if (found) setEditingTask(found);
+  }, [searchParams, tasks]);
+
+  function closeEditingTask() {
+    setEditingTask(null);
+    if (searchParams.get("task")) router.replace(pathname, { scroll: false });
+  }
+
+  function openTask(task: Task) {
+    setEditingTask(task);
+    if (searchParams.get("task") !== task.id) {
+      router.replace(`${pathname}?task=${task.id}`, { scroll: false });
+    }
+  }
 
   function toggleAssignee(id: string) {
     setAssigneeFilter((prev) => prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]);
@@ -2321,9 +2521,16 @@ export default function KanbanBoard({
   });
 
   function getColumnTasks(status: Task["status"]) {
-    return filteredTasks
-      .filter((t) => t.status === status)
-      .sort((a, b) => a.position - b.position);
+    const columnTasks = filteredTasks.filter((t) => t.status === status);
+    if (sortByPriority) {
+      // View-only order — doesn't touch `position`, so turning this off
+      // restores whatever manual drag order was already saved.
+      return columnTasks.sort(
+        (a, b) => PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority)
+          || a.position - b.position,
+      );
+    }
+    return columnTasks.sort((a, b) => a.position - b.position);
   }
 
   const columnIds = COLUMNS.map((c) => c.id as string);
@@ -2403,12 +2610,14 @@ export default function KanbanBoard({
   }
 
   async function handleAddTask(
-    taskData: Omit<Task, "id" | "position" | "created_by">,
+    taskData: Omit<Task, "id" | "position">,
   ): Promise<Task | undefined> {
     const colTasks = tasks
       .filter((t) => t.status === taskData.status)
       .sort((a, b) => a.position - b.position);
-    const position = colTasks.length > 0 ? colTasks[colTasks.length - 1].position + 1000 : 0;
+    // Newest first: place above the current top of the column instead of
+    // appending at the bottom.
+    const position = colTasks.length > 0 ? colTasks[0].position - 1000 : 0;
 
     const { data, error } = await supabase
       .from("tasks")
@@ -2416,7 +2625,7 @@ export default function KanbanBoard({
         ...taskData,
         description: formatTaskDescription(taskData.description),
         position,
-        created_by: currentUserId,
+        created_by: taskData.created_by ?? currentUserId,
       })
       .select()
       .single();
@@ -2437,11 +2646,27 @@ export default function KanbanBoard({
   }
 
   async function handleSaveTask(updated: Task): Promise<string | null> {
+    const previous = tasks.find((t) => t.id === updated.id);
+    const statusChanged = previous != null && previous.status !== updated.status;
+
+    let position = previous?.position ?? updated.position;
+    if (statusChanged) {
+      // Changed from the sidebar dropdown, not by dragging — there's no
+      // "dropped position" to honor, so land it at the top of the new
+      // column, same convention as a freshly created task.
+      const colTasks = tasks
+        .filter((t) => t.status === updated.status && t.id !== updated.id)
+        .sort((a, b) => a.position - b.position);
+      position = colTasks.length > 0 ? colTasks[0].position - 1000 : 0;
+    }
+
     const normalized: Task = {
       ...updated,
       description: formatTaskDescription(updated.description),
       assignee: updated.assignee?.trim() ? updated.assignee : null,
       due_date: updated.due_date?.trim() ? updated.due_date : null,
+      created_by: updated.created_by?.trim() ? updated.created_by : null,
+      position,
     };
     const { error } = await supabase
       .from("tasks")
@@ -2449,11 +2674,14 @@ export default function KanbanBoard({
         title: normalized.title,
         description: normalized.description,
         unit_code: normalized.unit_code,
+        status: normalized.status,
         priority: normalized.priority,
         type: normalized.type,
         due_date: normalized.due_date,
         created_at: normalized.created_at,
         assignee: normalized.assignee,
+        created_by: normalized.created_by,
+        position: normalized.position,
       })
       .eq("id", normalized.id);
 
@@ -2462,7 +2690,7 @@ export default function KanbanBoard({
       return error.message || "No se pudo guardar la tarea.";
     }
     setTasks((prev) => prev.map((t) => (t.id === normalized.id ? normalized : t)));
-    setEditingTask(null);
+    closeEditingTask();
     return null;
   }
 
@@ -2470,7 +2698,7 @@ export default function KanbanBoard({
     const { error } = await supabase.from("tasks").delete().eq("id", id);
     if (error) { console.error("Error deleting task:", error); return; }
     setTasks((prev) => prev.filter((t) => t.id !== id));
-    setEditingTask(null);
+    closeEditingTask();
   }
 
   const completedCount = tasks.filter((t) => t.status === "done").length;
@@ -2486,7 +2714,7 @@ export default function KanbanBoard({
           units={units}
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
-          onClose={() => setEditingTask(null)}
+          onClose={closeEditingTask}
         />
       )}
 
@@ -2584,6 +2812,8 @@ export default function KanbanBoard({
         onToggleType={toggleType}
         onToggleCreatedBy={toggleCreatedBy}
         onClearAll={clearAllFilters}
+        sortByPriority={sortByPriority}
+        onToggleSortByPriority={() => setSortByPriority((v) => !v)}
         onAddTask={() => setCreatingTask(true)}
       />
 
@@ -2597,8 +2827,10 @@ export default function KanbanBoard({
           className="kanban-board"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, minmax(206px, 1fr))",
+            gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(206px, 1fr))`,
             gap: 16,
+            overflowX: "auto",
+            paddingBottom: 4,
           }}
         >
           {COLUMNS.map((column) => (
@@ -2607,10 +2839,8 @@ export default function KanbanBoard({
               column={column}
               tasks={getColumnTasks(column.id)}
               profiles={profiles}
-              units={units}
               isOver={overColumnId === column.id}
-              onAddTask={handleAddTask}
-              onEditTask={setEditingTask}
+              onEditTask={openTask}
             />
           ))}
         </div>

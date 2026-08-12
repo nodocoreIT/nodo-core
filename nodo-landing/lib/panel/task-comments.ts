@@ -73,7 +73,8 @@ function sanitizeFilename(name: string): string {
     .slice(0, 80);
 }
 
-function assertEvidenceFile(file: File) {
+/** Also used by useDescriptionEvidence (KanbanBoard.tsx) to validate at attach time, not just at upload time. */
+export function assertEvidenceFile(file: File) {
   if (ALLOWED_IMAGE_MIME.has(file.type)) {
     if (file.size > MAX_IMAGE_BYTES) {
       throw new Error("Cada imagen puede pesar hasta 5 MB.");
