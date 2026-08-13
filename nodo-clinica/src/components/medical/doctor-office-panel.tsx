@@ -24,6 +24,8 @@ import {
   CalendarOff,
   Bell,
   Palette,
+  Wallet,
+  Landmark,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -270,6 +272,14 @@ export function DoctorOfficePanel({
   };
 
   const handleSave = async () => {
+    if (availability.days.length === 0) {
+      toast.error("Cargá al menos un día de atención en Agenda antes de guardar");
+      return;
+    }
+    if (!payment.consultationFee || payment.consultationFee <= 0) {
+      toast.error("El honorario de consulta es obligatorio, en Cobros");
+      return;
+    }
     setSaving(true);
     try {
       const result = await clinicApi.saveDoctorOffice({
@@ -314,6 +324,10 @@ export function DoctorOfficePanel({
   };
 
   const handleSavePayment = async () => {
+    if (!payment.consultationFee || payment.consultationFee <= 0) {
+      toast.error("El honorario de consulta es obligatorio");
+      return;
+    }
     setSaving(true);
     try {
       const result = await clinicApi.saveDoctorPayment(payment);
@@ -396,7 +410,9 @@ export function DoctorOfficePanel({
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-xs">Días que atiendo</Label>
+                <Label className="text-xs">
+                  Días que atiendo <span className="text-red-600">(obligatorio)</span>
+                </Label>
                 <Button
                   type="button"
                   variant="ghost"
@@ -740,6 +756,44 @@ export function DoctorOfficePanel({
               )}
             </div>
 
+            {(payment.alias || payment.cbu || payment.beneficiaryName) && (
+              <div
+                className={cn(
+                  "rounded-lg border p-3 space-y-1.5",
+                  payment.mercadopagoEnabled
+                    ? "border-[#009ee3]/30 bg-sky-50/50"
+                    : "border-slate-200 bg-slate-50/50",
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  {payment.mercadopagoEnabled ? (
+                    <Wallet className="h-4 w-4 text-[#009ee3]" />
+                  ) : (
+                    <Landmark className="h-4 w-4 text-slate-600" />
+                  )}
+                  <p className="text-xs font-semibold text-slate-700">
+                    {payment.mercadopagoEnabled ? "Mercado Pago" : "Cuenta bancaria"}
+                  </p>
+                </div>
+                {payment.alias && (
+                  <p className="text-xs text-slate-600">
+                    Alias: <span className="font-medium text-slate-900">{payment.alias}</span>
+                  </p>
+                )}
+                {payment.cbu && (
+                  <p className="text-xs text-slate-600">
+                    CBU/CVU: <span className="font-medium text-slate-900">{payment.cbu}</span>
+                  </p>
+                )}
+                {!payment.mercadopagoEnabled && payment.beneficiaryName && (
+                  <p className="text-xs text-slate-600">
+                    Titular:{" "}
+                    <span className="font-medium text-slate-900">{payment.beneficiaryName}</span>
+                  </p>
+                )}
+              </div>
+            )}
+
             <p className="text-[11px] text-slate-500">
               Transferencia manual: alias/CBU/CVU abajo. MP tiene prioridad si está activo
               y hay honorario cargado.
@@ -761,7 +815,9 @@ export function DoctorOfficePanel({
                 </Select>
               </div>
               <div>
-                <Label className="text-xs">Honorario consulta</Label>
+                <Label className="text-xs">
+                  Honorario consulta <span className="text-red-600">(obligatorio)</span>
+                </Label>
                 <div className="relative mt-1">
                   <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-500">
                     {currencySymbol(payment.currency)}

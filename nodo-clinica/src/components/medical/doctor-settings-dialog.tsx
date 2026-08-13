@@ -372,6 +372,14 @@ export function DoctorSettingsDialog({
   };
 
   const handleSave = async () => {
+    if (availability.days.length === 0) {
+      toast.error("Cargá al menos un día de atención en Agenda antes de guardar");
+      return;
+    }
+    if (!payment.consultationFee || payment.consultationFee <= 0) {
+      toast.error("El honorario de consulta es obligatorio, en Cobros");
+      return;
+    }
     setSaving(true);
     try {
       const result = await clinicApi.saveDoctorOffice({
@@ -514,7 +522,9 @@ export function DoctorSettingsDialog({
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label className="text-xs">Días que atiendo</Label>
+                      <Label className="text-xs">
+                        Días que atiendo <span className="text-red-600">(obligatorio)</span>
+                      </Label>
                       <Button
                         type="button"
                         variant="ghost"
@@ -1004,7 +1014,9 @@ export function DoctorSettingsDialog({
                       </Select>
                     </div>
                     <div>
-                      <Label className="text-xs">Honorario consulta</Label>
+                      <Label className="text-xs">
+                        Honorario consulta <span className="text-red-600">(obligatorio)</span>
+                      </Label>
                       <div className="relative mt-1">
                         <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-500">
                           {currencySymbol(payment.currency)}
