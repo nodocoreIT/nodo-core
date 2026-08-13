@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import { Input } from "@nodocore/shared-components";
@@ -15,6 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { syncContractInstallments } from "@/features/payments/lib/sync-contract-installments";
 import { PAYMENTS_QUERY_KEY } from "@/features/payments/hooks/use-payments";
 import { CONTRACTS_QUERY_KEY } from "@/features/contracts/hooks/use-contracts";
+import { useContractChargeConcepts } from "@/features/contracts/hooks/use-contract-charge-concepts";
 
 type GenerateOption = "from_start" | "from_date" | "none";
 
@@ -27,22 +28,29 @@ interface GeneratePaymentsDialogProps {
     rent_amount: number;
     currency: string;
     status: string;
-    expenses_amount: number;
   } | null;
   onClose: () => void;
+  /** True when this dialog follows an edit to an existing contract (not a brand-new one) — defaults to "No generar por ahora" instead of regenerating from the start. */
+  isEdit?: boolean;
 }
 
 export function GeneratePaymentsDialog({
   open,
   contract,
   onClose,
+  isEdit = false,
 }: GeneratePaymentsDialogProps) {
   const { orgId } = useAuth();
   const queryClient = useQueryClient();
-  const [option, setOption] = useState<GenerateOption>("from_start");
+  const { data: concepts = [] } = useContractChargeConcepts(contract?.id);
+  const [option, setOption] = useState<GenerateOption>(isEdit ? "none" : "from_start");
   const [fromDate, setFromDate] = useState("");
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) setOption(isEdit ? "none" : "from_start");
+  }, [open, isEdit]);
 
   async function handleConfirm() {
     if (!contract || !orgId) return;
@@ -57,7 +65,7 @@ export function GeneratePaymentsDialog({
     setIsPending(true);
     try {
       const from = option === "from_date" ? fromDate : undefined;
-      await syncContractInstallments(orgId, contract, from);
+      await syncContractInstallments(orgId, contract, concepts, from);
       await queryClient.invalidateQueries({ queryKey: PAYMENTS_QUERY_KEY });
       await queryClient.invalidateQueries({ queryKey: CONTRACTS_QUERY_KEY });
       onClose();

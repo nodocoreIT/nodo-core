@@ -48,6 +48,8 @@ import {
   useAnnulPayment,
   useDeletePayment,
 } from "../hooks/use-delete-payment";
+import { usePaymentCharges, useUpsertPaymentCharges } from "../hooks/use-payment-charges";
+import { useContractChargeConcepts } from "@/features/contracts/hooks/use-contract-charge-concepts";
 import { formatPeriod } from "../lib/payment-labels";
 import { remainingAmount } from "@/features/dashboard/lib/dashboard-payment-utils";
 import { formatMoney, formatDate } from "@/features/contracts/lib/contract-labels";
@@ -138,6 +140,11 @@ export function PaymentCollectDialog({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const { data: chargeConcepts = [] } = useContractChargeConcepts(payment?.contract_id);
+  const { data: savedCharges = [] } = usePaymentCharges(payment?.id);
+  const upsertPaymentCharges = useUpsertPaymentCharges();
+  const [chargeAmounts, setChargeAmounts] = useState<Record<string, string>>({});
+
   const currency = (payment?.currency ?? "ARS") as "ARS" | "USD";
 
   const form = useForm<FormValues>({
@@ -186,12 +193,32 @@ export function PaymentCollectDialog({
             : "",
         commissionAccountId: defaultAccount?.id ?? "",
       });
+
+      if (chargeConcepts.length > 0) {
+        const prefill: Record<string, string> = {};
+        for (const concept of chargeConcepts) {
+          const saved = savedCharges.find((c) => c.concept_id === concept.id);
+          if (saved && saved.amount > 0) {
+            prefill[concept.id] = formatCurrencyInput(String(Math.round(saved.amount)), currency);
+          } else if (concept.default_amount != null && concept.default_amount > 0) {
+            // No payment_charges row yet for this concept — fall back to the
+            // contract's default (e.g. Expensas), still editable per month.
+            prefill[concept.id] = formatCurrencyInput(
+              String(Math.round(concept.default_amount)),
+              currency,
+            );
+          } else {
+            prefill[concept.id] = "";
+          }
+        }
+        setChargeAmounts(prefill);
+      }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [open, payment, isPaid, accounts, currency, form, today]);
+  }, [open, payment, isPaid, accounts, currency, form, today, chargeConcepts, savedCharges]);
 
   async function handleSubmit(values: FormValues) {
     if (!payment || !orgId) return;
@@ -209,9 +236,15 @@ export function PaymentCollectDialog({
       return;
     }
 
-    const expenses = values.expensesAmount
-      ? parseCurrencyInput(values.expensesAmount) ?? 0
-      : 0;
+    const expenses =
+      chargeConcepts.length > 0
+        ? chargeConcepts.reduce(
+            (sum, concept) => sum + (parseCurrencyInput(chargeAmounts[concept.id]) ?? 0),
+            0,
+          )
+        : values.expensesAmount
+          ? parseCurrencyInput(values.expensesAmount) ?? 0
+          : 0;
 
     const periodMonth = periodToMonthInput(payment.period);
     const periodChanged = isPaid && values.periodMonth !== periodMonth;
@@ -236,6 +269,16 @@ export function PaymentCollectDialog({
     const isFullyPaid = isPaid || newPaidTotal >= payment.amount;
 
     try {
+      if (chargeConcepts.length > 0) {
+        await upsertPaymentCharges.mutateAsync({
+          payment_id: payment.id,
+          charges: chargeConcepts.map((concept) => ({
+            concept_id: concept.id,
+            amount: parseCurrencyInput(chargeAmounts[concept.id]) ?? 0,
+          })),
+        });
+      }
+
       await updatePayment.mutateAsync({
         id: payment.id,
         ...(periodChanged ? { period: newPeriod } : {}),
@@ -408,29 +451,57 @@ export function PaymentCollectDialog({
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="expensesAmount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Expensas / Otros (opcional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          inputMode="decimal"
-                          placeholder={currency === "USD" ? "US$ 0 — vacío si no aplica" : "$ 0 — vacío si no aplica"}
-                          value={field.value ?? ""}
-                          onChange={(e) => {
-                            const raw = e.target.value.replace(/\D/g, "");
-                            field.onChange(
-                              raw ? formatCurrencyInput(raw, currency) : "",
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {chargeConcepts.length > 0 ? (
+                  <div className="flex flex-col gap-3">
+                    {chargeConcepts.map((concept) => (
+                      <FormItem key={concept.id}>
+                        <FormLabel>{concept.label} (opcional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            inputMode="decimal"
+                            placeholder={
+                              currency === "USD"
+                                ? "US$ 0 — vacío si no aplica"
+                                : "$ 0 — vacío si no aplica"
+                            }
+                            value={chargeAmounts[concept.id] ?? ""}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, "");
+                              setChargeAmounts((prev) => ({
+                                ...prev,
+                                [concept.id]: raw ? formatCurrencyInput(raw, currency) : "",
+                              }));
+                            }}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    ))}
+                  </div>
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="expensesAmount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Expensas / Otros (opcional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            inputMode="decimal"
+                            placeholder={currency === "USD" ? "US$ 0 — vacío si no aplica" : "$ 0 — vacío si no aplica"}
+                            value={field.value ?? ""}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, "");
+                              field.onChange(
+                                raw ? formatCurrencyInput(raw, currency) : "",
+                              );
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <FormField
                   control={form.control}

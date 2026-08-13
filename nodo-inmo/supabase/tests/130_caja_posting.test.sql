@@ -2,7 +2,7 @@
 --
 -- TDD: RED before the trigger migration, GREEN after.
 begin;
-select plan(8);
+select plan(10);
 
 insert into auth.users (id, email, encrypted_password, created_at, updated_at) values
   ('e1000000-0000-0000-0000-000000000001', 'admin-p@test.local', 'x', now(), now());
@@ -66,6 +66,24 @@ select is(
 select is(
   (select count(*)::int from nodo_inmo.owner_settlements where payment_id = 'a0000000-0000-0000-0000-0000000000b2'),
   0, 'no-owner cobro: no settlement created');
+
+-- Regression: commission must be computed on rent (amount) only, never on
+-- gross (amount + expenses_amount). Owner P has 10% commission.
+insert into nodo_inmo.payments (id, org_id, contract_id, period, due_date, amount, expenses_amount) values
+  ('a0000000-0000-0000-0000-0000000000b3', 'e0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-0000000000a1', '2026-02-01', '2026-02-10', 300000, 50000);
+
+update nodo_inmo.payments set status = 'paid', paid_date = '2026-02-08'
+where id = 'a0000000-0000-0000-0000-0000000000b3';
+
+-- Commission = 10% of 300000 (rent) = 30000, NOT 10% of 350000 (gross) = 35000
+select is(
+  (select amount from nodo_inmo.cash_movements where payment_id = 'a0000000-0000-0000-0000-0000000000b3' and source = 'commission'),
+  30000.00, 'commission is computed on rent only, not on gross (rent + expensas)');
+
+-- Owner settlement = gross - commission = 350000 - 30000 = 320000
+select is(
+  (select amount from nodo_inmo.owner_settlements where payment_id = 'a0000000-0000-0000-0000-0000000000b3'),
+  320000.00, 'owner settlement still nets out from gross, only the commission base changed');
 
 select * from finish();
 rollback;

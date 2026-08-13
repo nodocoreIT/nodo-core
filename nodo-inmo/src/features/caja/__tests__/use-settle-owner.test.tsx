@@ -1,9 +1,11 @@
 /**
- * TDD — useSettleOwner (PR-B rewire to settle_owner RPC)
+ * useSettleOwner — batch settlement across every property of an owner.
  *
- * The hook must call supabase.schema('nodo_inmo').rpc('settle_owner', {...})
- * instead of three sequential .from() calls. The RPC handles atomicity,
- * breakdown write, and expense stamping server-side.
+ * The hook calls supabase.schema('nodo_inmo').rpc('settle_owner', {...}) once
+ * per property, in sequence (the RPC is transactional per-property, there is
+ * no cross-property transaction). If a call fails partway through, the
+ * properties already settled stay settled — the hook must surface a
+ * PartialSettleOwnerError carrying those results instead of losing them.
  */
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -19,7 +21,7 @@ vi.mock("@/shared/lib/supabase", () => ({
   },
 }));
 
-import { useSettleOwner } from "@/features/caja/hooks/use-settle-owner";
+import { PartialSettleOwnerError, useSettleOwner } from "@/features/caja/hooks/use-settle-owner";
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const client = new QueryClient({
@@ -28,77 +30,100 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
-const sampleBreakdown = {
-  version: 1,
+const breakdownA = {
+  version: 2,
   currency: "ARS",
   gross: 500000,
   commission_rate: 10,
   commission: 50000,
   owner_share: 450000,
-  deductions: [{ expense_id: "e1", amount: 12000, description: "Plomeria", expense_date: "2026-05-14", type: "arreglo" }],
-  deduction_total: 12000,
-  net: 438000,
-  settlement_group: "group-uuid",
+  deductions: [],
+  deduction_total: 0,
+  net: 450000,
+  settlement_group: "group-a",
   sealed_at: "2026-06-04T12:00:00Z",
-  cobro_count: 2,
+  cobro_count: 1,
+  property_id: "p1",
+};
+
+const breakdownB = {
+  ...breakdownA,
+  gross: 300000,
+  commission: 30000,
+  owner_share: 270000,
+  net: 270000,
+  settlement_group: "group-b",
+  property_id: "p2",
 };
 
 describe("useSettleOwner", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: RPC succeeds and returns the breakdown
-    mockRpc.mockResolvedValue({ data: sampleBreakdown, error: null });
     mockSchema.mockReturnValue({ rpc: mockRpc, from: mockFrom });
   });
 
-  // R-B10 / R-B13: hook calls the RPC (not from().update())
-  it("calls supabase.schema('nodo_inmo').rpc('settle_owner') with correct params", async () => {
+  it("calls the RPC once per property with correct params", async () => {
+    mockRpc
+      .mockResolvedValueOnce({ data: breakdownA, error: null })
+      .mockResolvedValueOnce({ data: breakdownB, error: null });
+
     const { result } = renderHook(() => useSettleOwner(), { wrapper });
 
     await act(async () => {
       await result.current.mutateAsync({
         owner_id: "o1",
         owner_name: "Juan",
-        settlement_ids: ["s1", "s2"],
-        total: 450000,
         currency: "ARS",
+        properties: [
+          { property_id: "p1", property_address: "Depto A", settlement_ids: ["s1"] },
+          { property_id: "p2", property_address: "Depto B", settlement_ids: ["s2", "s3"] },
+        ],
       });
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(mockSchema).toHaveBeenCalledWith("nodo_inmo");
-    expect(mockRpc).toHaveBeenCalledWith("settle_owner", {
+    expect(mockRpc).toHaveBeenNthCalledWith(1, "settle_owner", {
       p_owner_id: "o1",
+      p_property_id: "p1",
       p_currency: "ARS",
-      p_settlement_ids: ["s1", "s2"],
+      p_settlement_ids: ["s1"],
     });
+    expect(mockRpc).toHaveBeenNthCalledWith(2, "settle_owner", {
+      p_owner_id: "o1",
+      p_property_id: "p2",
+      p_currency: "ARS",
+      p_settlement_ids: ["s2", "s3"],
+    });
+    expect(mockRpc).toHaveBeenCalledTimes(2);
   });
 
-  // R-B13: hook does NOT make a separate .from('property_expenses').update() call
-  // (stamping is handled by the RPC server-side)
   it("does NOT call .from('property_expenses').update() — stamping is the RPC's job", async () => {
+    mockRpc.mockResolvedValue({ data: breakdownA, error: null });
+
     const { result } = renderHook(() => useSettleOwner(), { wrapper });
 
     await act(async () => {
       await result.current.mutateAsync({
         owner_id: "o1",
         owner_name: "Juan",
-        settlement_ids: ["s1", "s2"],
-        total: 450000,
         currency: "ARS",
+        properties: [{ property_id: "p1", property_address: "Depto A", settlement_ids: ["s1"] }],
       });
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    // The from() method must never be called (no client-side multi-mutation)
     expect(mockFrom).not.toHaveBeenCalledWith("property_expenses");
     expect(mockFrom).not.toHaveBeenCalledWith("owner_settlements");
   });
 
-  // R-B12: the RPC return value (breakdown JSONB) is forwarded as the mutation result
-  it("forwards the RPC return value as the mutation result", async () => {
+  it("resolves with one SettledPropertyResult per property, breakdown forwarded verbatim", async () => {
+    mockRpc
+      .mockResolvedValueOnce({ data: breakdownA, error: null })
+      .mockResolvedValueOnce({ data: breakdownB, error: null });
+
     const { result } = renderHook(() => useSettleOwner(), { wrapper });
     let returned: unknown;
 
@@ -106,99 +131,91 @@ describe("useSettleOwner", () => {
       returned = await result.current.mutateAsync({
         owner_id: "o1",
         owner_name: "Juan",
-        settlement_ids: ["s1", "s2"],
-        total: 450000,
         currency: "ARS",
+        properties: [
+          { property_id: "p1", property_address: "Depto A", settlement_ids: ["s1"] },
+          { property_id: "p2", property_address: "Depto B", settlement_ids: ["s2"] },
+        ],
       });
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(returned).toEqual(sampleBreakdown);
+    expect(returned).toEqual([
+      { property_id: "p1", property_address: "Depto A", breakdown: breakdownA },
+      { property_id: "p2", property_address: "Depto B", breakdown: breakdownB },
+    ]);
   });
 
-  // R-B14: if rpc() rejects, the mutation surfaces the error (no swallowing)
-  it("surfaces the error when rpc() rejects", async () => {
-    const testError = new Error("settle_owner: admin role required");
-    mockRpc.mockResolvedValue({ data: null, error: testError });
+  it("surfaces a PartialSettleOwnerError with the already-settled properties when a later call fails", async () => {
+    const testError = new Error("settle_owner: some settlements are missing, already settled, or already sealed");
+    mockRpc
+      .mockResolvedValueOnce({ data: breakdownA, error: null })
+      .mockResolvedValueOnce({ data: null, error: testError });
 
     const { result } = renderHook(() => useSettleOwner(), { wrapper });
 
     await act(async () => {
-      try {
-        await result.current.mutateAsync({
-          owner_id: "o1",
-          owner_name: "Juan",
-          settlement_ids: ["s1", "s2"],
-          total: 450000,
-          currency: "ARS",
-        });
-      } catch {
-        // expected
-      }
+      await result.current.mutateAsync({
+        owner_id: "o1",
+        owner_name: "Juan",
+        currency: "ARS",
+        properties: [
+          { property_id: "p1", property_address: "Depto A", settlement_ids: ["s1"] },
+          { property_id: "p2", property_address: "Depto B", settlement_ids: ["s2"] },
+        ],
+      }).catch(() => {
+        // expected — asserted below via result.current.error
+      });
     });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(result.current.error).toBe(testError);
+    const error = result.current.error as PartialSettleOwnerError;
+    expect(error).toBeInstanceOf(PartialSettleOwnerError);
+    expect(error.succeeded).toEqual([
+      { property_id: "p1", property_address: "Depto A", breakdown: breakdownA },
+    ]);
+    expect(error.failedPropertyAddress).toBe("Depto B");
+    // Stops after the failure — never calls the RPC for properties after the failed one
+    expect(mockRpc).toHaveBeenCalledTimes(2);
   });
 
-  // R-B16: hook passes only the p_settlement_ids provided; no client-side re-filtering
-  it("passes p_settlement_ids verbatim — no client-side re-filtering", async () => {
+  it("skips properties with empty settlement_ids without calling the RPC for them", async () => {
+    mockRpc.mockResolvedValueOnce({ data: breakdownB, error: null });
+
     const { result } = renderHook(() => useSettleOwner(), { wrapper });
 
     await act(async () => {
       await result.current.mutateAsync({
         owner_id: "o1",
         owner_name: "Juan",
-        settlement_ids: ["s1", "s2", "s3"],
-        total: 675000,
         currency: "ARS",
+        properties: [
+          { property_id: "p1", property_address: "Depto A", settlement_ids: [] },
+          { property_id: "p2", property_address: "Depto B", settlement_ids: ["s2"] },
+        ],
       });
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockRpc).toHaveBeenCalledWith("settle_owner", {
-      p_owner_id: "o1",
-      p_currency: "ARS",
-      p_settlement_ids: ["s1", "s2", "s3"],
-    });
-  });
-
-  // R-B18: no code path in the hook calls a breakdown UPDATE on an already-sealed row
-  // (seal-once guard lives in the RPC; the hook has a single RPC call, no update-breakdown path)
-  it("makes exactly one RPC call per mutation — no separate breakdown update path", async () => {
-    const { result } = renderHook(() => useSettleOwner(), { wrapper });
-
-    await act(async () => {
-      await result.current.mutateAsync({
-        owner_id: "o1",
-        owner_name: "Juan",
-        settlement_ids: ["s1"],
-        total: 225000,
-        currency: "ARS",
-      });
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    // Only one RPC call total
     expect(mockRpc).toHaveBeenCalledTimes(1);
-    expect(mockRpc).toHaveBeenCalledWith("settle_owner", expect.any(Object));
+    expect(mockRpc).toHaveBeenCalledWith("settle_owner", expect.objectContaining({ p_property_id: "p2" }));
   });
 
-  // Empty settlement_ids: early return without calling RPC
-  it("returns early without calling RPC when settlement_ids is empty", async () => {
+  it("returns an empty array without calling the RPC when there are no properties", async () => {
     const { result } = renderHook(() => useSettleOwner(), { wrapper });
+    let returned: unknown;
 
     await act(async () => {
-      await result.current.mutateAsync({
+      returned = await result.current.mutateAsync({
         owner_id: "o1",
         owner_name: "Juan",
-        settlement_ids: [],
-        total: 0,
         currency: "ARS",
+        properties: [],
       });
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(returned).toEqual([]);
     expect(mockRpc).not.toHaveBeenCalled();
   });
 });

@@ -308,10 +308,12 @@ describe("computeSettlementBreakdown", () => {
     expect(result.commission).toBe(100);
   });
 
-  it("gross includes rent and expenses_amount from cobros", () => {
+  it("gross includes rent and expenses_amount from cobros, commission passed through verbatim (computed on rent only upstream)", () => {
     const result = computeSettlementBreakdown(
+      // commissionMovements carries 44000 = 10% of rent (440000) only, never of gross —
+      // this function never recomputes it, just sums what the trigger already posted.
       [{ id: "p1", amount: 440000, expenses_amount: 50000, currency: "ARS" }],
-      [{ payment_id: "p1", amount: 49000 }],
+      [{ payment_id: "p1", amount: 44000 }],
       [],
       10,
       "ARS",
@@ -319,7 +321,68 @@ describe("computeSettlementBreakdown", () => {
     expect(result.rent_gross).toBe(440000);
     expect(result.expenses_gross).toBe(50000);
     expect(result.gross).toBe(490000);
-    expect(result.commission).toBe(49000);
-    expect(result.owner_share).toBe(441000);
+    expect(result.commission).toBe(44000);
+    expect(result.owner_share).toBe(446000);
+  });
+
+  it("rent_net_of_commission = rent_gross - commission, declared for the end-of-statement subtotal", () => {
+    const result = computeSettlementBreakdown(
+      [{ id: "p1", amount: 500000, expenses_amount: 125000, currency: "ARS" }],
+      [{ payment_id: "p1", amount: 50000 }],
+      [],
+      10,
+      "ARS",
+    );
+    expect(result.rent_net_of_commission).toBe(450000);
+  });
+
+  it("charges: non-retained payment_charges are summed by label, retained ones excluded", () => {
+    const result = computeSettlementBreakdown(
+      [{ id: "p1", amount: 500000, currency: "ARS" }, { id: "p2", amount: 500000, currency: "ARS" }],
+      [],
+      [],
+      10,
+      "ARS",
+      [
+        { payment_id: "p1", concept_label: "Expensas", retained_by_agency: false, amount: 90000 },
+        { payment_id: "p2", concept_label: "Expensas", retained_by_agency: false, amount: 90000 },
+        { payment_id: "p1", concept_label: "Gas", retained_by_agency: true, amount: 15000 },
+        // Not in the batch — must be excluded even though it's non-retained.
+        { payment_id: "p3", concept_label: "Luz", retained_by_agency: false, amount: 5000 },
+      ],
+    );
+    expect(result.charges).toEqual([{ label: "Expensas", amount: 180000 }]);
+  });
+
+  it("charges: an untracked expenses_amount (no matching payment_charges row) surfaces as a generic fallback line", () => {
+    // Regression: a pending installment generated before its contract had a
+    // concept configured has expenses_amount set but no payment_charges row —
+    // the gap must still show up, not vanish while still counting toward net.
+    const result = computeSettlementBreakdown(
+      [{ id: "p1", amount: 500000, expenses_amount: 50000, currency: "ARS" }],
+      [{ payment_id: "p1", amount: 44000 }],
+      [],
+      10,
+      "ARS",
+      [], // no payment_charges at all for this payment
+    );
+    expect(result.charges).toEqual([
+      { label: "Expensas / Otros (sin discriminar)", amount: 50000 },
+    ]);
+  });
+
+  it("charges: a partially-tracked expenses_amount only surfaces the untracked remainder", () => {
+    const result = computeSettlementBreakdown(
+      [{ id: "p1", amount: 500000, expenses_amount: 90000, currency: "ARS" }],
+      [{ payment_id: "p1", amount: 44000 }],
+      [],
+      10,
+      "ARS",
+      [{ payment_id: "p1", concept_label: "Expensas", retained_by_agency: false, amount: 50000 }],
+    );
+    expect(result.charges).toEqual([
+      { label: "Expensas", amount: 50000 },
+      { label: "Expensas / Otros (sin discriminar)", amount: 40000 },
+    ]);
   });
 });

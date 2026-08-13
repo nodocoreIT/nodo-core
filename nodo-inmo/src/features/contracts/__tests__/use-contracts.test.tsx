@@ -73,6 +73,7 @@ describe("useContracts", () => {
         guarantors: [
           { guarantor_id: "g-1", guarantor: { name: "Ana López", dni: "25555555", address: "Rivadavia 500" } },
         ],
+        charge_concepts: [],
         rent_amount: 250000,
         currency: "ARS",
         status: "active",

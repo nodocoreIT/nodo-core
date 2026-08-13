@@ -17,13 +17,13 @@ import {
   TableRow,
 } from "@nodocore/shared-components";
 import { useOwnerSettlements } from "@/features/caja/hooks/use-owner-settlements";
-import { useSettleOwner } from "@/features/caja/hooks/use-settle-owner";
+import { PartialSettleOwnerError, useSettleOwner } from "@/features/caja/hooks/use-settle-owner";
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import { usePdfLogoUrl } from "@/features/agency-profile/hooks/use-pdf-logo-url";
-import { groupPendingByProperty } from "@/features/caja/lib/caja-math";
-import { buildPendingStatementData } from "@/features/caja/lib/pending-settlement-pdf";
+import { groupPendingByOwnerWithProperties } from "@/features/caja/lib/caja-math";
+import { buildPendingStatementDataForOwner } from "@/features/caja/lib/pending-settlement-pdf";
 import { usePendingExpenses } from "@/features/caja/hooks/use-pending-expenses";
-import { buildStatementData, type SealedBreakdown, type StatementData } from "@/features/caja/lib/settlement-statement-data";
+import { buildStatementData, combineSealedBreakdowns, type StatementData } from "@/features/caja/lib/settlement-statement-data";
 import { handleDownload, handleShare } from "@/features/caja/lib/settlement-pdf-actions";
 import { SettlementPdfViewer } from "./settlement-pdf-viewer";
 import { formatMoney } from "@/features/contracts/lib/contract-labels";
@@ -40,15 +40,16 @@ export function RendicionesPage() {
   const [finalizeLoading, setFinalizeLoading] = useState<string | null>(null);
   const [finalizedStatement, setFinalizedStatement] = useState<StatementData | null>(null);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
+  const [finalizeError, setFinalizeError] = useState<string | null>(null);
 
   const allSettlements = data ?? [];
-  const pendingGroups = groupPendingByProperty(allSettlements);
+  const pendingGroups = groupPendingByOwnerWithProperties(allSettlements);
 
   async function openPreview(group: (typeof pendingGroups)[number]) {
-    const key = `${group.owner_id}:${group.property_id}:${group.currency}`;
+    const key = `${group.owner_id}:${group.currency}`;
     setPreviewLoadingKey(key);
     try {
-      const statement = await buildPendingStatementData(
+      const statement = await buildPendingStatementDataForOwner(
         group,
         allSettlements,
         agency ?? null,
@@ -62,21 +63,24 @@ export function RendicionesPage() {
   }
 
   async function handleFinalize(group: (typeof pendingGroups)[number]) {
-    const key = `${group.owner_id}:${group.property_id}:${group.currency}`;
+    const key = `${group.owner_id}:${group.currency}`;
     setFinalizeLoading(key);
+    setFinalizeError(null);
     try {
-      const sealedJson = await settleOwner.mutateAsync({
+      const results = await settleOwner.mutateAsync({
         owner_id: group.owner_id,
         owner_name: group.owner_name,
-        property_id: group.property_id,
-        settlement_ids: group.settlement_ids,
-        total: group.total,
         currency: group.currency,
+        properties: group.properties.map((p) => ({
+          property_id: p.property_id,
+          property_address: p.property_address,
+          settlement_ids: p.settlement_ids,
+        })),
       });
-      if (sealedJson) {
-        const sealed = sealedJson as unknown as SealedBreakdown;
+      if (results.length > 0) {
+        const breakdown = combineSealedBreakdowns(results);
         const statement = buildStatementData({
-          breakdown: { ...sealed, currency: group.currency },
+          breakdown,
           agency: agency ?? null,
           logoUrl: logoUrl ?? null,
           ownerName: group.owner_name,
@@ -84,6 +88,26 @@ export function RendicionesPage() {
         });
         setFinalizedStatement(statement);
         setFinalizeOpen(true);
+      }
+    } catch (err) {
+      if (err instanceof PartialSettleOwnerError) {
+        if (err.succeeded.length > 0) {
+          const breakdown = combineSealedBreakdowns(err.succeeded);
+          const statement = buildStatementData({
+            breakdown,
+            agency: agency ?? null,
+            logoUrl: logoUrl ?? null,
+            ownerName: group.owner_name,
+            settledDate: new Date().toISOString().slice(0, 10),
+          });
+          setFinalizedStatement(statement);
+          setFinalizeOpen(true);
+        }
+        setFinalizeError(
+          `Se liquidaron ${err.succeeded.length} de ${group.properties.length} propiedades de ${group.owner_name}. Falló en "${err.failedPropertyAddress}" — reintentá para completar el resto.`,
+        );
+      } else {
+        setFinalizeError(`No se pudo rendir a ${group.owner_name}. Intentá de nuevo.`);
       }
     } finally {
       setFinalizeLoading(null);
@@ -127,6 +151,15 @@ export function RendicionesPage() {
         </div>
       )}
 
+      {finalizeError && (
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          {finalizeError}
+        </div>
+      )}
+
       {!isLoading && !expensesLoading && !isError && pendingGroups.length === 0 && (
         <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed border-mist py-16 text-center">
           <p className="text-sm font-medium text-slate2">
@@ -156,13 +189,17 @@ export function RendicionesPage() {
             </TableHeader>
             <TableBody>
               {pendingGroups.map((group) => {
-                const rowKey = `${group.owner_id}:${group.property_id}:${group.currency}`;
+                const rowKey = `${group.owner_id}:${group.currency}`;
                 const isPreviewLoading = previewLoadingKey === rowKey;
+                const propertyIds = new Set(group.properties.map((p) => p.property_id));
+                const propertyAddresses = group.properties
+                  .map((p) => p.property_address)
+                  .join(", ");
 
-                // Sumar los gastos que corresponden a esta propiedad y moneda
+                // Sumar los gastos que corresponden a cualquiera de las propiedades del dueño, en esta moneda
                 const propExpenses = (expenses ?? []).filter(
                   (e) =>
-                    e.property_id === group.property_id &&
+                    propertyIds.has(e.property_id) &&
                     e.currency === group.currency
                 );
                 const expensesTotal = propExpenses.reduce((acc, curr) => acc + curr.amount, 0);
@@ -177,8 +214,8 @@ export function RendicionesPage() {
                     <TableCell className="font-semibold text-navy">
                       {group.owner_name}
                     </TableCell>
-                    <TableCell className="text-sm text-slate2">
-                      {group.property_address}
+                    <TableCell className="text-sm text-slate2" title={propertyAddresses}>
+                      {propertyAddresses}
                     </TableCell>
                     <TableCell>
                       <span className="inline-flex rounded-pill bg-mist px-2.5 py-0.5 text-xs font-semibold text-slate2">

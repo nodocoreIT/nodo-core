@@ -12,7 +12,15 @@ export type ContactParty = {
   phone?: string | null;
 };
 
-/** Contract row enriched with deeply embedded property (+ owner), tenant (+ dni), and guarantors (+ dni). */
+export type ContractChargeConcept = {
+  id: string;
+  label: string;
+  retained_by_agency: boolean;
+  default_amount: number | null;
+  sort_order: number;
+};
+
+/** Contract row enriched with deeply embedded property (+ owner), tenant (+ dni), guarantors (+ dni), and charge concepts. */
 export type ContractWithRelations = ContractRow & {
   property:
     | {
@@ -26,6 +34,7 @@ export type ContractWithRelations = ContractRow & {
     | null;
   tenant: ContactParty | null;
   guarantors: { guarantor_id: string; guarantor: ContactParty | null }[];
+  charge_concepts: ContractChargeConcept[];
 };
 
 export const CONTRACTS_QUERY_KEY = ["nodo_inmo", "contracts"] as const;
@@ -56,7 +65,8 @@ export function useContracts(options: UseContractsOptions = {}) {
             "owner:contacts!properties_owner_contact_id_fkey(name, dni, email, phone, address)" +
           "), " +
           "tenant:contacts!contracts_tenant_id_fkey(name, dni, address, phone), " +
-          "guarantors:contract_guarantors(guarantor_id, guarantor:contacts!contract_guarantors_guarantor_id_fkey(name, dni, address, phone))",
+          "guarantors:contract_guarantors(guarantor_id, guarantor:contacts!contract_guarantors_guarantor_id_fkey(name, dni, address, phone)), " +
+          "charge_concepts:contract_charge_concepts(id, label, retained_by_agency, default_amount, sort_order, active)",
         )
         .order("created_at", { ascending: false });
 
@@ -67,7 +77,19 @@ export function useContracts(options: UseContractsOptions = {}) {
       const { data, error } = await query;
 
       if (error) throw error;
-      return (data ?? []) as unknown as ContractWithRelations[];
+      type RawContract = Omit<ContractWithRelations, "charge_concepts"> & {
+        charge_concepts: (ContractChargeConcept & { active: boolean })[];
+      };
+      const contracts = (data ?? []) as unknown as RawContract[];
+
+      // The embed brings every concept regardless of `active` — filter to
+      // active-only here rather than relying on PostgREST embed filters.
+      return contracts.map((c) => ({
+        ...c,
+        charge_concepts: (c.charge_concepts ?? [])
+          .filter((cc) => cc.active)
+          .sort((a, b) => a.sort_order - b.sort_order),
+      }));
     },
   });
 }

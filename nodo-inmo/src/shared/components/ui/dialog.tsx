@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { Maximize2, Minimize2, X } from "lucide-react";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -32,33 +32,51 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        // Base
-        "fixed z-50 grid w-full gap-4 border border-[var(--color-border)] bg-[var(--color-card)] p-6 shadow-[var(--shadow-lg)] duration-200 rounded-md",
-        // Animations
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-        // Mobile: top-pinned with safe margins, scrollable so content is always reachable
-        "inset-x-4 top-4 w-[calc(100%-2rem)] translate-x-0 translate-y-0 max-h-[calc(100dvh-2rem)] overflow-y-auto",
-        // Desktop: centered as usual
-        "sm:inset-x-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-lg sm:max-h-[calc(100dvh-4rem)]",
-        "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-        className,
-      )}
-      {...props}
-    >
-      {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-[var(--color-background)] transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)] focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-[var(--color-accent)] data-[state=open]:text-[var(--color-muted-foreground)]">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPortal>
-));
+>(({ className, children, ...props }, ref) => {
+  const [isMaximized, setIsMaximized] = React.useState(false);
+
+  return (
+    <DialogPortal>
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        ref={ref}
+        className={cn(
+          // Base
+          "fixed z-50 grid w-full gap-4 border border-[var(--color-border)] bg-[var(--color-card)] p-6 shadow-[var(--shadow-lg)] duration-200 rounded-md",
+          // Animations
+          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          // Mobile: top-pinned with safe margins, scrollable so content is always reachable
+          "inset-x-4 top-4 w-[calc(100%-2rem)] translate-x-0 translate-y-0 max-h-[calc(100dvh-2rem)] overflow-y-auto",
+          // Desktop: centered as usual
+          "sm:inset-x-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-lg sm:max-h-[calc(100dvh-4rem)]",
+          "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+          className,
+          // Maximize override: comes after `className` so it always wins over
+          // any per-dialog size (max-w-lg, max-w-4xl, etc.) once toggled on.
+          isMaximized &&
+            "h-[95vh] max-h-[95vh] w-[96vw] max-w-[96vw] sm:max-h-[95vh] sm:max-w-[96vw]",
+        )}
+        {...props}
+      >
+        {children}
+        <button
+          type="button"
+          onClick={() => setIsMaximized((m) => !m)}
+          aria-label={isMaximized ? "Restaurar tamaño" : "Maximizar"}
+          title={isMaximized ? "Restaurar tamaño" : "Maximizar"}
+          className="absolute right-11 top-4 rounded-sm opacity-70 ring-offset-[var(--color-background)] transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)] focus:ring-offset-2"
+        >
+          {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          <span className="sr-only">{isMaximized ? "Restaurar tamaño" : "Maximizar"}</span>
+        </button>
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-[var(--color-background)] transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)] focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-[var(--color-accent)] data-[state=open]:text-[var(--color-muted-foreground)]">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  );
+});
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogHeader = ({
