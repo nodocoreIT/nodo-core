@@ -670,9 +670,11 @@ function publicPaymentSettings(
   return {
     consultationFee: payment.consultationFee,
     currency: payment.currency ?? "ARS",
-    alias: payment.alias,
-    cbu: payment.cbu,
-    beneficiaryName: payment.beneficiaryName,
+    // Si no hay cuenta alternativa cargada, mostramos los datos de la cuenta
+    // de Mercado Pago como alias/CBU de transferencia manual.
+    alias: payment.alias || payment.mercadopagoAlias,
+    cbu: payment.cbu || payment.mercadopagoCvu,
+    beneficiaryName: payment.beneficiaryName || payment.mercadopagoBeneficiaryName,
     bankName: payment.bankName,
     paymentInstructions: payment.paymentInstructions,
     qrImageData: payment.qrImageData,

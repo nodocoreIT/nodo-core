@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CreditCard, QrCode } from "lucide-react";
 import { currencySymbol } from "@/lib/clinic/currency";
@@ -40,38 +40,44 @@ export function ConsultationPaymentPanel({
     : null;
 
   return (
-    <Card className="border-emerald-200 bg-emerald-50/30 shadow-sm">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2 text-emerald-800">
-          <CreditCard className="h-4 w-4" />
-          Pago de la consulta
-        </CardTitle>
-        <p className="text-xs text-slate-500">Dr/a. {doctorName}</p>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {fee && (
-          <Badge className="bg-emerald-600 text-white text-sm px-3 py-1">
-            Honorario: {fee}
-          </Badge>
-        )}
-        {payment.alias && (
-          <p className="text-sm">
-            <span className="text-slate-500">Alias:</span>{" "}
-            <strong className="font-mono">{payment.alias}</strong>
-          </p>
-        )}
-        {payment.cbu && (
-          <p className="text-sm">
-            <span className="text-slate-500">CBU/CVU:</span>{" "}
-            <strong className="font-mono text-xs">{payment.cbu}</strong>
-          </p>
-        )}
-        {payment.beneficiaryName && (
-          <p className="text-sm">
-            <span className="text-slate-500">Titular:</span>{" "}
-            <strong>{payment.beneficiaryName}</strong>
-          </p>
-        )}
+    <Card size="sm" className="border-emerald-200 bg-emerald-50/30 shadow-sm">
+      <CardContent className="space-y-2">
+        <div className="flex flex-wrap items-start gap-x-10 gap-y-3">
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium flex items-center gap-2 text-emerald-800">
+              <CreditCard className="h-4 w-4" />
+              Pago de la consulta
+            </p>
+            <p className="text-xs text-slate-500">Dr/a. {doctorName}</p>
+            {fee && (
+              <Badge className="bg-emerald-600 text-white text-sm px-3 py-1 shrink-0 mt-1">
+                Honorario: {fee}
+              </Badge>
+            )}
+          </div>
+          {(payment.alias || payment.cbu || payment.beneficiaryName) && (
+            <div className="flex flex-col gap-1">
+              {payment.alias && (
+                <p className="text-sm">
+                  <span className="text-slate-500">Alias:</span>{" "}
+                  <strong className="font-mono">{payment.alias}</strong>
+                </p>
+              )}
+              {payment.cbu && (
+                <p className="text-sm">
+                  <span className="text-slate-500">CBU/CVU:</span>{" "}
+                  <strong className="font-mono text-xs">{payment.cbu}</strong>
+                </p>
+              )}
+              {payment.beneficiaryName && (
+                <p className="text-sm">
+                  <span className="text-slate-500">Titular:</span>{" "}
+                  <strong>{payment.beneficiaryName}</strong>
+                </p>
+              )}
+            </div>
+          )}
+        </div>
         {payment.paymentInstructions && (
           <p className="text-xs text-slate-600 whitespace-pre-wrap">
             {payment.paymentInstructions}

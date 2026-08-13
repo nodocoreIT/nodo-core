@@ -85,6 +85,7 @@ export async function GET(request: NextRequest) {
       profilePhotoUrl: professional.profile_photo_url,
       payment: {
         ...safePayment,
+        ...withTransferFallback(safePayment),
         mercadopagoReady: mpConnected && consultationFee > 0,
       },
     });
@@ -95,15 +96,59 @@ export async function GET(request: NextRequest) {
     .select("id, full_name, specialty, license_number, profile_photo_url")
     .not("enabled_at", "is", null);
 
-  return NextResponse.json(
-    (professionals ?? [])
-      .filter((p) => !isUnassignedSpecialty(p.specialty))
-      .map((p) => ({
-        id: p.id,
-        fullName: p.full_name,
-        specialty: p.specialty,
-        licenseNumber: p.license_number,
-        profilePhotoUrl: p.profile_photo_url,
-      })),
+  const activeProfessionals = (professionals ?? []).filter(
+    (p) => !isUnassignedSpecialty(p.specialty),
   );
+
+  const { data: officeSettingsRows } = activeProfessionals.length
+    ? await serviceClient
+        .from("office_settings")
+        .select("professional_id, payment")
+        .in(
+          "professional_id",
+          activeProfessionals.map((p) => p.id),
+        )
+    : { data: [] };
+
+  const paymentByProfessionalId = new Map<string, Record<string, unknown>>();
+  for (const row of officeSettingsRows ?? []) {
+    const payment = (row.payment as Record<string, unknown>) ?? {};
+    const {
+      mercadopagoAccessToken: _at,
+      mercadopagoRefreshToken: _rt,
+      mercadopagoPublicKey: _pk,
+      ...safePayment
+    } = payment;
+    paymentByProfessionalId.set(row.professional_id, {
+      ...safePayment,
+      ...withTransferFallback(safePayment),
+    });
+  }
+
+  return NextResponse.json(
+    activeProfessionals.map((p) => ({
+      id: p.id,
+      fullName: p.full_name,
+      specialty: p.specialty,
+      licenseNumber: p.license_number,
+      profilePhotoUrl: p.profile_photo_url,
+      payment: paymentByProfessionalId.get(p.id) ?? {},
+    })),
+  );
+}
+
+/**
+ * Cuando el médico no cargó una cuenta bancaria alternativa para transferencia
+ * manual (payment.alias / payment.cbu), usamos los datos de su cuenta de
+ * Mercado Pago (mercadopagoAlias / mercadopagoCvu) como alias/CBU a mostrarle
+ * al paciente, ya que esa cuenta también acepta transferencias comunes.
+ */
+function withTransferFallback(safePayment: Record<string, unknown>) {
+  return {
+    alias: (safePayment.alias as string | undefined) || (safePayment.mercadopagoAlias as string | undefined),
+    cbu: (safePayment.cbu as string | undefined) || (safePayment.mercadopagoCvu as string | undefined),
+    beneficiaryName:
+      (safePayment.beneficiaryName as string | undefined) ||
+      (safePayment.mercadopagoBeneficiaryName as string | undefined),
+  };
 }

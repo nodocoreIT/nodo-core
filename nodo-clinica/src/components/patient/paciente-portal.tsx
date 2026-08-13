@@ -389,6 +389,22 @@ export function PacientePortal() {
                           {doc.payment.consultationFee.toLocaleString("es-AR")}
                         </p>
                       )}
+                      {doc.payment?.alias && (
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Alias:{" "}
+                          <span className="font-mono text-slate-700">
+                            {doc.payment.alias}
+                          </span>
+                        </p>
+                      )}
+                      {doc.payment?.cbu && (
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          CBU/CVU:{" "}
+                          <span className="font-mono text-slate-700">
+                            {doc.payment.cbu}
+                          </span>
+                        </p>
+                      )}
                       <Badge variant="outline" className="text-xs mt-1">
                         Mat. {doc.licenseNumber}
                       </Badge>
