@@ -1,16 +1,17 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ObraSocialCombobox } from "@/components/ui/obra-social-combobox";
-import { User, Loader2, CheckCircle, ImagePlus, AlertCircle, X } from "lucide-react";
+import { User, Loader2, CheckCircle, AlertCircle, X } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi, OnboardingSubmitError } from "@/lib/clinic/client-api";
 import { CLINIC_BRAND_LOGO_SRC } from "@/lib/clinic/brand";
 import { NeuralNodesBackground } from "@/components/ui/neural-nodes-background";
 import { PhoneField } from "@/components/onboarding/phone-field";
 import { TermsAcceptanceModal } from "@/components/onboarding/terms-acceptance-modal";
+import { DniSlot } from "@/components/onboarding/dni-slot";
 import { PATIENT_SUBSCRIPTION_PLANS } from "@/lib/clinic/patient-subscription-plans";
 
 const PLANS = PATIENT_SUBSCRIPTION_PLANS;
@@ -29,50 +30,6 @@ const PATIENT_PLAN_DB_CODES: Record<string, string> = {
 const inputClass =
   "mt-1 w-full rounded-lg px-3 py-2.5 text-sm bg-white border border-slate-200 text-navy placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/25 focus:border-teal-500 transition-shadow [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_#ffffff] [&:-webkit-autofill]:[-webkit-text-fill-color:#1e293b]";
 const labelClass = "text-xs font-medium text-slate-300";
-
-interface DniSlotProps {
-  label: string;
-  file: File | null;
-  onChange: (file: File | null) => void;
-}
-
-function DniSlot({ label, file, onChange }: DniSlotProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const previewUrl = file ? URL.createObjectURL(file) : null;
-
-  return (
-    <div className="flex flex-col gap-1">
-      <span className={labelClass}>{label}</span>
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        className="mt-1 w-full rounded-xl border-2 border-dashed border-slate-200 hover:border-teal-400 transition-colors flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-teal-500 overflow-hidden relative bg-slate-50"
-        style={{ aspectRatio: "3/2" }}
-      >
-        {previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={previewUrl}
-            alt={label}
-            className="absolute inset-0 h-full w-full object-contain rounded-xl bg-slate-50"
-          />
-        ) : (
-          <>
-            <ImagePlus className="h-7 w-7" />
-            <span className="text-xs font-medium">Subir foto</span>
-          </>
-        )}
-      </button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="sr-only"
-        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-      />
-    </div>
-  );
-}
 
 function OnboardingPacienteContent() {
   const searchParams = useSearchParams();
@@ -284,8 +241,8 @@ function OnboardingPacienteContent() {
             <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Documento de identidad</p>
               <div className="grid grid-cols-2 gap-3 max-w-md">
-                <DniSlot label="DNI frente" file={dniFront} onChange={setDniFront} />
-                <DniSlot label="DNI dorso" file={dniBack} onChange={setDniBack} />
+                <DniSlot label="DNI frente" file={dniFront} onChange={setDniFront} labelClass={labelClass} />
+                <DniSlot label="DNI dorso" file={dniBack} onChange={setDniBack} labelClass={labelClass} />
               </div>
               <p className="text-xs" style={{ color: "rgba(234,240,247,.4)" }}>Las fotos son opcionales. Se usan para verificar tu identidad.</p>
             </div>

@@ -9,14 +9,10 @@ import {
 } from "@/lib/clinic/db/patients";
 import { TERMS_VERSION } from "@/lib/clinic/terms-content";
 import { notifyOnboardingCompleted } from "@/lib/clinic/onboarding-notify";
+import { uploadDniDocs } from "@/lib/clinic/dni-upload";
 
 /** Must match nodo_core.client_units/planes.unit_code exactly (case/accent-sensitive). */
 const UNIT_CODE = "Clínica";
-
-function getExtension(filename: string): string {
-  const parts = filename.split(".");
-  return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : "jpg";
-}
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -116,55 +112,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    let dniFrontPath: string | null = null;
-    let dniBackPath: string | null = null;
-
     // Upload DNI files before inserting the patient row
-    if (dniFront && dniFront.size > 0) {
-      const ext = getExtension(dniFront.name);
-      const storagePath = `${userId}/dni_front.${ext}`;
-      const buffer = await dniFront.arrayBuffer();
-
-      const { error: uploadError } = await serviceClient.storage
-        .from("clinic-registration-docs")
-        .upload(storagePath, buffer, {
-          contentType: dniFront.type || "image/jpeg",
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.error("[onboarding/paciente] DNI front upload error", uploadError);
-        return NextResponse.json(
-          { error: "Error al subir DNI frente. Reintentá." },
-          { status: 500 },
-        );
-      }
-
-      dniFrontPath = storagePath;
+    const uploadResult = await uploadDniDocs(serviceClient, userId, dniFront, dniBack);
+    if (!uploadResult.ok) {
+      console.error(`[onboarding/paciente] DNI ${uploadResult.side} upload error`, uploadResult.cause);
+      return NextResponse.json({ error: uploadResult.error }, { status: 500 });
     }
-
-    if (dniBack && dniBack.size > 0) {
-      const ext = getExtension(dniBack.name);
-      const storagePath = `${userId}/dni_back.${ext}`;
-      const buffer = await dniBack.arrayBuffer();
-
-      const { error: uploadError } = await serviceClient.storage
-        .from("clinic-registration-docs")
-        .upload(storagePath, buffer, {
-          contentType: dniBack.type || "image/jpeg",
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.error("[onboarding/paciente] DNI back upload error", uploadError);
-        return NextResponse.json(
-          { error: "Error al subir DNI dorso. Reintentá." },
-          { status: 500 },
-        );
-      }
-
-      dniBackPath = storagePath;
-    }
+    const { dniFrontPath, dniBackPath } = uploadResult;
 
     // Split fullName into first/last for the DB columns
     const nameParts = (fullName ?? "").trim().split(/\s+/);

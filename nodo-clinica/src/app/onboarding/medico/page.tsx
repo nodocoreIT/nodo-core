@@ -11,6 +11,7 @@ import { NeuralNodesBackground } from "@/components/ui/neural-nodes-background";
 import { ONBOARDING_PLANS, formatPlanPrice } from "@/lib/clinic/subscription-plans";
 import { PhoneField } from "@/components/onboarding/phone-field";
 import { TermsAcceptanceModal } from "@/components/onboarding/terms-acceptance-modal";
+import { DniSlot } from "@/components/onboarding/dni-slot";
 import { CLINIC_BRAND_LOGO_SRC } from "@/lib/clinic/brand";
 
 /**
@@ -48,6 +49,8 @@ function OnboardingMedicoContent() {
   });
   const [phone, setPhone] = useState("");
   const [phoneValid, setPhoneValid] = useState(false);
+  const [dniFront, setDniFront] = useState<File | null>(null);
+  const [dniBack, setDniBack] = useState<File | null>(null);
 
   const [livePricing, setLivePricing] = useState<
     Record<string, { label: string; amount: number; amountAnnual: number; currency: string }>
@@ -96,16 +99,18 @@ function OnboardingMedicoContent() {
   const submitRegistration = async () => {
     setLoading(true);
     try {
-      const result = await clinicApi.completeOnboardingMedico({
-        fullName: form.fullName,
-        specialty: form.specialty,
-        licenseNumber: form.licenseNumber,
-        dni: form.dni.trim(),
-        plan,
-        billingCycle,
-        token,
-        phone: phone.trim(),
-      });
+      const formData = new FormData();
+      formData.append("token", token);
+      formData.append("fullName", form.fullName);
+      formData.append("specialty", form.specialty);
+      formData.append("licenseNumber", form.licenseNumber);
+      formData.append("dni", form.dni.trim());
+      formData.append("plan", plan);
+      formData.append("billingCycle", billingCycle);
+      if (dniFront) formData.append("dniFront", dniFront);
+      if (dniBack) formData.append("dniBack", dniBack);
+      formData.append("phone", phone.trim());
+      const result = await clinicApi.completeOnboardingMedico(formData);
       if (result.checkoutUrl) {
         window.location.href = result.checkoutUrl;
         return;
@@ -234,6 +239,16 @@ function OnboardingMedicoContent() {
               onValidChange={setPhoneValid}
               labelClass={labelClass}
             />
+
+            {/* DNI upload */}
+            <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Documento de identidad</p>
+              <div className="grid grid-cols-2 gap-3 max-w-md">
+                <DniSlot label="DNI frente" file={dniFront} onChange={setDniFront} labelClass={labelClass} />
+                <DniSlot label="DNI dorso" file={dniBack} onChange={setDniBack} labelClass={labelClass} />
+              </div>
+              <p className="text-xs" style={{ color: "rgba(234,240,247,.4)" }}>Las fotos son opcionales. Se usan para verificar tu identidad.</p>
+            </div>
 
             {/* Planes */}
             <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4">

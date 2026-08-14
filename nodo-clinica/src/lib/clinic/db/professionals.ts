@@ -27,6 +27,8 @@ export interface ProfessionalOnboardingInput {
   plan: string;
   phone?: string | null;
   phoneVerifiedAt?: string | null;
+  dniFrontPath?: string | null;
+  dniBackPath?: string | null;
 }
 
 export async function upsertProfessionalOnboardingRecord(
@@ -53,6 +55,8 @@ export async function upsertProfessionalOnboardingRecord(
     specialties: [input.specialty],
     license_number: input.licenseNumber ?? null,
     dni: input.dni ?? null,
+    dni_front_path: input.dniFrontPath ?? null,
+    dni_back_path: input.dniBackPath ?? null,
     subscription_status: isPaidPlan ? "pending_payment" : "demo",
     subscription_plan: input.plan,
     trial_ends_at: isPaidPlan ? null : computeTrialEndsAt(),
