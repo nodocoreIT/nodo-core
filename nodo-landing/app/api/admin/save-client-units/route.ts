@@ -56,37 +56,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: fetchErr.message }, { status: 400 });
   }
 
-  const hadExistingUnits = (existingUnits ?? []).length > 0;
-
-  if (hadExistingUnits) {
-    for (const prev of existingUnits ?? []) {
-      const next = units.find((u) => String(u.unit_code ?? "").trim() === prev.unit_code);
-      if (!next) {
-        await revokeClientUnitAccess(prev);
-        continue;
-      }
-      const nextEmail = String(next.access_user ?? "").trim().toLowerCase();
-      const prevEmail = String(prev.access_user ?? "").trim().toLowerCase();
-      if (
-        prevEmail &&
-        nextEmail &&
-        prevEmail !== nextEmail &&
-        (prev.provision_user_id || prev.access_user)
-      ) {
-        await revokeClientUnitAccess(prev);
-      }
-    }
-
-    const { error: deleteErr } = await admin.from("client_units").delete().eq("client_id", clientId);
-    if (deleteErr) {
-      return NextResponse.json({ error: deleteErr.message }, { status: 400 });
-    }
-  }
-
-  if (units.length === 0) {
-    return NextResponse.json({ ok: true, units: [] });
-  }
-
   const rows = units.map((u) => ({
     client_id: clientId,
     unit_code: String(u.unit_code ?? "").trim(),
@@ -105,9 +74,72 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Cada nodo necesita un unit_code válido." }, { status: 400 });
   }
 
-  const { data, error: insertErr } = await admin.from("client_units").insert(rows).select();
-  if (insertErr) {
-    return NextResponse.json({ error: insertErr.message }, { status: 400 });
+  // Diff against existing rows instead of delete-all + insert-all — a blanket
+  // replace reset created_at (and any other DB-defaulted metadata) for every
+  // unit on every save, even ones the admin didn't touch. Confirmed in prod:
+  // editing one unit on a 4-unit client reset all 4 client_units.created_at
+  // to the same save timestamp, destroying their real "Alta" dates.
+  const existingByCode = new Map((existingUnits ?? []).map((u) => [u.unit_code, u]));
+  const nextCodes = new Set(rows.map((r) => r.unit_code));
+
+  for (const prev of existingUnits ?? []) {
+    if (!nextCodes.has(prev.unit_code)) {
+      await revokeClientUnitAccess(prev);
+      continue;
+    }
+    const next = rows.find((r) => r.unit_code === prev.unit_code)!;
+    const nextEmail = (next.access_user ?? "").trim().toLowerCase();
+    const prevEmail = String(prev.access_user ?? "").trim().toLowerCase();
+    if (
+      prevEmail &&
+      nextEmail &&
+      prevEmail !== nextEmail &&
+      (prev.provision_user_id || prev.access_user)
+    ) {
+      await revokeClientUnitAccess(prev);
+    }
+  }
+
+  const removedIds = (existingUnits ?? [])
+    .filter((prev) => !nextCodes.has(prev.unit_code))
+    .map((prev) => prev.id);
+  if (removedIds.length > 0) {
+    const { error: deleteErr } = await admin.from("client_units").delete().in("id", removedIds);
+    if (deleteErr) {
+      return NextResponse.json({ error: deleteErr.message }, { status: 400 });
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data: any[] = [];
+  for (const row of rows) {
+    const existing = existingByCode.get(row.unit_code);
+    if (existing) {
+      const { data: updated, error: updateErr } = await admin
+        .from("client_units")
+        .update(row)
+        .eq("id", existing.id)
+        .select()
+        .single();
+      if (updateErr) {
+        return NextResponse.json({ error: updateErr.message }, { status: 400 });
+      }
+      data.push(updated);
+    } else {
+      const { data: inserted, error: insertErr } = await admin
+        .from("client_units")
+        .insert(row)
+        .select()
+        .single();
+      if (insertErr) {
+        return NextResponse.json({ error: insertErr.message }, { status: 400 });
+      }
+      data.push(inserted);
+    }
+  }
+
+  if (units.length === 0) {
+    return NextResponse.json({ ok: true, units: [] });
   }
 
   await syncNodeEmailAccessForClient(admin, clientId);
