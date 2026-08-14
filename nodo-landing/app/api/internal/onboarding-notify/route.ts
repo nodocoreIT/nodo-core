@@ -17,8 +17,13 @@ function isAuthorized(request: NextRequest): boolean {
 
   const inmoKey = process.env.NODO_INMO_SERVICE_ROLE_KEY;
   const landingKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const clinicaKey = process.env.NODO_CLINICA_SERVICE_ROLE_KEY;
 
-  return (!!inmoKey && token === inmoKey) || (!!landingKey && token === landingKey);
+  return (
+    (!!inmoKey && token === inmoKey) ||
+    (!!landingKey && token === landingKey) ||
+    (!!clinicaKey && token === clinicaKey)
+  );
 }
 
 export async function POST(request: NextRequest) {

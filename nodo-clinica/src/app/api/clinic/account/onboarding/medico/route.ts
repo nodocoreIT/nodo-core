@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient, createSharedServiceClient, createNodoCoreServiceClient } from "@/lib/supabase/server";
+import { createServiceClient, createNodoCoreServiceClient } from "@/lib/supabase/server";
 import { normalizeArMobilePhone } from "@/lib/clinic/phone-utils";
 import { CLINIC_ORG_ID, syncClinicaAuthClaims } from "@/lib/clinic/clinic-org";
 import { upsertProfessionalOnboardingRecord } from "@/lib/clinic/db/professionals";
@@ -106,20 +106,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         { error: "Debés aceptar los términos y condiciones antes de continuar." },
         { status: 400 },
-      );
-    }
-
-    // Insert into org_members (shared schema — ignore duplicate)
-    const sharedClient = await createSharedServiceClient();
-    const { error: orgError } = await sharedClient
-      .from("org_members")
-      .insert({ user_id: userId, org_id: CLINIC_ORG_ID, role: "admin" });
-
-    if (orgError && orgError.code !== "23505") {
-      console.error("[onboarding/medico] org_members insert error", orgError);
-      return NextResponse.json(
-        { error: "Error al registrar organización." },
-        { status: 500 },
       );
     }
 

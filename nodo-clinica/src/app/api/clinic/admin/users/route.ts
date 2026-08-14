@@ -114,13 +114,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: profError.message }, { status: 400 });
     }
 
-    // Add to org_members with admin role
-    await supabase.from("org_members").insert({
-      user_id: authUserId,
-      org_id: auth.user.org_id,
-      role: "admin",
-    }).select();
-
     return NextResponse.json({
       ok: true,
       role: "doctor",
