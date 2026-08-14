@@ -1039,6 +1039,7 @@ export default function UsuariosNodoPage() {
                   <button
                     type="button"
                     disabled={
+                      impactModal.confirmEmail.trim().length === 0 ||
                       impactModal.loading ||
                       (impactModal.action === "delete" &&
                         impactModal.confirmEmail.trim().toLowerCase() !== impactModal.user.email.toLowerCase())
@@ -1046,11 +1047,11 @@ export default function UsuariosNodoPage() {
                     onClick={() => void confirmImpactAction()}
                     style={{
                       border: "none",
-                      background: impactModal.action === "delete" ? "#DC2626" : "#B45309",
-                      color: "white",
+                      background: impactModal.action === "delete" && impactModal.confirmEmail.trim().length > 0 ? "#DC2626" : impactModal.confirmEmail.trim().length === 0 ? "#c5c4c4" : "var(--color-mist)",
+                      color: impactModal.action === "delete" && impactModal.confirmEmail.trim().length > 0 ? "white" : impactModal.confirmEmail.trim().length === 0 ? "white" : "var(--color-slate2)",
                       borderRadius: 8,
                       padding: "8px 14px",
-                      cursor: "pointer",
+                      cursor: impactModal.confirmEmail.trim().length > 0 ? "pointer" : undefined,
                       fontWeight: 600,
                       opacity: impactModal.loading ? 0.7 : 1,
                     }}
