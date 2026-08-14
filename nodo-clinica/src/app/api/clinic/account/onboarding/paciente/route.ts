@@ -8,6 +8,7 @@ import {
   DNI_ALREADY_REGISTERED_CODE,
 } from "@/lib/clinic/db/patients";
 import { TERMS_VERSION } from "@/lib/clinic/terms-content";
+import { notifyOnboardingCompleted } from "@/lib/clinic/onboarding-notify";
 
 /** Must match nodo_core.client_units/planes.unit_code exactly (case/accent-sensitive). */
 const UNIT_CODE = "Clínica";
@@ -212,6 +213,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     await syncClinicaAuthClaims(serviceClient, userId, "paciente");
+
+    await notifyOnboardingCompleted({ type: "paciente", nombre: fullName, email });
 
     return NextResponse.json({ ok: true });
   } catch (err) {
