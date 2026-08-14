@@ -1,10 +1,16 @@
 import type { AuthConfig } from "@/lib/nodo/auth-config";
 import { isLocalMode } from "@/lib/clinic/config";
 
-/** Mismo flujo que Nodo Inmo — registro vía nodocore.com.ar */
+/**
+ * Mismo flujo que Nodo Inmo — registro vía nodocore.com.ar.
+ * Apunta directo a "www": el dominio apex devuelve un 308 a www.nodocore.com.ar,
+ * y ese salto rompía las llamadas server-to-server (notifyOnboardingCompleted
+ * nunca llegaba a nodo-landing — el request se resolvía en el redirect antes
+ * de tocar el route handler).
+ */
 export const NODO_LANDING_URL =
   process.env.NEXT_PUBLIC_NODO_LANDING_URL?.replace(/\/$/, "") ??
-  "https://nodocore.com.ar";
+  "https://www.nodocore.com.ar";
 
 export const CLINICA_REGISTRATION_URL =
   process.env.NEXT_PUBLIC_CLINICA_REGISTRATION_URL ??
