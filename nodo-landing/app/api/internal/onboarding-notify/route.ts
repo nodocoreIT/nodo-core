@@ -19,11 +19,23 @@ function isAuthorized(request: NextRequest): boolean {
   const landingKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const clinicaKey = process.env.NODO_CLINICA_SERVICE_ROLE_KEY;
 
-  return (
+  const authorized =
     (!!inmoKey && token === inmoKey) ||
     (!!landingKey && token === landingKey) ||
-    (!!clinicaKey && token === clinicaKey)
-  );
+    (!!clinicaKey && token === clinicaKey);
+
+  // TEMP diagnostic — remove once the clinica 401 is confirmed fixed. Logs
+  // lengths only, never the actual secret values.
+  if (!authorized) {
+    console.warn("onboarding-notify: auth mismatch", {
+      tokenLen: token.length,
+      inmoKeyLen: inmoKey?.length ?? 0,
+      landingKeyLen: landingKey?.length ?? 0,
+      clinicaKeyLen: clinicaKey?.length ?? 0,
+    });
+  }
+
+  return authorized;
 }
 
 export async function POST(request: NextRequest) {
