@@ -9,6 +9,9 @@ const PORT = Number(process.env.ZOHO_SMTP_PORT ?? 465);
 const USER = process.env.ZOHO_SMTP_USER;
 const PASS = process.env.ZOHO_SMTP_PASSWORD;
 const CONTACT_TO = process.env.CONTACT_TO ?? "contacto@nodocore.com.ar";
+// Ops inbox for internal server-to-server notifications (feedback, onboarding
+// pending review). Fixed on purpose — doesn't depend on CONTACT_TO.
+const NODOCORE_LP_EMAIL = "nodocore.lp@gmail.com";
 
 export function isMailConfigured(): boolean {
   return Boolean(USER && PASS);
@@ -788,6 +791,12 @@ type FeedbackEmailPayload = {
   userEmail?: string;
 };
 
+const FEEDBACK_SUBJECT_LABEL: Record<FeedbackEmailPayload["category"], string> = {
+  idea: "Tenés una nueva idea",
+  bug: "Tenés un nuevo bug",
+  bloat: "Tenés una nueva mejora",
+};
+
 export async function sendFeedbackEmail({
   category,
   content,
@@ -799,8 +808,8 @@ export async function sendFeedbackEmail({
 
   await transporter.sendMail({
     from: `"NODO Core · Feedback" <${USER}>`,
-    to: CONTACT_TO,
-    subject: `[Feedback] ${categoryLabel} — ${sourceNode}`,
+    to: [CONTACT_TO, NODOCORE_LP_EMAIL],
+    subject: `${FEEDBACK_SUBJECT_LABEL[category]} — ${sourceNode}`,
     text: `Nodo: ${sourceNode}\nCategoría: ${category}\nUsuario: ${userEmail ?? "anónimo"}\n\n${content}`,
     html: `
       <div style="font-family:sans-serif;max-width:500px;margin:0 auto;border:1px solid #DEE7F1;padding:24px;border-radius:14px;background:#F5F8FC;">
@@ -880,6 +889,48 @@ const TASK_NOTIFICATION_SUBJECT_PREFIX: Record<TaskNotificationType, string> = {
   reassigned: "Tarea reasignada",
   mentioned: "Te mencionaron",
 };
+
+type OnboardingPendingPayload = {
+  type: "paciente" | "medico";
+  nombre: string;
+  email: string;
+  sourceNode: string;
+};
+
+const ONBOARDING_TYPE_LABEL: Record<OnboardingPendingPayload["type"], string> = {
+  paciente: "Paciente",
+  medico: "Médico",
+};
+
+/** Notifies the ops inbox when a new paciente/medico onboarding finishes and needs review. */
+export async function sendOnboardingPendingEmail({
+  type,
+  nombre,
+  email,
+  sourceNode,
+}: OnboardingPendingPayload): Promise<void> {
+  const transporter = createTransporter();
+  const typeLabel = ONBOARDING_TYPE_LABEL[type];
+
+  await transporter.sendMail({
+    from: `"NODO Core · Onboarding" <${USER}>`,
+    to: NODOCORE_LP_EMAIL,
+    subject: `Nuevo registro pendiente de habilitación — ${typeLabel}`,
+    text: `Nuevo registro pendiente de habilitación.\n\nTipo: ${typeLabel}\nNombre: ${nombre}\nEmail: ${email}\nNodo de origen: ${sourceNode}\n\nHay que habilitar la cuenta desde el panel.`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #DEE7F1;border-radius:14px;">
+        <h2 style="color:#1B2A41;margin-top:0;">Nuevo registro pendiente de habilitación</h2>
+        <p style="color:#647890;line-height:1.5;">
+          <strong>Tipo:</strong> ${typeLabel}<br/>
+          <strong>Nombre:</strong> ${nombre}<br/>
+          <strong>Email:</strong> ${email}<br/>
+          <strong>Nodo de origen:</strong> ${sourceNode}
+        </p>
+        <p style="color:#1A2B3C;font-size:14px;">Hay que habilitar la cuenta desde el panel.</p>
+      </div>
+    `,
+  });
+}
 
 export async function sendTaskNotificationEmail({
   to,

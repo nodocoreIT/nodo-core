@@ -7,6 +7,7 @@ import { findSubscriptionPlan } from "@/lib/clinic/subscription-plans";
 import { createNodoSubscriptionPreapproval } from "@/lib/mercadopago/nodo-subscription";
 import { appBaseUrl } from "@/lib/clinic/appointment-payment";
 import { TERMS_VERSION } from "@/lib/clinic/terms-content";
+import { notifyOnboardingCompleted } from "@/lib/clinic/onboarding-notify";
 
 /** Must match nodo_core.client_units/planes.unit_code exactly (case/accent-sensitive). */
 const UNIT_CODE = "Clínica";
@@ -145,6 +146,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     await syncClinicaAuthClaims(serviceClient, userId, "medico");
+
+    // Fired once here (account created) rather than after the paid/free
+    // branch below — the notification is about account creation, not payment.
+    await notifyOnboardingCompleted({ type: "medico", nombre: fullName, email });
 
     // Paid plans go straight to MercadoPago checkout instead of being left
     // silently in "pending_payment" until someone activates them by hand.

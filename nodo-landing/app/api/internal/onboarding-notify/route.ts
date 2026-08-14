@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isMailConfigured, sendFeedbackEmail } from "@/lib/mail";
+import { isMailConfigured, sendOnboardingPendingEmail } from "@/lib/mail";
 import { notifyN8nWebhook } from "@/lib/webhooks";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-type FeedbackPayload = {
-  category: "bug" | "idea" | "bloat";
-  content: string;
+type OnboardingNotifyPayload = {
+  type: "paciente" | "medico";
+  nombre: string;
+  email: string;
   sourceNode: string;
-  userEmail?: string;
 };
 
 function isAuthorized(request: NextRequest): boolean {
@@ -26,17 +26,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: FeedbackPayload;
+  let body: OnboardingNotifyPayload;
   try {
-    body = (await request.json()) as FeedbackPayload;
+    body = (await request.json()) as OnboardingNotifyPayload;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { category, content, sourceNode, userEmail } = body;
+  const { type, nombre, email, sourceNode } = body;
 
-  if (!category || !content?.trim() || !sourceNode) {
-    return NextResponse.json({ error: "Missing required fields: category, content, sourceNode" }, { status: 400 });
+  if (!type || !nombre?.trim() || !email?.trim() || !sourceNode) {
+    return NextResponse.json(
+      { error: "Missing required fields: type, nombre, email, sourceNode" },
+      { status: 400 },
+    );
   }
 
   const results: {
@@ -55,11 +58,11 @@ export async function POST(request: NextRequest) {
   // 1. Send email notification
   if (isMailConfigured()) {
     try {
-      await sendFeedbackEmail({ category, content: content.trim(), sourceNode, userEmail });
+      await sendOnboardingPendingEmail({ type, nombre: nombre.trim(), email: email.trim(), sourceNode });
       results.email = true;
     } catch (err) {
       results.emailError = err instanceof Error ? err.message : String(err);
-      console.error("feedback-notify: email error", err);
+      console.error("onboarding-notify: email error", err);
     }
   } else {
     results.emailError = "SMTP not configured";
@@ -67,33 +70,33 @@ export async function POST(request: NextRequest) {
 
   // 2. Notify n8n webhook
   try {
-    const webhookResult = await notifyN8nWebhook("new_feedback", {
-      category,
-      content: content.trim(),
+    const webhookResult = await notifyN8nWebhook("onboarding_completed", {
+      type,
+      nombre: nombre.trim(),
+      email: email.trim(),
       sourceNode,
-      userEmail,
     });
     results.webhook = webhookResult.sent;
     if (webhookResult.error) results.webhookError = webhookResult.error;
   } catch (err) {
     results.webhookError = err instanceof Error ? err.message : String(err);
-    console.error("feedback-notify: webhook error", err);
+    console.error("onboarding-notify: webhook error", err);
   }
 
   // 3. Insert panel notification so the dashboard bell can surface it
   try {
     const admin = createAdminClient("nodo_core");
     const { error } = await admin.from("panel_notifications").insert({
-      kind: "new_feedback",
-      category,
-      content: content.trim().slice(0, 500),
+      kind: "onboarding_completed",
+      category: type,
+      content: `Nuevo registro: ${nombre.trim()} (${email.trim()})`,
       source_node: sourceNode,
     });
     if (error) throw error;
     results.notification = true;
   } catch (err) {
     results.notificationError = err instanceof Error ? err.message : String(err);
-    console.error("feedback-notify: notification insert error", err);
+    console.error("onboarding-notify: notification insert error", err);
   }
 
   // Return 200 even with partial failures so the caller doesn't retry
