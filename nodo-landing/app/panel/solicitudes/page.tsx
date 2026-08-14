@@ -374,6 +374,8 @@ export default function SolicitudesPage() {
                           day: "numeric",
                           month: "short",
                           year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
                         })}
                         {r.stage !== "pending_onboarding" && (
                           <> · vence {new Date(r.expires_at).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</>
