@@ -381,9 +381,14 @@ export function getNodeLoginPath(nodeSlug: string): string {
   return `/nodo-${slug}/login`;
 }
 
-/** Productos que el panel de clientes puede asignar hoy (sin nodos en desarrollo). */
+/**
+ * Productos que el panel de clientes puede asignar hoy (sin nodos en desarrollo).
+ * Clínica queda afuera a propósito: médicos/pacientes se dan de alta por su
+ * propio flujo self-service (nodo_clinica.professionals/patients), nunca vía
+ * client_units. Agregar una fila acá manualmente crea un client_units
+ * "sin_acceso" que bloquea el login real (user_has_node_access es deny-first).
+ */
 export const PANEL_ASSIGNABLE_NODE_CODES = [
-  "Clínica",
   "Autos",
   "Inmo",
   "Ecommerce",
