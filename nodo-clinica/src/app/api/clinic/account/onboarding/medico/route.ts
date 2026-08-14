@@ -8,23 +8,24 @@ import { createNodoSubscriptionPreapproval } from "@/lib/mercadopago/nodo-subscr
 import { appBaseUrl } from "@/lib/clinic/appointment-payment";
 import { TERMS_VERSION } from "@/lib/clinic/terms-content";
 import { notifyOnboardingCompleted } from "@/lib/clinic/onboarding-notify";
+import { uploadDniDocs } from "@/lib/clinic/dni-upload";
 
 /** Must match nodo_core.client_units/planes.unit_code exactly (case/accent-sensitive). */
 const UNIT_CODE = "Clínica";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const body = await request.json();
-    const { fullName, specialty, licenseNumber, dni, plan, billingCycle, token, phone } = body as {
-      fullName?: string;
-      specialty?: string;
-      licenseNumber?: string;
-      dni?: string;
-      plan?: string;
-      billingCycle?: string;
-      token?: string;
-      phone?: string;
-    };
+    const formData = await request.formData();
+    const fullName = formData.get("fullName") as string | null;
+    const specialty = formData.get("specialty") as string | null;
+    const licenseNumber = formData.get("licenseNumber") as string | null;
+    const dni = formData.get("dni") as string | null;
+    const plan = formData.get("plan") as string | null;
+    const billingCycle = formData.get("billingCycle") as string | null;
+    const token = formData.get("token") as string | null;
+    const phone = formData.get("phone") as string | null;
+    const dniFront = formData.get("dniFront") as File | null;
+    const dniBack = formData.get("dniBack") as File | null;
 
     if (!token) {
       return NextResponse.json(
@@ -109,6 +110,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // Upload DNI files before inserting the professional row
+    const uploadResult = await uploadDniDocs(serviceClient, userId, dniFront, dniBack);
+    if (!uploadResult.ok) {
+      console.error(`[onboarding/medico] DNI ${uploadResult.side} upload error`, uploadResult.cause);
+      return NextResponse.json({ error: uploadResult.error }, { status: 500 });
+    }
+
     // Split fullName into first/last for the DB columns
     const profResult = await upsertProfessionalOnboardingRecord(serviceClient, {
       userId,
@@ -121,6 +129,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       plan,
       phone: normalizedPhone,
       phoneVerifiedAt: null,
+      dniFrontPath: uploadResult.dniFrontPath,
+      dniBackPath: uploadResult.dniBackPath,
     });
 
     if (!profResult.ok) {

@@ -500,21 +500,14 @@ export const clinicApi = {
     return resData as { ok: boolean };
   },
 
-  async completeOnboardingMedico(data: {
-    fullName: string;
-    specialty: string;
-    licenseNumber: string;
-    dni: string;
-    plan: string;
-    billingCycle: "monthly" | "annual";
-    token: string;
-    phone: string;
-  }): Promise<{ ok: boolean; checkoutUrl?: string; checkoutFailed?: boolean }> {
+  async completeOnboardingMedico(
+    formData: FormData,
+  ): Promise<{ ok: boolean; checkoutUrl?: string; checkoutFailed?: boolean }> {
+    // No Content-Type header — browser sets multipart boundary automatically
     const res = await fetch(`${BASE}/api/clinic/account/onboarding/medico`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify(data),
+      body: formData,
     });
     const resData = await parseJsonResponse(res);
     if (!res.ok) throw new Error(resData.error || "Error en onboarding");
