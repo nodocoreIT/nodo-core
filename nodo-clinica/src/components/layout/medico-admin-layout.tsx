@@ -42,6 +42,10 @@ import { RoleSwitcher } from "@/components/nodo/role-switcher";
 import { MedicoDoctorProvider } from "@/contexts/medico-doctor-context";
 import { DoctorSettingsDialog, type SectionId } from "@/components/medical/doctor-settings-dialog";
 import { DoctorSpecialtySetupModal } from "@/components/medical/doctor-specialty-setup-modal";
+import {
+  DoctorOnboardingGateModal,
+  type OnboardingGateKind,
+} from "@/components/medical/doctor-onboarding-gate-modal";
 import { ClinicNotificationsBell } from "@/components/layout/clinic-notifications-bell";
 import { needsSpecialtyAssignment } from "@/lib/clinic/unassigned-specialty";
 import { PlanBadge } from "@/components/plan/plan-badge";
@@ -85,6 +89,18 @@ const ROUTE_TITLES: Record<string, string> = {
   "/medico/interconsultas": "Interconsultas",
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function resolveOnboardingGate(office: any): OnboardingGateKind | null {
+  const consultationFee = office?.payment?.consultationFee;
+  if (!(typeof consultationFee === "number" && consultationFee > 0)) {
+    return "honorarios";
+  }
+  if (!office?.hasAvailability) {
+    return "agenda";
+  }
+  return null;
+}
+
 function initials(value: string): string {
   const base = value.trim();
   if (!base) return "?";
@@ -120,6 +136,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SectionId | undefined>(undefined);
   const [specialtySetupOpen, setSpecialtySetupOpen] = useState(false);
+  const [onboardingGate, setOnboardingGate] = useState<OnboardingGateKind | null>(null);
   const [cobrosUnread, setCobrosUnread] = useState(0);
   const [mpJustConnected, setMpJustConnected] = useState(false);
   const mpCallbackHandled = useRef(false);
@@ -162,6 +179,19 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
       setCobrosUnread(data.cobrosCount);
     } catch {
       setCobrosUnread(0);
+    }
+  }, []);
+
+  // Re-derives whether honorarios/agenda are still unconfigured. Called
+  // after specialty setup completes and whenever the settings dialog
+  // closes, so the gate re-appears if the médico backed out without saving
+  // (must-configure, not a one-time dismissible tip).
+  const recheckOnboardingGate = useCallback(async (doctorId: string) => {
+    try {
+      const office = await clinicApi.getDoctorSchedule(doctorId);
+      setOnboardingGate(resolveOnboardingGate(office));
+    } catch {
+      /* leave gate state as-is on error */
     }
   }, []);
 
@@ -254,9 +284,11 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
           const officeSpecialties = Array.isArray(office.specialties)
             ? (office.specialties as string[])
             : [];
-          setSpecialtySetupOpen(
-            needsSpecialtyAssignment(officeSpecialties),
-          );
+          const needsSpecialty = needsSpecialtyAssignment(officeSpecialties);
+          setSpecialtySetupOpen(needsSpecialty);
+          if (!needsSpecialty) {
+            setOnboardingGate(resolveOnboardingGate(office));
+          }
           const photo =
             typeof office.profilePhotoData === "string" && office.profilePhotoData
               ? office.profilePhotoData
@@ -788,6 +820,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
               if (!o) {
                 setSettingsSection(undefined);
                 setMpJustConnected(false);
+                void recheckOnboardingGate(doctor.id);
               }
             }}
             doctorId={doctor.id}
@@ -798,7 +831,21 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
         {doctor && (
           <DoctorSpecialtySetupModal
             open={specialtySetupOpen}
-            onComplete={() => setSpecialtySetupOpen(false)}
+            onComplete={() => {
+              setSpecialtySetupOpen(false);
+              void recheckOnboardingGate(doctor.id);
+            }}
+          />
+        )}
+        {doctor && onboardingGate && !specialtySetupOpen && (
+          <DoctorOnboardingGateModal
+            kind={onboardingGate}
+            open
+            onContinue={() => {
+              setSettingsSection(onboardingGate === "honorarios" ? "cobros" : "agenda");
+              setSettingsOpen(true);
+              setOnboardingGate(null);
+            }}
           />
         )}
         {doctor &&

@@ -133,6 +133,10 @@ function OnboardingMedicoContent() {
       toast.error("El número de DNI es requerido.");
       return;
     }
+    if (!dniFront || !dniBack) {
+      toast.error("Subí las fotos del DNI (frente y dorso) para continuar.");
+      return;
+    }
     if (!phoneValid) {
       toast.error("Ingresá un número de celular con formato válido.");
       return;
@@ -244,10 +248,10 @@ function OnboardingMedicoContent() {
             <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Documento de identidad</p>
               <div className="grid grid-cols-2 gap-3 max-w-md">
-                <DniSlot label="DNI frente" file={dniFront} onChange={setDniFront} labelClass={labelClass} />
-                <DniSlot label="DNI dorso" file={dniBack} onChange={setDniBack} labelClass={labelClass} />
+                <DniSlot label="DNI frente *" file={dniFront} onChange={setDniFront} labelClass={labelClass} />
+                <DniSlot label="DNI dorso *" file={dniBack} onChange={setDniBack} labelClass={labelClass} />
               </div>
-              <p className="text-xs" style={{ color: "rgba(234,240,247,.4)" }}>Las fotos son opcionales. Se usan para verificar tu identidad.</p>
+              <p className="text-xs" style={{ color: "rgba(234,240,247,.4)" }}>Ambas fotos son obligatorias. Se usan para verificar tu identidad.</p>
             </div>
 
             {/* Planes */}

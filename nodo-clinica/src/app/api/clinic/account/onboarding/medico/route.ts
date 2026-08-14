@@ -41,6 +41,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    if (!dniFront || dniFront.size === 0 || !dniBack || dniBack.size === 0) {
+      return NextResponse.json(
+        { error: "Subí las fotos del DNI (frente y dorso) para continuar." },
+        { status: 400 },
+      );
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const serviceClient = (await createServiceClient()) as any;
 
