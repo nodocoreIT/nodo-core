@@ -1147,6 +1147,13 @@ export function DoctorSettingsDialog({
                         </p>
                       )}
                     </div>
+                  ) : subscription?.status === "courtesy" ? (
+                    <div className="rounded-md border border-violet-200 bg-violet-50/80 p-3 space-y-1">
+                      <p className="text-sm font-medium text-violet-900">Acceso de cortesía</p>
+                      <p className="text-[11px] text-violet-800">
+                        Tenés acceso de cortesía a Nodo Clínica, sin cargo. No necesitás suscribirte.
+                      </p>
+                    </div>
                   ) : (
                     <div className="rounded-md border border-amber-200 bg-amber-50/70 p-3 space-y-3">
                       <p className="text-sm text-amber-900">

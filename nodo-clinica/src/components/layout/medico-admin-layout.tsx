@@ -676,6 +676,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                         | "pending_payment"
                         | "active"
                         | "expired"
+                        | "courtesy"
                         | undefined
                     }
                     trialDaysRemaining={doctor.trialDaysRemaining}
@@ -766,6 +767,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                         | "pending_payment"
                         | "active"
                         | "expired"
+                        | "courtesy"
                         | undefined
                     }
                     trialDaysRemaining={doctor.trialDaysRemaining}

@@ -478,5 +478,48 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, user_id: provision.user_id, client_unit_id: newUnit.id });
   }
 
+  if (action === "grant_courtesy" || action === "revoke_courtesy") {
+    const clinicRowId = String(body.clinic_row_id ?? "").trim();
+    if (!clinicRowId) {
+      return NextResponse.json({ error: "clinic_row_id es obligatorio." }, { status: 400 });
+    }
+
+    const clinicAdmin = createAdminClient("nodo_clinica");
+
+    if (action === "grant_courtesy") {
+      // Clear trial_ends_at (no longer relevant) and mercadopago_preapproval_id
+      // — a stray/delayed MP webhook for an old checkout attempt matches by
+      // preapproval id and would otherwise silently overwrite subscription_status
+      // back to "expired"/"active", clobbering the courtesy grant.
+      const { error } = await clinicAdmin
+        .from("professionals")
+        .update({
+          subscription_status: "courtesy",
+          trial_ends_at: null,
+          mercadopago_preapproval_id: null,
+        })
+        .eq("id", clinicRowId);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    // revoke_courtesy — back to "expired" (blocked), never a fresh trial.
+    // The `.eq("subscription_status", "courtesy")` guard avoids clobbering a
+    // status that already changed through some other path in the meantime.
+    const { error } = await clinicAdmin
+      .from("professionals")
+      .update({ subscription_status: "expired" })
+      .eq("id", clinicRowId)
+      .eq("subscription_status", "courtesy");
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true });
+  }
+
   return NextResponse.json({ error: "Acción no reconocida." }, { status: 400 });
 }

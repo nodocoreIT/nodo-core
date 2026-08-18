@@ -12,6 +12,7 @@ import {
   Mail,
   Pause,
   Play,
+  Sparkles,
   Trash2,
   UserRound,
 } from "lucide-react";
@@ -90,6 +91,9 @@ const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }
   // la confirmación del pago — no tiene nada que ver con el fin de la demo.
   pending_payment: { bg: "#FCE9D8", color: "#B5630C", label: "Pago sin confirmar" },
   sin_acceso: { bg: "#FEE2E2", color: "#991B1B", label: "Sin acceso" },
+  // courtesy = professionals.subscription_status: acceso gratuito otorgado
+  // manualmente desde este panel (ver botón "Dar cortesía"), sin pasar por MP.
+  courtesy: { bg: "#EDE9FE", color: "#6D28D9", label: "Cortesía" },
 };
 
 function statusStyle(status: string) {
@@ -392,6 +396,19 @@ export default function UsuariosNodoPage() {
     }
   }
 
+  async function handleCourtesy(user: NodoUserRecord) {
+    if (!user.id.startsWith("clinic-medico:")) return;
+    const clinicRowId = user.id.replace("clinic-medico:", "");
+    const isCourtesy = user.status === "courtesy";
+    await runAction(
+      user,
+      { action: isCourtesy ? "revoke_courtesy" : "grant_courtesy", clinic_row_id: clinicRowId },
+      isCourtesy
+        ? `Cortesía retirada para ${user.email}.`
+        : `Cortesía otorgada a ${user.email} — ya no necesita suscripción.`,
+    );
+  }
+
   async function handleSendReset(user: NodoUserRecord) {
     await runAction(
       user,
@@ -673,6 +690,15 @@ export default function UsuariosNodoPage() {
                                 onClick={() => void handlePause(user)}
                               >
                                 <Pause className="h-3.5 w-3.5" />
+                              </ActionButton>
+                            )}
+                            {user.id.startsWith("clinic-medico:") && (
+                              <ActionButton
+                                title={user.status === "courtesy" ? "Quitar cortesía" : "Dar cortesía"}
+                                disabled={busy}
+                                onClick={() => void handleCourtesy(user)}
+                              >
+                                <Sparkles className="h-3.5 w-3.5" />
                               </ActionButton>
                             )}
                             <ActionButton
