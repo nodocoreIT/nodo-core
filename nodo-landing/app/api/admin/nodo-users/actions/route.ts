@@ -28,7 +28,12 @@ import {
 } from "@/lib/panel/nodo-user-lifecycle";
 import type { NodoUserRecord } from "@/lib/panel/nodo-users-list";
 import { provisionNodoAccessPendingPassword } from "@/lib/registration/provision";
-import { sendActivationEmail, sendNodeLinkedEmail } from "@/lib/mail";
+import {
+  sendActivationEmail,
+  sendCourtesyGrantedEmail,
+  sendNodeLinkedEmail,
+  isMailConfigured,
+} from "@/lib/mail";
 
 function asSingleRelation<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
@@ -491,18 +496,38 @@ export async function POST(request: NextRequest) {
       // — a stray/delayed MP webhook for an old checkout attempt matches by
       // preapproval id and would otherwise silently overwrite subscription_status
       // back to "expired"/"active", clobbering the courtesy grant.
-      const { error } = await clinicAdmin
+      const { data: updated, error } = await clinicAdmin
         .from("professionals")
         .update({
           subscription_status: "courtesy",
           trial_ends_at: null,
           mercadopago_preapproval_id: null,
         })
-        .eq("id", clinicRowId);
+        .eq("id", clinicRowId)
+        .select("email, full_name")
+        .maybeSingle();
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
+
+      // Best-effort — the grant already succeeded above, a mail hiccup must
+      // not report the whole action as failed.
+      if (updated?.email && isMailConfigured()) {
+        try {
+          const clinicaAppUrl = (process.env.NODO_CLINICA_APP_URL ?? "https://clinica.nodocore.com.ar").replace(/\/$/, "");
+          await sendCourtesyGrantedEmail({
+            nombre: updated.full_name ?? updated.email,
+            email: updated.email,
+            nodeLabel: "Nodo Clínica",
+            loginUrl: `${clinicaAppUrl}/login`,
+            unitCode: "clinica",
+          });
+        } catch (mailErr) {
+          console.error("[nodo-users/actions] grant_courtesy email error", mailErr);
+        }
+      }
+
       return NextResponse.json({ ok: true });
     }
 
