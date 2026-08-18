@@ -22,6 +22,8 @@ export type NodoUserRecord = {
   plan: string | null;
   createdAt: string | null;
   authBanned: boolean;
+  /** Only set for Clínica médicos on subscription_status "demo" — drives the days-remaining label. */
+  trialEndsAt: string | null;
 };
 
 type AuthUserInfo = { email: string; fullName: string | null; banned: boolean };
@@ -204,6 +206,7 @@ async function listFromClientUnits(): Promise<NodoUserRecord[]> {
       plan,
       createdAt: (unit.created_at as string) ?? null,
       authBanned: false,
+      trialEndsAt,
     };
   });
 }
@@ -222,7 +225,7 @@ export async function listFromClinicaProfiles(existingKeys: Set<string>): Promis
     clinicDb
       .from("professionals")
       .select(
-        "id, full_name, email, user_id, specialty, subscription_status, subscription_plan, created_at, paused_at",
+        "id, full_name, email, user_id, specialty, subscription_status, subscription_plan, trial_ends_at, created_at, paused_at",
       )
       .order("created_at", { ascending: false })
       .limit(500),
@@ -253,6 +256,7 @@ export async function listFromClinicaProfiles(existingKeys: Set<string>): Promis
       plan: (p.subscription_plan as string) ?? "paciente",
       createdAt: (p.created_at as string) ?? null,
       authBanned: false,
+      trialEndsAt: null,
     });
   }
 
@@ -264,6 +268,13 @@ export async function listFromClinicaProfiles(existingKeys: Set<string>): Promis
     if (existingKeys.has(profileKey)) continue;
     existingKeys.add(profileKey);
 
+    const rawStatus = prof.paused_at ? "pausado" : String(prof.subscription_status ?? "activo");
+    const trialEndsAt = (prof.trial_ends_at as string | null) ?? null;
+    // Same "demo_expired" convention as listFromClientUnits — the médico's
+    // own trial window (professionals.trial_ends_at), not client_units.
+    const isExpiredDemo =
+      rawStatus === "demo" && !!trialEndsAt && new Date(trialEndsAt).getTime() < Date.now();
+
     rows.push({
       id: `clinic-medico:${prof.id}`,
       email,
@@ -272,7 +283,7 @@ export async function listFromClinicaProfiles(existingKeys: Set<string>): Promis
       unitLabel: unitLabel(unitCode),
       role: "medico",
       accessType: inferAccessType((prof.subscription_plan as string) ?? null, unitCode),
-      status: prof.paused_at ? "pausado" : String(prof.subscription_status ?? "activo"),
+      status: isExpiredDemo ? "demo_expired" : rawStatus,
       clientId: null,
       clientUnitId: null,
       authUserId: (prof.user_id as string) ?? null,
@@ -281,6 +292,7 @@ export async function listFromClinicaProfiles(existingKeys: Set<string>): Promis
       plan: (prof.subscription_plan as string) ?? null,
       createdAt: (prof.created_at as string) ?? null,
       authBanned: false,
+      trialEndsAt,
     });
   }
 
@@ -360,6 +372,7 @@ async function listFromOrgMembers(existingKeys: Set<string>): Promise<NodoUserRe
           plan: null,
           createdAt: (member.created_at as string) ?? null,
           authBanned: auth?.banned ?? false,
+          trialEndsAt: null,
         });
       }
     }),
@@ -426,6 +439,7 @@ async function listFromPanelTeam(existingKeys: Set<string>): Promise<NodoUserRec
       plan: null,
       createdAt: (p.created_at as string) ?? null,
       authBanned: auth?.banned ?? false,
+      trialEndsAt: null,
     });
   }
 

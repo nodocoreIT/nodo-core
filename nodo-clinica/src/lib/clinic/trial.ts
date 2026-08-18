@@ -28,16 +28,18 @@ export function trialDaysRemaining(trialEndsAt: string | null | undefined): numb
 }
 
 /**
- * Whether the doctor currently has access. `"active"` is always true.
- * `"demo"` is true only while the trial window hasn't expired. `"pending_payment"`
- * (chose a paid plan, MercadoPago hasn't confirmed it yet) and anything else
- * (including `"expired"`) is false.
+ * Whether the doctor currently has access. `"active"` and `"courtesy"` (a
+ * NodoCore-granted comped/free access, unrelated to MercadoPago) are always
+ * true. `"demo"` is true only while the trial window hasn't expired.
+ * `"pending_payment"` (chose a paid plan, MercadoPago hasn't confirmed it
+ * yet) and anything else (including `"expired"`) is false.
  */
 export function isSubscriptionActive(professional: {
   subscription_status: string | null;
   trial_ends_at?: string | null;
 }): boolean {
   if (professional.subscription_status === "active") return true;
+  if (professional.subscription_status === "courtesy") return true;
   if (professional.subscription_status === "demo") {
     return !isTrialExpired(professional.trial_ends_at);
   }

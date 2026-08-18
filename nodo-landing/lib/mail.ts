@@ -634,6 +634,42 @@ export async function sendAccountEnabledEmail({
   });
 }
 
+/** Sent when NodoCore grants a médico free/comped "courtesy" access from the Usuarios de Nodo panel. */
+export async function sendCourtesyGrantedEmail({
+  nombre,
+  email,
+  nodeLabel,
+  loginUrl,
+  unitCode = "",
+}: {
+  nombre: string;
+  email: string;
+  nodeLabel: string;
+  loginUrl: string;
+  unitCode?: string;
+}): Promise<void> {
+  const transporter = createTransporter();
+  const theme = resolveNodeBrand(unitCode || nodeLabel);
+
+  await transporter.sendMail({
+    from: `"NODO Core" <${USER}>`,
+    to: email,
+    subject: `Se te otorgó un acceso de cortesía a ${nodeLabel}`,
+    text: `Hola ${nombre},\n\nSe te otorgó un acceso de cortesía de NODO Core a ${nodeLabel}. Esto significa que podés usar la app de forma gratuita, sin necesidad de pagar una suscripción.\n\nIngresá con tu email y contraseña de siempre:\n\n${loginUrl}\n\nQue lo disfrutes.\n\nSaludos,\nNODO Core`,
+    html: renderNodoEmailShell({
+      brandColor: theme.brand,
+      buttonText: theme.buttonText,
+      linkColor: theme.linkColor,
+      title: "¡Tenés acceso de cortesía!",
+      subtitleHtml: `en <strong>${nodeLabel}</strong>`,
+      bodyHtml: `Hola <strong>${nombre}</strong>,<br/><br/>Se te otorgó un acceso de cortesía de <strong>NODO Core</strong> a <strong>${nodeLabel}</strong>. Esto significa que podés usar la app de forma gratuita, sin necesidad de pagar una suscripción.<br/><br/>Que lo disfrutes.`,
+      ctaLabel: `Ingresar a ${nodeLabel}`,
+      ctaUrl: loginUrl,
+      footerNote: "Si no esperabas este correo, contactate con nosotros.",
+    }),
+  });
+}
+
 /** Sent once when a client_unit's platform subscription flips to `impago` (see lib/billing). */
 export async function sendPaymentOverdueEmail({
   nombre,

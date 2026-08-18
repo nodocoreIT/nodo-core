@@ -28,7 +28,12 @@ import {
 } from "@/lib/panel/nodo-user-lifecycle";
 import type { NodoUserRecord } from "@/lib/panel/nodo-users-list";
 import { provisionNodoAccessPendingPassword } from "@/lib/registration/provision";
-import { sendActivationEmail, sendNodeLinkedEmail } from "@/lib/mail";
+import {
+  sendActivationEmail,
+  sendCourtesyGrantedEmail,
+  sendNodeLinkedEmail,
+  isMailConfigured,
+} from "@/lib/mail";
 
 function asSingleRelation<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
@@ -476,6 +481,69 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ ok: true, user_id: provision.user_id, client_unit_id: newUnit.id });
+  }
+
+  if (action === "grant_courtesy" || action === "revoke_courtesy") {
+    const clinicRowId = String(body.clinic_row_id ?? "").trim();
+    if (!clinicRowId) {
+      return NextResponse.json({ error: "clinic_row_id es obligatorio." }, { status: 400 });
+    }
+
+    const clinicAdmin = createAdminClient("nodo_clinica");
+
+    if (action === "grant_courtesy") {
+      // Clear trial_ends_at (no longer relevant) and mercadopago_preapproval_id
+      // — a stray/delayed MP webhook for an old checkout attempt matches by
+      // preapproval id and would otherwise silently overwrite subscription_status
+      // back to "expired"/"active", clobbering the courtesy grant.
+      const { data: updated, error } = await clinicAdmin
+        .from("professionals")
+        .update({
+          subscription_status: "courtesy",
+          trial_ends_at: null,
+          mercadopago_preapproval_id: null,
+        })
+        .eq("id", clinicRowId)
+        .select("email, full_name")
+        .maybeSingle();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+
+      // Best-effort — the grant already succeeded above, a mail hiccup must
+      // not report the whole action as failed.
+      if (updated?.email && isMailConfigured()) {
+        try {
+          const clinicaAppUrl = (process.env.NODO_CLINICA_APP_URL ?? "https://clinica.nodocore.com.ar").replace(/\/$/, "");
+          await sendCourtesyGrantedEmail({
+            nombre: updated.full_name ?? updated.email,
+            email: updated.email,
+            nodeLabel: "Nodo Clínica",
+            loginUrl: `${clinicaAppUrl}/login`,
+            unitCode: "clinica",
+          });
+        } catch (mailErr) {
+          console.error("[nodo-users/actions] grant_courtesy email error", mailErr);
+        }
+      }
+
+      return NextResponse.json({ ok: true });
+    }
+
+    // revoke_courtesy — back to "expired" (blocked), never a fresh trial.
+    // The `.eq("subscription_status", "courtesy")` guard avoids clobbering a
+    // status that already changed through some other path in the meantime.
+    const { error } = await clinicAdmin
+      .from("professionals")
+      .update({ subscription_status: "expired" })
+      .eq("id", clinicRowId)
+      .eq("subscription_status", "courtesy");
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ error: "Acción no reconocida." }, { status: 400 });

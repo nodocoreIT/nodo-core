@@ -2151,6 +2151,7 @@ function FilterMenuItem({
         fontWeight: active ? 700 : 500,
         cursor: "pointer",
         fontFamily: "var(--font-sans)",
+        whiteSpace: "nowrap",
       }}
     >
       <span
