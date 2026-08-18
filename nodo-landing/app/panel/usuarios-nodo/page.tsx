@@ -82,9 +82,12 @@ const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }
   // impago = client_units.status: la suscripción de plataforma (nodo_core)
   // rechazó/no pudo cobrar un ciclo ya activo.
   impago: { bg: "#FEE2E2", color: "#991B1B", label: "Suscripción impaga" },
-  // demo_expired es calculado (plan=demo + trial_ends_at vencido), no un
-  // status guardado — ver listFromClientUnits en nodo-users-list.ts.
-  demo_expired: { bg: "#FCE9D8", color: "#B5630C", label: "Fin de demo" },
+  // demo_expired es calculado (plan=demo + trial_ends_at vencido, o
+  // professionals.subscription_status="demo" con trial_ends_at vencido —
+  // ver listFromClientUnits/listFromClinicaProfiles en nodo-users-list.ts).
+  // Mismo azul que "demo" en todos los nodos — solo cambia el texto, para
+  // que se lea como continuación de la demo y no como un estado aparte.
+  demo_expired: { bg: "#E8EEF8", color: "#2A6FDB", label: "Demo · Finalizada" },
   // pending_payment = professionals.subscription_status (suscripción
   // personal del médico a Nodo Clínica, sistema aparte de client_units):
   // eligió un plan pago y arrancó el checkout en MP, pero todavía no llegó
@@ -94,11 +97,25 @@ const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }
   // courtesy = professionals.subscription_status: acceso gratuito otorgado
   // manualmente desde este panel (ver botón "Dar cortesía"), sin pasar por MP.
   courtesy: { bg: "#EDE9FE", color: "#6D28D9", label: "Cortesía" },
+  // demo = plan/subscription_status todavía dentro de la ventana de trial —
+  // el label se pisa con los días restantes, ver demoDaysRemaining más abajo.
+  demo: { bg: "#E8EEF8", color: "#2A6FDB", label: "Demo" },
 };
+
+/** Días restantes de demo (status ya no es "demo" una vez vencida — ver demo_expired), o null si no aplica. */
+function demoDaysRemaining(trialEndsAt: string | null): number | null {
+  if (!trialEndsAt) return null;
+  const diffMs = new Date(trialEndsAt).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diffMs / 86_400_000));
+}
 
 function statusStyle(status: string) {
   return STATUS_STYLES[status] ?? { bg: "var(--color-mist)", color: "var(--color-slate2)", label: status };
 }
+
+// Nodos excluidos a propósito del selector de "Crear usuario" — Finanzas y
+// Autos no se dan de alta desde este atajo genérico.
+const CREATE_USER_EXCLUDED_NODES = new Set(["finanzas", "autos"]);
 
 function matchesEmailOrName(user: NodoUserRecord, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -180,6 +197,11 @@ export default function UsuariosNodoPage() {
     const codes = [...new Set(users.map((u) => u.unitCode))].sort();
     return [{ value: "all", label: "Todos los nodos" }, ...codes.map((c) => ({ value: c, label: c }))];
   }, [users]);
+
+  const createNodoOptions = useMemo(
+    () => nodoOptions.filter((o) => !CREATE_USER_EXCLUDED_NODES.has(o.value.toLowerCase())),
+    [nodoOptions],
+  );
 
   const filtered = useMemo(() => {
     return users.filter((u) => {
@@ -630,6 +652,13 @@ export default function UsuariosNodoPage() {
                 <tbody>
                   {sorted.map((user) => {
                     const st = statusStyle(user.authBanned ? "suspendido" : user.status);
+                    const demoDays = user.status === "demo" ? demoDaysRemaining(user.trialEndsAt) : null;
+                    const statusLabel =
+                      demoDays != null
+                        ? demoDays === 0
+                          ? "Demo · vence hoy"
+                          : `Demo · ${demoDays} día${demoDays === 1 ? "" : "s"}`
+                        : st.label;
                     const busy = processingId === user.id;
                     const isPaused = user.status === "pausado" || user.authBanned;
 
@@ -669,7 +698,7 @@ export default function UsuariosNodoPage() {
                               color: st.color,
                             }}
                           >
-                            {st.label}
+                            {statusLabel}
                           </span>
                         </td>
                         <td style={{ ...tdStyle, color: "var(--color-slate2)" }}>{formatDate(user.createdAt)}</td>
@@ -854,7 +883,7 @@ export default function UsuariosNodoPage() {
                 onChange={(v) => setCreateForm((f) => ({ ...f, unitCode: v }))}
                 options={[
                   { value: "", label: "Elegí un nodo…" },
-                  ...nodoOptions.filter((o) => o.value !== "all"),
+                  ...createNodoOptions.filter((o) => o.value !== "all"),
                 ]}
                 aria-label="Nodo de destino"
               />
