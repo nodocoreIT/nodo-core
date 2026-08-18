@@ -1,11 +1,12 @@
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { LoginForm } from "@/app/[nodeSlug]/login/page";
+import { ClinicaRedirectClient } from "./clinica-redirect-client";
 
 /**
  * /nodo-clinica/login handler:
  * - mode=register → render the landing registration form (doctor subscription)
- * - all other modes → redirect to the clinica app
+ * - all other modes → redirect to the clinica app (client-side — see
+ *   ClinicaRedirectClient for why this can't be a plain server redirect())
  */
 export default function NodoClinicaLoginPage({
   searchParams,
@@ -36,5 +37,5 @@ export default function NodoClinicaLoginPage({
   if (typeof role === "string") dest.searchParams.set("role", role);
   if (typeof mode === "string") dest.searchParams.set("mode", mode);
 
-  redirect(dest.toString());
+  return <ClinicaRedirectClient dest={dest.toString()} />;
 }
