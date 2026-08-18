@@ -89,6 +89,8 @@ const CLINICA_STATUS_STYLES: Record<string, { bg: string; color: string; label: 
   demo: { bg: "#E8EEF8", color: "#2A6FDB", label: "Demo" },
   pending_payment: { bg: "#FCE9D8", color: "#B5630C", label: "Pago sin confirmar" },
   expired: { bg: "#FBE3E1", color: "#C0392B", label: "Vencido" },
+  // Matches STATUS_STYLES.courtesy in usuarios-nodo/page.tsx — keep in sync.
+  courtesy: { bg: "#EDE9FE", color: "#6D28D9", label: "Cortesía" },
 };
 
 type SortKey = "cliente" | "contacto" | "estado" | "desde";
@@ -1073,6 +1075,12 @@ export default function ClientesPage() {
   const allSelected = selectableFiltered.length > 0 && selected.size === selectableFiltered.length;
   const activeFormUnit = formUnits.find((u) => u.key === activeUnitKey) ?? formUnits[0];
   const assignableNodes = getAssignableNodes(formUnits.map((u) => u.unit_code));
+  // Read-only — openEditForm deliberately excludes virtual Clínica units from
+  // formUnits (see its comment), this is purely informational so the admin
+  // isn't left wondering why a médico/paciente they know about isn't listed.
+  const virtualClinicaUnit = editingClient
+    ? (unitsByClient.get(editingClient.id) ?? []).find((u) => u.isVirtual)
+    : undefined;
 
   return (
     <>
@@ -1776,6 +1784,36 @@ export default function ClientesPage() {
                         </button>
                       );
                     })}
+                    {virtualClinicaUnit && (
+                      <span
+                        title="Usuario de Nodo Clínica — gestionalo desde Usuarios de Nodo"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          borderRadius: 999,
+                          padding: "8px 12px",
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          whiteSpace: "nowrap",
+                          fontFamily: "var(--font-sans)",
+                          cursor: "default",
+                          ...(virtualClinicaUnit.status === "courtesy"
+                            ? { background: "#EDE9FE", color: "#6D28D9", border: "1px solid #DDD6FE" }
+                            : { background: "white", color: "#0D7C73", border: "1px solid #0D7C73" }),
+                        }}
+                      >
+                        <span>Nodo Clínica</span>
+                        <span
+                          style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: "50%",
+                            background: statusStyle(virtualClinicaUnit.status).color,
+                          }}
+                        />
+                      </span>
+                    )}
                   </div>
 
                   {activeFormUnit && (
