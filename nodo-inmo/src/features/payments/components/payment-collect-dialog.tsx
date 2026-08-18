@@ -48,8 +48,15 @@ import {
   useAnnulPayment,
   useDeletePayment,
 } from "../hooks/use-delete-payment";
-import { usePaymentCharges, useUpsertPaymentCharges } from "../hooks/use-payment-charges";
-import { useContractChargeConcepts } from "@/features/contracts/hooks/use-contract-charge-concepts";
+import {
+  usePaymentCharges,
+  useUpsertPaymentCharges,
+  type PaymentChargeRow,
+} from "../hooks/use-payment-charges";
+import {
+  useContractChargeConcepts,
+  type ContractChargeConceptRow,
+} from "@/features/contracts/hooks/use-contract-charge-concepts";
 import { formatPeriod } from "../lib/payment-labels";
 import { remainingAmount } from "@/features/dashboard/lib/dashboard-payment-utils";
 import { formatMoney, formatDate } from "@/features/contracts/lib/contract-labels";
@@ -84,6 +91,14 @@ function contractLabel(payment: PaymentWithRelations): string {
 function periodToMonthInput(period: string): string {
   return period.slice(0, 7);
 }
+
+// Stable references — a fresh `[]` literal on every render (e.g. via an
+// inline destructuring default while the underlying query is disabled or
+// still loading) would keep changing identity, and both feed the setup
+// effect's dependency array below, re-triggering it every render in a tight
+// loop until React aborts with "Maximum update depth exceeded" (#185).
+const EMPTY_CHARGE_CONCEPTS: ContractChargeConceptRow[] = [];
+const EMPTY_PAYMENT_CHARGES: PaymentChargeRow[] = [];
 
 function formatSubmitError(err: unknown): string {
   const raw =
@@ -140,8 +155,8 @@ export function PaymentCollectDialog({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const { data: chargeConcepts = [] } = useContractChargeConcepts(payment?.contract_id);
-  const { data: savedCharges = [] } = usePaymentCharges(payment?.id);
+  const { data: chargeConcepts = EMPTY_CHARGE_CONCEPTS } = useContractChargeConcepts(payment?.contract_id);
+  const { data: savedCharges = EMPTY_PAYMENT_CHARGES } = usePaymentCharges(payment?.id);
   const upsertPaymentCharges = useUpsertPaymentCharges();
   const [chargeAmounts, setChargeAmounts] = useState<Record<string, string>>({});
 
