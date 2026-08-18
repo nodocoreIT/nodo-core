@@ -109,22 +109,10 @@ export const NODO_PLANS: NodoPlanConfig[] = [
     description: "Administración de proyectos constructivos: avances, gastos, registros y pagos.",
   },
   {
-    slug: "autos",
-    label: "Nodo Autos",
-    status: "available",
-    description: "Gestión de concesionarias: stock de vehículos, clientes, publicaciones y contratos.",
-  },
-  {
     slug: "clinica",
     label: "Nodo Clínica",
     status: "development",
     description: "Telemedicina profesional: consultorios virtuales, recetas digitales e informes con IA.",
-  },
-  {
-    slug: "finanzas",
-    label: "Nodo Finanzas",
-    status: "available",
-    description: "Finanzas personales: gastos, tarjetas, préstamos, planes de ahorro e informe mensual.",
   },
   {
     slug: "contable",
