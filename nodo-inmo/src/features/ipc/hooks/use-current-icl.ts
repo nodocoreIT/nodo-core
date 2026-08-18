@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/shared/lib/supabase";
 
 export interface ICLEntry {
   id: string;
@@ -16,10 +17,11 @@ export function useCurrentICL() {
     queryKey: ICL_QUERY_KEY,
     queryFn: async (): Promise<ICLEntry | null> => {
       try {
-        const res = await fetch("https://api.argly.com.ar/v1/icl");
-        if (!res.ok) throw new Error(`API error ${res.status}`);
-
-        const json = await res.json();
+        // Proxied through our own Edge Function — a direct browser fetch to
+        // api.argly.com.ar gets blocked by CORS (that API doesn't send
+        // Access-Control-Allow-Origin), see get-current-icl/index.ts.
+        const { data: json, error } = await supabase.functions.invoke("get-current-icl");
+        if (error) throw new Error(error.message);
         const data = json.data;
 
         if (!data || data.fecha === undefined || data.valor === undefined) {
