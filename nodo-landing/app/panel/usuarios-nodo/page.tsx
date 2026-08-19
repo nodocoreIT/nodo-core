@@ -113,9 +113,9 @@ function statusStyle(status: string) {
   return STATUS_STYLES[status] ?? { bg: "var(--color-mist)", color: "var(--color-slate2)", label: status };
 }
 
-// Nodos excluidos a propósito del selector de "Crear usuario" — Finanzas y
-// Autos no se dan de alta desde este atajo genérico.
-const CREATE_USER_EXCLUDED_NODES = new Set(["finanzas", "autos"]);
+// Nodos dados de baja del ecosistema — Finanzas y Autos ya no se dan de
+// alta ni se ofrecen como filtro en el panel de Usuarios de Nodo.
+const EXCLUDED_NODE_CODES = new Set(["finanzas", "autos"]);
 
 function matchesEmailOrName(user: NodoUserRecord, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -194,12 +194,14 @@ export default function UsuariosNodoPage() {
   }, [loadUsers]);
 
   const nodoOptions = useMemo(() => {
-    const codes = [...new Set(users.map((u) => u.unitCode))].sort();
+    const codes = [...new Set(users.map((u) => u.unitCode))]
+      .filter((c) => !EXCLUDED_NODE_CODES.has(c.toLowerCase()))
+      .sort();
     return [{ value: "all", label: "Todos los nodos" }, ...codes.map((c) => ({ value: c, label: c }))];
   }, [users]);
 
   const createNodoOptions = useMemo(
-    () => nodoOptions.filter((o) => !CREATE_USER_EXCLUDED_NODES.has(o.value.toLowerCase())),
+    () => nodoOptions.filter((o) => !EXCLUDED_NODE_CODES.has(o.value.toLowerCase())),
     [nodoOptions],
   );
 
