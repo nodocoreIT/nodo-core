@@ -389,10 +389,8 @@ export function getNodeLoginPath(nodeSlug: string): string {
  * "sin_acceso" que bloquea el login real (user_has_node_access es deny-first).
  */
 export const PANEL_ASSIGNABLE_NODE_CODES = [
-  "Autos",
   "Inmo",
   "Ecommerce",
-  "Finanzas",
 ] as const;
 
 export type PanelAssignableNodeCode = (typeof PANEL_ASSIGNABLE_NODE_CODES)[number];
