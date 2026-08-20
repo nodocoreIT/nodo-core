@@ -927,7 +927,7 @@ const TASK_NOTIFICATION_SUBJECT_PREFIX: Record<TaskNotificationType, string> = {
 };
 
 type OnboardingPendingPayload = {
-  type: "paciente" | "medico";
+  type: "paciente" | "medico" | "cliente";
   nombre: string;
   email: string;
   sourceNode: string;
@@ -936,9 +936,16 @@ type OnboardingPendingPayload = {
 const ONBOARDING_TYPE_LABEL: Record<OnboardingPendingPayload["type"], string> = {
   paciente: "Paciente",
   medico: "Médico",
+  cliente: "Cliente",
 };
 
-/** Notifies the ops inbox when a new paciente/medico onboarding finishes and needs review. */
+/**
+ * Notifies the ops inbox when a new registration finishes and needs review.
+ * Same criteria across nodos: fixed NODOCORE_LP_EMAIL destination (never
+ * CONTACT_TO), same card layout. Clínica shows the person type (Paciente/
+ * Médico) in the subject since that's the meaningful distinction there;
+ * nodos without that distinction (Inmo, etc.) show the nodo name instead.
+ */
 export async function sendOnboardingPendingEmail({
   type,
   nombre,
@@ -947,11 +954,15 @@ export async function sendOnboardingPendingEmail({
 }: OnboardingPendingPayload): Promise<void> {
   const transporter = createTransporter();
   const typeLabel = ONBOARDING_TYPE_LABEL[type];
+  const subjectSuffix =
+    sourceNode.toLowerCase() === "clinica"
+      ? typeLabel
+      : sourceNode.charAt(0).toUpperCase() + sourceNode.slice(1).toLowerCase();
 
   await transporter.sendMail({
     from: `"NODO Core · Onboarding" <${USER}>`,
     to: NODOCORE_LP_EMAIL,
-    subject: `Nuevo registro pendiente de habilitación — ${typeLabel}`,
+    subject: `Nuevo registro pendiente de habilitación — ${subjectSuffix}`,
     text: `Nuevo registro pendiente de habilitación.\n\nTipo: ${typeLabel}\nNombre: ${nombre}\nEmail: ${email}\nNodo de origen: ${sourceNode}\n\nHay que habilitar la cuenta desde el panel.`,
     html: `
       <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #DEE7F1;border-radius:14px;">

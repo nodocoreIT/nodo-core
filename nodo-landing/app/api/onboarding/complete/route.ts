@@ -5,11 +5,45 @@ import {
   requiresIdentityVerification,
 } from "@/lib/registration/node-config";
 import { notifyAdminPendingRegistration } from "@/app/actions/registration";
+import { isMailConfigured, sendOnboardingPendingEmail } from "@/lib/mail";
 import {
   isValidArgentineDni,
   normalizeDocumentNumber,
 } from "@/lib/identity-verification";
 import { resolveExistingOnboardingUser } from "@/lib/onboarding/existing-user";
+
+/**
+ * Nodos that use the same ops-inbox criteria as Clínica's onboarding
+ * (fixed NODOCORE_LP_EMAIL destination, "Nuevo registro pendiente de
+ * habilitación" card) instead of the legacy sendAdminNewRegistrationEmail,
+ * which goes to CONTACT_TO — a different inbox the team wasn't checking.
+ */
+const ONBOARDING_PENDING_EMAIL_NODES = new Set(["Inmo"]);
+
+async function notifyPendingRegistration(params: {
+  clientName: string;
+  email: string;
+  unitCode: string;
+  plan: string;
+  origin: string;
+}): Promise<void> {
+  if (ONBOARDING_PENDING_EMAIL_NODES.has(params.unitCode)) {
+    if (!isMailConfigured()) return;
+    try {
+      await sendOnboardingPendingEmail({
+        type: "cliente",
+        nombre: params.clientName,
+        email: params.email,
+        sourceNode: params.unitCode.toLowerCase(),
+      });
+    } catch (err) {
+      console.error("onboarding pending email failed:", err);
+    }
+    return;
+  }
+
+  await notifyAdminPendingRegistration(params);
+}
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
@@ -135,7 +169,7 @@ export async function POST(request: NextRequest) {
       .eq("id", tokenRow.id);
 
     const origin = request.nextUrl.origin;
-    await notifyAdminPendingRegistration({
+    await notifyPendingRegistration({
       clientName: fullName || email,
       email,
       unitCode: unitRow.unit_code,
@@ -252,7 +286,7 @@ export async function POST(request: NextRequest) {
     .eq("id", tokenRow.id);
 
   const origin = request.nextUrl.origin;
-  await notifyAdminPendingRegistration({
+  await notifyPendingRegistration({
     clientName: fullName,
     email,
     unitCode: unitRow.unit_code,
