@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { LoginNodeLockup } from "@/components/LoginNodeLockup";
 import { LoginNodeDetail } from "@/components/LoginNodeDetail";
 import { getNodeBySlug } from "@/lib/nodes";
@@ -35,7 +36,7 @@ export default function LoginBrandPanel({
       />
 
       <div className="login-brand-top relative z-1">
-        <a href="https://www.nodocore.com.ar" target="_blank" rel="noopener noreferrer">
+        <Link href="/">
           <Image
             src={TOP_LOGO_SRC}
             alt="NODO"
@@ -44,7 +45,7 @@ export default function LoginBrandPanel({
             style={{ height: "30px", width: "auto" }}
             priority
           />
-        </a>
+        </Link>
       </div>
 
       <div className="login-brand-hero relative z-1 flex min-h-0 flex-1 flex-col items-center justify-center py-8">
