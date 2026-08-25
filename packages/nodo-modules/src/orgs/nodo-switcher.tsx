@@ -51,6 +51,11 @@ const PRODUCT_PATHS: Record<string, string> = {
   finanzas: "/finanzas/admin/dashboard",
 };
 
+// Nodos dados de baja del ecosistema — Finanzas y Autos ya no se ofrecen
+// como destino de cambio de organización, aunque el usuario todavía tenga
+// membresías ahí.
+const EXCLUDED_SWITCH_PRODUCTS = new Set(["finanzas", "autos"]);
+
 const PENDING_ORG_SWITCH_KEY = "nodo-org-switch-pending";
 
 type PendingOrgSwitch = {
@@ -254,7 +259,9 @@ export function NodoSwitcher({ product, clinicaRole }: NodoSwitcherProps = {}) {
       return aOwn - bOwn;
     });
 
-  const otherProducts = allOrgs.filter((o) => product && o.product !== product);
+  const otherProducts = allOrgs.filter(
+    (o) => product && o.product !== product && !EXCLUDED_SWITCH_PRODUCTS.has(o.product),
+  );
 
   // Group other-product orgs by product.
   const otherByProduct: Record<string, OrgEntry[]> = {};

@@ -31,7 +31,6 @@ import {
   useBillingLockout,
 } from "@nodocore/shared-components";
 import { SettingsDialog, type SettingsTabId } from "@nodocore/nodo-modules/settings";
-import { NodoSwitcher } from "@nodocore/nodo-modules";
 import { cn } from "@/shared/lib/utils";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { FinanzasSettingsModuleProvider } from "@/shared/lib/finanzas-settings-module";
@@ -379,16 +378,10 @@ export function AdminLayout() {
                 </div>
               </div>
 
-              <PortalHeaderMobileActions
-                notifications={<NotificationBell />}
-                trailing={<NodoSwitcher product="finanzas" />}
-              />
+              <PortalHeaderMobileActions notifications={<NotificationBell />} />
             </div>
 
-            <PortalHeaderActions
-              notifications={<NotificationBell />}
-              trailing={<NodoSwitcher product="finanzas" />}
-            />
+            <PortalHeaderActions notifications={<NotificationBell />} />
           </header>
 
           {/* Content */}
