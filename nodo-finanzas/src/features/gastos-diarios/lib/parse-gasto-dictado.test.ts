@@ -185,4 +185,15 @@ describe('parseGastoDictado', () => {
     expect(result.formaPago).toBe('TARJETA');
     expect(result.cuotas).toBe(3);
   });
+
+  it('interpreta montos grandes que el motor de voz separa con espacios (100 000 -> 100000)', () => {
+    const result = parseGastoDictado({
+      texto: 'gasté 100 000 pesos en categoría belleza y pagué con mercado pago',
+      rubros,
+      fechaReferencia: '2026-06-19',
+    });
+
+    expect(result.monto).toBe(100000);
+    expect(result.formaPago).toBe('MERCADO_PAGO');
+  });
 });

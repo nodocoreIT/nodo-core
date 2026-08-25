@@ -214,6 +214,13 @@ function extractMonto(text: string): number | undefined {
     if (!Number.isNaN(base)) return Math.round(base * 1000);
   }
 
+  // El motor de voz suele separar miles con espacios en vez de puntos: "cien mil" -> "100 000".
+  const spacedThousandsMatch = normalized.match(/\b(\d{1,3}(?:\s\d{3})+)\b/);
+  if (spacedThousandsMatch) {
+    const amount = Number.parseFloat(spacedThousandsMatch[1].replace(/\s+/g, ''));
+    if (!Number.isNaN(amount) && amount > 0) return amount;
+  }
+
   const patterns = [
     /\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/,
     /(?:gast[eé]|pagu[eé])\s*(?:ayer|hoy|ante\s*ayer)?\s*(?:un\s+)?(?:gasto\s+(?:de\s+)?)?\$?\s*(\d+(?:[.,]\d+)?)/,
