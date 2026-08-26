@@ -92,12 +92,13 @@ const ROUTE_TITLES: Record<string, string> = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function resolveOnboardingGate(office: any): OnboardingGateKind | null {
   const consultationFee = office?.payment?.consultationFee;
-  if (!(typeof consultationFee === "number" && consultationFee > 0)) {
-    return "honorarios";
-  }
-  if (!office?.hasAvailability) {
-    return "agenda";
-  }
+  const needsFee = !(typeof consultationFee === "number" && consultationFee > 0);
+  const needsAgenda = !office?.hasAvailability;
+  // First run: both pending → combined welcome gate that names both steps.
+  // Then the sequential gates take over (honorarios first, agenda after).
+  if (needsFee && needsAgenda) return "ambos";
+  if (needsFee) return "honorarios";
+  if (needsAgenda) return "agenda";
   return null;
 }
 
@@ -844,7 +845,9 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
             kind={onboardingGate}
             open
             onContinue={() => {
-              setSettingsSection(onboardingGate === "honorarios" ? "cobros" : "agenda");
+              // "ambos" and "honorarios" both start at cobros (fees first);
+              // "agenda" jumps straight to the schedule section.
+              setSettingsSection(onboardingGate === "agenda" ? "agenda" : "cobros");
               setSettingsOpen(true);
               setOnboardingGate(null);
             }}

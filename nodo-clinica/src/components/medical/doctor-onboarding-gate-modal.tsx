@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Wallet } from "lucide-react";
+import { CalendarClock, ClipboardList, Wallet } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,12 +11,19 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-export type OnboardingGateKind = "honorarios" | "agenda";
+export type OnboardingGateKind = "ambos" | "honorarios" | "agenda";
 
 const GATE_COPY: Record<
   OnboardingGateKind,
   { icon: React.ElementType; title: string; description: string; cta: string }
 > = {
+  ambos: {
+    icon: ClipboardList,
+    title: "Configurá tu consultorio",
+    description:
+      "Antes de recibir turnos definí tus honorarios y tus horarios de agenda.",
+    cta: "Empezar",
+  },
   honorarios: {
     icon: Wallet,
     title: "Configurá tus honorarios",
