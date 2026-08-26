@@ -89,7 +89,14 @@ export async function POST(request: NextRequest) {
     password,
     email_confirm: true,
   });
-  if (updateError) {
+  // If the user re-typed their current password, Supabase rejects it with
+  // "New password should be different from the old password." That's not a real
+  // failure for this flow — the account already has exactly the password they
+  // want, so accept it: fall through, burn the token, and return ok. The email
+  // is already confirmed for any account that has a previous password.
+  const samePassword =
+    updateError?.message === "New password should be different from the old password.";
+  if (updateError && !samePassword) {
     return NextResponse.json({ error: updateError.message }, { status: 400 });
   }
 
