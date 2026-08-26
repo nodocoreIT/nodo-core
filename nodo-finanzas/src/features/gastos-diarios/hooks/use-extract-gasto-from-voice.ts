@@ -101,34 +101,55 @@ async function callAI(
   };
 }
 
-function mergeParsed(local: ParsedGastoDictado, gemini: Partial<ParsedGastoDictado>): ParsedGastoDictado {
-  const camposDetectados = new Set(local.camposDetectados);
-  const advertencias = [...local.advertencias];
+/**
+ * La IA es la fuente primaria (entiende "cien mil" / "100 000" / cualquier
+ * variante del dictado mucho mejor que los regex del parser local); el
+ * parser local solo completa lo que la IA no pudo resolver (tarjeta/cuenta,
+ * que la IA ni siquiera calcula) y recalcula advertencias sobre el
+ * resultado final, no sobre lo que el parser local detectó por su cuenta.
+ */
+function mergeParsed(
+  gemini: Partial<ParsedGastoDictado>,
+  local: ParsedGastoDictado,
+  context: ParseGastoDictadoContext,
+): ParsedGastoDictado {
+  const monto = gemini.monto ?? local.monto;
+  const descripcion = gemini.descripcion ?? local.descripcion;
+  const fecha = gemini.fecha ?? local.fecha;
+  const formaPago = gemini.formaPago ?? local.formaPago;
+  const rubroId = gemini.rubroId ?? local.rubroId;
+  const rubroCodigo = gemini.rubroCodigo ?? local.rubroCodigo;
+  const cuotas = gemini.cuotas ?? local.cuotas;
+  const tarjetaId = local.tarjetaId;
+  const cuentaId = local.cuentaId;
 
-  const monto = local.monto ?? gemini.monto;
-  const descripcion = local.descripcion ?? gemini.descripcion;
-  const fecha = local.fecha ?? gemini.fecha;
-  const formaPago = local.formaPago ?? gemini.formaPago;
-  const rubroId = local.rubroId ?? gemini.rubroId;
-  const rubroCodigo = local.rubroCodigo ?? gemini.rubroCodigo;
-  const cuotas = local.cuotas ?? gemini.cuotas;
+  const camposDetectados: string[] = [];
+  if (monto) camposDetectados.push('monto');
+  if (descripcion) camposDetectados.push('descripcion');
+  if (fecha) camposDetectados.push('fecha');
+  if (formaPago) camposDetectados.push('formaPago');
+  if (rubroId) camposDetectados.push('rubro');
+  if (cuotas) camposDetectados.push('cuotas');
+  if (tarjetaId) camposDetectados.push('tarjeta');
+  if (cuentaId) camposDetectados.push('cuenta');
 
-  if (monto && !local.monto) camposDetectados.add('monto');
-  if (descripcion && !local.descripcion) camposDetectados.add('descripcion');
-  if (fecha && !local.fecha) camposDetectados.add('fecha');
-  if (formaPago && !local.formaPago) camposDetectados.add('formaPago');
-  if (rubroId && !local.rubroId) camposDetectados.add('rubro');
-  if (cuotas && !local.cuotas) camposDetectados.add('cuotas');
-
+  const advertencias: string[] = [];
+  if (!monto) advertencias.unshift('No detectamos el monto. Completalo manualmente.');
+  if (!rubroId) advertencias.push('No pudimos identificar el rubro. Seleccioná uno manualmente.');
+  const tarjetasActivas = context.tarjetas?.filter((t) => t.activa).length ?? 0;
+  if (formaPago === 'TARJETA' && !tarjetaId && tarjetasActivas > 1) {
+    advertencias.push('Mencionaste tarjeta, pero no identificamos cuál. Elegila manualmente.');
+  }
   if (gemini.monto || gemini.descripcion || gemini.rubroId) {
     advertencias.push('Parte del dictado se interpretó con IA (Gemini).');
   }
 
-  let confianza = local.confianza;
-  if (monto) confianza = Math.max(confianza, 0.35);
-  if (formaPago) confianza += 0.1;
-  if (rubroId) confianza += 0.15;
-  if (descripcion) confianza += 0.05;
+  let confianza = 0;
+  if (monto) confianza += 0.35;
+  if (formaPago) confianza += 0.2;
+  if (rubroId) confianza += 0.25;
+  if (descripcion) confianza += 0.1;
+  if (fecha) confianza += 0.1;
 
   return {
     monto,
@@ -137,11 +158,11 @@ function mergeParsed(local: ParsedGastoDictado, gemini: Partial<ParsedGastoDicta
     formaPago,
     rubroId,
     rubroCodigo,
-    tarjetaId: local.tarjetaId,
-    cuentaId: local.cuentaId,
+    tarjetaId,
+    cuentaId,
     cuotas,
     confianza: Math.min(confianza, 1),
-    camposDetectados: [...camposDetectados],
+    camposDetectados,
     advertencias,
   };
 }
@@ -154,18 +175,15 @@ export function useExtractGastoFromVoice() {
   const extract = async (context: ParseGastoDictadoContext): Promise<ParsedGastoDictado> => {
     const local = parseGastoDictado(context);
 
-    // Parser local alcanza: no llamar a IA (evita fallos de red/API innecesarios).
-    if (parsedTieneDatosUtiles(local)) {
-      return local;
-    }
-
+    // Sin API key configurada el parser local (regex) es la única opción.
     if (!apiKey) {
+      if (parsedTieneDatosUtiles(local)) return local;
       throw new Error('NO_API_KEY');
     }
 
     try {
       const gemini = await callAI(provider, apiKey, context.texto, context);
-      const merged = mergeParsed(local, gemini);
+      const merged = mergeParsed(gemini, local, context);
       if (!parsedTieneDatosUtiles(merged)) throw new Error('EMPTY_PARSE');
       return merged;
     } catch (err) {
