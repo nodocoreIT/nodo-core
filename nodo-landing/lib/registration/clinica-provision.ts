@@ -1,7 +1,92 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const DEFAULT_CLINIC_ORG_ID = "843524dc-0c3b-4340-bc8e-e3ae5aa00fd2";
+
+/**
+ * Grants a clinica portal user access at the nodo_core level so
+ * `user_has_node_access('Clínica')` returns true. This is the row the
+ * clinica login flow gates on: without it, signInWithPassword succeeds but
+ * enforceNodeAccess immediately signs the user out, and the orphaned token
+ * then surfaces as `session_not_found` on the next request.
+ *
+ * Model (chosen deliberately): one client + client_unit per médico, each
+ * carrying its own plan / MercadoPago subscription, with the médico's email as
+ * the node_email_access row. Idempotent via node_email_access' UNIQUE
+ * (email, unit_code) — safe to call on every re-approval.
+ */
+export async function ensureClinicaNodeAccess(params: {
+  email: string;
+  fullName: string;
+  phone?: string | null;
+  plan?: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const core = createAdminClient("nodo_core");
+  const email = params.email.trim().toLowerCase();
+  const unitCode = "Clínica";
+
+  // Idempotent: already provisioned?
+  const { data: existing, error: existingError } = await core
+    .from("node_email_access")
+    .select("id")
+    .eq("email", email)
+    .eq("unit_code", unitCode)
+    .maybeSingle();
+  if (existingError) return { ok: false, error: existingError.message };
+  if (existing) return { ok: true };
+
+  const plan = params.plan?.trim() || "demo";
+
+  // 1. Client — one per médico so billing (MP preapproval) is per-professional.
+  const { data: client, error: clientError } = await core
+    .from("clients")
+    .insert({
+      name: params.fullName.trim() || email,
+      email,
+      phone: params.phone ?? null,
+      unit_code: unitCode,
+      status: "activo",
+      plan,
+    })
+    .select("id")
+    .single();
+  if (clientError || !client) {
+    return { ok: false, error: clientError?.message ?? "No se pudo crear el cliente." };
+  }
+
+  // 2. Client unit for Clínica.
+  const { data: unit, error: unitError } = await core
+    .from("client_units")
+    .insert({
+      client_id: client.id,
+      unit_code: unitCode,
+      plan,
+      status: "activo",
+      access_user: email,
+      enabled_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  if (unitError || !unit) {
+    return { ok: false, error: unitError?.message ?? "No se pudo crear la unidad del cliente." };
+  }
+
+  // 3. Email-access row — what user_has_node_access() actually reads.
+  const { error: accessError } = await core.from("node_email_access").insert({
+    email,
+    unit_code: unitCode,
+    client_id: client.id,
+    client_unit_id: unit.id,
+    status: "activo",
+  });
+  // 23505 = a concurrent approval already inserted it; treat as success.
+  if (accessError && accessError.code !== "23505") {
+    return { ok: false, error: accessError.message };
+  }
+
+  return { ok: true };
+}
 
 export function getDefaultClinicOrgId(): string {
   return process.env.CLINIC_ORG_ID ?? DEFAULT_CLINIC_ORG_ID;

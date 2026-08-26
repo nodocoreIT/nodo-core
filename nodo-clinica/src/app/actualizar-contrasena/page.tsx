@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { KeyRound, Loader2, CheckCircle, Stethoscope, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { clinicApi } from "@/lib/clinic/client-api";
 import { CLINIC_BRAND_LOGO_SRC } from "@/lib/clinic/brand";
 import { parseClinicDbRole } from "@/lib/clinic/resolve-clinic-role";
 
@@ -154,7 +155,9 @@ export default function ActualizarContrasenaPage() {
       const resolvedEmail = (setPwData.email as string | undefined) ?? userEmail;
       const resolvedUserId = (setPwData.userId as string | undefined) ?? authUserId;
 
-      let resolvedRole: "medico" | "paciente" = intendedRole;
+      let redirectPath = intendedRole === "medico" ? "/medico/dashboard" : "/paciente/inicio";
+      let loginRole: "doctor" | "patient" =
+        intendedRole === "medico" ? "doctor" : "patient";
       if (resolvedEmail || resolvedUserId) {
         const roleRes = await fetch("/api/clinic/account/ensure-role", {
           method: "POST",
@@ -172,18 +175,25 @@ export default function ActualizarContrasenaPage() {
               "No se pudo verificar el tipo de cuenta. Solicitá un nuevo enlace.",
           );
         }
-        resolvedRole = roleData.role === "medico" ? "medico" : "paciente";
+        if (roleData.role === "medico") {
+          redirectPath = "/medico/dashboard";
+          loginRole = "doctor";
+        } else {
+          redirectPath = "/paciente/inicio";
+          loginRole = "patient";
+        }
       }
 
-      // No re-login automático acá: encadenar signInWithPassword justo después
-      // de set-password duplicaba la escritura de la cookie de sesión de
-      // Supabase (server + browser) y podía romper verify-portal al aterrizar
-      // en el dashboard. Se manda al login normal para un único login limpio.
+      // 2. Re-authenticate and land straight on the panel. The node access row
+      // (nodo_core.node_email_access) is provisioned when the admin enables the
+      // account, so by the time we get here enforceNodeAccess won't bounce this
+      // session — auto-login is safe and gives the smoothest activation UX.
+      if (resolvedEmail) {
+        await clinicApi.login(resolvedEmail, password, loginRole);
+      }
+
       setSuccess(true);
-      setTimeout(
-        () => window.location.replace(`/login?role=${resolvedRole}`),
-        2000,
-      );
+      setTimeout(() => window.location.replace(redirectPath), 2000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       const SUPABASE_ERRORS: Record<string, string> = {
@@ -270,7 +280,7 @@ export default function ActualizarContrasenaPage() {
               Contraseña actualizada
             </h2>
             <p className="text-slate2 text-[14.5px]">
-              Redirigiendo al inicio de sesión…
+              Redirigiendo al panel…
             </p>
           </div>
         </main>

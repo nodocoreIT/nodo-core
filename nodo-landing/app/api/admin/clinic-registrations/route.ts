@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createNodoAdminClient } from "@/lib/supabase/nodo-admin";
 import { sendAccountEnabledEmail, sendNodeLinkedEmail } from "@/lib/mail";
 import { hasForeignMembership } from "@/lib/registration/auth-user-lookup";
-import { getDefaultClinicOrgId } from "@/lib/registration/clinica-provision";
+import { getDefaultClinicOrgId, ensureClinicaNodeAccess } from "@/lib/registration/clinica-provision";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
   const table = reg.role === "medico" ? "professionals" : "patients";
   const { data: profile } = await clinicAdmin
     .from(table)
-    .select("full_name, email")
+    .select("full_name, email, subscription_plan")
     .eq("email", reg.email)
     .maybeSingle();
 
@@ -275,6 +275,23 @@ export async function POST(request: NextRequest) {
       .from("professionals")
       .update({ enabled_at: new Date().toISOString() })
       .eq("email", reg.email);
+  }
+
+  // Grant node access at the nodo_core level — this is the row the clinica
+  // login flow gates on (user_has_node_access). Without it, login succeeds but
+  // enforceNodeAccess immediately signs the user out, surfacing as
+  // session_not_found. Do this for both roles: both hit the identical gate.
+  const access = await ensureClinicaNodeAccess({
+    email: reg.email,
+    fullName: profile.full_name ?? reg.email,
+    plan: (profile as { subscription_plan?: string | null }).subscription_plan ?? null,
+  });
+  if (!access.ok) {
+    console.error("[admin/clinic-registrations] node access provisioning failed", access.error);
+    return Response.json(
+      { error: "Error al provisionar el acceso al nodo." },
+      { status: 500 },
+    );
   }
 
   // Delete the pending registration (cleanup)
