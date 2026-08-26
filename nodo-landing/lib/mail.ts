@@ -62,7 +62,7 @@ function resolveNodeBrand(unitCodeOrLabel: string): NodeBrandTheme {
 /** Public-URL logo (white wordmark) — avoids CID attachment delays in mail clients. */
 function nodoWhiteLogoHtml(heightPx = 44): string {
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://www.nodocore.com.ar").replace(/\/$/, "");
-  const logoUrl = `${appUrl}/logos/logo%20compuesto%20estrella%20az%20letra%20blanca.png`;
+  const logoUrl = `${appUrl}/logos/logo%20compuesto%20estrella%20az%20letra%20blanca_50.png`;
   return `<img src="${logoUrl}" alt="NODO Core" style="height:${heightPx}px;width:auto;display:inline-block;"/>`;
 }
 
