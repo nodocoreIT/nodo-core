@@ -299,6 +299,18 @@ export function formatDateKeyLabel(dateKey: string): string {
   return format(d, "EEEE d 'de' MMMM", { locale: es });
 }
 
+export function appointmentRangeOverlaps(
+  apt1Start: Date,
+  apt1Duration: number,
+  apt2Start: Date,
+  apt2Duration: number,
+): boolean {
+  const apt1End = new Date(apt1Start.getTime() + apt1Duration * 60 * 1000);
+  const apt2End = new Date(apt2Start.getTime() + apt2Duration * 60 * 1000);
+  return apt1Start < apt2End && apt2Start < apt1End;
+}
+}
+
 export function formatDateKeyShortLabel(dateKey: string): string {
   const d = parseLocalDate(dateKey);
   return format(d, "EEE, d MMM", { locale: es });

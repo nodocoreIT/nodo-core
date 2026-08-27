@@ -1897,4 +1897,37 @@ export const clinicApi = {
       error?: string;
     };
   },
+
+  async saveInPersonAvailability(payload: {
+    enabled: boolean;
+    availability: { slotDurationMinutes: number; days: Array<{ dayOfWeek: number; startTime: string; endTime: string }> };
+    location_info: { address?: string; phone?: string; parkingNotes?: string };
+  }) {
+    const res = await fetch(`${BASE}/api/clinic/in-person-availability`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "No se pudo guardar la agenda presencial");
+    return data;
+  },
+
+  async searchPatients(query: string) {
+    if (!query.trim()) return [];
+    const res = await fetch(
+      `${BASE}/api/clinic/patients/search?q=${encodeURIComponent(query)}`,
+      clinicFetchOpts(),
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al buscar pacientes");
+    return data as Array<{
+      id: string;
+      fullName: string;
+      email: string;
+      dni?: string;
+      lastAppointmentAt?: string;
+    }>;
+  },
 };

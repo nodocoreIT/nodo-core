@@ -23,6 +23,8 @@ import {
   slotKeyFromIso,
   addDaysToDateKey,
   formatAppointmentLabelFromIso,
+  DoctorAvailability,
+  appointmentRangeOverlaps,
 } from "@/lib/clinic/schedule";
 import {
   isPaymentConfirmed,
@@ -688,8 +690,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { doctorId, scheduledAt, paymentMethod, shareHealthProfile, receipt, intakeReason, studyFiles } =
+  const { doctorId, scheduledAt, paymentMethod, shareHealthProfile, receipt, intakeReason, studyFiles, appointmentType } =
     await request.json();
+
+  const type = (appointmentType === 'in_person' ? 'in_person' : 'virtual') as 'virtual' | 'in_person';
 
   if (!doctorId) {
     return NextResponse.json({ error: "Médico requerido" }, { status: 400 });
@@ -705,6 +709,24 @@ export async function POST(request: NextRequest) {
   }
 
   const { professional, officeSettings } = bookable;
+
+  // Fetch in_person_availability if booking presencial appointment
+  let inPersonAvailability: { availability?: DoctorAvailability; location_info?: Record<string, unknown> } | null = null;
+  if (type === 'in_person') {
+    const { data } = await supabase
+      .from('in_person_availability')
+      .select('availability, location_info, enabled')
+      .eq('professional_id', doctorId)
+      .maybeSingle();
+    inPersonAvailability = data;
+
+    if (!inPersonAvailability?.enabled) {
+      return NextResponse.json(
+        { error: 'El médico no atiende pacientes de forma presencial' },
+        { status: 404 },
+      );
+    }
+  }
 
   // Find the patient row for this auth user
   const { data: patientRow } = await supabase
@@ -814,29 +836,53 @@ export async function POST(request: NextRequest) {
     validatedReceipt = receiptPayload;
   }
 
-  if (!appointmentMatchesScheduleGrid(when.toISOString(), availability)) {
+  // Validate against appropriate availability (virtual or presencial)
+  const scheduleToValidate = type === 'in_person'
+    ? (inPersonAvailability?.availability ?? DEFAULT_AVAILABILITY)
+    : availability;
+
+  if (!appointmentMatchesScheduleGrid(when.toISOString(), scheduleToValidate)) {
     return NextResponse.json(
       { error: "El horario elegido está fuera de la agenda del médico" },
       { status: 400 },
     );
   }
 
-  // Check slot availability
+  // Check slot availability and bidirectional conflicts (presencial vs virtual)
   const slotKey = slotKeyFromIso(when.toISOString());
   const { data: existingApts } = await supabase
     .from("appointments")
-    .select("id, scheduled_at, status")
+    .select("id, scheduled_at, status, appointment_type")
     .eq("doctor_id", doctorId)
     .neq("status", "cancelled");
 
-  const slotTaken = (existingApts ?? []).some(
-    (a) => slotKeyFromIso(a.scheduled_at) === slotKey,
-  );
-  if (slotTaken) {
-    return NextResponse.json(
-      { error: "Ese horario ya está reservado" },
-      { status: 409 },
-    );
+  // For presencial: check overlap with ANY existing appointment (virtual or presencial)
+  // For virtual: only check overlap with other virtuals
+  const aptDuration = type === 'in_person'
+    ? (inPersonAvailability?.availability?.slotDurationMinutes ?? 30)
+    : (availability.slotDurationMinutes ?? 30);
+
+  const conflictingApt = (existingApts ?? []).find((a) => {
+    if (type === 'in_person') {
+      // Presencial: check overlap with BOTH virtual and presencial
+      return appointmentRangeOverlaps(
+        new Date(a.scheduled_at),
+        30, // assume standard 30min for existing apt
+        when,
+        aptDuration,
+      );
+    } else {
+      // Virtual: check overlap only with other virtuals
+      if (a.appointment_type === 'in_person') return false;
+      return slotKeyFromIso(a.scheduled_at) === slotKey;
+    }
+  });
+
+  if (conflictingApt) {
+    const msg = type === 'in_person'
+      ? "No podés asignar un turno presencial en ese horario: conflicto con turno existente"
+      : "Ese horario ya está reservado";
+    return NextResponse.json({ error: msg }, { status: 409 });
   }
 
   const whenDateKey = localDateKeyFromIso(when.toISOString());
@@ -861,7 +907,7 @@ export async function POST(request: NextRequest) {
     appointment_date: when.toISOString(),
     status: "scheduled",
     queue_position: queueToday + 1,
-    jitsi_room_id: `clinica-${doctorId.slice(-8)}-${Date.now()}`,
+    jitsi_room_id: type === 'virtual' ? `clinica-${doctorId.slice(-8)}-${Date.now()}` : null,
     access_token: randomUUID(),
     token_expires_at: tokenExpires.toISOString(),
     payment_status: paymentStatus as "waived" | "pending" | "confirmed",
@@ -870,6 +916,7 @@ export async function POST(request: NextRequest) {
     share_health_profile: !!shareHealthProfile,
     intake_reason: intakeReason ? String(intakeReason).slice(0, 4000) : null,
     payment_receipt_audit: receiptAudit ?? null,
+    appointment_type: type,
   });
 
   if (insertError || !apt) {
@@ -967,14 +1014,28 @@ export async function POST(request: NextRequest) {
     )} del turno a ${patientRow.email}.`;
   }
 
-  sendAppointmentConfirmationEmail({
-    patientEmail: patientRow.email,
-    patientName: patientRow.full_name,
-    doctorName: professional.full_name,
-    scheduledAt: scheduledLabel,
-    waitingRoomUrl: patientLoginUrl(baseUrl),
-    reminderNote,
-  }).catch((err) => console.error("[Email] confirmation failed", err));
+  if (type === 'in_person') {
+    const locationInfo = inPersonAvailability?.location_info as Record<string, string> | undefined;
+    // TODO: implement sendInPersonConfirmationEmail
+    // For now, send standard confirmation (email template can be added later)
+    sendAppointmentConfirmationEmail({
+      patientEmail: patientRow.email,
+      patientName: patientRow.full_name,
+      doctorName: professional.full_name,
+      scheduledAt: scheduledLabel,
+      waitingRoomUrl: patientLoginUrl(baseUrl),
+      reminderNote,
+    }).catch((err) => console.error("[Email] confirmation failed", err));
+  } else {
+    sendAppointmentConfirmationEmail({
+      patientEmail: patientRow.email,
+      patientName: patientRow.full_name,
+      doctorName: professional.full_name,
+      scheduledAt: scheduledLabel,
+      waitingRoomUrl: patientLoginUrl(baseUrl),
+      reminderNote,
+    }).catch((err) => console.error("[Email] confirmation failed", err));
+  }
 
   const paymentPendingReview =
     requiresPayment && !usesMercadoPago && !transferPaymentValidated;
