@@ -7,25 +7,11 @@ import { DoctorCobrosList } from "@/components/medical/doctor-cobros-list";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { NODO_LANDING_URL } from "@/lib/clinic/platform-config";
 
-const FINANZAS_BANNER_DISMISSED_KEY = "clinica_finanzas_banner_dismissed";
-
 export function LocalMedicoCobros() {
   const router = useRouter();
   const [doctorId, setDoctorId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingRefresh, setPendingRefresh] = useState(0);
-  const [finanzasBannerDismissed, setFinanzasBannerDismissed] = useState(true);
-
-  useEffect(() => {
-    setFinanzasBannerDismissed(
-      localStorage.getItem(FINANZAS_BANNER_DISMISSED_KEY) === "1",
-    );
-  }, []);
-
-  const dismissFinanzasBanner = useCallback(() => {
-    localStorage.setItem(FINANZAS_BANNER_DISMISSED_KEY, "1");
-    setFinanzasBannerDismissed(true);
-  }, []);
 
   const refreshSidebarBadge = useCallback(() => {
     setPendingRefresh((n) => n + 1);
@@ -106,32 +92,6 @@ export function LocalMedicoCobros() {
           Configurar honorarios
         </button>
       </div>
-
-      {!finanzasBannerDismissed && (
-        <div className="flex items-center gap-3 rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-2.5 text-sm text-emerald-900">
-          <Coins className="h-4 w-4 shrink-0 text-emerald-600" />
-          <p className="flex-1">
-            Ya tenés Nodo Clínica — ¿te gustaría anexar{" "}
-            <a
-              href={`${NODO_LANDING_URL}/nodo-finanzas`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium underline underline-offset-2 hover:text-emerald-700"
-            >
-              Nodo Finanzas
-            </a>{" "}
-            para llevar el control de tus ingresos?
-          </p>
-          <button
-            type="button"
-            onClick={dismissFinanzasBanner}
-            aria-label="Cerrar"
-            className="shrink-0 rounded p-1 text-emerald-500 hover:bg-emerald-100 hover:text-emerald-700"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
 
       <section className="rounded-xl border border-mist bg-white p-4 shadow-sm sm:p-5">
         <DoctorCobrosList
