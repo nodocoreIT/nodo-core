@@ -168,7 +168,7 @@ export function PatientHistoryDetail({ patientId }: { patientId: string }) {
   useEffect(() => {
     let active = true;
     clinicApi
-      .getPatientHistory(patientId)
+      .getMyPatientHistory(patientId)
       .then((d) => {
         if (active) setData(d);
       })
