@@ -29,7 +29,7 @@ export function PacienteHomePage() {
 
   return (
     <>
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3 items-start">
         {/* Main content */}
         <div className="lg:col-span-2 space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
