@@ -9,14 +9,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1534,22 +1527,16 @@ export function DoctorSettingsDialog({
       </DialogContent>
     </Dialog>
 
-    <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
-      <AlertDialogContent>
-        <AlertDialogTitle>Cambios sin guardar</AlertDialogTitle>
-        <AlertDialogDescription>
-          Realizaste cambios que no se guardaron. ¿Querés guardarlos antes de cerrar?
-        </AlertDialogDescription>
-        <div className="flex gap-3 justify-end">
-          <AlertDialogCancel onClick={handleCloseWithoutSave}>
-            No guardar
-          </AlertDialogCancel>
-          <AlertDialogAction onClick={handleSaveBeforeClose} className="bg-emerald-600 hover:bg-emerald-700">
-            Guardar cambios
-          </AlertDialogAction>
-        </div>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      open={showUnsavedDialog}
+      onOpenChange={setShowUnsavedDialog}
+      title="Cambios sin guardar"
+      description="Realizaste cambios que no se guardaron. ¿Querés guardarlos antes de cerrar?"
+      confirmLabel="Guardar cambios"
+      cancelLabel="No guardar"
+      destructive={false}
+      onConfirm={handleSaveBeforeClose}
+    />
     </>
   );
 }
