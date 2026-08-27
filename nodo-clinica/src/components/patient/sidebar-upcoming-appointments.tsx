@@ -89,7 +89,9 @@ export function SidebarUpcomingAppointments() {
               </p>
               <div className="flex items-center gap-1 text-xs text-slate-600">
                 <Clock className="h-3 w-3" />
-                {formatAppointmentLabelFromIso(apt.scheduled_at)}
+                {apt.scheduled_at
+                  ? formatAppointmentLabelFromIso(apt.scheduled_at)
+                  : "Horario no disponible"}
               </div>
               <div className="flex items-center gap-1">
                 <span
