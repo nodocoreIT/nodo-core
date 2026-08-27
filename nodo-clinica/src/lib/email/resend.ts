@@ -236,3 +236,95 @@ export async function sendPrescriptionEmail(
     ],
   });
 }
+
+interface InPersonAppointmentEmailParams {
+  patientEmail: string;
+  patientName: string;
+  doctorName: string;
+  scheduledAt: string;
+  address?: string;
+  phone?: string;
+  parkingNotes?: string;
+  reminderNote?: string;
+}
+
+export async function sendInPersonConfirmationEmail(
+  params: InPersonAppointmentEmailParams,
+): Promise<EmailSendResult> {
+  const {
+    patientEmail,
+    patientName,
+    doctorName,
+    scheduledAt,
+    address,
+    phone,
+    parkingNotes,
+    reminderNote,
+  } = params;
+
+  const reminderBlock = reminderNote
+    ? clinicEmailParagraph(`📅 ${reminderNote}`)
+    : "";
+
+  const locationBlock = address || phone || parkingNotes
+    ? clinicEmailParagraph(`
+        <strong>📍 Ubicación:</strong><br>
+        ${address ? `${address}<br>` : ""}
+        ${phone ? `Teléfono: ${phone}<br>` : ""}
+        ${parkingNotes ? `Estacionamiento: ${parkingNotes}` : ""}
+      `)
+    : "";
+
+  const html = clinicEmailDocument(
+    "Confirmación de turno presencial",
+    `
+      ${clinicEmailTealHeader("Confirmación de turno presencial")}
+      <div style="padding:32px 24px;">
+        ${clinicEmailParagraph(`Hola <strong>${patientName}</strong>,`)}
+        ${clinicEmailParagraph(
+          `Tu consulta presencial con <strong>${doctorName}</strong> está confirmada para el <strong>${scheduledAt}</strong>.`,
+        )}
+        ${locationBlock}
+        ${reminderBlock}
+        ${clinicEmailParagraph(
+          `Ingresá a la app como paciente para ver tu turno en <strong>Mis turnos</strong>:`,
+        )}
+        <div style="text-align:center;margin:32px 0;">
+          <a href="https://nodo-clinica.vercel.app/paciente/turnos"
+             style="background:#0f766e;color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;word-wrap:break-word;">
+            Ver mi turno
+          </a>
+        </div>
+      </div>
+    `,
+  );
+
+  const textLines = [
+    `Hola ${patientName},`,
+    "",
+    `Tu consulta presencial con ${doctorName} está confirmada para el ${scheduledAt}.`,
+    "",
+  ];
+
+  if (address || phone || parkingNotes) {
+    textLines.push("📍 Ubicación:");
+    if (address) textLines.push(address);
+    if (phone) textLines.push(`Teléfono: ${phone}`);
+    if (parkingNotes) textLines.push(`Estacionamiento: ${parkingNotes}`);
+    textLines.push("");
+  }
+
+  if (reminderNote) {
+    textLines.push(`📅 ${reminderNote}`);
+    textLines.push("");
+  }
+
+  textLines.push("Ver mi turno: https://nodo-clinica.vercel.app/paciente/turnos");
+
+  return sendClinicEmail({
+    to: patientEmail,
+    subject: `Turno presencial confirmado — ${doctorName}`,
+    html,
+    text: textLines.join("\n"),
+  });
+}
