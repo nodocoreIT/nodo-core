@@ -373,10 +373,24 @@ async function deleteClinicaMedicoExplicit(professionalId: string, email: string
   const db = createAdminClient("nodo_clinica");
   const nodoAdmin = createNodoAdminClient("clinica");
 
-  await db.from("doctor_tasks").delete().eq("professional_id", professionalId);
-  await db.from("office_settings").delete().eq("professional_id", professionalId);
-  await db.from("appointments").delete().eq("doctor_id", professionalId);
+  // Clear the FK references to professionals that are NOT ON DELETE CASCADE —
+  // otherwise the professionals delete below is blocked. medical_records is
+  // RESTRICT; doctor_notifications and interconsult_messages are NO ACTION.
+  // Everything else that points at professionals (appointments and its cascade
+  // children clinical_notes/soap_summaries/transcriptions/prescriptions/
+  // study_orders/patient_documents, plus clinical_records, office_settings,
+  // doctor_tasks, payment_credentials, doctor_presence, chat_read_cursors) is
+  // ON DELETE CASCADE and goes with the professionals row automatically.
+  await db.from("medical_records").delete().eq("professional_id", professionalId);
+  await db.from("doctor_notifications").delete().eq("professional_id", professionalId);
+  await db.from("interconsult_messages").delete().eq("from_professional_id", professionalId);
+  await db.from("interconsult_messages").delete().eq("to_professional_id", professionalId);
+
   await db.from("professionals").delete().eq("id", professionalId);
+
+  // Keyed by email/user_id, not professional_id, so they never cascade — clear
+  // them explicitly or they linger and (activation tokens) block re-creation.
+  await db.from("account_activation_tokens").delete().ilike("email", email);
   await db.from("pending_clinic_registrations").delete().ilike("email", email);
 
   if (authUserId && nodoAdmin) {
@@ -421,23 +435,26 @@ export async function deleteNodoUser(user: NodoUserRecord): Promise<{ ok: true }
           }
         }
 
+        // Hard delete (not a "sin_acceso" soft-delete): the médico must leave
+        // zero rows behind, and a leftover client_unit in sin_acceso would also
+        // block re-creation via user_has_node_access' deny-first check.
         await landingAdmin.from("node_email_access").delete().eq("client_unit_id", unit.id);
-        await landingAdmin
-          .from("client_units")
-          .update({
-            access_user: null,
-            access_password: null,
-            provision_user_id: null,
-            provisioned_at: null,
-            // "sin_acceso", not "pausado" — this wasn't a reversible business
-            // pause, the credentials are gone. Keeps the two cases visually
-            // distinct in Clientes and blocks the one-click "Reactivar"
-            // toggle (client-unit-status/route.ts only allows activo/pausado).
-            status: "sin_acceso",
-          })
-          .eq("id", unit.id);
+        await landingAdmin.from("client_units").delete().eq("id", unit.id);
 
-        if (unit.client_id) await syncNodeEmailAccessForClient(landingAdmin, unit.client_id);
+        // Drop the owning client too, but ONLY if it has no other units — a
+        // shared client with access to another nodo must survive untouched.
+        if (unit.client_id) {
+          const { count: remainingUnits } = await landingAdmin
+            .from("client_units")
+            .select("id", { count: "exact", head: true })
+            .eq("client_id", unit.client_id);
+          if ((remainingUnits ?? 0) === 0) {
+            await landingAdmin.from("node_email_access").delete().eq("client_id", unit.client_id);
+            await landingAdmin.from("clients").delete().eq("id", unit.client_id);
+          } else {
+            await syncNodeEmailAccessForClient(landingAdmin, unit.client_id);
+          }
+        }
       }
     }
 
@@ -472,6 +489,11 @@ export async function deleteNodoUser(user: NodoUserRecord): Promise<{ ok: true }
     // it here would silently break that other access, contradicting the
     // warning shown before confirming.
     if (preview.willDeleteAuthUser && authUserId && authAdmin) {
+      // terms_acceptances (nodo_core) has a NO ACTION FK to auth.users, so it
+      // blocks deleteUser if left behind. Only reached when the account has no
+      // access in any other nodo (willDeleteAuthUser), so clearing it can't
+      // affect another nodo's data.
+      await landingAdmin.from("terms_acceptances").delete().eq("user_id", authUserId);
       await authAdmin.auth.admin.deleteUser(authUserId);
     }
 
