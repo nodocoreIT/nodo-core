@@ -8,6 +8,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -102,7 +110,10 @@ export function PatientSettingsDialog({
     readProfileCache(),
   );
   const [profileLoading, setProfileLoading] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const loadGen = useRef(0);
+  const initialStateRef = useRef<any>(null);
   const { setSettings, hydrateSettings } = useThemeSettings();
 
   useEffect(() => {
@@ -131,6 +142,27 @@ export function PatientSettingsDialog({
       });
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Capture initial state when modal opens
+  useEffect(() => {
+    if (!open) {
+      initialStateRef.current = null;
+      setIsDirty(false);
+      return;
+    }
+    if (profileData) {
+      initialStateRef.current = JSON.stringify(profileData);
+      setIsDirty(false);
+    }
+  }, [open, profileData]);
+
+  // Detect changes (dirty state) - profiles change via section components
+  // We detect dirty state by checking if profileData changed since it was captured
+  useEffect(() => {
+    if (!open || !initialStateRef.current || !profileData) return;
+    const hasChanges = JSON.stringify(profileData) !== initialStateRef.current;
+    setIsDirty(hasChanges);
+  }, [open, profileData]);
+
   const sectionDescription =
     activeSection === "perfil"
       ? "Actualizá tus datos personales y contraseña."
@@ -142,8 +174,22 @@ export function PatientSettingsDialog({
             ? "Conectores e integraciones con IA."
             : "Información de tu plan de paciente en Nodo Clínica.";
 
+  const handleCloseWithCheck = (newOpen: boolean) => {
+    if (!newOpen && isDirty) {
+      setShowUnsavedDialog(true);
+      return;
+    }
+    onOpenChange(newOpen);
+  };
+
+  const handleCloseWithoutSave = () => {
+    setShowUnsavedDialog(false);
+    onOpenChange(false);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={handleCloseWithCheck}>
       <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[90vh] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden bg-white">
         <SettingsDesktopNav
           items={PATIENT_SETTINGS_NAV}
@@ -224,5 +270,23 @@ export function PatientSettingsDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+      <AlertDialogContent>
+        <AlertDialogTitle>Cambios sin guardar</AlertDialogTitle>
+        <AlertDialogDescription>
+          Realizaste cambios que no se guardaron. ¿Querés descartar los cambios y cerrar?
+        </AlertDialogDescription>
+        <div className="flex gap-3 justify-end">
+          <AlertDialogCancel onClick={handleCloseWithoutSave}>
+            Descartar cambios
+          </AlertDialogCancel>
+          <AlertDialogAction onClick={() => setShowUnsavedDialog(false)} className="bg-slate-600 hover:bg-slate-700">
+            Seguir editando
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

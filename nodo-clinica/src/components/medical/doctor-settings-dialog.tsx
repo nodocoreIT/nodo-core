@@ -9,6 +9,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -174,6 +182,10 @@ export function DoctorSettingsDialog({
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [testingReminder, setTestingReminder] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingClose, setPendingClose] = useState(false);
+  const initialStateRef = useRef<any>(null);
   const [mpOAuthConfigured, setMpOAuthConfigured] = useState<boolean | null>(null);
   const [subscription, setSubscription] = useState<{
     status: string;
@@ -295,6 +307,53 @@ export function DoctorSettingsDialog({
         }
       });
   }, [doctorId, applyOfficeData, open]);
+
+  // Capture initial state when modal opens
+  useEffect(() => {
+    if (!open) {
+      initialStateRef.current = null;
+      setIsDirty(false);
+      return;
+    }
+    initialStateRef.current = {
+      availability: JSON.stringify(availability),
+      blockedDates: JSON.stringify(blockedDates),
+      fullName,
+      licenseNumber,
+      specialties: JSON.stringify(specialties),
+      signatureText,
+      signatureImageData,
+      profilePhotoData,
+      bio,
+      payment: JSON.stringify(payment),
+      reminderSettings: JSON.stringify(reminderSettings),
+      googleCalendarId,
+      themeSettings: JSON.stringify(themeSettings),
+    };
+    setIsDirty(false);
+  }, [open]);
+
+  // Detect changes (dirty state)
+  useEffect(() => {
+    if (!open || !initialStateRef.current) return;
+    const currentState = {
+      availability: JSON.stringify(availability),
+      blockedDates: JSON.stringify(blockedDates),
+      fullName,
+      licenseNumber,
+      specialties: JSON.stringify(specialties),
+      signatureText,
+      signatureImageData,
+      profilePhotoData,
+      bio,
+      payment: JSON.stringify(payment),
+      reminderSettings: JSON.stringify(reminderSettings),
+      googleCalendarId,
+      themeSettings: JSON.stringify(themeSettings),
+    };
+    const hasChanges = JSON.stringify(currentState) !== JSON.stringify(initialStateRef.current);
+    setIsDirty(hasChanges);
+  }, [open, availability, blockedDates, fullName, licenseNumber, specialties, signatureText, signatureImageData, profilePhotoData, bio, payment, reminderSettings, googleCalendarId, themeSettings]);
 
   const toggleDay = (dayOfWeek: number) => {
     setAvailability((prev) => {
@@ -435,6 +494,29 @@ export function DoctorSettingsDialog({
     }
   };
 
+  const handleCloseWithCheck = (newOpen: boolean) => {
+    if (!newOpen && isDirty) {
+      setShowUnsavedDialog(true);
+      setPendingClose(true);
+      return;
+    }
+    onOpenChange(newOpen);
+  };
+
+  const handleSaveBeforeClose = async () => {
+    setShowUnsavedDialog(false);
+    await handleSave();
+    setPendingClose(false);
+    // Close after save (handleSave resets isDirty via applyOfficeData)
+    onOpenChange(false);
+  };
+
+  const handleCloseWithoutSave = () => {
+    setShowUnsavedDialog(false);
+    setPendingClose(false);
+    onOpenChange(false);
+  };
+
   const addBlockedDate = () => {
     if (!newBlockDate || blockedDates.includes(newBlockDate)) return;
     setBlockedDates((prev) => [...prev, newBlockDate].sort());
@@ -453,7 +535,8 @@ export function DoctorSettingsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={handleCloseWithCheck}>
       <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[90vh] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden bg-white">
         <SettingsDesktopNav
           items={CLINICA_SETTINGS_NAV}
@@ -1450,5 +1533,23 @@ export function DoctorSettingsDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+      <AlertDialogContent>
+        <AlertDialogTitle>Cambios sin guardar</AlertDialogTitle>
+        <AlertDialogDescription>
+          Realizaste cambios que no se guardaron. ¿Querés guardarlos antes de cerrar?
+        </AlertDialogDescription>
+        <div className="flex gap-3 justify-end">
+          <AlertDialogCancel onClick={handleCloseWithoutSave}>
+            No guardar
+          </AlertDialogCancel>
+          <AlertDialogAction onClick={handleSaveBeforeClose} className="bg-emerald-600 hover:bg-emerald-700">
+            Guardar cambios
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
