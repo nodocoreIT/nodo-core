@@ -1767,6 +1767,53 @@ export const clinicApi = {
     return data;
   },
 
+  async getMyPatients() {
+    const res = await fetch(`${BASE}/api/clinic/medico/pacientes`, clinicFetchOpts());
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar pacientes");
+    return data as {
+      patients: Array<{
+        id: string;
+        fullName: string;
+        profilePhotoUrl: string | null;
+        lastVisit: string;
+        visitCount: number;
+      }>;
+    };
+  },
+
+  async getMyPatientHistory(patientId: string) {
+    const res = await fetch(
+      `${BASE}/api/clinic/medico/pacientes/${encodeURIComponent(patientId)}`,
+      clinicFetchOpts(),
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al cargar la historia clínica");
+    return data as {
+      patient: {
+        id: string;
+        fullName: string;
+        profilePhotoUrl: string | null;
+        dateOfBirth: string | null;
+        dni: string | null;
+      };
+      consultations: Array<{
+        id: string;
+        scheduledAt: string;
+        intakeReason: string | null;
+        notes: string | null;
+        soap: {
+          subjective: string | null;
+          objective: string | null;
+          analysis: string | null;
+          plan: string | null;
+        } | null;
+        prescriptions: Array<{ id: string; medications: unknown; pdfUrl: string | null; createdAt: string }>;
+        studyOrders: Array<{ id: string; studies: unknown; notes: string | null; pdfUrl: string | null; createdAt: string }>;
+      }>;
+    };
+  },
+
   async getCobrosUnreadCount() {
     const res = await fetch(
       `${BASE}/api/clinic/notifications?scope=unread_count`,

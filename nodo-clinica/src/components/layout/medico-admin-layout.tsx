@@ -14,6 +14,7 @@ import {
   Wallet,
   CalendarDays,
   CalendarPlus,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -76,6 +77,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/medico/consultorio", label: "Consultorio", icon: Stethoscope },
   { href: "/medico/asignar-turnos", label: "Asignar Turnos", icon: CalendarPlus },
   { href: "/medico/turnos-programados", label: "Turnos Programados", icon: CalendarDays },
+  { href: "/medico/pacientes", label: "Pacientes", icon: Users },
   { href: "/medico/cobros", label: "Cobros", icon: Wallet },
   { href: "/medico/interconsultas", label: "Interconsultas", icon: MessageSquare },
 ];
@@ -85,6 +87,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/medico/consultorio": "Consultorio",
   "/medico/asignar-turnos": "Asignar Turnos",
   "/medico/turnos-programados": "Turnos Programados",
+  "/medico/pacientes": "Pacientes",
   "/medico/cobros": "Cobros",
   "/medico/interconsultas": "Interconsultas",
 };
