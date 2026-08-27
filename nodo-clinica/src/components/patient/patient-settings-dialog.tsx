@@ -144,7 +144,7 @@ export function PatientSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[800px] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden bg-white">
+      <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[90vh] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden bg-white">
         <SettingsDesktopNav
           items={PATIENT_SETTINGS_NAV}
           activeId={activeSection}
