@@ -14,7 +14,7 @@ import {
 /** nodo_core.planes code for the patient paid plan (unit_code "Clínica"). */
 const PACIENTE_PRO_DB_CODE = "paciente_pro";
 
-/** GET — current patient subscription plan (for settings UI). */
+/** GET — current patient subscription plan + live pricing (for settings UI). */
 export async function GET(request: NextRequest) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
@@ -24,15 +24,35 @@ export async function GET(request: NextRequest) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const svc = (await createServiceClient()) as any;
-  const { data } = await svc
+  const { data, error } = await svc
     .from("patients")
     .select("subscription_plan, mercadopago_preapproval_id")
     .eq("profile_id", auth.user.id)
     .maybeSingle();
 
+  if (error) {
+    console.error("[patient-subscription/checkout GET] patient lookup failed:", error);
+  }
+
+  // Fetch live pricing from nodo_core.planes for display
+  const nodoCoreDb = await createNodoCoreServiceClient();
+  const { data: planRow } = await nodoCoreDb
+    .from("planes")
+    .select("price_monthly, currency")
+    .eq("unit_code", "Clínica")
+    .eq("code", PACIENTE_PRO_DB_CODE)
+    .eq("is_active", true)
+    .maybeSingle();
+
   return NextResponse.json({
     plan: data?.subscription_plan ?? "gratuito",
     hasPreapproval: Boolean(data?.mercadopago_preapproval_id),
+    pricing: planRow
+      ? {
+          amount: Number(planRow.price_monthly),
+          currency: planRow.currency as string,
+        }
+      : null,
   });
 }
 

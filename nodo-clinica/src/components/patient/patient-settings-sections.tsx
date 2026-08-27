@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -604,6 +604,16 @@ export function PatientSuscripcionSection({
   const current = getPatientPlanById(subscriptionPlan);
   const [selectedPlanId, setSelectedPlanId] = useState<string>(currentId);
   const [checkingOut, setCheckingOut] = useState(false);
+  const [pricing, setPricing] = useState<{ amount: number; currency: string } | null>(null);
+  const [loadingPricing, setLoadingPricing] = useState(true);
+
+  useEffect(() => {
+    clinicApi
+      .getPatientSubscriptionPricing()
+      .then((res) => setPricing(res.pricing ?? null))
+      .catch((e) => console.error("Failed to load pricing:", e))
+      .finally(() => setLoadingPricing(false));
+  }, []);
 
   const canCheckout = patientPlanRequiresCheckout(subscriptionPlan, selectedPlanId);
 
@@ -649,6 +659,7 @@ export function PatientSuscripcionSection({
         {PATIENT_SUBSCRIPTION_PLANS.map((plan) => {
           const isCurrent = plan.id === currentId;
           const isSelected = plan.id === selectedPlanId;
+
           return (
             <button
               key={plan.id}
@@ -670,8 +681,10 @@ export function PatientSuscripcionSection({
                 ) : null}
               </div>
               <p className="text-base font-bold text-slate-800">
-                {plan.price}{" "}
-                <span className="text-xs font-normal text-slate-400">{plan.period}</span>
+                {plan.id === "pago" && pricing
+                  ? `${pricing.currency === "USD" ? "US$ " : "$ "}${pricing.currency === "USD" ? pricing.amount : pricing.amount.toLocaleString("es-AR")}`
+                  : plan.price}{" "}
+                <span className="text-xs font-normal text-slate-400">/mes</span>
               </p>
               <ul className="space-y-1">
                 {plan.features.map((feature) => (

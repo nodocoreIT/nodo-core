@@ -815,6 +815,19 @@ export const clinicApi = {
     return data as { initPoint: string };
   },
 
+  async getPatientSubscriptionPricing() {
+    const res = await fetch(`${BASE}/api/clinic/patient-subscription/checkout`, {
+      credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al obtener precios");
+    return data as {
+      plan: string;
+      hasPreapproval: boolean;
+      pricing?: { amount: number; currency: string } | null;
+    };
+  },
+
   async testMercadoPagoConnection() {
     const res = await fetch(`${BASE}/api/clinic/mercadopago/test/connection`, {
       credentials: "include",
