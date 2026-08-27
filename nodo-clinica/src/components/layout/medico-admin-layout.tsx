@@ -37,7 +37,7 @@ import {
   PortalHeaderActions,
   type AdminCommandPaletteItem,
 } from "@nodocore/shared-components";
-import { NodoSwitcher } from "@nodocore/nodo-modules";
+// import { NodoSwitcher } from "@nodocore/nodo-modules"; // TODO: uncomment when nodoswitch is needed
 import { FeedbackFAB } from "@nodocore/nodo-modules/feedback";
 import { RoleSwitcher } from "@/components/nodo/role-switcher";
 import { MedicoDoctorProvider } from "@/contexts/medico-doctor-context";
@@ -719,9 +719,10 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                       disabled={inVideoConsultation}
                       onDisabledClick={warnNavigationBlocked}
                     />
-                    {isPlatformMode() && isBrowserSupabaseEnabled() ? (
+                    {/* TODO: uncomment nodoswitch when needed */}
+                    {/* {isPlatformMode() && isBrowserSupabaseEnabled() ? (
                       <NodoSwitcher product="clinica" clinicaRole="medico" />
-                    ) : null}
+                    ) : null} */}
                   </div>
                 </div>
               ) : null}
@@ -790,9 +791,10 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                       disabled={inVideoConsultation}
                       onDisabledClick={warnNavigationBlocked}
                     />
-                    {isPlatformMode() && isBrowserSupabaseEnabled() ? (
+                    {/* TODO: uncomment nodoswitch when needed */}
+                    {/* {isPlatformMode() && isBrowserSupabaseEnabled() ? (
                       <NodoSwitcher product="clinica" clinicaRole="medico" />
-                    ) : null}
+                    ) : null} */}
                   </div>
                 }
               />

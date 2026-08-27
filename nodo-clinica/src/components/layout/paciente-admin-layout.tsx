@@ -20,7 +20,7 @@ import { clinicApi, getClientSession } from "@/lib/clinic/client-api";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { RoleSwitcher } from "@/components/nodo/role-switcher";
-import { NodoSwitcher } from "@nodocore/nodo-modules";
+// import { NodoSwitcher } from "@nodocore/nodo-modules"; // TODO: uncomment when nodoswitch is needed
 import { isBrowserSupabaseEnabled } from "@/lib/clinic/config";
 import { isPlatformMode } from "@/lib/clinic/platform-config";
 import {
@@ -337,9 +337,10 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
           </div>
           <div className="flex items-center gap-2">
             <RoleSwitcher currentRole="patient" canSwitchToOther={canSwitchToDoctor} />
-            {isPlatformMode() && isBrowserSupabaseEnabled() ? (
+            {/* TODO: uncomment nodoswitch when needed */}
+            {/* {isPlatformMode() && isBrowserSupabaseEnabled() ? (
               <NodoSwitcher product="clinica" clinicaRole="paciente" />
-            ) : null}
+            ) : null} */}
           </div>
         </header>
 

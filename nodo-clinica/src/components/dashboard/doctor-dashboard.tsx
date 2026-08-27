@@ -473,6 +473,8 @@ export function DoctorDashboard({
         .eq("id", appointmentId);
 
       updatePatientStatus(appointmentId, "finalizada");
+      dismissConsultation();
+      setPreviewPatient(null);
       toast.success("Consulta finalizada");
       loadQueue();
     },

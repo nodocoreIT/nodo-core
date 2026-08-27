@@ -263,9 +263,9 @@ export function PacienteInicioPage() {
           </div>
         </div>
 
-        <div className="grid gap- sm:grid-cols-2 max-w-2xl">
+        <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {filteredDoctors.length === 0 ? (
-            <p className="text-sm text-slate-400 col-span-2 text-center py-8 bg-white rounded-xl border">
+            <p className="text-sm text-slate-400 col-span-1 sm:col-span-2 lg:col-span-3 text-center py-8 bg-white rounded-xl border">
               {doctors.length === 0
                 ? "No hay médicos disponibles en este momento."
                 : specialtyFilter !== "all"
