@@ -1814,6 +1814,21 @@ export const clinicApi = {
     };
   },
 
+  async updateConsultationNotes(patientId: string, appointmentId: string, content: string) {
+    const res = await fetch(
+      `${BASE}/api/clinic/medico/pacientes/${encodeURIComponent(patientId)}/consultations/${encodeURIComponent(appointmentId)}/notes`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...clinicFetchOpts().headers },
+        credentials: "include",
+        body: JSON.stringify({ content }),
+      },
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al guardar las notas");
+    return data as { content: string; updatedAt: string };
+  },
+
   async getCobrosUnreadCount() {
     const res = await fetch(
       `${BASE}/api/clinic/notifications?scope=unread_count`,
