@@ -309,7 +309,6 @@ export function appointmentRangeOverlaps(
   const apt2End = new Date(apt2Start.getTime() + apt2Duration * 60 * 1000);
   return apt1Start < apt2End && apt2Start < apt1End;
 }
-}
 
 export function formatDateKeyShortLabel(dateKey: string): string {
   const d = parseLocalDate(dateKey);
