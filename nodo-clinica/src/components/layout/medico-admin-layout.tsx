@@ -43,6 +43,7 @@ import { RoleSwitcher } from "@/components/nodo/role-switcher";
 import { MedicoDoctorProvider } from "@/contexts/medico-doctor-context";
 import { DoctorSettingsDialog, type SectionId } from "@/components/medical/doctor-settings-dialog";
 import { DoctorSpecialtySetupModal } from "@/components/medical/doctor-specialty-setup-modal";
+import { PatientSearchModal } from "@/components/medical/patient-search-modal";
 import {
   DoctorOnboardingGateModal,
   type OnboardingGateKind,
@@ -143,6 +144,7 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
   const [onboardingGate, setOnboardingGate] = useState<OnboardingGateKind | null>(null);
   const [cobrosUnread, setCobrosUnread] = useState(0);
   const [mpJustConnected, setMpJustConnected] = useState(false);
+  const [patientSearchOpen, setPatientSearchOpen] = useState(false);
   const mpCallbackHandled = useRef(false);
 
   const chatEmbedded = pathname === "/medico/interconsultas";
@@ -785,6 +787,17 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
                       inVideoConsultation && "pointer-events-none opacity-50",
                     )}
                   >
+                    {pathname === "/medico/pacientes" && (
+                      <Button
+                        onClick={() => setPatientSearchOpen(true)}
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                      >
+                        <Users className="h-4 w-4" />
+                        Buscar paciente
+                      </Button>
+                    )}
                     <RoleSwitcher
                       currentRole="doctor"
                       canSwitchToOther={canSwitchToPatient}
@@ -875,6 +888,11 @@ export function MedicoAdminLayout({ children }: { children: React.ReactNode }) {
             initialPeerName={chatInitialPeer.name ?? null}
           />
         )}
+
+        <PatientSearchModal
+          open={patientSearchOpen}
+          onOpenChange={setPatientSearchOpen}
+        />
       </div>
     </AdminCommandPaletteProvider>
     </MedicoDoctorProvider>
