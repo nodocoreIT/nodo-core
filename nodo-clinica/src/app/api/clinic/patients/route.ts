@@ -44,7 +44,10 @@ export async function GET(request: NextRequest) {
           .from("patient_documents")
           .select("*", { count: "exact", head: true })
           .eq("patient_id", patientId)
-          .eq("org_id", user.org_id ?? ""),
+          .eq("org_id", user.org_id ?? "")
+          // Exclude "Mis estudios" personal (appointment-less) documents —
+          // this stat is appointment-scoped doctor-visible history only.
+          .not("appointment_id", "is", null),
         supabase
           .from("clinical_records")
           .select("*", { count: "exact", head: true })
@@ -107,7 +110,10 @@ export async function GET(request: NextRequest) {
             .from("patient_documents")
             .select("*", { count: "exact", head: true })
             .eq("patient_id", patient.id)
-            .eq("org_id", user.org_id ?? ""),
+            .eq("org_id", user.org_id ?? "")
+            // Exclude "Mis estudios" personal (appointment-less) documents —
+            // this stat is appointment-scoped doctor-visible history only.
+            .not("appointment_id", "is", null),
           supabase
             .from("clinical_records")
             .select("*", { count: "exact", head: true })
