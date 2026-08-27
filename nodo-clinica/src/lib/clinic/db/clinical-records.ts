@@ -232,13 +232,14 @@ export async function createTranscription(
 // ── Patient Documents (metadata) ──────────────────────────────────────────────
 
 export interface PatientDocumentInsert {
-  org_id: string;
+  org_id: string | null;
   patient_id: string;
-  appointment_id: string;
+  appointment_id?: string | null;
   file_name: string;
   file_path: string;
   mime_type: string;
   document_type?: "payment_receipt" | "study";
+  study_order_id?: string | null;
 }
 
 /** Returns patient documents for a given appointment. */

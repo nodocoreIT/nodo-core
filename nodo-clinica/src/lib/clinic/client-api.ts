@@ -1318,6 +1318,50 @@ export const clinicApi = {
     return res.json();
   },
 
+  /**
+   * Uploads a personal study file (no appointment). PRO-plan patients only —
+   * the server re-validates the plan regardless of client-side gating.
+   */
+  async uploadStudy(file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("documentType", "study");
+    const res = await fetch(`${BASE}/api/clinic/documents`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "Error al subir archivo");
+    return data as {
+      id: string;
+      fileName: string;
+      uploadedAt: string;
+      downloadUrl?: string;
+      documentType?: "payment_receipt" | "study";
+    };
+  },
+
+  /** Lists the authenticated patient's own appointment-less studies. */
+  async getPatientStudies() {
+    const res = await fetch(
+      `${BASE}/api/clinic/documents?personal=1`,
+      clinicFetchOpts(),
+    );
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "Error al cargar estudios");
+    return data as Array<{
+      id: string;
+      patientId: string;
+      appointmentId: string | null;
+      fileName: string;
+      mimeType: string;
+      uploadedAt: string;
+      documentType?: "payment_receipt" | "study";
+      downloadUrl: string;
+    }>;
+  },
+
   async getPatientHistory(patientId: string, doctorId?: string) {
     const params = new URLSearchParams({ patientId });
     if (doctorId) params.set("doctorId", doctorId);

@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { ALLOWED_MIME, MAX_FILE_BYTES } from "@/lib/clinic/storage";
 import { markTransferReceiptPendingReview } from "@/lib/clinic/transfer-receipt-pending";
 import { createPatientDocument } from "@/lib/clinic/db/clinical-records";
+import { resolvePatientPlanId } from "@/lib/clinic/patient-subscription-plans";
 import { isLocalMode } from "@/lib/clinic/config";
 import { resolveAppointmentByAccessToken } from "@/lib/clinic/appointment-token-auth";
 import {
@@ -17,7 +18,7 @@ const STORAGE_BUCKET = "patient-documents";
 function mapDocument(doc: {
   id: string;
   patient_id: string;
-  appointment_id: string;
+  appointment_id: string | null;
   file_name: string;
   mime_type: string;
   uploaded_at: string;
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
   const patientId = searchParams.get("patientId");
   const appointmentId = searchParams.get("appointmentId");
   const accessToken = searchParams.get("token");
+  const personal = searchParams.get("personal") === "1";
 
   // A valid, non-expired appointment access_token is sufficient credential
   // to download a document that belongs to THAT ONE appointment — no login
@@ -157,7 +159,28 @@ export async function GET(request: NextRequest) {
     .select("*, appointments(scheduled_at, professionals!appointments_doctor_id_fkey(full_name))")
     .order("uploaded_at", { ascending: false });
 
-  if (accessToken) {
+  if (personal) {
+    // Patient's own appointment-less studies. Never let a client-supplied
+    // patientId reach this branch — patient_id is always derived from the
+    // authenticated session, matching the RLS ownership model.
+    if (user.role !== "patient") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+    const { data: patientRow } = await supabase
+      .from("patients")
+      .select("id")
+      .eq("profile_id", user.id)
+      .maybeSingle();
+    if (!patientRow) {
+      return NextResponse.json(
+        { error: "Paciente no encontrado" },
+        { status: 404 },
+      );
+    }
+    docsQuery = docsQuery
+      .eq("patient_id", patientRow.id)
+      .is("appointment_id", null);
+  } else if (accessToken) {
     const { data: apt } = await supabase
       .from("appointments")
       .select("id")
@@ -173,7 +196,7 @@ export async function GET(request: NextRequest) {
   } else if (appointmentId) {
     docsQuery = docsQuery.eq("appointment_id", appointmentId);
   } else if (patientId) {
-    docsQuery = docsQuery.eq("patient_id", patientId);
+    docsQuery = docsQuery.eq("patient_id", patientId).not("appointment_id", "is", null);
   } else {
     return NextResponse.json(
       { error: "Parámetro requerido" },
@@ -284,6 +307,97 @@ async function uploadReceiptForAppointment(
   );
 }
 
+/**
+ * Patient-personal study upload — no appointment context at all.
+ * PRO-plan patients only; plan is resolved server-side, never trusted from
+ * the client. Storage path is scoped under `personal/{patientId}/...` since
+ * these documents may exist before the patient ever has an org-scoped
+ * appointment.
+ */
+async function uploadPersonalStudy(
+  file: File,
+  user: { id: string; role: string },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+) {
+  if (user.role !== "patient") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
+  const { data: patientRow } = await supabase
+    .from("patients")
+    .select("id, org_id, subscription_plan")
+    .eq("profile_id", user.id)
+    .maybeSingle();
+
+  if (!patientRow) {
+    return NextResponse.json(
+      { error: "Paciente no encontrado" },
+      { status: 404 },
+    );
+  }
+
+  if (resolvePatientPlanId(patientRow.subscription_plan) !== "pago") {
+    return NextResponse.json(
+      { error: "Esta función requiere el plan Pago" },
+      { status: 403 },
+    );
+  }
+
+  const serviceClient = await createServiceClient();
+  const storagePath = `personal/${patientRow.id}/${Date.now()}-${file.name}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  const { error: uploadError } = await serviceClient.storage
+    .from(STORAGE_BUCKET)
+    .upload(storagePath, buffer, {
+      contentType: file.type,
+      upsert: false,
+    });
+
+  if (uploadError) {
+    return NextResponse.json(
+      { error: `Error al subir archivo: ${uploadError.message}` },
+      { status: 500 },
+    );
+  }
+
+  const { data: doc, error: insertError } = await createPatientDocument(
+    supabase,
+    {
+      org_id: patientRow.org_id ?? null,
+      patient_id: patientRow.id,
+      appointment_id: null,
+      file_name: file.name,
+      file_path: storagePath,
+      mime_type: file.type,
+      document_type: "study",
+    },
+  );
+
+  if (insertError || !doc) {
+    // Attempt to clean up uploaded file
+    await serviceClient.storage.from(STORAGE_BUCKET).remove([storagePath]);
+    return NextResponse.json(
+      { error: "Error al registrar documento" },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json(
+    mapDocument({
+      id: doc.id,
+      patient_id: doc.patient_id,
+      appointment_id: doc.appointment_id,
+      file_name: doc.file_name,
+      mime_type: doc.mime_type,
+      uploaded_at: doc.uploaded_at,
+      file_path: doc.file_path,
+      document_type: doc.document_type,
+    }),
+  );
+}
+
 export async function POST(request: NextRequest) {
   if (isLocalMode()) {
     return handleDocumentsPostLocal(request);
@@ -334,6 +448,13 @@ export async function POST(request: NextRequest) {
   const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
   const { user, supabase } = authResult;
+
+  // Appointment-less personal study upload (patient's own library, no turno
+  // selected). FREE-plan patients are blocked server-side inside the branch
+  // regardless of what the UI shows.
+  if (!accessToken && !appointmentIdParam && documentType === "study") {
+    return uploadPersonalStudy(file, user, supabase);
+  }
 
   // Resolve the appointment
   let appointment: UploadableAppointment | null = null;
