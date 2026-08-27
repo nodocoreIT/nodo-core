@@ -8,13 +8,13 @@ import { formatAppointmentLabelFromIso } from "@/lib/clinic/schedule";
 
 interface Appointment {
   id: string;
-  scheduled_at: string;
+  scheduledAt: string;
   status: string;
-  payment_status?: string;
-  doctor_id: string;
-  professional?: {
-    full_name: string;
+  paymentStatus?: string;
+  doctor?: {
+    fullName: string;
     specialty?: string;
+    profilePhotoUrl?: string;
   };
 }
 
@@ -36,7 +36,7 @@ export function SidebarUpcomingAppointments() {
             ["scheduled", "waiting", "in_consultation"].includes(apt.status)
           )
           .sort((a: Appointment, b: Appointment) =>
-            new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
+            new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
           )
           .slice(0, 3);
         setAppointments(upcoming);
@@ -82,30 +82,30 @@ export function SidebarUpcomingAppointments() {
               className="flex flex-col gap-1 pb-3 border-b border-slate-100 last:border-0 last:pb-0"
             >
               <p className="font-medium text-sm text-slate-900">
-                {apt.professional?.full_name}
+                {apt.doctor?.fullName}
               </p>
               <p className="text-xs text-slate-500">
-                {apt.professional?.specialty}
+                {apt.doctor?.specialty}
               </p>
               <div className="flex items-center gap-1 text-xs text-slate-600">
                 <Clock className="h-3 w-3" />
-                {apt.scheduled_at
-                  ? formatAppointmentLabelFromIso(apt.scheduled_at)
+                {apt.scheduledAt
+                  ? formatAppointmentLabelFromIso(apt.scheduledAt)
                   : "Horario no disponible"}
               </div>
               <div className="flex items-center gap-1">
                 <span
                   className={`text-xs font-medium px-2 py-0.5 rounded ${
-                    apt.payment_status === "confirmed"
+                    apt.paymentStatus === "confirmed"
                       ? "bg-emerald-100 text-emerald-700"
-                      : apt.payment_status === "pending"
+                      : apt.paymentStatus === "pending"
                         ? "bg-amber-100 text-amber-700"
                         : "bg-slate-100 text-slate-600"
                   }`}
                 >
-                  {apt.payment_status === "confirmed"
+                  {apt.paymentStatus === "confirmed"
                     ? "Pago confirmado"
-                    : apt.payment_status === "pending"
+                    : apt.paymentStatus === "pending"
                       ? "Pago pendiente"
                       : "Gratuito"}
                 </span>

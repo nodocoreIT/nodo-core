@@ -178,6 +178,7 @@ export function DoctorSettingsDialog({
   const [isDirty, setIsDirty] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingClose, setPendingClose] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const initialStateRef = useRef<any>(null);
   const [mpOAuthConfigured, setMpOAuthConfigured] = useState<boolean | null>(null);
   const [subscription, setSubscription] = useState<{
@@ -262,6 +263,25 @@ export function DoctorSettingsDialog({
         setThemeSettings(merged);
         hydrateSettings(merged);
       }
+      // Capture initial state AFTER data is loaded (to avoid race condition)
+      setTimeout(() => {
+        initialStateRef.current = {
+          availability: JSON.stringify(data.availability ?? DEFAULT_AVAILABILITY),
+          blockedDates: JSON.stringify(data.blockedDates ?? []),
+          fullName: data.fullName ?? "",
+          licenseNumber: data.licenseNumber ?? "",
+          specialties: JSON.stringify(data.specialties ?? []),
+          signatureText: data.signatureText ?? "",
+          signatureImageData: data.signatureImageData ?? "",
+          profilePhotoData: data.profilePhotoData ?? "",
+          bio: data.bio ?? "",
+          payment: JSON.stringify(data.payment ?? {}),
+          reminderSettings: JSON.stringify(data.reminderSettings ?? {}),
+          googleCalendarId: data.googleCalendarId ?? "",
+          themeSettings: JSON.stringify(data.themeSettings ?? {}),
+        };
+        setIsDirty(false);
+      }, 0);
     },
     [hydrateSettings],
   );
@@ -286,44 +306,33 @@ export function DoctorSettingsDialog({
   }, [open, mpJustConnected]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
     const gen = ++loadGen.current;
     clinicApi
       .getDoctorSchedule(doctorId)
       .then((data) => {
         if (gen !== loadGen.current) return;
         applyOfficeData(data);
+        setIsLoading(false);
       })
       .catch(() => {
         if (gen === loadGen.current) {
           toast.error("No se pudo cargar la configuración del consultorio");
+          setIsLoading(false);
         }
       });
   }, [doctorId, applyOfficeData, open]);
 
-  // Capture initial state when modal opens
+  // Reset dirty state when modal closes
   useEffect(() => {
     if (!open) {
       initialStateRef.current = null;
       setIsDirty(false);
-      return;
     }
-    initialStateRef.current = {
-      availability: JSON.stringify(availability),
-      blockedDates: JSON.stringify(blockedDates),
-      fullName,
-      licenseNumber,
-      specialties: JSON.stringify(specialties),
-      signatureText,
-      signatureImageData,
-      profilePhotoData,
-      bio,
-      payment: JSON.stringify(payment),
-      reminderSettings: JSON.stringify(reminderSettings),
-      googleCalendarId,
-      themeSettings: JSON.stringify(themeSettings),
-    };
-    setIsDirty(false);
   }, [open]);
 
   // Detect changes (dirty state)
@@ -505,6 +514,7 @@ export function DoctorSettingsDialog({
   };
 
   const handleCloseWithoutSave = () => {
+    // Close immediately without resetting (state will be reloaded on next open)
     setShowUnsavedDialog(false);
     setPendingClose(false);
     onOpenChange(false);
@@ -574,6 +584,11 @@ export function DoctorSettingsDialog({
 
           {/* Scrollable content */}
           <ScrollArea className="flex-1 min-h-0">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full p-6">
+                <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+              </div>
+            ) : (
             <div className="p-6 space-y-4">
 
               {/* ── Agenda ── */}
@@ -1507,6 +1522,7 @@ export function DoctorSettingsDialog({
               )}
 
             </div>
+            )}
           </ScrollArea>
 
           {/* Fixed save footer */}
@@ -1536,6 +1552,7 @@ export function DoctorSettingsDialog({
       cancelLabel="No guardar"
       destructive={false}
       onConfirm={handleSaveBeforeClose}
+      onCancel={handleCloseWithoutSave}
     />
     </>
   );

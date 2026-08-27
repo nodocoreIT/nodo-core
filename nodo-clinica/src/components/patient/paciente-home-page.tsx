@@ -29,18 +29,27 @@ export function PacienteHomePage() {
 
   return (
     <>
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
+        <div>
+          <h2 className="font-display text-2xl font-bold uppercase tracking-wide text-navy">
+            Hola{patientName ? `, ${patientName}` : ""}
+          </h2>
+          <p className="mt-1 text-sm text-slate2">Hoy es {todayLabel()}</p>
+        </div>
+        <Button
+          onClick={() => setUtilitiesOpen(true)}
+          variant="outline"
+          size="sm"
+          className="gap-2 border-emerald-200 hover:bg-emerald-50"
+        >
+          <Zap className="h-4 w-4" />
+          Utilidades y servicios útiles
+        </Button>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-3 items-start">
         {/* Main content */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="font-display text-2xl font-bold uppercase tracking-wide text-navy">
-                Hola{patientName ? `, ${patientName}` : ""}
-              </h2>
-              <p className="mt-1 text-sm text-slate2">Hoy es {todayLabel()}</p>
-            </div>
-          </div>
-
           {/* Main action cards: 2x2 grid */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <DashboardActionCard
@@ -76,17 +85,6 @@ export function PacienteHomePage() {
               tone="slate"
             />
           </div>
-
-          {/* Utilities button */}
-          <Button
-            onClick={() => setUtilitiesOpen(true)}
-            variant="outline"
-            size="lg"
-            className="w-full gap-2 border-emerald-200 hover:bg-emerald-50"
-          >
-            <Zap className="h-5 w-5" />
-            Utilidades y servicios útiles
-          </Button>
         </div>
 
         {/* Sidebar */}

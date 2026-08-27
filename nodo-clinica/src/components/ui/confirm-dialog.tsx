@@ -21,6 +21,7 @@ interface ConfirmDialogProps {
   destructive?: boolean;
   loading?: boolean;
   onConfirm: () => void;
+  onCancel?: () => void;
 }
 
 /** Reusable delete/action confirmation modal, styled like the rest of the app's dialogs. */
@@ -34,6 +35,7 @@ export function ConfirmDialog({
   destructive = true,
   loading = false,
   onConfirm,
+  onCancel,
 }: ConfirmDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -47,7 +49,13 @@ export function ConfirmDialog({
             type="button"
             variant="outline"
             disabled={loading}
-            onClick={() => onOpenChange(false)}
+            onClick={() => {
+              if (onCancel) {
+                onCancel();
+              } else {
+                onOpenChange(false);
+              }
+            }}
           >
             {cancelLabel}
           </Button>

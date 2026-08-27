@@ -74,6 +74,10 @@ export async function POST(request: NextRequest) {
   const plan = getPatientPaidCheckoutPlan();
   const nodoAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim();
   if (!nodoAccessToken) {
+    console.error(
+      "[patient-subscription checkout POST] MERCADOPAGO_ACCESS_TOKEN not found. Available env keys:",
+      Object.keys(process.env).filter(k => k.includes("MERCADO")).join(", ") || "none"
+    );
     return NextResponse.json(
       { error: "Falta configurar MERCADOPAGO_ACCESS_TOKEN en el servidor." },
       { status: 503 },
