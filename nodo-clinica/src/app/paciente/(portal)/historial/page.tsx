@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { clinicApi, getClientSession } from "@/lib/clinic/client-api";
 import { PatientHistorySection } from "@/components/patient/patient-history-section";
+import { PatientPlanUpsellCard } from "@/components/patient/patient-plan-upsell-card";
 import type { PatientTimelineItem } from "@/lib/clinic/patient-timeline";
-import { Loader2, Lock } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export default function PacienteHistorialPage() {
   const [patientId, setPatientId] = useState<string | null>(null);
@@ -51,19 +52,10 @@ export default function PacienteHistorialPage() {
 
   if (locked) {
     return (
-      <div className="max-w-3xl mx-auto">
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-14 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-            <Lock className="h-5 w-5 text-slate-500" />
-          </div>
-          <p className="text-sm font-semibold text-slate-700">
-            Tu historial está disponible en el plan Pago
-          </p>
-          <p className="max-w-sm text-xs text-slate-400">
-            Con el plan Pago accedés al historial completo de consultas, tu historia clínica y los archivos que vayas subiendo.
-          </p>
-        </div>
-      </div>
+      <PatientPlanUpsellCard
+        title="Desbloqueá tu Historial"
+        description="Con el plan Pago accedés al historial completo de consultas, tu historia clínica y los archivos que vayas subiendo."
+      />
     );
   }
 
