@@ -16,6 +16,7 @@ import {
   type MedicationDraft,
 } from "@/components/medical/medication-rows-editor";
 import { downloadPdf, generatePrescriptionPdf, pdfToBase64 } from "@/lib/pdf/generator";
+import { currencySymbol, formatThousands, parseThousands } from "@/lib/clinic/currency";
 
 interface PatientSearchResult {
   id: string;
@@ -60,7 +61,7 @@ export function RecetaForm({ onSaved }: RecetaFormProps = {}) {
   const [institutionId, setInstitutionId] = useState("");
   const [medications, setMedications] = useState<MedicationDraft[]>([emptyMedication()]);
   const [notes, setNotes] = useState("");
-  const [priceAmount, setPriceAmount] = useState("");
+  const [priceAmount, setPriceAmount] = useState<number | undefined>(undefined);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -171,7 +172,7 @@ export function RecetaForm({ onSaved }: RecetaFormProps = {}) {
     setInstitutionId("");
     setMedications([emptyMedication()]);
     setNotes("");
-    setPriceAmount("");
+    setPriceAmount(undefined);
   };
 
   /** Shared save step — used by both "Guardar borrador" and "Enviar receta".
@@ -195,7 +196,7 @@ export function RecetaForm({ onSaved }: RecetaFormProps = {}) {
     );
 
     const doc = buildPdf();
-    const parsedPrice = priceAmount.trim() ? Number(priceAmount) : undefined;
+    const parsedPrice = priceAmount;
 
     const result = await clinicApi.savePrescription({
       doctorId: doctor.id,
@@ -354,6 +355,18 @@ export function RecetaForm({ onSaved }: RecetaFormProps = {}) {
                 ))}
               </ul>
             )}
+            {!searchingPatients && patientQuery.trim() && patientResults.length === 0 && (
+              <div className="mt-1 rounded-md border bg-white px-3 py-2 text-sm text-slate-500 shadow-sm">
+                Paciente no encontrado.{" "}
+                <button
+                  type="button"
+                  className="font-medium text-emerald-600 hover:underline"
+                  onClick={() => setUnregistered(true)}
+                >
+                  Cargar como no registrado
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -395,15 +408,19 @@ export function RecetaForm({ onSaved }: RecetaFormProps = {}) {
       {/* Precio */}
       <div className="space-y-1.5 max-w-xs">
         <Label className="text-sm font-medium">Precio</Label>
-        <Input
-          type="number"
-          min="0"
-          step="0.01"
-          value={priceAmount}
-          onChange={(e) => setPriceAmount(e.target.value)}
-          placeholder="0.00"
-          className="h-9 text-sm"
-        />
+        <div className="relative">
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-500">
+            {currencySymbol()}
+          </span>
+          <Input
+            type="text"
+            inputMode="numeric"
+            value={formatThousands(priceAmount)}
+            onChange={(e) => setPriceAmount(parseThousands(e.target.value))}
+            placeholder="15.000"
+            className="h-9 pl-8 text-sm"
+          />
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 pt-2">
