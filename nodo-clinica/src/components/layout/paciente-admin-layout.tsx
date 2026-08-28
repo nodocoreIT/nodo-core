@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -80,6 +80,16 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
   } | null>(null);
   const [checking, setChecking] = useState(true);
   const [canSwitchToDoctor, setCanSwitchToDoctor] = useState(false);
+  const [recetasUnread, setRecetasUnread] = useState(0);
+
+  const refreshRecetasUnread = useCallback(async () => {
+    try {
+      const data = await clinicApi.getPatientPrescriptionsUnreadCount();
+      setRecetasUnread(data.count);
+    } catch {
+      setRecetasUnread(0);
+    }
+  }, []);
 
   useEffect(() => {
     async function check() {
@@ -136,6 +146,11 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
     }
     void check();
   }, [router]);
+
+  useEffect(() => {
+    if (!patient) return;
+    refreshRecetasUnread();
+  }, [patient, refreshRecetasUnread]);
 
   const openSettings = (section?: PatientSettingsSectionId) => {
     setSettingsSection(section ?? "perfil");
@@ -253,6 +268,8 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
                 href === "/paciente"
                   ? pathname === "/paciente"
                   : pathname.startsWith(href);
+              const showRecetasBadge =
+                href === "/paciente/recetas" && recetasUnread > 0;
               return (
                 <Link
                   key={href}
@@ -266,7 +283,15 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  {label}
+                  <span className="flex-1">{label}</span>
+                  {showRecetasBadge && (
+                    <span
+                      className="ml-auto shrink-0 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold leading-tight text-white whitespace-nowrap"
+                      aria-label={`${recetasUnread} receta${recetasUnread === 1 ? "" : "s"} pendiente${recetasUnread === 1 ? "" : "s"} de descarga`}
+                    >
+                      {recetasUnread} Pendiente{recetasUnread === 1 ? "" : "s"}
+                    </span>
+                  )}
                 </Link>
               );
             })}

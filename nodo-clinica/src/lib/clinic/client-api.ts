@@ -1400,6 +1400,33 @@ export const clinicApi = {
     }>;
   },
 
+  /** Count of not-yet-downloaded recetas, for the "Mis recetas" sidebar badge. */
+  async getPatientPrescriptionsUnreadCount() {
+    const res = await fetch(
+      `${BASE}/api/clinic/patient-prescriptions/unread-count`,
+      clinicFetchOpts(),
+    );
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "Error al cargar recetas pendientes");
+    return data as { count: number };
+  },
+
+  /** Marks a receta as downloaded/viewed so it stops counting toward the badge. */
+  async markPrescriptionViewed(id: string, source: "standalone" | "consultation") {
+    const res = await fetch(
+      `${BASE}/api/clinic/patient-prescriptions/${id}/view`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...clinicFetchOpts().headers },
+        credentials: "include",
+        body: JSON.stringify({ source }),
+      },
+    );
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "Error al marcar receta como vista");
+    return data as { ok: boolean };
+  },
+
   async getPatientHistory(patientId: string, doctorId?: string) {
     const params = new URLSearchParams({ patientId });
     if (doctorId) params.set("doctorId", doctorId);
