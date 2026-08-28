@@ -21,42 +21,44 @@ export function UtilitiesModal({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
-        <DialogHeader>
+      <DialogContent className="w-[95vw] max-w-6xl h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Utilidades y servicios útiles</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="farmacias" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="farmacias">Farmacias</TabsTrigger>
-            <TabsTrigger value="laboratorios">Laboratorios</TabsTrigger>
-            <TabsTrigger value="diagnostico">Diagnóstico</TabsTrigger>
-          </TabsList>
+        <div className="flex-1 overflow-hidden">
+          <Tabs defaultValue="farmacias" className="w-full h-full flex flex-col">
+            <TabsList className="grid w-full grid-cols-3 shrink-0">
+              <TabsTrigger value="farmacias">Farmacias</TabsTrigger>
+              <TabsTrigger value="laboratorios">Laboratorios</TabsTrigger>
+              <TabsTrigger value="diagnostico">Diagnóstico</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="farmacias" className="mt-4">
-            <PharmacyOnCallCard />
-          </TabsContent>
+            <TabsContent value="farmacias" className="mt-4 flex-1 overflow-y-auto overflow-x-hidden">
+              <PharmacyOnCallCard />
+            </TabsContent>
 
-          <TabsContent value="laboratorios" className="mt-4">
-            <MedicalDirectoryCard
-              category="laboratorio"
-              title="Laboratorios de análisis clínicos"
-              icon={FlaskConical}
-              tone="sky"
-              emptyLabel="Todavía no se cargó el listado de laboratorios."
-            />
-          </TabsContent>
+            <TabsContent value="laboratorios" className="mt-4 flex-1 overflow-y-auto overflow-x-hidden">
+              <MedicalDirectoryCard
+                category="laboratorio"
+                title="Laboratorios de análisis clínicos"
+                icon={FlaskConical}
+                tone="sky"
+                emptyLabel="Todavía no se cargó el listado de laboratorios."
+              />
+            </TabsContent>
 
-          <TabsContent value="diagnostico" className="mt-4">
-            <MedicalDirectoryCard
-              category="diagnostico_imagenes"
-              title="Diagnóstico por imágenes"
-              icon={Scan}
-              tone="violet"
-              emptyLabel="Todavía no se cargó el listado de centros de diagnóstico."
-            />
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="diagnostico" className="mt-4 flex-1 overflow-y-auto overflow-x-hidden">
+              <MedicalDirectoryCard
+                category="diagnostico_imagenes"
+                title="Diagnóstico por imágenes"
+                icon={Scan}
+                tone="violet"
+                emptyLabel="Todavía no se cargó el listado de centros de diagnóstico."
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );
