@@ -335,7 +335,7 @@ export function PacientePortal() {
                 </div>
                 <div className="flex flex-col gap-2 shrink-0">
                   <Link href={`/paciente/sala/${apt.accessToken}`}>
-                    <Button className="bg-emerald-600 hover:bg-emerald-700 w-full">
+                    <Button className="bg-[var(--color-primary)] hover:opacity-90 w-full">
                       Ir a sala
                       <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>

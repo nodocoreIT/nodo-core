@@ -76,10 +76,10 @@ export function PatientHealthProfileSection({
       : null;
 
   return (
-    <Card className="border-emerald-100 bg-white/90 shadow-sm">
+    <Card className="border-[var(--color-primary)]/20 bg-white/90 shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2 text-slate-800">
-          <HeartPulse className="h-5 w-5 text-emerald-600" />
+          <HeartPulse className="h-5 w-5 text-[var(--color-primary)]" />
           Mi ficha de salud
         </CardTitle>
         <p className="text-xs text-slate-500">
@@ -202,7 +202,7 @@ export function PatientHealthProfileSection({
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="w-full bg-emerald-700 hover:bg-emerald-800"
+          className="w-full bg-[var(--color-primary)] hover:opacity-90"
         >
           {saving ? (
             <Loader2 className="h-4 w-4 animate-spin mr-1" />

@@ -51,7 +51,7 @@ export function RecetasLibrary() {
   if (loading) {
     return (
       <div className="flex justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+        <Loader2 className="h-6 w-6 animate-spin text-[var(--color-primary)]" />
       </div>
     );
   }

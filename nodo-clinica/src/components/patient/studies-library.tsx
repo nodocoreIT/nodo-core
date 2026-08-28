@@ -116,15 +116,15 @@ export function StudiesLibrary() {
           "flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-14 transition-colors",
           uploading ? "cursor-wait opacity-70" : "cursor-pointer",
           dragging
-            ? "border-emerald-500 bg-emerald-50"
-            : "border-slate-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/40",
+            ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
+            : "border-slate-200 bg-white hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5",
         ].join(" ")}
       >
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-primary)]/10">
           {uploading ? (
-            <Loader2 className="h-5 w-5 text-emerald-600 animate-spin" />
+            <Loader2 className="h-5 w-5 text-[var(--color-primary)] animate-spin" />
           ) : (
-            <Upload className="h-5 w-5 text-emerald-600" />
+            <Upload className="h-5 w-5 text-[var(--color-primary)]" />
           )}
         </div>
         <div className="text-center">
@@ -134,7 +134,7 @@ export function StudiesLibrary() {
             ) : (
               <>
                 Arrastrá tus archivos acá o{" "}
-                <span className="text-emerald-600 underline underline-offset-2">
+                <span className="text-[var(--color-primary)] underline underline-offset-2">
                   seleccioná desde tu dispositivo
                 </span>
               </>
@@ -156,7 +156,7 @@ export function StudiesLibrary() {
       {/* Study list */}
       {loading ? (
         <div className="flex justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--color-primary)]" />
         </div>
       ) : studies.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-10 text-slate-400">

@@ -57,7 +57,7 @@ export function SidebarUpcomingAppointments() {
         </CardHeader>
         <CardContent>
           <div className="flex justify-center py-8">
-            <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--color-primary)]" />
           </div>
         </CardContent>
       </Card>

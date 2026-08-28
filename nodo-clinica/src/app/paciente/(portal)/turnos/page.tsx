@@ -132,7 +132,7 @@ function PacienteTurnosContent() {
   if (loading) {
     return (
       <div className="flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
       </div>
     );
   }
@@ -190,7 +190,7 @@ function PacienteTurnosContent() {
                         className={`h-8 text-xs flex-1 ${
                           isPending
                             ? "bg-amber-600 hover:bg-amber-700"
-                            : "bg-emerald-600 hover:bg-emerald-700"
+                            : "bg-[var(--color-primary)] hover:opacity-90"
                         }`}
                         onClick={() => setOpenToken(apt.accessToken)}
                       >
@@ -239,7 +239,7 @@ export default function PacienteTurnosPage() {
     <Suspense
       fallback={
         <div className="flex justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
         </div>
       }
     >

@@ -159,12 +159,12 @@ function WizardProgress({
           >
             <div
               className={`h-1.5 w-full rounded-full ${
-                i <= idx ? "bg-emerald-500" : "bg-slate-200"
+                i <= idx ? "bg-[var(--color-primary)]" : "bg-slate-200"
               }`}
             />
             <span
               className={`text-[11px] hidden sm:block ${
-                i === idx ? "text-emerald-700 font-medium" : "text-slate-400"
+                i === idx ? "text-[var(--color-primary)] font-medium" : "text-slate-400"
               }`}
             >
               {STEP_LABELS[s]}
@@ -584,7 +584,7 @@ export function BookAppointmentDialog({
               <p className="text-sm font-medium text-slate-700 mb-2">Elegí el día</p>
               {loadingDates && dates.length === 0 ? (
                 <div className="flex justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                  <Loader2 className="h-6 w-6 animate-spin text-[var(--color-primary)]" />
                 </div>
               ) : dates.every((d) => d.status !== "available") ? (
                 <p className="text-sm text-slate-400 text-center py-4 bg-slate-50 rounded-lg">
@@ -610,7 +610,7 @@ export function BookAppointmentDialog({
                 </p>
                 {loadingSlots ? (
                   <div className="flex justify-center py-4">
-                    <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                    <Loader2 className="h-6 w-6 animate-spin text-[var(--color-primary)]" />
                   </div>
                 ) : slots.every((s) => s.status !== "available") ? (
                   <p className="text-sm text-amber-700 text-center py-4 bg-amber-50 rounded-lg border border-amber-100">
@@ -656,7 +656,7 @@ export function BookAppointmentDialog({
 
             <Button
               type="button"
-              className="w-full bg-emerald-700 hover:bg-emerald-800"
+              className="w-full bg-[var(--color-primary)] hover:opacity-90"
               disabled={!selectedSlot || loadingSlots || !paymentSettingsReady}
               onClick={handleContinueFromSlot}
             >
@@ -916,7 +916,7 @@ export function BookAppointmentDialog({
               </p>
             )}
 
-            <label className="flex items-start gap-2 rounded-md border border-emerald-100 bg-emerald-50/50 p-3 cursor-pointer">
+            <label className="flex items-start gap-2 rounded-md border border-[var(--color-primary)]/20 bg-[var(--color-primary)]/5 p-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={shareHealthProfile}
@@ -935,7 +935,7 @@ export function BookAppointmentDialog({
                 Volver
               </Button>
               <Button
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                className="flex-1 bg-[var(--color-primary)] hover:opacity-90"
                 disabled={
                   booking ||
                   (needsPayment &&

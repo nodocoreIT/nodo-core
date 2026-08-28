@@ -307,7 +307,7 @@ export function PatientHistorySection({
     return (
       <Card className="border-slate-200">
         <CardContent className="py-10 flex justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--color-primary)]" />
         </CardContent>
       </Card>
     );
@@ -317,7 +317,7 @@ export function PatientHistorySection({
     <Card className="border-slate-200">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
-          <History className="h-5 w-5 text-emerald-600" />
+          <History className="h-5 w-5 text-[var(--color-primary)]" />
           Línea de tiempo clínica
         </CardTitle>
         <p className="text-sm text-slate-500">
@@ -334,7 +334,7 @@ export function PatientHistorySection({
               variant={filter === opt.value ? "default" : "outline"}
               className={
                 filter === opt.value
-                  ? "bg-emerald-600 hover:bg-emerald-700 h-7 text-xs shrink-0"
+                  ? "bg-[var(--color-primary)] hover:opacity-90 h-7 text-xs shrink-0"
                   : "h-7 text-xs shrink-0"
               }
               onClick={() => setFilter(opt.value)}

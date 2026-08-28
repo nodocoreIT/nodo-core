@@ -95,9 +95,9 @@ function SpecialtyFilterCombobox({
           setOpen((o) => !o);
           if (!open) setTimeout(() => inputRef.current?.focus(), 0);
         }}
-        className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+        className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
       >
-        <span className={hasValue ? "font-medium text-emerald-700" : "text-slate-400"}>
+        <span className={hasValue ? "font-medium text-[var(--color-primary)]" : "text-slate-400"}>
           {label}
         </span>
         {hasValue ? (
@@ -124,7 +124,7 @@ function SpecialtyFilterCombobox({
               role="option"
               aria-selected={value === "all"}
               onClick={() => select("all")}
-              className="cursor-pointer px-3 py-1.5 text-sm text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
+              className="cursor-pointer px-3 py-1.5 text-sm text-slate-500 hover:bg-[var(--color-primary)]/10 hover:text-[var(--color-primary)]"
             >
               Todas las especialidades
             </li>
@@ -137,8 +137,8 @@ function SpecialtyFilterCombobox({
                 role="option"
                 aria-selected={value === spec}
                 onClick={() => select(spec)}
-                className={`cursor-pointer px-3 py-1.5 text-sm hover:bg-emerald-50 hover:text-emerald-700 ${
-                  value === spec ? "bg-emerald-50 font-medium text-emerald-700" : "text-slate-700"
+                className={`cursor-pointer px-3 py-1.5 text-sm hover:bg-[var(--color-primary)]/10 hover:text-[var(--color-primary)] ${
+                  value === spec ? "bg-[var(--color-primary)]/10 font-medium text-[var(--color-primary)]" : "text-slate-700"
                 }`}
               >
                 {spec}
@@ -225,7 +225,7 @@ export function PacienteInicioPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
       </div>
     );
   }
@@ -299,7 +299,7 @@ export function PacienteInicioPage() {
                       onClick={() =>
                         setBookingDoctor({ id: doc.id, name: doc.fullName })
                       }
-                      className="bg-emerald-700 hover:bg-emerald-800 w-full"
+                      className="bg-[var(--color-primary)] hover:opacity-90 w-full"
                       size="sm"
                     >
                       <Calendar className="h-4 w-4 mr-1" />

@@ -7,7 +7,7 @@ function PacienteLayoutFallback() {
       <div
         role="status"
         aria-label="Cargando"
-        className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent"
+        className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent"
       />
     </div>
   );

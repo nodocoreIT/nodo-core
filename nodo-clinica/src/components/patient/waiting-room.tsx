@@ -712,7 +712,7 @@ export function WaitingRoom({
               </p>
               {!embedded && (
                 <Link href="/paciente">
-                  <Button className="bg-emerald-600 hover:bg-emerald-700">
+                  <Button className="bg-[var(--color-primary)] hover:opacity-90">
                     Volver al portal
                   </Button>
                 </Link>
@@ -1016,7 +1016,7 @@ export function WaitingRoom({
                 </span>
               </label>
               <Button
-                className="w-full bg-emerald-600 hover:bg-emerald-700"
+                className="w-full bg-[var(--color-primary)] hover:opacity-90"
                 disabled={!paymentAck || confirmingPayment}
                 onClick={handleConfirmPayment}
               >
@@ -1134,14 +1134,14 @@ export function WaitingRoom({
               </p>
               {embedded ? (
                 <Button
-                  className="mt-6 bg-emerald-600 hover:bg-emerald-700"
+                  className="mt-6 bg-[var(--color-primary)] hover:opacity-90"
                   onClick={onClose}
                 >
                   Cerrar
                 </Button>
               ) : (
                 <Button
-                  className="mt-6 bg-emerald-600 hover:bg-emerald-700"
+                  className="mt-6 bg-[var(--color-primary)] hover:opacity-90"
                   onClick={() => {
                     window.location.href = "/paciente";
                   }}

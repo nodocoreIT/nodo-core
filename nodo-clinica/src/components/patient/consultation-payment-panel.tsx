@@ -40,17 +40,17 @@ export function ConsultationPaymentPanel({
     : null;
 
   return (
-    <Card size="sm" className="border-emerald-200 bg-emerald-50/30 shadow-sm">
+    <Card size="sm" className="border-[var(--color-primary)]/30 bg-[var(--color-primary)]/5 shadow-sm">
       <CardContent className="space-y-2">
         <div className="flex flex-wrap items-start gap-x-10 gap-y-3">
           <div className="flex flex-col gap-1">
-            <p className="text-sm font-medium flex items-center gap-2 text-emerald-800">
+            <p className="text-sm font-medium flex items-center gap-2 text-[var(--color-primary)]">
               <CreditCard className="h-4 w-4" />
               Pago de la consulta
             </p>
             <p className="text-xs text-slate-500">Dr/a. {doctorName}</p>
             {fee && (
-              <Badge className="bg-emerald-600 text-white text-sm px-3 py-1 shrink-0 mt-1">
+              <Badge className="bg-[var(--color-primary)] text-white text-sm px-3 py-1 shrink-0 mt-1">
                 Honorario: {fee}
               </Badge>
             )}
@@ -93,7 +93,7 @@ export function ConsultationPaymentPanel({
             <img
               src={payment.qrImageData}
               alt="QR de pago"
-              className="max-h-44 mx-auto rounded-lg border border-emerald-200 bg-white p-2"
+              className="max-h-44 mx-auto rounded-lg border border-[var(--color-primary)]/30 bg-white p-2"
             />
           </div>
         )}

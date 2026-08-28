@@ -18,7 +18,7 @@ export function ReceiptValidationCard({
   if (loading) {
     return (
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 flex items-center gap-2 text-sm text-slate-600">
-        <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+        <Loader2 className="h-4 w-4 animate-spin text-[var(--color-primary)]" />
         Analizando comprobante con IA…
       </div>
     );

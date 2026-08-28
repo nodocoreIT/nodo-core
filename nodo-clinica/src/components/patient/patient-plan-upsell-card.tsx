@@ -84,7 +84,7 @@ export function PatientPlanUpsellCard({ title, description }: PatientPlanUpsellC
   if (pricingLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+        <Loader2 className="h-6 w-6 animate-spin text-[var(--color-primary)]" />
       </div>
     );
   }
@@ -114,7 +114,7 @@ export function PatientPlanUpsellCard({ title, description }: PatientPlanUpsellC
           type="button"
           disabled={checkingOut}
           onClick={() => void handleCheckout()}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 w-full sm:w-auto"
+          className="bg-[var(--color-primary)] hover:opacity-90 text-white gap-2 w-full sm:w-auto"
         >
           {checkingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Actualizar a plan {plan.name}
