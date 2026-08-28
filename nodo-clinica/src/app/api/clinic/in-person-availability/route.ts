@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const professional = await resolveProfessional(user.id);
+  const professional = await resolveProfessional(authResult);
   if (!professional?.id) {
     return NextResponse.json(
       { error: "Médico no encontrado" },
@@ -22,13 +22,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (!user.org_id) {
+    return NextResponse.json({ error: "org_id requerido" }, { status: 403 });
+  }
+
   const { enabled, availability, location_info } = await request.json();
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("in_person_availability")
     .upsert({
       professional_id: professional.id,
-      org_id: professional.org_id,
+      org_id: user.org_id,
       enabled: enabled ?? false,
       availability: availability ?? { slotDurationMinutes: 30, days: [] },
       location_info: location_info ?? {},

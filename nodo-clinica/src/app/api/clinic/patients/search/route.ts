@@ -14,12 +14,16 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const professional = await resolveProfessional(user.id);
+  const professional = await resolveProfessional(authResult);
   if (!professional?.id) {
     return NextResponse.json(
       { error: "Médico no encontrado" },
       { status: 404 },
     );
+  }
+
+  if (!user.org_id) {
+    return NextResponse.json({ error: "org_id requerido" }, { status: 403 });
   }
 
   const { searchParams } = new URL(request.url);
@@ -33,10 +37,10 @@ export async function GET(request: NextRequest) {
   const q = query.trim().toLowerCase();
 
   // Get all patients for this doctor's org
-  const { data: patients, error } = await supabase
+  const { data: patients, error } = await (supabase as any)
     .from("patients")
     .select("id, full_name, email, dni, updated_at")
-    .eq("org_id", professional.org_id)
+    .eq("org_id", user.org_id)
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -48,7 +52,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Filter by name, email, or DNI (client-side filtering for RLS safety)
-  const filtered = (patients ?? []).filter((p) => {
+  const filtered = (patients ?? []).filter((p: { full_name: string | null; email: string | null; dni: string | null }) => {
     const name = (p.full_name ?? "").toLowerCase();
     const email = (p.email ?? "").toLowerCase();
     const dni = (p.dni ?? "").toLowerCase();
@@ -61,7 +65,7 @@ export async function GET(request: NextRequest) {
   });
 
   return NextResponse.json(
-    filtered.map((p) => ({
+    filtered.map((p: { id: string; full_name: string | null; email: string | null; dni: string | null; updated_at: string }) => ({
       id: p.id,
       fullName: p.full_name,
       email: p.email,
