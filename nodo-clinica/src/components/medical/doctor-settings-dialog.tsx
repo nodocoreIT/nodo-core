@@ -697,6 +697,15 @@ export function DoctorSettingsDialog({
                       })}
                     </div>
                   </div>
+
+                  <div className="border-t border-slate-200 pt-6 mt-6">
+                    <h3 className="text-sm font-semibold mb-4">Turnos Presenciales</h3>
+                    <AgendaPresencialSection
+                      onSaved={() => {
+                        toast.success("Agenda presencial guardada");
+                      }}
+                    />
+                  </div>
                 </>
               )}
 
@@ -898,15 +907,6 @@ export function DoctorSettingsDialog({
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={signatureImageData} alt="Firma" className="mt-2 h-12 object-contain" />
                     )}
-                  </div>
-
-                  <div className="border-t border-slate-200 pt-6 mt-6">
-                    <h3 className="text-sm font-semibold mb-4">Turnos Presenciales</h3>
-                    <AgendaPresencialSection
-                      onSaved={() => {
-                        toast.success("Agenda presencial guardada");
-                      }}
-                    />
                   </div>
                 </>
               )}
