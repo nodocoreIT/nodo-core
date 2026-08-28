@@ -12,22 +12,53 @@ interface PatientPlanUpsellCardProps {
   description: string;
 }
 
+type CachedPricing = { amount: number; currency: string } | null;
+const PRICING_CACHE_KEY = "clinic_patient_pricing_cache";
+
+function readCachedPricing(): CachedPricing | undefined {
+  try {
+    const raw = sessionStorage.getItem(PRICING_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as CachedPricing) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeCachedPricing(pricing: CachedPricing) {
+  try {
+    sessionStorage.setItem(PRICING_CACHE_KEY, JSON.stringify(pricing));
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Card genérico de upsell mostrado a pacientes FREE cuando entran a una
  * sección exclusiva del plan Pago (Mis estudios, Historial, etc.) — mismo
  * diseño y flujo de checkout en todos los casos, solo cambia el título y la
- * descripción según la sección. */
+ * descripción según la sección.
+ *
+ * El precio se cachea en sessionStorage: si ya se pidió una vez en esta
+ * pestaña, se muestra de entrada sin volver a mostrar loading al navegar
+ * ida y vuelta a la sección — solo se revalida en segundo plano. */
 export function PatientPlanUpsellCard({ title, description }: PatientPlanUpsellCardProps) {
   const plan = getPatientPaidCheckoutPlan();
-  const [pricing, setPricing] = useState<{ amount: number; currency: string } | null>(null);
-  const [pricingLoading, setPricingLoading] = useState(true);
+  const cached = readCachedPricing();
+  const [pricing, setPricing] = useState<{ amount: number; currency: string } | null>(
+    cached ?? null,
+  );
+  const [pricingLoading, setPricingLoading] = useState(cached === undefined);
   const [checkingOut, setCheckingOut] = useState(false);
 
   useEffect(() => {
     clinicApi
       .getPatientSubscriptionPricing()
-      .then((res) => setPricing(res.pricing ?? null))
+      .then((res) => {
+        const value = res.pricing ?? null;
+        setPricing(value);
+        writeCachedPricing(value);
+      })
       .catch(() => {
-        /* fall back to the static plan price below */
+        /* keep cached/fallback value if the refresh fails */
       })
       .finally(() => setPricingLoading(false));
   }, []);
@@ -50,6 +81,14 @@ export function PatientPlanUpsellCard({ title, description }: PatientPlanUpsellC
     }
   };
 
+  if (pricingLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-lg mx-auto">
       <div className="rounded-xl border border-violet-200 bg-violet-50/60 px-6 py-8 text-center space-y-4">
@@ -60,14 +99,8 @@ export function PatientPlanUpsellCard({ title, description }: PatientPlanUpsellC
           <h2 className="text-base font-semibold text-slate-800">{title}</h2>
           <p className="text-sm text-slate-500 mt-1">{description}</p>
         </div>
-        <p className="text-2xl font-bold text-slate-800 flex items-center justify-center gap-2 h-8">
-          {pricingLoading ? (
-            <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
-          ) : (
-            <>
-              {priceLabel} <span className="text-xs font-normal text-slate-400">/mes</span>
-            </>
-          )}
+        <p className="text-2xl font-bold text-slate-800">
+          {priceLabel} <span className="text-xs font-normal text-slate-400">/mes</span>
         </p>
         <ul className="text-left space-y-1.5 max-w-xs mx-auto">
           {plan.features.map((feature) => (
