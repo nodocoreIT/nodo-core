@@ -16,6 +16,7 @@ type UnifiedPrescription = {
   issuedAt: string;
   expiresAt: string;
   isExpired: boolean;
+  isViewed: boolean;
   medicationsSummary: string;
 };
 
@@ -78,14 +79,14 @@ export async function GET(request: NextRequest) {
   const [standaloneResult, consultationResult] = await Promise.all([
     supabase
       .from("prescriptions")
-      .select("id, medications, sent_at, professionals(full_name)")
+      .select("id, medications, sent_at, viewed_at, professionals(full_name)")
       .eq("patient_id", patientId)
       .in("payment_status", ["confirmed", "waived"])
       .not("sent_at", "is", null)
       .order("sent_at", { ascending: false }),
     supabase
       .from("clinical_records")
-      .select("id, content, created_at, professionals(full_name)")
+      .select("id, content, created_at, viewed_at, professionals(full_name)")
       .eq("patient_id", patientId)
       .eq("record_type", "receta")
       .not("appointment_id", "is", null)
@@ -119,6 +120,7 @@ export async function GET(request: NextRequest) {
       issuedAt,
       expiresAt: getPrescriptionExpiresAt(issuedAt).toISOString(),
       isExpired: isPrescriptionExpired(issuedAt),
+      isViewed: Boolean(row.viewed_at),
       medicationsSummary: summarizeMedications(medications),
     });
   }
@@ -134,6 +136,7 @@ export async function GET(request: NextRequest) {
       issuedAt,
       expiresAt: getPrescriptionExpiresAt(issuedAt).toISOString(),
       isExpired: isPrescriptionExpired(issuedAt),
+      isViewed: Boolean(row.viewed_at),
       medicationsSummary: summarizeMedications(medications),
     });
   }

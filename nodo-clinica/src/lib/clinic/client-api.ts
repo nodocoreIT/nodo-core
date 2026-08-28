@@ -1396,6 +1396,7 @@ export const clinicApi = {
       issuedAt: string;
       expiresAt: string;
       isExpired: boolean;
+      isViewed: boolean;
       medicationsSummary: string;
     }>;
   },
