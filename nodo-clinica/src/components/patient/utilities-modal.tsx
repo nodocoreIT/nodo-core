@@ -35,7 +35,7 @@ export function UtilitiesModal({
           </TabsList>
 
           <ScrollArea className="flex-1 min-h-0">
-            <div className="pr-4">
+            <div className="p-1 pr-4">
               <TabsContent value="farmacias" className="mt-0">
                 <PharmacyOnCallCard />
               </TabsContent>
