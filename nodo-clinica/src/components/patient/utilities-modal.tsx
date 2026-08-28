@@ -22,7 +22,7 @@ export function UtilitiesModal({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[90vw] h-[85vh] max-w-none flex flex-col gap-0 p-6 overflow-hidden">
+      <DialogContent className="w-[90vw] sm:max-w-4xl h-[85vh] flex flex-col gap-0 p-6 overflow-hidden">
         <DialogHeader className="shrink-0 mb-4">
           <DialogTitle className="text-2xl">Utilidades y servicios útiles</DialogTitle>
         </DialogHeader>

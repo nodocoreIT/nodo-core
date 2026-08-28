@@ -207,7 +207,7 @@ export function PharmacyOnCallCard() {
               {selectedPharmacies.length === 0 ? (
                 <p className="text-xs text-slate-400">Sin datos para este día.</p>
               ) : (
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {pharmaciesWithDistance.map(({ pharmacy, distanceKm }, i) => {
                     const mapsQuery = encodeURIComponent(
                       `${pharmacy.name} ${pharmacy.address}, Santa Rosa, La Pampa`,
