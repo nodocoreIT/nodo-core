@@ -11,6 +11,7 @@ import { toast } from "sonner";
 export function StudiesUpsellCard() {
   const plan = getPatientPaidCheckoutPlan();
   const [pricing, setPricing] = useState<{ amount: number; currency: string } | null>(null);
+  const [pricingLoading, setPricingLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
 
   useEffect(() => {
@@ -19,7 +20,8 @@ export function StudiesUpsellCard() {
       .then((res) => setPricing(res.pricing ?? null))
       .catch(() => {
         /* fall back to the static plan price below */
-      });
+      })
+      .finally(() => setPricingLoading(false));
   }, []);
 
   const priceLabel = pricing
@@ -53,8 +55,14 @@ export function StudiesUpsellCard() {
             quieras.
           </p>
         </div>
-        <p className="text-2xl font-bold text-slate-800">
-          {priceLabel} <span className="text-xs font-normal text-slate-400">/mes</span>
+        <p className="text-2xl font-bold text-slate-800 flex items-center justify-center gap-2 h-8">
+          {pricingLoading ? (
+            <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
+          ) : (
+            <>
+              {priceLabel} <span className="text-xs font-normal text-slate-400">/mes</span>
+            </>
+          )}
         </p>
         <ul className="text-left space-y-1.5 max-w-xs mx-auto">
           {plan.features.map((feature) => (
