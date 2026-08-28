@@ -601,7 +601,7 @@ export function RecetaForm({ onSaved, editingId }: RecetaFormProps = {}) {
         </div>
         {previewUrl && (
           <iframe
-            src={`${previewUrl}#zoom=150`}
+            src={`${previewUrl}#zoom=100`}
             className="flex-1 w-full min-h-0 rounded border border-slate-200"
             title="Vista previa de la receta"
           />
