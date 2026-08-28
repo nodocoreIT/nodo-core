@@ -73,7 +73,7 @@ function invalidateProfileCache() {
   }
 }
 
-export function PatientPerfilSection({ initialData }: { initialData: PatientProfileData }) {
+export function PatientPerfilSection({ initialData, onDirtyChange }: { initialData: PatientProfileData; onDirtyChange?: (dirty: boolean) => void }) {
   const [saving, setSaving] = useState(false);
   const [firstName, setFirstName] = useState(initialData.firstName ?? "");
   const [lastName, setLastName] = useState(initialData.lastName ?? "");
@@ -90,6 +90,19 @@ export function PatientPerfilSection({ initialData }: { initialData: PatientProf
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!onDirtyChange) return;
+    const isDirty =
+      firstName !== (initialData.firstName ?? "") ||
+      lastName !== (initialData.lastName ?? "") ||
+      phone !== (initialData.phone ?? "") ||
+      dni !== (initialData.dni ?? "") ||
+      address !== (initialData.address ?? "") ||
+      password !== "" ||
+      confirmPassword !== "";
+    onDirtyChange(isDirty);
+  }, [firstName, lastName, phone, dni, address, password, confirmPassword, initialData, onDirtyChange]);
 
   const handlePhoto = async (file: File) => {
     try {
@@ -122,6 +135,7 @@ export function PatientPerfilSection({ initialData }: { initialData: PatientProf
       }
 
       invalidateProfileCache();
+      onDirtyChange?.(false);
       toast.success("Cambios guardados");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al guardar");
@@ -338,7 +352,7 @@ export function PatientPerfilSection({ initialData }: { initialData: PatientProf
   );
 }
 
-export function PatientSaludSection({ initialData }: { initialData: PatientProfileData }) {
+export function PatientSaludSection({ initialData, onDirtyChange }: { initialData: PatientProfileData; onDirtyChange?: (dirty: boolean) => void }) {
   const [saving, setSaving] = useState(false);
   const [bloodType, setBloodType] = useState(initialData.bloodType ?? "");
   const [obraSocial, setObraSocial] = useState(initialData.obraSocial ?? "");
@@ -361,6 +375,22 @@ export function PatientSaludSection({ initialData }: { initialData: PatientProfi
     initialData.emergencyContactPhone ?? "",
   );
 
+  useEffect(() => {
+    if (!onDirtyChange) return;
+    const isDirty =
+      bloodType !== (initialData.bloodType ?? "") ||
+      obraSocial !== (initialData.obraSocial ?? "") ||
+      insuranceNumber !== (initialData.insuranceNumber ?? "") ||
+      heightCm !== (initialData.heightCm != null ? String(initialData.heightCm) : "") ||
+      weightKg !== (initialData.weightKg != null ? String(initialData.weightKg) : "") ||
+      allergies !== (initialData.allergies ?? "") ||
+      chronicConditions !== (initialData.chronicConditions ?? "") ||
+      medications !== (initialData.medications ?? "") ||
+      emergencyContactName !== (initialData.emergencyContactName ?? "") ||
+      emergencyContactPhone !== (initialData.emergencyContactPhone ?? "");
+    onDirtyChange(isDirty);
+  }, [bloodType, obraSocial, insuranceNumber, heightCm, weightKg, allergies, chronicConditions, medications, emergencyContactName, emergencyContactPhone, initialData, onDirtyChange]);
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -379,6 +409,7 @@ export function PatientSaludSection({ initialData }: { initialData: PatientProfi
         },
       });
       invalidateProfileCache();
+      onDirtyChange?.(false);
       toast.success("Datos de salud actualizados");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al guardar");

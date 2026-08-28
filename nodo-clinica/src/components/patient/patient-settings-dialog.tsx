@@ -31,6 +31,7 @@ import {
 import { useThemeSettings } from "@/hooks/use-theme-settings";
 import { HeartPulse, Loader2, Palette, Plug, Receipt, User } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export type PatientSettingsSectionId =
   | "perfil"
@@ -102,12 +103,49 @@ export function PatientSettingsDialog({
     readProfileCache(),
   );
   const [profileLoading, setProfileLoading] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingClose, setPendingClose] = useState(false);
   const loadGen = useRef(0);
   const { setSettings, hydrateSettings } = useThemeSettings();
 
   useEffect(() => {
     if (open && initialSection) setActiveSection(initialSection);
   }, [open, initialSection]);
+
+  useEffect(() => {
+    if (!open) {
+      setIsDirty(false);
+      setShowUnsavedDialog(false);
+      setPendingClose(false);
+    }
+  }, [open]);
+
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen && isDirty) {
+      setShowUnsavedDialog(true);
+      setPendingClose(true);
+    } else {
+      setIsDirty(false);
+      setShowUnsavedDialog(false);
+      setPendingClose(false);
+      onOpenChange(newOpen);
+    }
+  };
+
+  const handleCloseWithoutSave = () => {
+    setShowUnsavedDialog(false);
+    setPendingClose(false);
+    setIsDirty(false);
+    onOpenChange(false);
+  };
+
+  const handleSaveBeforeClose = () => {
+    setShowUnsavedDialog(false);
+    setPendingClose(false);
+    setIsDirty(false);
+    onOpenChange(false);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -144,7 +182,7 @@ export function PatientSettingsDialog({
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] md:h-[90vh] flex flex-col sm:flex-row gap-0 p-0 overflow-hidden bg-white">
         <SettingsDesktopNav
           items={PATIENT_SETTINGS_NAV}
@@ -198,11 +236,11 @@ export function PatientSettingsDialog({
               ) : (
                 <>
                   {activeSection === "perfil" && profileData ? (
-                    <PatientPerfilSection initialData={profileData} />
+                    <PatientPerfilSection initialData={profileData} onDirtyChange={setIsDirty} />
                   ) : null}
 
                   {activeSection === "salud" && profileData ? (
-                    <PatientSaludSection initialData={profileData} />
+                    <PatientSaludSection initialData={profileData} onDirtyChange={setIsDirty} />
                   ) : null}
 
                   {activeSection === "personalizacion" ? (
@@ -225,6 +263,18 @@ export function PatientSettingsDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      open={showUnsavedDialog}
+      onOpenChange={setShowUnsavedDialog}
+      title="¿Descartar cambios?"
+      description="Tienes cambios sin guardar. ¿Deseas guardarlos antes de cerrar?"
+      confirmLabel="Guardar"
+      cancelLabel="Descartar"
+      destructive={false}
+      onConfirm={handleSaveBeforeClose}
+      onCancel={handleCloseWithoutSave}
+    />
     </>
   );
 }
