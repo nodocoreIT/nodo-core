@@ -1520,6 +1520,31 @@ export const clinicApi = {
     return data;
   },
 
+  /** Fase 5 de Recetas — historial de recetas emitidas por el médico logueado
+   * (borrador / enviada / pagada), para <RecetasList />. */
+  async getPrescriptionsByDoctor() {
+    const res = await fetch(`${BASE}/api/clinic/prescriptions`, clinicFetchOpts());
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "No se pudieron obtener las recetas");
+    return data as {
+      prescriptions: Array<{
+        id: string;
+        patientFullName: string;
+        institutionSnapshot: {
+          name: string;
+          city: string | null;
+          address: string | null;
+          extraInfo: string | null;
+        } | null;
+        priceAmount: number | null;
+        priceCurrency: string | null;
+        paymentStatus: string;
+        sentAt: string | null;
+        createdAt: string;
+      }>;
+    };
+  },
+
   async saveStudyOrder(payload: {
     appointmentId: string;
     doctorId: string;

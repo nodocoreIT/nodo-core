@@ -168,6 +168,25 @@ export async function createPrescription(
   return supabase.from("prescriptions").insert(data).select().single();
 }
 
+/** Returns the recetas history (standalone + live-consultation) issued by a
+ * doctor — Fase 5 of "Recetas". Joins `patients(full_name)` so records that
+ * predate patient_full_name being snapshotted (live-consultation recetas,
+ * which only ever set patient_id) still resolve a display name. */
+export async function getPrescriptionsByDoctor(
+  supabase: AnyClient,
+  doctorId: string,
+  orgId: string,
+) {
+  return supabase
+    .from("prescriptions")
+    .select(
+      "id, patient_id, patient_full_name, institution_snapshot, price_amount, price_currency, payment_status, sent_at, created_at, patients(full_name)",
+    )
+    .eq("doctor_id", doctorId)
+    .eq("org_id", orgId)
+    .order("created_at", { ascending: false });
+}
+
 // ── Study Orders ──────────────────────────────────────────────────────────────
 
 export interface StudyOrderInsert {

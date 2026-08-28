@@ -25,12 +25,20 @@ interface PatientSearchResult {
   lastAppointmentAt?: string;
 }
 
+interface RecetaFormProps {
+  /** Fase 5 — called after a successful "Guardar borrador" or "Enviar
+   * receta", so the caller (e.g. the recetas-history dialog) can close the
+   * dialog and refresh its list. Optional: the standalone /medico/recetas
+   * page rendered the form inline before Fase 5 and had no such callback. */
+  onSaved?: () => void;
+}
+
 /** Standalone (fuera de consulta) prescription form — Fase 2 de "Recetas".
  * Lets the médico pick a registered patient (or type one that isn't
  * registered), an institution for the PDF letterhead, medications and free
  * notes, and save the receta as a draft. No email/magic-link/payment yet —
  * that's Fase 3/4. */
-export function RecetaForm() {
+export function RecetaForm({ onSaved }: RecetaFormProps = {}) {
   const doctor = useMedicoDoctor();
 
   const [doctorSpecialty, setDoctorSpecialty] = useState<string | undefined>();
@@ -214,6 +222,7 @@ export function RecetaForm() {
       if (!id) return;
       toast.success("Receta guardada como borrador");
       resetForm();
+      onSaved?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al guardar la receta");
     } finally {
@@ -229,6 +238,7 @@ export function RecetaForm() {
       await clinicApi.sendPrescription(id);
       toast.success("Receta enviada por email al paciente");
       resetForm();
+      onSaved?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al enviar la receta");
     } finally {

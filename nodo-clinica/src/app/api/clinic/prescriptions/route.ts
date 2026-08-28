@@ -1,8 +1,71 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/supabase/auth-guard";
-import { createPrescription, createRecord } from "@/lib/clinic/db/clinical-records";
+import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
+import {
+  createPrescription,
+  createRecord,
+  getPrescriptionsByDoctor,
+} from "@/lib/clinic/db/clinical-records";
 import { getInstitutionById } from "@/lib/clinic/db/institutions";
 import { formatPrescriptionRecordContent } from "@/lib/clinic/medication-catalog";
+
+/**
+ * Fase 5 of "Recetas" — the médico's recetas history (draft/sent/paid), used
+ * by <RecetasList /> in the médico dashboard. `doctorId` query param is
+ * accepted for symmetry with other endpoints (e.g. GET /appointments) but is
+ * only ever honored when it matches the authenticated médico — a médico can
+ * never list another médico's recetas.
+ */
+export async function GET(request: NextRequest) {
+  const authResult = await requireAuth(request);
+  if (authResult instanceof NextResponse) return authResult;
+  const { user, supabase } = authResult;
+
+  if (user.role !== "doctor" && user.role !== "medico") {
+    return NextResponse.json(
+      { error: "Debe iniciar sesión como médico" },
+      { status: 401 },
+    );
+  }
+
+  const professional = await resolveProfessional(authResult);
+  if (!professional?.id) {
+    return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
+  }
+
+  if (!user.org_id) {
+    return NextResponse.json({ error: "org_id requerido" }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const doctorIdParam = searchParams.get("doctorId");
+  if (doctorIdParam && doctorIdParam !== professional.id) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
+  const { data, error } = await getPrescriptionsByDoctor(
+    supabase,
+    professional.id,
+    user.org_id,
+  );
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prescriptions = (data ?? []).map((row: any) => ({
+    id: row.id,
+    patientFullName: row.patient_full_name ?? row.patients?.full_name ?? "Paciente",
+    institutionSnapshot: row.institution_snapshot ?? null,
+    priceAmount: row.price_amount,
+    priceCurrency: row.price_currency,
+    paymentStatus: row.payment_status,
+    sentAt: row.sent_at,
+    createdAt: row.created_at,
+  }));
+
+  return NextResponse.json({ prescriptions });
+}
 
 export async function POST(request: NextRequest) {
   const authResult = await requireAuth(request);

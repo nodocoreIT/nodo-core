@@ -56,6 +56,22 @@ export function RecetaAccessLanding({ accessToken }: RecetaAccessLandingProps) {
     }
   }
 
+  // The receta may already be paid before this page even loads — e.g. the
+  // médico marks it "waived", or the MP webhook confirms it in the
+  // background while the patient opens the link straight from their email
+  // instead of coming back through the checkout redirect. `paid` (local
+  // state, set only by handlePay's immediate-paid response) alone would miss
+  // that case, so it's OR'd with the payment_status already on the resolved
+  // prescription.
+  const prescriptionPaymentStatus =
+    result?.status === "authorized"
+      ? (result.prescription?.payment_status as string | null | undefined)
+      : null;
+  const isPaid =
+    paid ||
+    prescriptionPaymentStatus === "confirmed" ||
+    prescriptionPaymentStatus === "waived";
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -129,14 +145,23 @@ export function RecetaAccessLanding({ accessToken }: RecetaAccessLandingProps) {
               </div>
               <CardTitle className="text-lg">Tu receta está lista</CardTitle>
               <p className="text-sm text-slate-500">
-                Realizá el pago para acceder al PDF de tu receta médica.
+                {isPaid
+                  ? "Ya podés ver y descargar el PDF de tu receta médica."
+                  : "Realizá el pago para acceder al PDF de tu receta médica."}
               </p>
             </CardHeader>
-            <CardContent>
-              {paid ? (
-                <p className="text-sm text-emerald-700 font-medium">
-                  Tu receta ya está pagada. La descarga del PDF estará disponible próximamente.
-                </p>
+            <CardContent className="space-y-3">
+              {isPaid ? (
+                <a
+                  href={`/api/clinic/prescriptions/${accessToken}/pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button className="w-full bg-teal-600 hover:bg-teal-700 gap-2">
+                    <FileText className="h-4 w-4" />
+                    Ver / Descargar receta
+                  </Button>
+                </a>
               ) : (
                 <Button className="w-full bg-teal-600 hover:bg-teal-700" onClick={handlePay} disabled={paying}>
                   {paying ? (
