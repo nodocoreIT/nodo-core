@@ -33,6 +33,7 @@ import {
   Palette,
   Receipt,
   Wallet,
+  Building2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
@@ -45,6 +46,7 @@ const SUSCRIPCION_PLAN_DB_CODES: Record<string, string> = {
 };
 import { trialDaysRemaining, isTrialExpired } from "@/lib/clinic/trial";
 import { AgendaPresencialSection } from "@/components/medical/agenda-presencial-section";
+import { InstitucionesSection } from "@/components/medical/instituciones-section";
 import {
   dayLabel,
   DEFAULT_AVAILABILITY,
@@ -73,6 +75,7 @@ const ALL_DAYS = [1, 2, 3, 4, 5, 6, 0];
 
 export type SectionId =
   | "agenda"
+  | "instituciones"
   | "perfil"
   | "cobros"
   | "suscripcion"
@@ -82,6 +85,7 @@ export type SectionId =
 
 const SECTIONS: { id: SectionId; label: string; icon: React.ElementType }[] = [
   { id: "agenda", label: "Agenda", icon: CalendarClock },
+  { id: "instituciones", label: "Instituciones", icon: Building2 },
   { id: "perfil", label: "Perfil", icon: User },
   { id: "cobros", label: "Cobros", icon: CreditCard },
   //{ id: "avisos", label: "Recordatorios", icon: Bell },
@@ -708,6 +712,9 @@ export function DoctorSettingsDialog({
                   </div>
                 </>
               )}
+
+              {/* ── Instituciones ── */}
+              {activeSection === "instituciones" && <InstitucionesSection />}
 
               {/* ── Perfil ── */}
               {activeSection === "perfil" && (

@@ -2,6 +2,20 @@ import type { ClinicSession } from "@/lib/clinic/types";
 import type { AppointmentStatus } from "@/lib/clinic/types";
 import type { MedicationSearchResponse } from "@/lib/clinic/medication-catalog";
 
+export interface InstitutionRecord {
+  id: string;
+  org_id: string;
+  professional_id: string;
+  name: string;
+  city: string | null;
+  address: string | null;
+  extra_info: string | null;
+  schedule: { days: Array<{ dayOfWeek: number; startTime: string; endTime: string }> };
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 const BASE = "";
 const SESSION_KEY = "clinica_local_session";
 const AUTH_TOKEN_CACHE = "clinica_access_token";
@@ -1956,6 +1970,65 @@ export const clinicApi = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "No se pudo guardar la agenda presencial");
     return data;
+  },
+
+  async getInstitutions() {
+    const res = await fetch(
+      `${BASE}/api/clinic/institutions`,
+      clinicFetchOpts(),
+    );
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "No se pudieron obtener las instituciones");
+    return data as { institutions: InstitutionRecord[] };
+  },
+
+  async saveInstitution(data: {
+    name: string;
+    city?: string;
+    address?: string;
+    extra_info?: string;
+    schedule?: { days: Array<{ dayOfWeek: number; startTime: string; endTime: string }> };
+  }) {
+    const res = await fetch(`${BASE}/api/clinic/institutions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    const json = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(json.error || "No se pudo guardar la institución");
+    return json as { institution: InstitutionRecord };
+  },
+
+  async updateInstitution(
+    id: string,
+    data: {
+      name?: string;
+      city?: string;
+      address?: string;
+      extra_info?: string;
+      schedule?: { days: Array<{ dayOfWeek: number; startTime: string; endTime: string }> };
+    },
+  ) {
+    const res = await fetch(`${BASE}/api/clinic/institutions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    const json = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(json.error || "No se pudo actualizar la institución");
+    return json as { institution: InstitutionRecord };
+  },
+
+  async deleteInstitution(id: string) {
+    const res = await fetch(`${BASE}/api/clinic/institutions/${id}`, {
+      ...clinicFetchOpts(),
+      method: "DELETE",
+    });
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "No se pudo eliminar la institución");
+    return data as { ok: boolean };
   },
 
   async searchPatients(query: string) {
