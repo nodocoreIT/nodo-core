@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { create } from "zustand";
 import {
   DEFAULT_THEME_SETTINGS,
@@ -165,9 +166,15 @@ export function useThemeSettings() {
   return { settings, setSettings, hydrateSettings, resetSettings };
 }
 
-/** Tema fijo del portal paciente. */
+/** Tema fijo del portal paciente. Se reaplica en cada cambio de ruta (no
+ * solo al montar el layout) porque la sección "Personalización" reusa el
+ * store/localStorage del tema del médico (nodo-theme-medico) — si el
+ * paciente lo abre una vez, ese valor pisa la variable CSS para el resto de
+ * la sesión SPA. Reforzarlo por pathname evita que un color custom del
+ * médico se "filtre" al portal paciente al navegar entre secciones. */
 export function usePatientTheme() {
+  const pathname = usePathname();
   useEffect(() => {
     applyThemeToDocument(PATIENT_THEME_SETTINGS);
-  }, []);
+  }, [pathname]);
 }
