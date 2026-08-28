@@ -181,7 +181,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
         <div
           role="status"
           aria-label="Cargando portal"
-          className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-600 border-t-transparent"
+          className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-primary)] border-t-transparent"
         />
       </div>
     );
@@ -241,8 +241,8 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
               className={cn(
                 "flex-shrink-0 rounded-md p-1.5 transition-colors",
                 settingsOpen
-                  ? "text-emerald-400"
-                  : "text-[var(--color-sidebar-text)] hover:text-emerald-400",
+                  ? "text-[var(--sidebar-accent-foreground)]"
+                  : "text-[var(--color-sidebar-text)] hover:text-[var(--sidebar-accent-foreground)]",
               )}
             >
               <Settings className="h-4 w-4" />
@@ -251,7 +251,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
               type="button"
               aria-label="Cerrar sesión"
               onClick={handleLogout}
-              className="flex-shrink-0 rounded-md p-1.5 transition-colors text-[var(--color-sidebar-text)] hover:text-emerald-400"
+              className="flex-shrink-0 rounded-md p-1.5 transition-colors text-[var(--color-sidebar-text)] hover:text-[var(--sidebar-accent-foreground)]"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -278,8 +278,8 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
                   className={cn(
                     "flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-emerald-600 text-white"
-                      : "text-[var(--color-sidebar-text)] hover:bg-emerald-600/10 hover:text-emerald-400",
+                      ? "bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)]"
+                      : "text-[var(--color-sidebar-text)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]",
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
@@ -325,8 +325,8 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
               className={cn(
                 "rounded-md p-1.5 transition-colors",
                 settingsOpen
-                  ? "text-emerald-400"
-                  : "text-[var(--color-sidebar-text)] hover:text-emerald-400",
+                  ? "text-[var(--sidebar-accent-foreground)]"
+                  : "text-[var(--color-sidebar-text)] hover:text-[var(--sidebar-accent-foreground)]",
               )}
             >
               <Settings className="h-4 w-4" />
@@ -335,7 +335,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
           <Button
             variant="outline"
             onClick={handleLogout}
-            className="mt-2 w-full justify-center gap-2 border-[var(--color-sidebar-border)] bg-transparent text-[var(--color-sidebar-text)] hover:bg-emerald-600/10 hover:text-emerald-400"
+            className="mt-2 w-full justify-center gap-2 border-[var(--color-sidebar-border)] bg-transparent text-[var(--color-sidebar-text)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
           >
             <LogOut className="h-4 w-4" />
             Cerrar sesión
