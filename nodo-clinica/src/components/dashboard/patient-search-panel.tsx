@@ -36,7 +36,6 @@ interface PatientSearchPanelProps {
 }
 
 export function PatientSearchPanel({
-  doctorId,
   onSelectPatient,
 }: PatientSearchPanelProps) {
   const [query, setQuery] = useState("");
@@ -47,12 +46,12 @@ export function PatientSearchPanel({
     setLoading(true);
     const timer = setTimeout(() => {
       clinicApi
-        .searchPatients(doctorId, query)
+        .searchPatientsDetailed(query)
         .then((data) => setResults(Array.isArray(data) ? data : []))
         .finally(() => setLoading(false));
     }, 250);
     return () => clearTimeout(timer);
-  }, [doctorId, query]);
+  }, [query]);
 
   return (
     <div className="space-y-3">

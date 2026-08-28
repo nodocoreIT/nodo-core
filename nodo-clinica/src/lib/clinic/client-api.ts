@@ -1667,13 +1667,6 @@ export const clinicApi = {
     return data;
   },
 
-  async searchPatients(doctorId: string, q = "") {
-    const params = new URLSearchParams({ doctorId });
-    if (q) params.set("q", q);
-    const res = await fetch(`${BASE}/api/clinic/patients?${params}`, clinicFetchOpts());
-    return res.json();
-  },
-
   async updatePatientProfile(payload: {
     profilePhotoData?: string;
     firstName?: string;
@@ -2214,6 +2207,17 @@ export const clinicApi = {
     const data = await parseJsonResponse(res);
     if (!res.ok) throw new Error(data.error || "No se pudo eliminar la institución");
     return data as { ok: boolean };
+  },
+
+  /** Org-scoped patient search with visit stats (appointments/documents/
+   * clinical records) — used by the dashboard header/panel search that shows
+   * those badges. Doesn't need a doctorId: results are already scoped by
+   * the session's org_id server-side. */
+  async searchPatientsDetailed(query: string) {
+    const params = new URLSearchParams();
+    if (query.trim()) params.set("q", query.trim());
+    const res = await fetch(`${BASE}/api/clinic/patients?${params}`, clinicFetchOpts());
+    return res.json();
   },
 
   async searchPatients(query: string) {

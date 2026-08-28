@@ -45,7 +45,6 @@ interface PatientSearchHeaderProps {
 }
 
 export function PatientSearchHeader({
-  doctorId,
   onViewPatient,
   onAssignPatient,
 }: PatientSearchHeaderProps) {
@@ -60,12 +59,12 @@ export function PatientSearchHeader({
     setLoading(true);
     const timer = setTimeout(() => {
       clinicApi
-        .searchPatients(doctorId, query)
+        .searchPatientsDetailed(query)
         .then((data) => setResults(Array.isArray(data) ? data : []))
         .finally(() => setLoading(false));
     }, 250);
     return () => clearTimeout(timer);
-  }, [doctorId, query, open]);
+  }, [query, open]);
 
   useEffect(() => {
     const onPointerDown = (e: MouseEvent) => {

@@ -140,7 +140,7 @@ export function DoctorAssignAppointmentForm({
     setSearchLoading(true);
     const timer = setTimeout(() => {
       clinicApi
-        .searchPatients(doctorId, query)
+        .searchPatients(query)
         .then((data) =>
           setSearchResults(Array.isArray(data) ? (data as PatientOption[]) : []),
         )
@@ -148,7 +148,7 @@ export function DoctorAssignAppointmentForm({
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [active, doctorId, query, searchOpen, prefill]);
+  }, [active, query, searchOpen, prefill]);
 
   useEffect(() => {
     if (!selectedDate) {
