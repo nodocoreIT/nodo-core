@@ -22,22 +22,20 @@ export function UtilitiesModal({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[98vw] h-[95vh] flex flex-col gap-0 p-0 overflow-hidden">
-        <DialogHeader className="shrink-0 border-b px-6 py-4">
-          <DialogTitle>Utilidades y servicios útiles</DialogTitle>
+      <DialogContent className="w-[90vw] h-[85vh] max-w-none flex flex-col gap-0 p-6 overflow-hidden">
+        <DialogHeader className="shrink-0 mb-4">
+          <DialogTitle className="text-2xl">Utilidades y servicios útiles</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="farmacias" className="flex-1 flex flex-col overflow-hidden">
-          <div className="px-6 pt-4 pb-0 shrink-0">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="farmacias">Farmacias</TabsTrigger>
-              <TabsTrigger value="laboratorios">Laboratorios</TabsTrigger>
-              <TabsTrigger value="diagnostico">Diagnóstico</TabsTrigger>
-            </TabsList>
-          </div>
+        <Tabs defaultValue="farmacias" className="flex-1 flex flex-col min-h-0">
+          <TabsList className="grid w-full grid-cols-3 shrink-0 mb-4">
+            <TabsTrigger value="farmacias">Farmacias</TabsTrigger>
+            <TabsTrigger value="laboratorios">Laboratorios</TabsTrigger>
+            <TabsTrigger value="diagnostico">Diagnóstico</TabsTrigger>
+          </TabsList>
 
           <ScrollArea className="flex-1">
-            <div className="px-6 py-4">
+            <div className="pr-4">
               <TabsContent value="farmacias" className="mt-0">
                 <PharmacyOnCallCard />
               </TabsContent>
