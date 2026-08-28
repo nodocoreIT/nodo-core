@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/nodo/brand-mark";
-import { usePatientTheme } from "@/hooks/use-theme-settings";
+import { usePatientThemeSettings } from "@/hooks/use-theme-settings";
 import { clinicApi, getClientSession } from "@/lib/clinic/client-api";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -63,7 +63,7 @@ const ROUTE_TITLES: Record<string, string> = {
 };
 
 export function PacienteAdminLayout({ children }: { children: React.ReactNode }) {
-  usePatientTheme();
+  usePatientThemeSettings();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();

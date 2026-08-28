@@ -47,6 +47,55 @@ function getStoredSettings(storageKey: string): DoctorThemeSettings | null {
   return null;
 }
 
+const THEME_CSS_PROPERTIES = [
+  "--color-brand",
+  "--color-brand-600",
+  "--color-brand-300",
+  "--color-ring",
+  "--color-primary-foreground",
+  "--color-primary",
+  "--primary",
+  "--primary-foreground",
+  "--ring",
+  "--color-navy",
+  "--color-navy-700",
+  "--color-navy-900",
+  "--color-sidebar-bg",
+  "--color-sidebar-hover",
+  "--color-sidebar-border",
+  "--color-sidebar-text",
+  "--sidebar",
+  "--sidebar-foreground",
+  "--sidebar-primary",
+  "--sidebar-primary-foreground",
+  "--sidebar-ring",
+  "--color-sidebar-accent",
+  "--sidebar-accent",
+  "--sidebar-accent-foreground",
+  "--color-ink",
+  "--color-foreground",
+  "--foreground",
+  "--radius",
+  "--radius-sm",
+  "--radius-md",
+  "--font-sans",
+];
+
+/** Quita cualquier variable CSS de tema que haya quedado seteada inline en
+ * <html> por applyThemeToDocument() (persiste entre navegaciones SPA, ya
+ * que se escribe directo en document.documentElement.style). Usado en
+ * páginas que NUNCA deben reflejar la personalización del médico/paciente
+ * — ej. /login — para que vuelvan a usar el branding institucional fijo
+ * definido en globals.css, sin importar qué tema haya quedado aplicado de
+ * una sesión anterior en el mismo navegador. */
+export function resetThemeToDocument(): void {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  for (const prop of THEME_CSS_PROPERTIES) {
+    root.style.removeProperty(prop);
+  }
+}
+
 export function applyThemeToDocument(settings: DoctorThemeSettings): void {
   if (typeof document === "undefined") return;
 
@@ -177,23 +226,18 @@ export function useThemeSettings() {
   return { settings, setSettings, hydrateSettings, resetSettings };
 }
 
-/** Tema del portal paciente — personalizable, persistido en su PROPIA clave
- * de localStorage (separada de la del médico) para que ninguno de los dos
- * roles pise el color del otro cuando comparten navegador/cuenta. Se
- * hidrata una sola vez al montar el layout paciente; a partir de ahí,
- * cambios en "Personalización" se aplican en vivo y persisten al navegar. */
+/** Tema institucional FIJO — usado por el <ThemeProvider> global (envuelve
+ * TODA la app: landing pública, /login, y cualquier página sin sesión).
+ * A propósito NO lee ninguna personalización guardada — el login y las
+ * páginas públicas nunca deben reflejar el color que un médico o paciente
+ * eligió para su propio portal. La personalización real del paciente
+ * logueado se aplica aparte, en el layout del portal (ver
+ * usePatientThemeSettings), que corre DESPUÉS de este por estar más
+ * adentro en el árbol y gana la carrera de efectos. */
 export function usePatientTheme() {
-  const { hydrateSettings } = usePatientThemeStore();
-
   useEffect(() => {
-    if (usePatientThemeStore.getState().hydrated) return;
-    const stored = getStoredSettings(PACIENTE_THEME_STORAGE_KEY);
-    const next = stored ?? PATIENT_THEME_SETTINGS;
-    usePatientThemeStore.setState({ settings: next, hydrated: true });
-    applyThemeToDocument(next);
+    applyThemeToDocument(PATIENT_THEME_SETTINGS);
   }, []);
-
-  return { hydrateSettings };
 }
 
 /** Personalización del tema del portal paciente (usado por la sección
