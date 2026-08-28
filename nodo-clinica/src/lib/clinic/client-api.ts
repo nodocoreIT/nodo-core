@@ -1379,6 +1379,27 @@ export const clinicApi = {
     }>;
   },
 
+  /** "Mis recetas" — unified standalone + live-consultation recetas for the
+   * logged-in patient, with the 10-day access window already resolved
+   * server-side (isExpired). */
+  async getPatientPrescriptions() {
+    const res = await fetch(
+      `${BASE}/api/clinic/patient-prescriptions`,
+      clinicFetchOpts(),
+    );
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "Error al cargar recetas");
+    return data as Array<{
+      id: string;
+      source: "standalone" | "consultation";
+      doctorName: string;
+      issuedAt: string;
+      expiresAt: string;
+      isExpired: boolean;
+      medicationsSummary: string;
+    }>;
+  },
+
   async getPatientHistory(patientId: string, doctorId?: string) {
     const params = new URLSearchParams({ patientId });
     if (doctorId) params.set("doctorId", doctorId);

@@ -10,6 +10,7 @@ import {
   generateStudyOrderPdf,
 } from "@/lib/pdf/generator";
 import { parsePrescriptionRecordContent } from "@/lib/clinic/medication-catalog";
+import { isPrescriptionExpired } from "@/lib/clinic/prescription-expiration";
 
 export const dynamic = "force-dynamic";
 
@@ -188,6 +189,14 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
     if (!patientRow || patientRow.id !== record.patient_id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+
+    // "Mis recetas" 10-day access window (patient portal only — a médico
+    // reviewing their own history, or the appointment-accessToken branch
+    // above, is unaffected). Only applies to record_type "receta"; estudios
+    // and informes have no expiration rule.
+    if (record.record_type === "receta" && isPrescriptionExpired(record.created_at)) {
+      return NextResponse.json({ error: "Esta receta ya venció" }, { status: 404 });
     }
   }
 

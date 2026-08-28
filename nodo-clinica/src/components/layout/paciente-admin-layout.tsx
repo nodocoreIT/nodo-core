@@ -7,6 +7,7 @@ import {
   Home,
   Stethoscope,
   FileText,
+  Pill,
   Clock,
   Settings,
   LogOut,
@@ -47,6 +48,7 @@ const NAV_ITEMS = [
   { href: "/paciente/inicio", label: "Inicio", icon: Home },
   { href: "/paciente", label: "Buscar médico", icon: Stethoscope },
   { href: "/paciente/estudios", label: "Mis estudios", icon: FileText },
+  { href: "/paciente/recetas", label: "Mis recetas", icon: Pill },
   { href: "/paciente/historial", label: "Historial", icon: FileText },
   { href: "/paciente/turnos", label: "Mis turnos", icon: Clock },
 ];
@@ -55,6 +57,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/paciente/inicio": "Inicio",
   "/paciente": "Buscar médico",
   "/paciente/estudios": "Mis estudios",
+  "/paciente/recetas": "Mis recetas",
   "/paciente/historial": "Historial clínico",
   "/paciente/turnos": "Mis turnos",
 };
