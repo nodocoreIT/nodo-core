@@ -49,41 +49,90 @@ interface PrescriptionPdfOptions {
   signatureUrl?: string;
   signatureText?: string;
   signatureImageData?: string;
+  /** Fase 2 — standalone (fuera de consulta) prescriptions: when present,
+   * renders a gray institution letterhead instead of the default teal
+   * consultation header. The live consultation call site never passes this,
+   * so its visual output is unchanged. */
+  institution?: { name: string; city?: string; address?: string; extraInfo?: string };
+  patientDni?: string;
+  notes?: string;
 }
 
 export function generatePrescriptionPdf(options: PrescriptionPdfOptions): jsPDF {
   const doc = new jsPDF();
-  const { doctor, patientName, medications, signatureText, signatureImageData } =
-    options;
+  const {
+    doctor,
+    patientName,
+    medications,
+    signatureText,
+    signatureImageData,
+    institution,
+    patientDni,
+    notes,
+  } = options;
 
-  doc.setFillColor(240, 247, 255);
-  doc.rect(0, 0, 210, 40, "F");
+  if (institution) {
+    // Standalone flow: gray institution letterhead instead of the teal
+    // consultation header — membrete for the institution the receta was
+    // issued under, snapshotted at issue time.
+    doc.setFillColor(226, 232, 240);
+    doc.rect(0, 0, 210, 34, "F");
 
-  doc.setFontSize(18);
-  doc.setTextColor(30, 64, 110);
-  doc.text("Receta Médica Digital", 105, 15, { align: "center" });
+    doc.setFontSize(16);
+    doc.setTextColor(51, 65, 85);
+    doc.text(institution.name, 105, 14, { align: "center" });
 
-  doc.setFontSize(10);
-  doc.setTextColor(71, 85, 105);
-  doc.text(`Dr/a. ${doctor.full_name}`, 105, 24, { align: "center" });
-  if (doctor.specialty) {
-    doc.text(doctor.specialty, 105, 30, { align: "center" });
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105);
+    let headerY = 21;
+    const locationLine = [institution.city, institution.address]
+      .filter(Boolean)
+      .join(" — ");
+    if (locationLine) {
+      doc.text(locationLine, 105, headerY, { align: "center" });
+      headerY += 6;
+    }
+    if (institution.extraInfo) {
+      doc.text(institution.extraInfo, 105, headerY, { align: "center" });
+    }
+
+    doc.setDrawColor(148, 163, 184);
+    doc.line(20, 40, 190, 40);
+
+    doc.setFontSize(11);
+    doc.setTextColor(30, 41, 59);
+    doc.text(`APELLIDO Y NOMBRE: ${patientName}`, 20, 50);
+    doc.text(`DNI: ${patientDni || "-"}`, 20, 58);
+  } else {
+    doc.setFillColor(240, 247, 255);
+    doc.rect(0, 0, 210, 40, "F");
+
+    doc.setFontSize(18);
+    doc.setTextColor(30, 64, 110);
+    doc.text("Receta Médica Digital", 105, 15, { align: "center" });
+
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Dr/a. ${doctor.full_name}`, 105, 24, { align: "center" });
+    if (doctor.specialty) {
+      doc.text(doctor.specialty, 105, 30, { align: "center" });
+    }
+    if (doctor.license_number) {
+      doc.text(`Mat. Prof. ${doctor.license_number}`, 105, 36, { align: "center" });
+    }
+
+    doc.setDrawColor(203, 213, 225);
+    doc.line(20, 45, 190, 45);
+
+    doc.setFontSize(11);
+    doc.setTextColor(30, 41, 59);
+    doc.text(`Paciente: ${patientName}`, 20, 55);
+    doc.text(
+      `Fecha: ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}`,
+      20,
+      63
+    );
   }
-  if (doctor.license_number) {
-    doc.text(`Mat. Prof. ${doctor.license_number}`, 105, 36, { align: "center" });
-  }
-
-  doc.setDrawColor(203, 213, 225);
-  doc.line(20, 45, 190, 45);
-
-  doc.setFontSize(11);
-  doc.setTextColor(30, 41, 59);
-  doc.text(`Paciente: ${patientName}`, 20, 55);
-  doc.text(
-    `Fecha: ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}`,
-    20,
-    63
-  );
 
   doc.setFontSize(12);
   doc.setTextColor(30, 64, 110);
@@ -105,6 +154,31 @@ export function generatePrescriptionPdf(options: PrescriptionPdfOptions): jsPDF 
     }
     y += 4;
   });
+
+  if (notes) {
+    y += 4;
+    doc.setFontSize(11);
+    doc.setTextColor(30, 64, 110);
+    doc.text("Indicaciones:", 20, y);
+    y += 7;
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105);
+    const noteLines = doc.splitTextToSize(notes, 170);
+    doc.text(noteLines, 20, y);
+    y += noteLines.length * 5;
+  }
+
+  if (institution) {
+    // "fecha al pie" — placed near the bottom instead of near the top,
+    // since the letterhead above already carries institution + patient info.
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text(
+      `Fecha: ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}`,
+      20,
+      234,
+    );
+  }
 
   doc.setDrawColor(203, 213, 225);
   doc.line(20, 240, 190, 240);

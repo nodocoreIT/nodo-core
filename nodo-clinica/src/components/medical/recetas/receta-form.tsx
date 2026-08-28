@@ -1,0 +1,395 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Download, Loader2, Save, Search, User } from "lucide-react";
+import { toast } from "sonner";
+import { useMedicoDoctor } from "@/contexts/medico-doctor-context";
+import { clinicApi, type InstitutionRecord } from "@/lib/clinic/client-api";
+import {
+  MedicationRowsEditor,
+  emptyMedication,
+  type MedicationDraft,
+} from "@/components/medical/medication-rows-editor";
+import { downloadPdf, generatePrescriptionPdf, pdfToBase64 } from "@/lib/pdf/generator";
+
+interface PatientSearchResult {
+  id: string;
+  fullName: string;
+  email: string;
+  dni?: string;
+  lastAppointmentAt?: string;
+}
+
+/** Standalone (fuera de consulta) prescription form — Fase 2 de "Recetas".
+ * Lets the médico pick a registered patient (or type one that isn't
+ * registered), an institution for the PDF letterhead, medications and free
+ * notes, and save the receta as a draft. No email/magic-link/payment yet —
+ * that's Fase 3/4. */
+export function RecetaForm() {
+  const doctor = useMedicoDoctor();
+
+  const [doctorSpecialty, setDoctorSpecialty] = useState<string | undefined>();
+  const [doctorLicense, setDoctorLicense] = useState<string | undefined>();
+  const [signatureText, setSignatureText] = useState("");
+  const [signatureImageData, setSignatureImageData] = useState("");
+
+  // ── Patient selection ──────────────────────────────────────────────────
+  const [unregistered, setUnregistered] = useState(false);
+  const [patientQuery, setPatientQuery] = useState("");
+  const [patientResults, setPatientResults] = useState<PatientSearchResult[]>([]);
+  const [searchingPatients, setSearchingPatients] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<PatientSearchResult | null>(null);
+  const [manualPatientName, setManualPatientName] = useState("");
+  const [manualPatientEmail, setManualPatientEmail] = useState("");
+
+  // ── Institution, medications, notes, price ─────────────────────────────
+  const [institutions, setInstitutions] = useState<InstitutionRecord[]>([]);
+  const [institutionId, setInstitutionId] = useState("");
+  const [medications, setMedications] = useState<MedicationDraft[]>([emptyMedication()]);
+  const [notes, setNotes] = useState("");
+  const [priceAmount, setPriceAmount] = useState("");
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  useEffect(() => {
+    clinicApi
+      .getDoctorSchedule(doctor.id)
+      .then((data) => {
+        if (Array.isArray(data.specialties) && data.specialties.length > 0) {
+          setDoctorSpecialty(data.specialties[0]);
+        }
+        if (data.licenseNumber) setDoctorLicense(data.licenseNumber);
+        if (data.signatureText) setSignatureText(data.signatureText);
+        if (data.signatureImageData) setSignatureImageData(data.signatureImageData);
+      })
+      .catch(() => undefined);
+  }, [doctor.id]);
+
+  useEffect(() => {
+    clinicApi
+      .getInstitutions()
+      .then((data) => setInstitutions(data.institutions))
+      .catch(() => undefined);
+  }, []);
+
+  const searchPatients = useCallback(async (q: string) => {
+    if (!q.trim()) {
+      setPatientResults([]);
+      return;
+    }
+    setSearchingPatients(true);
+    try {
+      const res = await clinicApi.searchPatients(q);
+      setPatientResults(res);
+    } catch {
+      setPatientResults([]);
+    } finally {
+      setSearchingPatients(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (unregistered) return;
+    const timer = setTimeout(() => void searchPatients(patientQuery), 300);
+    return () => clearTimeout(timer);
+  }, [patientQuery, unregistered, searchPatients]);
+
+  const selectedInstitution = institutions.find((i) => i.id === institutionId) ?? null;
+
+  const resolvePatientName = () =>
+    unregistered ? manualPatientName.trim() : selectedPatient?.fullName ?? "";
+
+  const validate = (): string | null => {
+    if (unregistered) {
+      if (!manualPatientName.trim() || !manualPatientEmail.trim()) {
+        return "Completá nombre y email del paciente no registrado";
+      }
+    } else if (!selectedPatient) {
+      return "Seleccioná un paciente";
+    }
+    const validMeds = medications.every((m) => m.name && m.dosage);
+    if (!validMeds) {
+      return "Completá al menos nombre y dosis de cada medicamento";
+    }
+    return null;
+  };
+
+  const buildPdf = () => {
+    const medicationsToSave = medications.map(
+      ({ name, dosage, frequency, duration, instructions }) => ({
+        name,
+        dosage,
+        frequency,
+        duration,
+        instructions,
+      }),
+    );
+
+    return generatePrescriptionPdf({
+      doctor: {
+        full_name: doctor.fullName,
+        specialty: doctorSpecialty,
+        license_number: doctorLicense,
+      },
+      patientName: resolvePatientName(),
+      medications: medicationsToSave,
+      signatureText: signatureText || `Dr/a. ${doctor.fullName}`,
+      signatureImageData,
+      institution: selectedInstitution
+        ? {
+            name: selectedInstitution.name,
+            city: selectedInstitution.city ?? undefined,
+            address: selectedInstitution.address ?? undefined,
+            extraInfo: selectedInstitution.extra_info ?? undefined,
+          }
+        : undefined,
+      notes: notes.trim() || undefined,
+    });
+  };
+
+  const resetForm = () => {
+    setSelectedPatient(null);
+    setManualPatientName("");
+    setManualPatientEmail("");
+    setPatientQuery("");
+    setPatientResults([]);
+    setInstitutionId("");
+    setMedications([emptyMedication()]);
+    setNotes("");
+    setPriceAmount("");
+  };
+
+  const handleSaveDraft = async () => {
+    const error = validate();
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
+    const medicationsToSave = medications.map(
+      ({ name, dosage, frequency, duration, instructions }) => ({
+        name,
+        dosage,
+        frequency,
+        duration,
+        instructions,
+      }),
+    );
+
+    setIsSaving(true);
+    try {
+      const doc = buildPdf();
+      const parsedPrice = priceAmount.trim() ? Number(priceAmount) : undefined;
+
+      await clinicApi.savePrescription({
+        doctorId: doctor.id,
+        patientId: unregistered ? undefined : selectedPatient?.id,
+        medications: medicationsToSave,
+        pdfBase64: pdfToBase64(doc),
+        institutionId: institutionId || undefined,
+        priceAmount:
+          typeof parsedPrice === "number" && !Number.isNaN(parsedPrice)
+            ? parsedPrice
+            : undefined,
+        notes: notes.trim() || undefined,
+        patientEmail: unregistered ? manualPatientEmail.trim() : selectedPatient?.email,
+        patientFullName: unregistered ? manualPatientName.trim() : selectedPatient?.fullName,
+      });
+
+      toast.success("Receta guardada como borrador");
+      resetForm();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al guardar la receta");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDownloadPreview = () => {
+    const error = validate();
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    setIsDownloading(true);
+    try {
+      const doc = buildPdf();
+      const safeName = resolvePatientName().replace(/\s+/g, "_") || "receta";
+      downloadPdf(doc, `receta_${safeName}.pdf`);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      {/* Paciente */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-medium">Paciente</Label>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="unregistered-patient"
+              checked={unregistered}
+              onCheckedChange={(checked) => {
+                setUnregistered(checked === true);
+                setSelectedPatient(null);
+              }}
+            />
+            <label htmlFor="unregistered-patient" className="text-xs text-slate-600 cursor-pointer">
+              Paciente no registrado
+            </label>
+          </div>
+        </div>
+
+        {unregistered ? (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Nombre completo</Label>
+              <Input
+                value={manualPatientName}
+                onChange={(e) => setManualPatientName(e.target.value)}
+                placeholder="Nombre y apellido"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Email</Label>
+              <Input
+                type="email"
+                value={manualPatientEmail}
+                onChange={(e) => setManualPatientEmail(e.target.value)}
+                placeholder="paciente@email.com"
+                className="h-9 text-sm"
+              />
+            </div>
+          </div>
+        ) : selectedPatient ? (
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-slate-400" />
+              <div>
+                <p className="text-sm font-medium text-slate-900">{selectedPatient.fullName}</p>
+                <p className="text-xs text-slate-500">{selectedPatient.email}</p>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedPatient(null)}>
+              Cambiar
+            </Button>
+          </div>
+        ) : (
+          <div className="relative">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+              <Input
+                value={patientQuery}
+                onChange={(e) => setPatientQuery(e.target.value)}
+                placeholder="Buscar por nombre, email o DNI…"
+                className="pl-9 h-9 text-sm"
+              />
+            </div>
+            {searchingPatients && (
+              <div className="flex items-center justify-center py-3">
+                <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+              </div>
+            )}
+            {!searchingPatients && patientResults.length > 0 && (
+              <ul className="mt-1 max-h-48 overflow-y-auto rounded-md border bg-white shadow-sm text-sm divide-y">
+                {patientResults.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-slate-50"
+                      onClick={() => {
+                        setSelectedPatient(p);
+                        setPatientQuery("");
+                        setPatientResults([]);
+                      }}
+                    >
+                      <p className="font-medium text-slate-900">{p.fullName}</p>
+                      <p className="text-xs text-slate-500">{p.email}</p>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Institución */}
+      <div className="space-y-1.5">
+        <Label className="text-sm font-medium">Institución (membrete del PDF)</Label>
+        <select
+          value={institutionId}
+          onChange={(e) => setInstitutionId(e.target.value)}
+          className="flex h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <option value="">Sin institución</option>
+          {institutions.map((inst) => (
+            <option key={inst.id} value={inst.id}>
+              {inst.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Medicamentos */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">Medicamentos</Label>
+        <MedicationRowsEditor value={medications} onChange={setMedications} />
+      </div>
+
+      {/* Indicaciones */}
+      <div className="space-y-1.5">
+        <Label className="text-sm font-medium">Indicaciones / notas</Label>
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Indicaciones libres para el paciente…"
+          rows={3}
+        />
+      </div>
+
+      {/* Precio */}
+      <div className="space-y-1.5 max-w-xs">
+        <Label className="text-sm font-medium">Precio</Label>
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          value={priceAmount}
+          onChange={(e) => setPriceAmount(e.target.value)}
+          placeholder="0.00"
+          className="h-9 text-sm"
+        />
+      </div>
+
+      <div className="flex gap-2 pt-2">
+        <Button onClick={handleSaveDraft} disabled={isSaving} className="gap-2">
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Guardar borrador
+        </Button>
+        <Button
+          variant="outline"
+          onClick={handleDownloadPreview}
+          disabled={isDownloading}
+          className="gap-2"
+        >
+          {isDownloading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          Descargar vista previa
+        </Button>
+      </div>
+    </div>
+  );
+}

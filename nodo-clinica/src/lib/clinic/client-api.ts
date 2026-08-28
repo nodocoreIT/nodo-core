@@ -1439,9 +1439,9 @@ export const clinicApi = {
   },
 
   async savePrescription(payload: {
-    appointmentId: string;
+    appointmentId?: string;
     doctorId: string;
-    patientId: string;
+    patientId?: string;
     medications: Array<{
       name: string;
       dosage: string;
@@ -1450,6 +1450,12 @@ export const clinicApi = {
       instructions?: string;
     }>;
     pdfBase64?: string;
+    // Fase 2 — standalone (fuera de consulta) recetas.
+    institutionId?: string;
+    priceAmount?: number;
+    notes?: string;
+    patientEmail?: string;
+    patientFullName?: string;
   }) {
     const res = await fetch(`${BASE}/api/clinic/prescriptions`, {
       method: "POST",

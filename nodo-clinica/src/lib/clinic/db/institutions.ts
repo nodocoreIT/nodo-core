@@ -36,6 +36,22 @@ export async function getInstitutions(
     .order("created_at", { ascending: false });
 }
 
+/** Returns a single institution by id, scoped to org — used to snapshot the
+ * letterhead ({name, city, address, extra_info}) into a prescription at the
+ * moment it's issued (Fase 2 — recetas standalone). */
+export async function getInstitutionById(
+  supabase: AnyClient,
+  id: string,
+  orgId: string,
+) {
+  return supabase
+    .from("institutions")
+    .select("*")
+    .eq("id", id)
+    .eq("org_id", orgId)
+    .maybeSingle();
+}
+
 /** Inserts a new institution. */
 export async function createInstitution(
   supabase: AnyClient,

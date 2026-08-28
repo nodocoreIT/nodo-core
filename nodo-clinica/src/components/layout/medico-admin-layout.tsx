@@ -15,6 +15,7 @@ import {
   CalendarDays,
   CalendarPlus,
   Users,
+  Pill,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -79,6 +80,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/medico/asignar-turnos", label: "Asignar Turnos", icon: CalendarPlus },
   { href: "/medico/turnos-programados", label: "Turnos Programados", icon: CalendarDays },
   { href: "/medico/pacientes", label: "Pacientes", icon: Users },
+  { href: "/medico/recetas", label: "Recetas", icon: Pill },
   { href: "/medico/cobros", label: "Cobros", icon: Wallet },
   { href: "/medico/interconsultas", label: "Interconsultas", icon: MessageSquare },
 ];
@@ -89,6 +91,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/medico/asignar-turnos": "Asignar Turnos",
   "/medico/turnos-programados": "Turnos Programados",
   "/medico/pacientes": "Pacientes",
+  "/medico/recetas": "Recetas",
   "/medico/cobros": "Cobros",
   "/medico/interconsultas": "Interconsultas",
 };

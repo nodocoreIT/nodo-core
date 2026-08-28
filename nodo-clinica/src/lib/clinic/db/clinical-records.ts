@@ -130,11 +130,20 @@ export async function createSOAP(supabase: AnyClient, data: SOAPUpsert) {
 
 export interface PrescriptionInsert {
   org_id: string;
-  appointment_id: string;
+  appointment_id?: string | null;
   doctor_id: string;
-  patient_id: string;
+  patient_id?: string | null;
   medications: unknown;
   pdf_url?: string | null;
+  // Fase 2 — standalone (fuera de consulta) prescriptions.
+  institution_id?: string | null;
+  institution_snapshot?: unknown;
+  price_amount?: number | null;
+  price_currency?: string;
+  payment_status?: string;
+  patient_email?: string | null;
+  patient_full_name?: string | null;
+  notes?: string | null;
 }
 
 /** Returns prescriptions for a patient. */
