@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,18 +18,25 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 
-export default function RegistroPacientePage() {
+function RegistroPacienteContent() {
+  const searchParams = useSearchParams();
+  // Fase 3 de Recetas — arriving from a receta magic link prefills the form
+  // and carries `next` through registration+onboarding so the patient lands
+  // back on the receta page instead of the generic /login. Every other
+  // entry point (no query params) behaves exactly as before.
+  const nextPath = searchParams.get("next") ?? undefined;
+
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState(searchParams.get("fullName") ?? "");
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [submittedEmail, setSubmittedEmail] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await clinicApi.register({ email, fullName, role: "paciente" });
+      await clinicApi.register({ email, fullName, role: "paciente", nextPath });
       setSubmittedEmail(email);
       setSubmitted(true);
       setFullName("");
@@ -137,5 +145,19 @@ export default function RegistroPacientePage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function RegistroPacientePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+        </div>
+      }
+    >
+      <RegistroPacienteContent />
+    </Suspense>
   );
 }

@@ -464,6 +464,9 @@ export const clinicApi = {
     email: string;
     fullName: string;
     role: "medico" | "paciente";
+    // Fase 3 de Recetas — post-onboarding redirect (must start with
+    // /paciente or /medico). Optional: omitted for every other caller.
+    nextPath?: string;
   }): Promise<{ ok: boolean }> {
     const res = await fetch(`${BASE}/api/clinic/account/register`, {
       method: "POST",
@@ -1466,6 +1469,41 @@ export const clinicApi = {
     const data = await parseJsonResponse(res);
     if (!res.ok) throw new Error(data.error || "Error al guardar receta");
     return data;
+  },
+
+  /** Fase 3 de Recetas — envía (o reenvía) el magic link de una receta ya guardada. */
+  async sendPrescription(id: string): Promise<{ ok: boolean }> {
+    const res = await fetch(`${BASE}/api/clinic/prescriptions/${id}/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "Error al enviar la receta");
+    return data as { ok: boolean };
+  },
+
+  /** Fase 3 de Recetas — resuelve qué debe ver el paciente en el magic link
+   * (needs_registration / needs_login / authorized / not_found). Sesión de
+   * paciente opcional: se manda con credentials:"include" si existe. */
+  async getPrescriptionAccess(accessToken: string) {
+    const res = await fetch(
+      `${BASE}/api/clinic/prescriptions/access?token=${encodeURIComponent(accessToken)}`,
+      { credentials: "include" },
+    );
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "No se pudo resolver la receta");
+    return data as
+      | { status: "not_found" }
+      | {
+          status: "needs_registration";
+          patientEmail: string;
+          patientFullName: string | null;
+          accessToken: string;
+        }
+      | { status: "needs_login"; accessToken: string }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      | { status: "authorized"; prescription: any };
   },
 
   async saveStudyOrder(payload: {

@@ -6,11 +6,23 @@ import { CLINIC_ORG_ID } from "@/lib/clinic/clinic-org";
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
-    const { email, fullName, role } = body as {
+    const { email, fullName, role, nextPath } = body as {
       email?: string;
       fullName?: string;
       role?: string;
+      nextPath?: string;
     };
+
+    // Fase 3 de Recetas — optional "resume where you left off" destination.
+    // Only accepted if it's a same-app relative path under /paciente or
+    // /medico; anything else (absolute URL, open-redirect attempt, typo) is
+    // silently ignored rather than rejected — this is a UX nicety, not a
+    // required field.
+    const safeNextPath =
+      typeof nextPath === "string" &&
+      (nextPath.startsWith("/paciente") || nextPath.startsWith("/medico"))
+        ? nextPath
+        : null;
 
     if (!email || !fullName?.trim() || !role) {
       return NextResponse.json(
@@ -55,7 +67,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // WHERE verified_at IS NULL prevents duplicate pending rows.
     const { data: row, error: insertError } = await serviceClient
       .from("pending_clinic_registrations")
-      .insert({ email: email.toLowerCase().trim(), full_name: fullName.trim(), role })
+      .insert({
+        email: email.toLowerCase().trim(),
+        full_name: fullName.trim(),
+        role,
+        next_path: safeNextPath,
+      })
       .select("token")
       .single();
 

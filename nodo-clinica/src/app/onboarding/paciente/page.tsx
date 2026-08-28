@@ -34,6 +34,11 @@ const labelClass = "text-xs font-medium text-slate-300";
 function OnboardingPacienteContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
+  // Fase 3 de Recetas — carried through from /registro/paciente via
+  // account/verify's redirect. Only present when the patient arrived from a
+  // receta magic link; every other onboarding flow has no `next` and the
+  // success link below falls back to plain /login, unchanged.
+  const next = searchParams.get("next");
 
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -373,7 +378,7 @@ function OnboardingPacienteContent() {
               Pronto desde NODO activaremos tu cuenta. Una vez habilitada, vas a poder iniciar sesión con tu email y contraseña.
             </p>
             <a
-              href="/login"
+              href={next ? `/login?role=paciente&next=${encodeURIComponent(next)}` : "/login"}
               className="mt-2 inline-flex items-center justify-center rounded-md bg-teal-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors"
             >
               Ir al inicio de sesión

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, Loader2, Save, Search, User } from "lucide-react";
+import { Download, Loader2, Mail, Save, Search, User } from "lucide-react";
 import { toast } from "sonner";
 import { useMedicoDoctor } from "@/contexts/medico-doctor-context";
 import { clinicApi, type InstitutionRecord } from "@/lib/clinic/client-api";
@@ -56,6 +56,7 @@ export function RecetaForm() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     clinicApi
@@ -165,11 +166,14 @@ export function RecetaForm() {
     setPriceAmount("");
   };
 
-  const handleSaveDraft = async () => {
+  /** Shared save step — used by both "Guardar borrador" and "Enviar receta".
+   * Returns the saved prescription's id, or null if validation failed
+   * (toast already shown). Throws on network/API failure. */
+  const saveReceta = async (): Promise<string | null> => {
     const error = validate();
     if (error) {
       toast.error(error);
-      return;
+      return null;
     }
 
     const medicationsToSave = medications.map(
@@ -182,32 +186,53 @@ export function RecetaForm() {
       }),
     );
 
+    const doc = buildPdf();
+    const parsedPrice = priceAmount.trim() ? Number(priceAmount) : undefined;
+
+    const result = await clinicApi.savePrescription({
+      doctorId: doctor.id,
+      patientId: unregistered ? undefined : selectedPatient?.id,
+      medications: medicationsToSave,
+      pdfBase64: pdfToBase64(doc),
+      institutionId: institutionId || undefined,
+      priceAmount:
+        typeof parsedPrice === "number" && !Number.isNaN(parsedPrice)
+          ? parsedPrice
+          : undefined,
+      notes: notes.trim() || undefined,
+      patientEmail: unregistered ? manualPatientEmail.trim() : selectedPatient?.email,
+      patientFullName: unregistered ? manualPatientName.trim() : selectedPatient?.fullName,
+    });
+
+    return (result as { id?: string }).id ?? null;
+  };
+
+  const handleSaveDraft = async () => {
     setIsSaving(true);
     try {
-      const doc = buildPdf();
-      const parsedPrice = priceAmount.trim() ? Number(priceAmount) : undefined;
-
-      await clinicApi.savePrescription({
-        doctorId: doctor.id,
-        patientId: unregistered ? undefined : selectedPatient?.id,
-        medications: medicationsToSave,
-        pdfBase64: pdfToBase64(doc),
-        institutionId: institutionId || undefined,
-        priceAmount:
-          typeof parsedPrice === "number" && !Number.isNaN(parsedPrice)
-            ? parsedPrice
-            : undefined,
-        notes: notes.trim() || undefined,
-        patientEmail: unregistered ? manualPatientEmail.trim() : selectedPatient?.email,
-        patientFullName: unregistered ? manualPatientName.trim() : selectedPatient?.fullName,
-      });
-
+      const id = await saveReceta();
+      if (!id) return;
       toast.success("Receta guardada como borrador");
       resetForm();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al guardar la receta");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSendReceta = async () => {
+    setIsSending(true);
+    try {
+      const id = await saveReceta();
+      if (!id) return;
+      await clinicApi.sendPrescription(id);
+      toast.success("Receta enviada por email al paciente");
+      resetForm();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al enviar la receta");
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -371,10 +396,18 @@ export function RecetaForm() {
         />
       </div>
 
-      <div className="flex gap-2 pt-2">
-        <Button onClick={handleSaveDraft} disabled={isSaving} className="gap-2">
+      <div className="flex flex-wrap gap-2 pt-2">
+        <Button onClick={handleSaveDraft} disabled={isSaving || isSending} className="gap-2">
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Guardar borrador
+        </Button>
+        <Button
+          onClick={handleSendReceta}
+          disabled={isSaving || isSending}
+          className="gap-2 bg-teal-600 hover:bg-teal-700"
+        >
+          {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+          Enviar receta
         </Button>
         <Button
           variant="outline"

@@ -10,6 +10,15 @@ interface PendingRow {
   expires_at: string;
   verified_at: string | null;
   onboarding_token: string | null;
+  next_path: string | null;
+}
+
+/** Fase 3 de Recetas — appends `&next=` when the pending row carries a
+ * post-onboarding redirect destination. No-op (returns the base URL
+ * unchanged) for every other caller, since next_path is null for them. */
+function withNextParam(url: URL, nextPath: string | null): URL {
+  if (nextPath) url.searchParams.set("next", nextPath);
+  return url;
 }
 
 export const dynamic = "force-dynamic";
@@ -55,7 +64,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Already verified — if onboarding_token exists, let them continue onboarding
     if (pendingRow.onboarding_token) {
       return NextResponse.redirect(
-        new URL(`/onboarding/${role}?token=${pendingRow.onboarding_token}`, origin),
+        withNextParam(
+          new URL(`/onboarding/${role}?token=${pendingRow.onboarding_token}`, origin),
+          pendingRow.next_path,
+        ),
       );
     }
     return NextResponse.redirect(new URL(`/login`, origin));
@@ -136,6 +148,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // Direct redirect to onboarding page — no Supabase redirectTo needed
   return NextResponse.redirect(
-    new URL(`/onboarding/${role}?token=${onboardingToken}`, origin),
+    withNextParam(
+      new URL(`/onboarding/${role}?token=${onboardingToken}`, origin),
+      pendingRow.next_path,
+    ),
   );
 }

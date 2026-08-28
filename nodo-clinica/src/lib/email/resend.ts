@@ -237,6 +237,62 @@ export async function sendPrescriptionEmail(
   });
 }
 
+interface PrescriptionMagicLinkEmailParams {
+  patientEmail: string;
+  patientName: string;
+  doctorName: string;
+  confirmUrl: string;
+}
+
+/**
+ * Fase 3 of "Recetas" — sends the magic link for a standalone receta so the
+ * patient can land on /paciente/receta/[accessToken] and be routed to
+ * registration, login, or payment depending on their situation. Unlike
+ * sendPrescriptionEmail above, this does NOT attach the PDF — the PDF only
+ * becomes available after payment (Fase 4/5), so this is a separate,
+ * intentionally simpler function.
+ */
+export async function sendPrescriptionMagicLinkEmail(
+  params: PrescriptionMagicLinkEmailParams,
+): Promise<EmailSendResult> {
+  const { patientEmail, patientName, doctorName, confirmUrl } = params;
+
+  const html = clinicEmailDocument(
+    "Tu receta médica",
+    `
+        ${clinicEmailTealHeader("Tu receta médica")}
+        <div style="padding:32px 24px;">
+          ${clinicEmailParagraph(`Hola <strong>${patientName}</strong>,`)}
+          ${clinicEmailParagraph(
+            `<strong>${doctorName}</strong> te emitió una receta médica.`,
+          )}
+          <div style="text-align:center;margin:32px 0;">
+            <a href="${confirmUrl}"
+               style="background:#0f766e;color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;word-wrap:break-word;">
+              Confirmar receta
+            </a>
+          </div>
+          ${clinicEmailParagraph(
+            `<span style="color:#94a3b8;font-size:13px;line-height:1.5;display:block;">Este enlace es único y personal. No lo compartas con terceros.</span>`,
+          )}
+        </div>
+  `,
+  );
+
+  return sendClinicEmail({
+    to: patientEmail,
+    subject: `Receta médica — Dr/a. ${doctorName}`,
+    html,
+    text: [
+      `Hola ${patientName},`,
+      "",
+      `${doctorName} te emitió una receta médica.`,
+      "",
+      `Confirmar receta: ${confirmUrl}`,
+    ].join("\n"),
+  });
+}
+
 interface InPersonAppointmentEmailParams {
   patientEmail: string;
   patientName: string;
