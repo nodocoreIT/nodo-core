@@ -28,7 +28,7 @@ import {
   PATIENT_THEME_SETTINGS,
   mergeThemeSettings,
 } from "@/lib/clinic/theme-settings";
-import { useThemeSettings } from "@/hooks/use-theme-settings";
+import { usePatientThemeSettings } from "@/hooks/use-theme-settings";
 import { HeartPulse, Loader2, Palette, Plug, Receipt, User } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -107,7 +107,7 @@ export function PatientSettingsDialog({
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingClose, setPendingClose] = useState(false);
   const loadGen = useRef(0);
-  const { setSettings, hydrateSettings } = useThemeSettings();
+  const { setSettings, hydrateSettings } = usePatientThemeSettings();
 
   useEffect(() => {
     if (open && initialSection) setActiveSection(initialSection);
@@ -231,7 +231,7 @@ export function PatientSettingsDialog({
                 activeSection === "salud" ||
                 activeSection === "suscripcion") ? (
                 <div className="flex justify-center py-10">
-                  <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                  <Loader2 className="h-6 w-6 animate-spin text-[var(--color-primary)]" />
                 </div>
               ) : (
                 <>

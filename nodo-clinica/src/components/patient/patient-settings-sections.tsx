@@ -16,7 +16,7 @@ import { ObraSocialCombobox } from "@/components/ui/obra-social-combobox";
 import { ThemeSettingsPanel } from "@/components/settings/theme-settings-panel";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { createClient } from "@/lib/supabase/client";
-import { useThemeSettings } from "@/hooks/use-theme-settings";
+import { usePatientThemeSettings } from "@/hooks/use-theme-settings";
 import {
   getPatientPlanById,
   PATIENT_SUBSCRIPTION_PLANS,
@@ -251,7 +251,7 @@ export function PatientPerfilSection({ initialData, onDirtyChange }: { initialDa
           <button
             type="button"
             onClick={() => setPasswordSectionOpen(true)}
-            className="text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:underline"
+            className="text-sm font-medium text-[var(--color-primary)] hover:opacity-80 hover:underline"
           >
             Cambiar contraseña
           </button>
@@ -342,7 +342,7 @@ export function PatientPerfilSection({ initialData, onDirtyChange }: { initialDa
         <Button
           onClick={() => void handleSave()}
           disabled={saving}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="bg-[var(--color-primary)] hover:opacity-90 text-white"
         >
           {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
           Guardar cambios
@@ -568,7 +568,7 @@ export function PatientSaludSection({ initialData, onDirtyChange }: { initialDat
         <Button
           onClick={() => void handleSave()}
           disabled={saving}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="bg-[var(--color-primary)] hover:opacity-90 text-white"
         >
           {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
           Guardar datos de salud
@@ -579,7 +579,7 @@ export function PatientSaludSection({ initialData, onDirtyChange }: { initialDat
 }
 
 export function PatientPersonalizacionSection() {
-  const { settings, setSettings, resetSettings } = useThemeSettings();
+  const { settings, setSettings, resetSettings } = usePatientThemeSettings();
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -602,7 +602,7 @@ export function PatientPersonalizacionSection() {
         <Button
           onClick={() => void handleSave()}
           disabled={saving}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="bg-[var(--color-primary)] hover:opacity-90 text-white"
         >
           {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
           Guardar personalización
@@ -699,8 +699,8 @@ export function PatientSuscripcionSection({
               className={cn(
                 "rounded-lg border p-3 space-y-2 text-left transition-colors",
                 isSelected
-                  ? "border-emerald-400 bg-emerald-50/50 ring-1 ring-emerald-200"
-                  : "border-slate-200 bg-white hover:border-emerald-300",
+                  ? "border-[var(--color-primary)] bg-[var(--color-primary)]/5 ring-1 ring-[var(--color-primary)]/20"
+                  : "border-slate-200 bg-white hover:border-[var(--color-primary)]/60",
               )}
             >
               <div className="flex items-center justify-between gap-2">
@@ -735,7 +735,7 @@ export function PatientSuscripcionSection({
             type="button"
             disabled={checkingOut}
             onClick={() => void handleCheckout()}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+            className="bg-[var(--color-primary)] hover:opacity-90 text-white gap-2"
           >
             {checkingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Cambiar a este plan

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
 import { create } from "zustand";
 import {
   DEFAULT_THEME_SETTINGS,
@@ -14,6 +13,7 @@ export type ThemeSettings = DoctorThemeSettings;
 export const DEFAULT_SETTINGS = DEFAULT_THEME_SETTINGS;
 
 const MEDICO_THEME_STORAGE_KEY = "nodo-theme-medico";
+const PACIENTE_THEME_STORAGE_KEY = "nodo-theme-paciente";
 
 interface ThemeStore {
   settings: DoctorThemeSettings;
@@ -23,15 +23,7 @@ interface ThemeStore {
   resetSettings: () => void;
 }
 
-const persistMedicoLocal = (settings: DoctorThemeSettings) => {
-  try {
-    localStorage.setItem(MEDICO_THEME_STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    /* ignore */
-  }
-};
-
-function normalizeMedicoThemeSettings(
+function normalizeThemeSettings(
   stored: Partial<DoctorThemeSettings>,
 ): DoctorThemeSettings {
   const merged = mergeThemeSettings(stored);
@@ -44,16 +36,16 @@ function normalizeMedicoThemeSettings(
   return merged;
 }
 
-const getMedicoStoredSettings = (): DoctorThemeSettings | null => {
+function getStoredSettings(storageKey: string): DoctorThemeSettings | null {
   if (typeof window === "undefined") return null;
   try {
-    const stored = localStorage.getItem(MEDICO_THEME_STORAGE_KEY);
-    if (stored) return normalizeMedicoThemeSettings(JSON.parse(stored));
+    const stored = localStorage.getItem(storageKey);
+    if (stored) return normalizeThemeSettings(JSON.parse(stored));
   } catch {
     /* ignore */
   }
   return null;
-};
+}
 
 export function applyThemeToDocument(settings: DoctorThemeSettings): void {
   if (typeof document === "undefined") return;
@@ -114,38 +106,57 @@ export function applyThemeToDocument(settings: DoctorThemeSettings): void {
   }
 }
 
-export const useThemeStore = create<ThemeStore>((set) => ({
-  settings: DEFAULT_THEME_SETTINGS,
-  hydrated: false,
-  setSettings: (newSettings) =>
-    set((state) => {
-      const next = mergeThemeSettings({ ...state.settings, ...newSettings });
-      persistMedicoLocal(next);
-      applyThemeToDocument(next);
-      return { settings: next, hydrated: true };
-    }),
-  hydrateSettings: (newSettings) =>
-    set(() => {
-      const next = mergeThemeSettings(newSettings);
-      persistMedicoLocal(next);
-      applyThemeToDocument(next);
-      return { settings: next, hydrated: true };
-    }),
-  resetSettings: () => {
+/** Crea un store de tema independiente, persistido bajo su propia clave de
+ * localStorage — usado para que médico y paciente tengan cada uno su propia
+ * personalización sin pisarse entre sí (comparten el mismo navegador cuando
+ * el mismo usuario tiene ambos roles). */
+function createThemeStore(storageKey: string, defaultSettings: DoctorThemeSettings) {
+  const persistLocal = (settings: DoctorThemeSettings) => {
     try {
-      localStorage.removeItem(MEDICO_THEME_STORAGE_KEY);
+      localStorage.setItem(storageKey, JSON.stringify(settings));
     } catch {
       /* ignore */
     }
-    const next = DEFAULT_THEME_SETTINGS;
-    applyThemeToDocument(next);
-    set({ settings: next, hydrated: true });
-  },
-}));
+  };
+
+  return create<ThemeStore>((set) => ({
+    settings: defaultSettings,
+    hydrated: false,
+    setSettings: (newSettings) =>
+      set((state) => {
+        const next = mergeThemeSettings({ ...state.settings, ...newSettings });
+        persistLocal(next);
+        applyThemeToDocument(next);
+        return { settings: next, hydrated: true };
+      }),
+    hydrateSettings: (newSettings) =>
+      set(() => {
+        const next = mergeThemeSettings(newSettings);
+        persistLocal(next);
+        applyThemeToDocument(next);
+        return { settings: next, hydrated: true };
+      }),
+    resetSettings: () => {
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {
+        /* ignore */
+      }
+      applyThemeToDocument(defaultSettings);
+      set({ settings: defaultSettings, hydrated: true });
+    },
+  }));
+}
+
+export const useThemeStore = createThemeStore(MEDICO_THEME_STORAGE_KEY, DEFAULT_THEME_SETTINGS);
+const usePatientThemeStore = createThemeStore(
+  PACIENTE_THEME_STORAGE_KEY,
+  PATIENT_THEME_SETTINGS,
+);
 
 export function configureThemeDefaults(overrides: Partial<DoctorThemeSettings>): void {
   if (typeof window === "undefined") return;
-  if (!getMedicoStoredSettings()) {
+  if (!getStoredSettings(MEDICO_THEME_STORAGE_KEY)) {
     const merged = mergeThemeSettings(overrides);
     useThemeStore.setState({ settings: merged });
   }
@@ -157,7 +168,7 @@ export function useThemeSettings() {
 
   useEffect(() => {
     if (useThemeStore.getState().hydrated) return;
-    const stored = getMedicoStoredSettings();
+    const stored = getStoredSettings(MEDICO_THEME_STORAGE_KEY);
     const next = stored ?? DEFAULT_THEME_SETTINGS;
     useThemeStore.setState({ settings: next, hydrated: true });
     applyThemeToDocument(next);
@@ -166,15 +177,38 @@ export function useThemeSettings() {
   return { settings, setSettings, hydrateSettings, resetSettings };
 }
 
-/** Tema fijo del portal paciente. Se reaplica en cada cambio de ruta (no
- * solo al montar el layout) porque la sección "Personalización" reusa el
- * store/localStorage del tema del médico (nodo-theme-medico) — si el
- * paciente lo abre una vez, ese valor pisa la variable CSS para el resto de
- * la sesión SPA. Reforzarlo por pathname evita que un color custom del
- * médico se "filtre" al portal paciente al navegar entre secciones. */
+/** Tema del portal paciente — personalizable, persistido en su PROPIA clave
+ * de localStorage (separada de la del médico) para que ninguno de los dos
+ * roles pise el color del otro cuando comparten navegador/cuenta. Se
+ * hidrata una sola vez al montar el layout paciente; a partir de ahí,
+ * cambios en "Personalización" se aplican en vivo y persisten al navegar. */
 export function usePatientTheme() {
-  const pathname = usePathname();
+  const { hydrateSettings } = usePatientThemeStore();
+
   useEffect(() => {
-    applyThemeToDocument(PATIENT_THEME_SETTINGS);
-  }, [pathname]);
+    if (usePatientThemeStore.getState().hydrated) return;
+    const stored = getStoredSettings(PACIENTE_THEME_STORAGE_KEY);
+    const next = stored ?? PATIENT_THEME_SETTINGS;
+    usePatientThemeStore.setState({ settings: next, hydrated: true });
+    applyThemeToDocument(next);
+  }, []);
+
+  return { hydrateSettings };
+}
+
+/** Personalización del tema del portal paciente (usado por la sección
+ * "Personalización" dentro de Configuración del paciente) — separado del
+ * hook de médico para no compartir su store/localStorage. */
+export function usePatientThemeSettings() {
+  const { settings, setSettings, hydrateSettings, resetSettings } = usePatientThemeStore();
+
+  useEffect(() => {
+    if (usePatientThemeStore.getState().hydrated) return;
+    const stored = getStoredSettings(PACIENTE_THEME_STORAGE_KEY);
+    const next = stored ?? PATIENT_THEME_SETTINGS;
+    usePatientThemeStore.setState({ settings: next, hydrated: true });
+    applyThemeToDocument(next);
+  }, []);
+
+  return { settings, setSettings, hydrateSettings, resetSettings };
 }
