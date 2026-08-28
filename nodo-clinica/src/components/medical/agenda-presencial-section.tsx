@@ -3,26 +3,20 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { WeeklyScheduleEditor } from "@/components/medical/weekly-schedule-editor";
 import { MapPin, Phone, AlertCircle, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi, type InstitutionRecord } from "@/lib/clinic/client-api";
-
-interface PresencialSlot {
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-}
-
-const DAY_NAMES = [
-  "Domingo",
-  "Lunes",
-  "Martes",
-  "Miércoles",
-  "Jueves",
-  "Viernes",
-  "Sábado",
-];
+import type { DaySchedule } from "@/lib/clinic/schedule";
 
 function institutionLabel(inst: InstitutionRecord): string {
   return inst.city ? `${inst.name} — ${inst.city}` : inst.name;
@@ -42,7 +36,7 @@ export function AgendaPresencialSection({
   const [phone, setPhone] = useState("");
   const [parkingNotes, setParkingNotes] = useState("");
   const [slotDuration, setSlotDuration] = useState(30);
-  const [slots, setSlots] = useState<PresencialSlot[]>([
+  const [slots, setSlots] = useState<DaySchedule[]>([
     { dayOfWeek: 1, startTime: "09:00", endTime: "13:00" },
     { dayOfWeek: 1, startTime: "16:00", endTime: "19:00" },
     { dayOfWeek: 2, startTime: "09:00", endTime: "13:00" },
@@ -64,7 +58,7 @@ export function AgendaPresencialSection({
         }
         if (availabilityRes.availability?.days?.length) {
           setSlots(
-            availabilityRes.availability.days as unknown as PresencialSlot[],
+            availabilityRes.availability.days,
           );
         }
       })
@@ -80,14 +74,6 @@ export function AgendaPresencialSection({
       active = false;
     };
   }, []);
-
-  const handleAddSlot = () => {
-    setSlots([...slots, { dayOfWeek: 1, startTime: "09:00", endTime: "13:00" }]);
-  };
-
-  const handleRemoveSlot = (idx: number) => {
-    setSlots(slots.filter((_, i) => i !== idx));
-  };
 
   const selectedInstitution = institutions.find((i) => i.id === institutionId);
 
@@ -239,80 +225,26 @@ export function AgendaPresencialSection({
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Duración del turno</label>
-              <select
-                value={slotDuration}
-                onChange={(e) => setSlotDuration(Number(e.target.value))}
-                className="h-8 rounded border border-slate-200 px-2 text-sm"
-              >
-                <option value={30}>30 minutos</option>
-                <option value={45}>45 minutos</option>
-                <option value={60}>1 hora</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              {slots.map((slot, idx) => (
-                <div key={idx} className="flex gap-2 items-end">
-                  <select
-                    value={slot.dayOfWeek}
-                    onChange={(e) => {
-                      const newSlots = [...slots];
-                      newSlots[idx].dayOfWeek = Number(e.target.value);
-                      setSlots(newSlots);
-                    }}
-                    className="h-9 rounded border border-slate-200 px-2 text-sm flex-1"
-                  >
-                    {DAY_NAMES.map((name, i) => (
-                      <option key={i} value={i}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <input
-                    type="time"
-                    value={slot.startTime}
-                    onChange={(e) => {
-                      const newSlots = [...slots];
-                      newSlots[idx].startTime = e.target.value;
-                      setSlots(newSlots);
-                    }}
-                    className="h-9 rounded border border-slate-200 px-2 text-sm flex-1"
-                  />
-
-                  <input
-                    type="time"
-                    value={slot.endTime}
-                    onChange={(e) => {
-                      const newSlots = [...slots];
-                      newSlots[idx].endTime = e.target.value;
-                      setSlots(newSlots);
-                    }}
-                    className="h-9 rounded border border-slate-200 px-2 text-sm flex-1"
-                  />
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleRemoveSlot(idx)}
-                  >
-                    −
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAddSlot}
-              className="w-full"
+          <div>
+            <Label className="text-xs">Duración de cada turno</Label>
+            <Select
+              value={String(slotDuration)}
+              onValueChange={(v) => setSlotDuration(Number(v))}
             >
-              + Agregar horario
-            </Button>
+              <SelectTrigger className="mt-1 h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[15, 20, 30, 45, 60].map((m) => (
+                  <SelectItem key={m} value={String(m)}>{m} minutos</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs">Días y horarios</Label>
+            <WeeklyScheduleEditor days={slots} onChange={setSlots} />
           </div>
 
           <div className="flex gap-2 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">

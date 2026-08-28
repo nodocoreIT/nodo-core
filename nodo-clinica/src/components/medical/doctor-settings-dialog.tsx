@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import type { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import {
   Dialog,
   DialogContent,
@@ -47,8 +48,8 @@ const SUSCRIPCION_PLAN_DB_CODES: Record<string, string> = {
 import { trialDaysRemaining, isTrialExpired } from "@/lib/clinic/trial";
 import { AgendaPresencialSection } from "@/components/medical/agenda-presencial-section";
 import { InstitucionesSection } from "@/components/medical/instituciones-section";
+import { WeeklyScheduleEditor } from "@/components/medical/weekly-schedule-editor";
 import {
-  dayLabel,
   DEFAULT_AVAILABILITY,
   normalizeAvailability,
   type DoctorAvailability,
@@ -70,8 +71,6 @@ import {
   type DoctorThemeSettings,
 } from "@/lib/clinic/theme-settings";
 import { useConsultorioTheme } from "@/hooks/use-consultorio-theme";
-
-const ALL_DAYS = [1, 2, 3, 4, 5, 6, 0];
 
 export type SectionId =
   | "agenda"
@@ -361,82 +360,6 @@ export function DoctorSettingsDialog({
     setIsDirty(hasChanges);
   }, [open, availability, blockedDates, fullName, licenseNumber, specialties, signatureText, signatureImageData, profilePhotoData, bio, payment, reminderSettings, googleCalendarId, themeSettings]);
 
-  const toggleDay = (dayOfWeek: number) => {
-    setAvailability((prev) => {
-      const exists = prev.days.some((d) => d.dayOfWeek === dayOfWeek);
-      if (exists) return { ...prev, days: prev.days.filter((d) => d.dayOfWeek !== dayOfWeek) };
-      return {
-        ...prev,
-        days: [
-          ...prev.days,
-          { dayOfWeek, startTime: "09:00", endTime: "13:00" },
-        ].sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime)),
-      };
-    });
-  };
-
-  const blocksForDay = (dayOfWeek: number) =>
-    availability.days.filter((d) => d.dayOfWeek === dayOfWeek);
-
-  const updateBlockTime = (
-    dayOfWeek: number,
-    blockIndex: number,
-    field: "startTime" | "endTime",
-    value: string,
-  ) => {
-    setAvailability((prev) => {
-      let idx = -1;
-      return {
-        ...prev,
-        days: prev.days.map((d) => {
-          if (d.dayOfWeek !== dayOfWeek) return d;
-          idx += 1;
-          if (idx !== blockIndex) return d;
-          return { ...d, [field]: value };
-        }),
-      };
-    });
-  };
-
-  const addBlockForDay = (dayOfWeek: number) => {
-    setAvailability((prev) => ({
-      ...prev,
-      days: [
-        ...prev.days,
-        { dayOfWeek, startTime: "16:00", endTime: "19:00" },
-      ].sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime)),
-    }));
-  };
-
-  const removeBlockForDay = (dayOfWeek: number, blockIndex: number) => {
-    setAvailability((prev) => {
-      let idx = -1;
-      const next = prev.days.filter((d) => {
-        if (d.dayOfWeek !== dayOfWeek) return true;
-        idx += 1;
-        return idx !== blockIndex;
-      });
-      return { ...prev, days: next };
-    });
-  };
-
-  const copyMondayToWeekdays = () => {
-    setAvailability((prev) => {
-      const monday = prev.days.filter((d) => d.dayOfWeek === 1);
-      if (!monday.length) return prev;
-      const rest = prev.days.filter((d) => ![2, 3, 4, 5].includes(d.dayOfWeek));
-      const copied = [2, 3, 4, 5].flatMap((dayOfWeek) =>
-        monday.map((b) => ({ ...b, dayOfWeek })),
-      );
-      return {
-        ...prev,
-        days: [...rest, ...copied].sort(
-          (a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime),
-        ),
-      };
-    });
-  };
-
   const handleSave = async () => {
     if (availability.days.length === 0) {
       toast.error("Cargá al menos un día de atención en Agenda antes de guardar");
@@ -500,7 +423,23 @@ export function DoctorSettingsDialog({
     }
   };
 
-  const handleCloseWithCheck = (newOpen: boolean) => {
+  const handleCloseWithCheck = (
+    newOpen: boolean,
+    eventDetails?: DialogPrimitive.Root.ChangeEventDetails,
+  ) => {
+    // Radix Select (Duración de cada turno, and any other Radix dropdown
+    // nested in this base-ui Dialog) portals its popup outside this Dialog's
+    // DOM subtree. Base UI's "outside press" detection has no way to know
+    // that portal belongs to us, so picking an option — or even the second
+    // click of a double-click on the trigger — reads as a click outside the
+    // dialog and closes the whole settings modal. Ignore those specifically.
+    if (!newOpen && eventDetails?.reason === "outside-press") {
+      const target = eventDetails.event?.target as Element | null;
+      if (target?.closest?.("[data-radix-popper-content-wrapper]")) {
+        eventDetails.cancel();
+        return;
+      }
+    }
     if (!newOpen && isDirty) {
       setShowUnsavedDialog(true);
       setPendingClose(true);
@@ -617,89 +556,13 @@ export function DoctorSettingsDialog({
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs">
-                        Días que atiendo <span className="text-red-600">(obligatorio)</span>
-                      </Label>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs text-blue-600 hover:text-blue-700 disabled:opacity-40"
-                        disabled={blocksForDay(1).length === 0}
-                        onClick={copyMondayToWeekdays}
-                      >
-                        Copiar Lun a Vie
-                      </Button>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 divide-y divide-slate-100 overflow-hidden">
-                      {ALL_DAYS.map((dow) => {
-                        const active = availability.days.some((d) => d.dayOfWeek === dow);
-                        const blocks = blocksForDay(dow);
-                        return (
-                          <div
-                            key={dow}
-                            className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 ${
-                              active ? "bg-blue-50/30" : ""
-                            }`}
-                          >
-                            <label className="flex items-center gap-2 w-14 shrink-0 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={active}
-                                onChange={() => toggleDay(dow)}
-                                className="rounded"
-                              />
-                              <span className="text-sm font-medium">{dayLabel(dow)}</span>
-                            </label>
-                            {active ? (
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                {blocks.map((block, blockIndex) => (
-                                  <div key={blockIndex} className="flex items-center gap-1">
-                                    <Input
-                                      type="time"
-                                      value={block.startTime}
-                                      onChange={(e) =>
-                                        updateBlockTime(dow, blockIndex, "startTime", e.target.value)
-                                      }
-                                      className="h-7 w-26 text-xs px-1.5"
-                                    />
-                                    <span className="text-xs text-slate-400">a</span>
-                                    <Input
-                                      type="time"
-                                      value={block.endTime}
-                                      onChange={(e) =>
-                                        updateBlockTime(dow, blockIndex, "endTime", e.target.value)
-                                      }
-                                      className="h-7 w-26 text-xs px-1.5"
-                                    />
-                                    {blocks.length > 1 && (
-                                      <button
-                                        type="button"
-                                        onClick={() => removeBlockForDay(dow, blockIndex)}
-                                        className="text-red-500 hover:text-red-700 text-xs px-1"
-                                        aria-label="Quitar franja"
-                                      >
-                                        ✕
-                                      </button>
-                                    )}
-                                  </div>
-                                ))}
-                                <button
-                                  type="button"
-                                  onClick={() => addBlockForDay(dow)}
-                                  className="text-xs text-blue-600 hover:text-blue-700 px-1"
-                                >
-                                  + franja
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-slate-400">No atiende</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <Label className="text-xs">
+                      Días que atiendo <span className="text-red-600">(obligatorio)</span>
+                    </Label>
+                    <WeeklyScheduleEditor
+                      days={availability.days}
+                      onChange={(days) => setAvailability((prev) => ({ ...prev, days }))}
+                    />
                   </div>
 
                   <div className="border-t border-slate-200 pt-6 mt-6">
