@@ -213,6 +213,26 @@ export function formatAppointmentLabelFromIso(iso: string): string {
   }
 }
 
+/** Turnos que quedan "en curso"/"en espera" indefinidamente porque el
+ * médico nunca cerró la consulta (ej. se cortó la sesión sin finalizarla)
+ * no deberían seguir mostrándose como activos en el dashboard del
+ * paciente. Pasadas STALE_ACTIVE_HOURS desde el horario programado, se
+ * consideran vencidos y se ocultan de las vistas de "turnos activos" —
+ * esto es puramente un filtro de UI, no cambia el estado real en la base
+ * de datos (el médico/staff sigue viendo el turno tal cual quedó). */
+export const STALE_ACTIVE_HOURS = 2;
+
+export function isStaleActiveAppointment(
+  scheduledAt: string | null | undefined,
+  status: string,
+): boolean {
+  if (!["scheduled", "waiting", "in_consultation"].includes(status)) return false;
+  if (!scheduledAt) return false;
+  const scheduledMs = new Date(scheduledAt).getTime();
+  if (Number.isNaN(scheduledMs)) return false;
+  return Date.now() - scheduledMs > STALE_ACTIVE_HOURS * 60 * 60 * 1000;
+}
+
 export function addDaysToDateKey(dateKey: string, days: number): string {
   const base = new Date(argentinaDateTimeToIso(dateKey, "12:00"));
   return localDateKeyFromDate(addDays(base, days));

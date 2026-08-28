@@ -12,6 +12,7 @@ import { ChevronRight, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { WaitingRoomModal } from "@/components/patient/waiting-room-modal";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { isStaleActiveAppointment } from "@/lib/clinic/schedule";
 
 const ACTIVE_STATUSES = ["scheduled", "waiting", "in_consultation"];
 
@@ -97,7 +98,13 @@ function PacienteTurnosContent() {
         ? await appointmentsPromise
         : await clinicApi.getPatientAppointments(patientAuthId);
     const list = Array.isArray(apts) ? (apts as PatientAppointment[]) : [];
-    setAppointments(list.filter((a) => a.status !== "completed"));
+    setAppointments(
+      list.filter(
+        (a) =>
+          a.status !== "completed" &&
+          !isStaleActiveAppointment(a.scheduledAt, a.status),
+      ),
+    );
     setLoading(false);
   }, []);
 

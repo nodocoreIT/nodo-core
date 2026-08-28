@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, Clock, Loader2 } from "lucide-react";
 import { clinicApi, getClientSession } from "@/lib/clinic/client-api";
-import { formatAppointmentLabelFromIso } from "@/lib/clinic/schedule";
+import { formatAppointmentLabelFromIso, isStaleActiveAppointment } from "@/lib/clinic/schedule";
 
 interface Appointment {
   id: string;
@@ -32,8 +32,10 @@ export function SidebarUpcomingAppointments() {
         }
         const res = await clinicApi.getPatientAppointments(session.user.id);
         const upcoming = (res ?? [])
-          .filter((apt: Appointment) =>
-            ["scheduled", "waiting", "in_consultation"].includes(apt.status)
+          .filter(
+            (apt: Appointment) =>
+              ["scheduled", "waiting", "in_consultation"].includes(apt.status) &&
+              !isStaleActiveAppointment(apt.scheduledAt, apt.status),
           )
           .sort((a: Appointment, b: Appointment) =>
             new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
