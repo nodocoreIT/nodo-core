@@ -20,6 +20,8 @@ interface RecetaAccessLandingProps {
 export function RecetaAccessLanding({ accessToken }: RecetaAccessLandingProps) {
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState<AccessResult | null>(null);
+  const [paying, setPaying] = useState(false);
+  const [paid, setPaid] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +40,21 @@ export function RecetaAccessLanding({ accessToken }: RecetaAccessLandingProps) {
       cancelled = true;
     };
   }, [accessToken]);
+
+  async function handlePay() {
+    setPaying(true);
+    try {
+      const checkout = await clinicApi.getPrescriptionCheckout(accessToken);
+      if ("checkoutUrl" in checkout) {
+        window.location.href = checkout.checkoutUrl;
+        return;
+      }
+      setPaid(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo iniciar el pago");
+      setPaying(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -116,14 +133,19 @@ export function RecetaAccessLanding({ accessToken }: RecetaAccessLandingProps) {
               </p>
             </CardHeader>
             <CardContent>
-              {/* El checkout real de Mercado Pago es Fase 4 — placeholder por ahora. */}
-              <Button
-                className="w-full"
-                variant="outline"
-                onClick={() => toast.message("Pago disponible pronto")}
-              >
-                Pagar y ver receta — Próximamente
-              </Button>
+              {paid ? (
+                <p className="text-sm text-emerald-700 font-medium">
+                  Tu receta ya está pagada. La descarga del PDF estará disponible próximamente.
+                </p>
+              ) : (
+                <Button className="w-full bg-teal-600 hover:bg-teal-700" onClick={handlePay} disabled={paying}>
+                  {paying ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Pagar y ver receta"
+                  )}
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}

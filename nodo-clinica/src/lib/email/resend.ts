@@ -293,6 +293,57 @@ export async function sendPrescriptionMagicLinkEmail(
   });
 }
 
+interface PrescriptionReadyEmailParams {
+  patientEmail: string;
+  patientName: string;
+  doctorName: string;
+  recetaUrl: string;
+}
+
+/**
+ * Fase 4 of "Recetas" — sent right after payment confirmation, so the
+ * patient knows their receta is now available. Mirrors
+ * sendPrescriptionMagicLinkEmail's style; the actual PDF download is Fase 5,
+ * so this just points back at the same magic-link landing page.
+ */
+export async function sendPrescriptionReadyEmail(
+  params: PrescriptionReadyEmailParams,
+): Promise<EmailSendResult> {
+  const { patientEmail, patientName, doctorName, recetaUrl } = params;
+
+  const html = clinicEmailDocument(
+    "Tu receta ya está disponible",
+    `
+        ${clinicEmailTealHeader("Tu receta ya está disponible")}
+        <div style="padding:32px 24px;">
+          ${clinicEmailParagraph(`Hola <strong>${patientName}</strong>,`)}
+          ${clinicEmailParagraph(
+            `Confirmamos tu pago. Tu receta emitida por <strong>${doctorName}</strong> ya está lista.`,
+          )}
+          <div style="text-align:center;margin:32px 0;">
+            <a href="${recetaUrl}"
+               style="background:#0f766e;color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;word-wrap:break-word;">
+              Ver mi receta
+            </a>
+          </div>
+        </div>
+  `,
+  );
+
+  return sendClinicEmail({
+    to: patientEmail,
+    subject: `Tu receta ya está disponible — Dr/a. ${doctorName}`,
+    html,
+    text: [
+      `Hola ${patientName},`,
+      "",
+      `Confirmamos tu pago. Tu receta emitida por ${doctorName} ya está lista.`,
+      "",
+      `Ver mi receta: ${recetaUrl}`,
+    ].join("\n"),
+  });
+}
+
 interface InPersonAppointmentEmailParams {
   patientEmail: string;
   patientName: string;

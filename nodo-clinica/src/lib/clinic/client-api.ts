@@ -1506,6 +1506,20 @@ export const clinicApi = {
       | { status: "authorized"; prescription: any };
   },
 
+  /** Fase 4 de Recetas — obtiene (o regenera) la URL de checkout MP para una
+   * receta standalone pendiente de pago, o {paid:true} si ya está pagada. */
+  async getPrescriptionCheckout(
+    accessToken: string,
+  ): Promise<{ paid: true } | { checkoutUrl: string; preferenceId: string }> {
+    const res = await fetch(
+      `${BASE}/api/clinic/prescriptions/mercadopago?accessToken=${encodeURIComponent(accessToken)}`,
+      { credentials: "include" },
+    );
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "No se pudo iniciar el pago");
+    return data;
+  },
+
   async saveStudyOrder(payload: {
     appointmentId: string;
     doctorId: string;
