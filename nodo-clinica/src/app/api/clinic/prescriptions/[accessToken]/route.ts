@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
+import { createServiceClient } from "@/lib/supabase/server";
 import {
   getPrescriptionById,
   updatePrescription,
@@ -9,7 +10,7 @@ import { getInstitutionById } from "@/lib/clinic/db/institutions";
 /**
  * Fase 6 of "Recetas" — read/edit a single receta that is still a draft.
  * A médico may only read/edit their own recetas (doctor_id ownership check,
- * mirrors `[id]/send/route.ts`). Editing is blocked once the receta was sent
+ * mirrors `[accessToken]/send/route.ts`). Editing is blocked once the receta was sent
  * to the patient or paid — see the PATCH handler.
  */
 async function authorizeAndLoad(request: NextRequest, id: string) {
@@ -39,8 +40,16 @@ async function authorizeAndLoad(request: NextRequest, id: string) {
     };
   }
 
+  // The `prescriptions` RLS policies gate on nodo_clinica.current_org_id(),
+  // which doesn't resolve for every auth path requireAuth() accepts (mirrors
+  // why [id]/send/route.ts already reads/writes this table via the service
+  // client instead of the authed one) — ownership is enforced explicitly
+  // below instead of relying on RLS.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const serviceClient = (await createServiceClient()) as any;
+
   const { data: prescription, error: fetchError } = await getPrescriptionById(
-    supabase,
+    serviceClient,
     id,
   );
 
@@ -54,14 +63,19 @@ async function authorizeAndLoad(request: NextRequest, id: string) {
     return { error: NextResponse.json({ error: "No autorizado" }, { status: 403 }) };
   }
 
-  return { user, supabase, prescription };
+  return { user, supabase, serviceClient, prescription };
 }
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ accessToken: string }> },
 ) {
-  const { id } = await params;
+  // This dynamic segment is named `accessToken` only because Next.js
+  // requires sibling dynamic folders to share one param name (see
+  // `[accessToken]/pdf/route.ts`, the patient-facing magic-link endpoint) —
+  // here the value is genuinely the receta's `id` (médico-authenticated
+  // edit flow, unrelated to the patient access_token).
+  const { accessToken: id } = await params;
   const result = await authorizeAndLoad(request, id);
   if (result.error) return result.error;
   const { prescription } = result;
@@ -83,12 +97,17 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ accessToken: string }> },
 ) {
-  const { id } = await params;
+  // This dynamic segment is named `accessToken` only because Next.js
+  // requires sibling dynamic folders to share one param name (see
+  // `[accessToken]/pdf/route.ts`, the patient-facing magic-link endpoint) —
+  // here the value is genuinely the receta's `id` (médico-authenticated
+  // edit flow, unrelated to the patient access_token).
+  const { accessToken: id } = await params;
   const result = await authorizeAndLoad(request, id);
   if (result.error) return result.error;
-  const { user, supabase, prescription } = result;
+  const { user, supabase, serviceClient, prescription } = result;
 
   if (prescription.sent_at || prescription.payment_status !== "pending") {
     return NextResponse.json(
@@ -170,7 +189,7 @@ export async function PATCH(
     }
 
     const { data: updated, error: updateError } = await updatePrescription(
-      supabase,
+      serviceClient,
       id,
       {
         patient_id: patientId || null,

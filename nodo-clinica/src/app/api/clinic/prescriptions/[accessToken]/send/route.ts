@@ -15,9 +15,12 @@ const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ accessToken: string }> },
 ) {
-  const { id } = await params;
+  // Named `accessToken` only to satisfy Next.js's sibling-dynamic-folder
+  // naming rule (see `[accessToken]/pdf/route.ts`) — the value here is the
+  // receta's `id`, not a patient access token.
+  const { accessToken: id } = await params;
 
   const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
