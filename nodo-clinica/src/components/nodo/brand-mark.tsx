@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Stethoscope } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useThemeStore } from "@/hooks/use-theme-settings";
+import { useThemeStore, usePatientThemeStore } from "@/hooks/use-theme-settings";
 import {
   DEFAULT_THEME_SETTINGS,
   PATIENT_THEME_SETTINGS,
@@ -54,8 +54,9 @@ interface BrandMarkProps {
 export function BrandMark({ onDark, className, iconClassName }: BrandMarkProps) {
   const pathname = usePathname();
   const medicoSettings = useThemeStore((s) => s.settings);
+  const patientSettings = usePatientThemeStore((s) => s.settings);
   const isMedico = pathname?.startsWith("/medico");
-  const active = isMedico ? medicoSettings : PATIENT_THEME_SETTINGS;
+  const active = isMedico ? medicoSettings : patientSettings;
   const fallback = isMedico ? DEFAULT_THEME_SETTINGS : PATIENT_THEME_SETTINGS;
   const settings = active ?? fallback;
 

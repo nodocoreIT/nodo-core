@@ -149,7 +149,7 @@ function createThemeStore(storageKey: string, defaultSettings: DoctorThemeSettin
 }
 
 export const useThemeStore = createThemeStore(MEDICO_THEME_STORAGE_KEY, DEFAULT_THEME_SETTINGS);
-const usePatientThemeStore = createThemeStore(
+export const usePatientThemeStore = createThemeStore(
   PACIENTE_THEME_STORAGE_KEY,
   PATIENT_THEME_SETTINGS,
 );
