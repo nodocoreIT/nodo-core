@@ -567,7 +567,7 @@ export function RecetaForm({ onSaved, editingId }: RecetaFormProps = {}) {
           ) : (
             <Download className="h-4 w-4" />
           )}
-          Descargar vista previa
+          Vista previa
         </Button>
       </div>
     </div>
@@ -582,32 +582,30 @@ export function RecetaForm({ onSaved, editingId }: RecetaFormProps = {}) {
         }
       }}
     >
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
+      <DialogContent className="w-[92vw] sm:max-w-5xl h-[90vh] flex flex-col gap-3">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Vista previa de la receta</DialogTitle>
           <DialogDescription>{resolvePatientName() || "—"}</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              disabled={!previewUrl}
-              onClick={handleDownloadFromPreview}
-            >
-              <Download className="h-3.5 w-3.5" />
-              Descargar
-            </Button>
-          </div>
-          {previewUrl && (
-            <iframe
-              src={previewUrl}
-              className="h-[65vh] w-full rounded border border-slate-200"
-              title="Vista previa de la receta"
-            />
-          )}
+        <div className="flex items-center justify-end shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            disabled={!previewUrl}
+            onClick={handleDownloadFromPreview}
+          >
+            <Download className="h-3.5 w-3.5" />
+            Descargar
+          </Button>
         </div>
+        {previewUrl && (
+          <iframe
+            src={`${previewUrl}#zoom=150`}
+            className="flex-1 w-full min-h-0 rounded border border-slate-200"
+            title="Vista previa de la receta"
+          />
+        )}
       </DialogContent>
     </Dialog>
     </>
