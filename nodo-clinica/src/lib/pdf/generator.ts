@@ -56,6 +56,12 @@ interface PrescriptionPdfOptions {
   institution?: { name: string; city?: string; address?: string; extraInfo?: string };
   patientDni?: string;
   notes?: string;
+  /** Fecha a imprimir en el documento. Para recetas standalone (Fase 3+),
+   * debe ser la fecha del último envío/reenvío (prescriptions.sent_at) — no
+   * el momento en que el paciente descarga el PDF ya pagado, que puede ser
+   * días después. Si no se pasa, usa el momento de generación (comportamiento
+   * histórico, correcto para la receta de consulta en vivo). */
+  issuedAt?: Date;
 }
 
 export function generatePrescriptionPdf(options: PrescriptionPdfOptions): jsPDF {
@@ -69,7 +75,9 @@ export function generatePrescriptionPdf(options: PrescriptionPdfOptions): jsPDF 
     institution,
     patientDni,
     notes,
+    issuedAt,
   } = options;
+  const dateLabel = format(issuedAt ?? new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es });
 
   if (institution) {
     // Standalone flow: gray institution letterhead instead of the teal
@@ -127,11 +135,7 @@ export function generatePrescriptionPdf(options: PrescriptionPdfOptions): jsPDF 
     doc.setFontSize(11);
     doc.setTextColor(30, 41, 59);
     doc.text(`Paciente: ${patientName}`, 20, 55);
-    doc.text(
-      `Fecha: ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}`,
-      20,
-      63
-    );
+    doc.text(`Fecha: ${dateLabel}`, 20, 63);
   }
 
   doc.setFontSize(12);
@@ -173,11 +177,7 @@ export function generatePrescriptionPdf(options: PrescriptionPdfOptions): jsPDF 
     // since the letterhead above already carries institution + patient info.
     doc.setFontSize(9);
     doc.setTextColor(100, 116, 139);
-    doc.text(
-      `Fecha: ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}`,
-      20,
-      234,
-    );
+    doc.text(`Fecha: ${dateLabel}`, 20, 234);
   }
 
   doc.setDrawColor(203, 213, 225);

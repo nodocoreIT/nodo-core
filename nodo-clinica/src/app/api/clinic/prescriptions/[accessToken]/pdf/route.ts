@@ -112,6 +112,12 @@ export async function GET(
         }
       : undefined,
     notes: prescription.notes ?? undefined,
+    // La fecha impresa es la del último envío/reenvío, no el momento en que
+    // el paciente descarga el PDF ya pagado (que puede ser días después) —
+    // una receta médica lleva la fecha en que fue emitida, no la de descarga.
+    issuedAt: prescription.sent_at
+      ? new Date(prescription.sent_at as string)
+      : new Date(prescription.created_at as string),
   });
 
   const buffer = Buffer.from(pdfDoc.output("arraybuffer"));
