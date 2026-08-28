@@ -289,7 +289,7 @@ export function PacienteAdminLayout({ children }: { children: React.ReactNode })
                       className="ml-auto shrink-0 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold leading-tight text-white whitespace-nowrap"
                       aria-label={`${recetasUnread} receta${recetasUnread === 1 ? "" : "s"} pendiente${recetasUnread === 1 ? "" : "s"} de descarga`}
                     >
-                      {recetasUnread} Pendiente{recetasUnread === 1 ? "" : "s"}
+                      {recetasUnread} Nueva{recetasUnread === 1 ? "" : "s"}
                     </span>
                   )}
                 </Link>
