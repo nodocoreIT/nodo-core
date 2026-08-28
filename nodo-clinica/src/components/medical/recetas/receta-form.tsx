@@ -6,6 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Download, Loader2, Mail, Save, Search, User } from "lucide-react";
 import { toast } from "sonner";
 import { useMedicoDoctor } from "@/contexts/medico-doctor-context";
@@ -15,7 +22,11 @@ import {
   emptyMedication,
   type MedicationDraft,
 } from "@/components/medical/medication-rows-editor";
-import { downloadPdf, generatePrescriptionPdf, pdfToBase64 } from "@/lib/pdf/generator";
+import {
+  generatePrescriptionPdf,
+  pdfToBase64,
+  pdfToBlob,
+} from "@/lib/pdf/generator";
 import { currencySymbol, formatThousands, parseThousands } from "@/lib/clinic/currency";
 
 interface PatientSearchResult {
@@ -72,6 +83,18 @@ export function RecetaForm({ onSaved, editingId }: RecetaFormProps = {}) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isLoadingEdit, setIsLoadingEdit] = useState(Boolean(editingId));
+
+  // Preview modal — mismo patrón que PaymentReceiptViewer de nodo-inmo:
+  // genera el PDF a un blob y lo muestra en un iframe, con "Descargar" adentro.
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewFilename, setPreviewFilename] = useState("receta.pdf");
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   useEffect(() => {
     clinicApi
@@ -328,10 +351,23 @@ export function RecetaForm({ onSaved, editingId }: RecetaFormProps = {}) {
     try {
       const doc = buildPdf();
       const safeName = resolvePatientName().replace(/\s+/g, "_") || "receta";
-      downloadPdf(doc, `receta_${safeName}.pdf`);
+      const blob = pdfToBlob(doc);
+      const url = URL.createObjectURL(blob);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(url);
+      setPreviewFilename(`receta_${safeName}.pdf`);
+      setPreviewOpen(true);
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  const handleDownloadFromPreview = () => {
+    if (!previewUrl) return;
+    const a = document.createElement("a");
+    a.href = previewUrl;
+    a.download = previewFilename;
+    a.click();
   };
 
   if (isLoadingEdit) {
@@ -343,6 +379,7 @@ export function RecetaForm({ onSaved, editingId }: RecetaFormProps = {}) {
   }
 
   return (
+    <>
     <div className="space-y-6 max-w-2xl">
       {/* Paciente */}
       <div className="space-y-2">
@@ -534,5 +571,45 @@ export function RecetaForm({ onSaved, editingId }: RecetaFormProps = {}) {
         </Button>
       </div>
     </div>
+
+    <Dialog
+      open={previewOpen}
+      onOpenChange={(open) => {
+        setPreviewOpen(open);
+        if (!open && previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+          setPreviewUrl(null);
+        }
+      }}
+    >
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Vista previa de la receta</DialogTitle>
+          <DialogDescription>{resolvePatientName() || "—"}</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={!previewUrl}
+              onClick={handleDownloadFromPreview}
+            >
+              <Download className="h-3.5 w-3.5" />
+              Descargar
+            </Button>
+          </div>
+          {previewUrl && (
+            <iframe
+              src={previewUrl}
+              className="h-[65vh] w-full rounded border border-slate-200"
+              title="Vista previa de la receta"
+            />
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
