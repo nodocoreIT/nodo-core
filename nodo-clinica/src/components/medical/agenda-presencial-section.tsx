@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MapPin, Phone, AlertCircle, Loader2 } from "lucide-react";
+import { MapPin, Phone, AlertCircle, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { clinicApi } from "@/lib/clinic/client-api";
-import type { DoctorAvailability } from "@/lib/clinic/schedule";
+import { clinicApi, type InstitutionRecord } from "@/lib/clinic/client-api";
 
 interface PresencialSlot {
   dayOfWeek: number;
@@ -15,17 +14,6 @@ interface PresencialSlot {
   endTime: string;
 }
 
-interface InPersonAvailability {
-  enabled: boolean;
-  availability: DoctorAvailability;
-  location_info: {
-    address: string;
-    phone: string;
-    parkingNotes?: string;
-  };
-}
-
-const DAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const DAY_NAMES = [
   "Domingo",
   "Lunes",
@@ -36,13 +24,21 @@ const DAY_NAMES = [
   "Sábado",
 ];
 
+function institutionLabel(inst: InstitutionRecord): string {
+  return inst.city ? `${inst.name} — ${inst.city}` : inst.name;
+}
+
 export function AgendaPresencialSection({
   onSaved,
+  onGoToInstituciones,
 }: {
   onSaved?: () => void;
+  onGoToInstituciones?: () => void;
 }) {
+  const [loading, setLoading] = useState(true);
+  const [institutions, setInstitutions] = useState<InstitutionRecord[]>([]);
   const [enabled, setEnabled] = useState(false);
-  const [address, setAddress] = useState("");
+  const [institutionId, setInstitutionId] = useState("");
   const [phone, setPhone] = useState("");
   const [parkingNotes, setParkingNotes] = useState("");
   const [slotDuration, setSlotDuration] = useState(30);
@@ -53,6 +49,38 @@ export function AgendaPresencialSection({
   ]);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    let active = true;
+    Promise.all([clinicApi.getInstitutions(), clinicApi.getInPersonAvailability()])
+      .then(([institutionsRes, availabilityRes]) => {
+        if (!active) return;
+        setInstitutions(institutionsRes.institutions.filter((i) => i.active));
+        setEnabled(availabilityRes.enabled);
+        setInstitutionId(availabilityRes.institution_id ?? "");
+        setPhone(availabilityRes.location_info?.phone ?? "");
+        setParkingNotes(availabilityRes.location_info?.parkingNotes ?? "");
+        if (availabilityRes.availability?.slotDurationMinutes) {
+          setSlotDuration(availabilityRes.availability.slotDurationMinutes);
+        }
+        if (availabilityRes.availability?.days?.length) {
+          setSlots(
+            availabilityRes.availability.days as unknown as PresencialSlot[],
+          );
+        }
+      })
+      .catch((err) => {
+        toast.error(
+          err instanceof Error ? err.message : "No se pudo cargar la agenda presencial",
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleAddSlot = () => {
     setSlots([...slots, { dayOfWeek: 1, startTime: "09:00", endTime: "13:00" }]);
   };
@@ -61,9 +89,11 @@ export function AgendaPresencialSection({
     setSlots(slots.filter((_, i) => i !== idx));
   };
 
+  const selectedInstitution = institutions.find((i) => i.id === institutionId);
+
   const handleSave = async () => {
-    if (enabled && !address) {
-      toast.error("Ingresá la dirección de atención");
+    if (enabled && !institutionId) {
+      toast.error("Elegí la institución donde atendés de forma presencial");
       return;
     }
 
@@ -80,7 +110,18 @@ export function AgendaPresencialSection({
           slotDurationMinutes: slotDuration,
           days: enabled ? slots : [],
         },
-        location_info: enabled ? { address, phone, parkingNotes } : {},
+        location_info: enabled
+          ? {
+              address: selectedInstitution
+                ? [selectedInstitution.address, selectedInstitution.city]
+                    .filter(Boolean)
+                    .join(", ")
+                : "",
+              phone,
+              parkingNotes,
+            }
+          : {},
+        institution_id: enabled ? institutionId || null : null,
       });
       toast.success("Agenda presencial guardada");
       onSaved?.();
@@ -92,6 +133,14 @@ export function AgendaPresencialSection({
       setSaving(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-8">
+        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -115,13 +164,55 @@ export function AgendaPresencialSection({
             <div>
               <label className="block text-sm font-medium mb-1">
                 <MapPin className="inline h-4 w-4 mr-1" />
-                Dirección
+                Institución
               </label>
-              <Input
-                placeholder="Ej: Av. Corrientes 1234, CABA"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-              />
+              {institutions.length === 0 ? (
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <span>Todavía no cargaste ninguna institución.</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onGoToInstituciones}
+                    className="gap-1"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Agregar institución
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={institutionId}
+                    onChange={(e) => setInstitutionId(e.target.value)}
+                    className="h-9 flex-1 rounded border border-slate-200 px-2 text-sm bg-white"
+                  >
+                    <option value="">Seleccioná una institución…</option>
+                    {institutions.map((inst) => (
+                      <option key={inst.id} value={inst.id}>
+                        {institutionLabel(inst)}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onGoToInstituciones}
+                    className="gap-1 shrink-0"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Agregar institución
+                  </Button>
+                </div>
+              )}
+              {selectedInstitution?.address && (
+                <p className="text-xs text-slate-400 mt-1">
+                  {[selectedInstitution.address, selectedInstitution.city]
+                    .filter(Boolean)
+                    .join(", ")}
+                </p>
+              )}
             </div>
 
             <div>

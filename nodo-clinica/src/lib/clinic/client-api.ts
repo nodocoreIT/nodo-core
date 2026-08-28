@@ -2134,10 +2134,23 @@ export const clinicApi = {
     };
   },
 
+  async getInPersonAvailability() {
+    const res = await fetch(`${BASE}/api/clinic/in-person-availability`, clinicFetchOpts());
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "No se pudo cargar la agenda presencial");
+    return data as {
+      enabled: boolean;
+      availability: { slotDurationMinutes: number; days: Array<{ dayOfWeek: number; startTime: string; endTime: string }> };
+      location_info: { address?: string; phone?: string; parkingNotes?: string };
+      institution_id: string | null;
+    };
+  },
+
   async saveInPersonAvailability(payload: {
     enabled: boolean;
     availability: { slotDurationMinutes: number; days: Array<{ dayOfWeek: number; startTime: string; endTime: string }> };
     location_info: { address?: string; phone?: string; parkingNotes?: string };
+    institution_id?: string | null;
   }) {
     const res = await fetch(`${BASE}/api/clinic/in-person-availability`, {
       method: "POST",

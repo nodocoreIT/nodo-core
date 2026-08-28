@@ -708,6 +708,7 @@ export function DoctorSettingsDialog({
                       onSaved={() => {
                         toast.success("Agenda presencial guardada");
                       }}
+                      onGoToInstituciones={() => setActiveSection("instituciones")}
                     />
                   </div>
                 </>
