@@ -34,7 +34,7 @@ export function UtilitiesModal({
             <TabsTrigger value="diagnostico">Diagnóstico</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 min-h-0">
             <div className="pr-4">
               <TabsContent value="farmacias" className="mt-0">
                 <PharmacyOnCallCard />
