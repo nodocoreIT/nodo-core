@@ -1471,6 +1471,59 @@ export const clinicApi = {
     return data;
   },
 
+  /** Fase 6 de Recetas — obtiene una receta propia (borrador o no) para
+   * precargar el form de edición. */
+  async getPrescription(id: string) {
+    const res = await fetch(`${BASE}/api/clinic/prescriptions/${id}`, clinicFetchOpts());
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "No se pudo obtener la receta");
+    return data as {
+      id: string;
+      patient_id: string | null;
+      patient_email: string | null;
+      patient_full_name: string | null;
+      institution_id: string | null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      medications: any;
+      notes: string | null;
+      price_amount: number | null;
+      price_currency: string | null;
+      sent_at: string | null;
+      payment_status: string;
+    };
+  },
+
+  /** Fase 6 de Recetas — actualiza una receta en estado borrador. El backend
+   * rechaza con 409 si ya fue enviada o pagada. */
+  async updatePrescription(
+    id: string,
+    payload: {
+      patientId?: string;
+      medications: Array<{
+        name: string;
+        dosage: string;
+        frequency: string;
+        duration: string;
+        instructions?: string;
+      }>;
+      institutionId?: string;
+      priceAmount?: number;
+      notes?: string;
+      patientEmail?: string;
+      patientFullName?: string;
+    },
+  ) {
+    const res = await fetch(`${BASE}/api/clinic/prescriptions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    const data = await parseJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "Error al actualizar la receta");
+    return data as { id: string };
+  },
+
   /** Fase 3 de Recetas — envía (o reenvía) el magic link de una receta ya guardada. */
   async sendPrescription(id: string): Promise<{ ok: boolean }> {
     const res = await fetch(`${BASE}/api/clinic/prescriptions/${id}/send`, {

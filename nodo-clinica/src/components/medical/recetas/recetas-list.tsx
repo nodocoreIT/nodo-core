@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Building2, FileText, Loader2, Mail, User } from "lucide-react";
+import { Building2, FileText, Loader2, Mail, Pencil, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { currencySymbol } from "@/lib/clinic/currency";
@@ -44,10 +44,17 @@ function formatMoney(amount: number | null, currency: string | null) {
   return `${currencySymbol(currency)} ${amount.toLocaleString("es-AR")}`;
 }
 
+interface RecetasListProps {
+  /** Fase 6 — called when the médico clicks "Editar" on a draft receta, so
+   * the caller can open the form dialog in edit mode. Only shown for
+   * recetas in "borrador" status. */
+  onEdit?: (id: string) => void;
+}
+
 /** Fase 5 de "Recetas" — historial de recetas emitidas por el médico logueado,
  * con badge de estado (borrador/enviada/pagada) y botón de reenviar para las
- * que todavía no están pagadas. */
-export function RecetasList() {
+ * que todavía no están pagadas. Fase 6 agrega "Editar" para los borradores. */
+export function RecetasList({ onEdit }: RecetasListProps = {}) {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<RecetaRow[]>([]);
   const [resendingId, setResendingId] = useState<string | null>(null);
@@ -140,22 +147,35 @@ export function RecetasList() {
             </div>
 
             {canResend && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-2 text-[11px] gap-1 shrink-0"
-                disabled={resendingId === row.id}
-                onClick={() => void handleResend(row.id)}
-              >
-                {resendingId === row.id ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <>
-                    <Mail className="h-3 w-3" />
-                    {status === "enviada" ? "Reenviar" : "Enviar"}
-                  </>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {status === "borrador" && onEdit && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-[11px] gap-1"
+                    onClick={() => onEdit(row.id)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Editar
+                  </Button>
                 )}
-              </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-[11px] gap-1"
+                  disabled={resendingId === row.id}
+                  onClick={() => void handleResend(row.id)}
+                >
+                  {resendingId === row.id ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <>
+                      <Mail className="h-3 w-3" />
+                      {status === "enviada" ? "Reenviar" : "Enviar"}
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
             {!canResend && (
               <span className="flex items-center gap-1 text-[11px] text-emerald-700 shrink-0">

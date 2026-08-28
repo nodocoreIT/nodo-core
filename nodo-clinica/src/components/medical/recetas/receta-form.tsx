@@ -32,14 +32,19 @@ interface RecetaFormProps {
    * dialog and refresh its list. Optional: the standalone /medico/recetas
    * page rendered the form inline before Fase 5 and had no such callback. */
   onSaved?: () => void;
+  /** Fase 6 — when set, the form loads the existing (draft-only) receta and
+   * "Guardar borrador"/"Enviar receta" update it in place instead of
+   * creating a new one. Absent (the default): the form behaves exactly like
+   * before, creating a brand-new receta. */
+  editingId?: string;
 }
 
 /** Standalone (fuera de consulta) prescription form — Fase 2 de "Recetas".
  * Lets the médico pick a registered patient (or type one that isn't
  * registered), an institution for the PDF letterhead, medications and free
  * notes, and save the receta as a draft. No email/magic-link/payment yet —
- * that's Fase 3/4. */
-export function RecetaForm({ onSaved }: RecetaFormProps = {}) {
+ * that's Fase 3/4. Fase 6 adds an edit mode for drafts, gated by `editingId`. */
+export function RecetaForm({ onSaved, editingId }: RecetaFormProps = {}) {
   const doctor = useMedicoDoctor();
 
   const [doctorSpecialty, setDoctorSpecialty] = useState<string | undefined>();
@@ -66,6 +71,7 @@ export function RecetaForm({ onSaved }: RecetaFormProps = {}) {
   const [isSaving, setIsSaving] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isLoadingEdit, setIsLoadingEdit] = useState(Boolean(editingId));
 
   useEffect(() => {
     clinicApi
@@ -87,6 +93,48 @@ export function RecetaForm({ onSaved }: RecetaFormProps = {}) {
       .then((data) => setInstitutions(data.institutions))
       .catch(() => undefined);
   }, []);
+
+  // Fase 6 — edit mode: load the existing draft and prefill every field.
+  useEffect(() => {
+    if (!editingId) return;
+    // isLoadingEdit already starts `true` when editingId is set (see useState
+    // above) — no need to set it again here, just clear it in .finally().
+    clinicApi
+      .getPrescription(editingId)
+      .then((data) => {
+        if (data.patient_id) {
+          setUnregistered(false);
+          setSelectedPatient({
+            id: data.patient_id,
+            fullName: data.patient_full_name ?? "Paciente",
+            email: data.patient_email ?? "",
+          });
+        } else {
+          setUnregistered(true);
+          setManualPatientName(data.patient_full_name ?? "");
+          setManualPatientEmail(data.patient_email ?? "");
+        }
+        setInstitutionId(data.institution_id ?? "");
+        const meds = Array.isArray(data.medications) ? data.medications : [];
+        setMedications(
+          meds.length > 0
+            ? meds.map((m: MedicationDraft) => ({
+                name: m.name ?? "",
+                dosage: m.dosage ?? "",
+                frequency: m.frequency ?? "",
+                duration: m.duration ?? "",
+                instructions: m.instructions ?? "",
+              }))
+            : [emptyMedication()],
+        );
+        setNotes(data.notes ?? "");
+        setPriceAmount(data.price_amount ?? undefined);
+      })
+      .catch((err) =>
+        toast.error(err instanceof Error ? err.message : "No se pudo cargar la receta"),
+      )
+      .finally(() => setIsLoadingEdit(false));
+  }, [editingId]);
 
   const searchPatients = useCallback(async (q: string) => {
     if (!q.trim()) {
@@ -195,8 +243,31 @@ export function RecetaForm({ onSaved }: RecetaFormProps = {}) {
       }),
     );
 
-    const doc = buildPdf();
     const parsedPrice = priceAmount;
+
+    // Fase 6 — edit mode updates the existing receta in place instead of
+    // creating a new one. Creation mode still snapshots a PDF preview to
+    // send along; the PATCH payload doesn't need it (no pdf_url column is
+    // written by either endpoint today).
+    if (editingId) {
+      const result = await clinicApi.updatePrescription(editingId, {
+        patientId: unregistered ? undefined : selectedPatient?.id,
+        medications: medicationsToSave,
+        institutionId: institutionId || undefined,
+        priceAmount:
+          typeof parsedPrice === "number" && !Number.isNaN(parsedPrice)
+            ? parsedPrice
+            : undefined,
+        notes: notes.trim() || undefined,
+        patientEmail: unregistered ? manualPatientEmail.trim() : selectedPatient?.email,
+        patientFullName: unregistered
+          ? manualPatientName.trim()
+          : selectedPatient?.fullName,
+      });
+      return result.id;
+    }
+
+    const doc = buildPdf();
 
     const result = await clinicApi.savePrescription({
       doctorId: doctor.id,
@@ -221,8 +292,8 @@ export function RecetaForm({ onSaved }: RecetaFormProps = {}) {
     try {
       const id = await saveReceta();
       if (!id) return;
-      toast.success("Receta guardada como borrador");
-      resetForm();
+      toast.success(editingId ? "Receta actualizada" : "Receta guardada como borrador");
+      if (!editingId) resetForm();
       onSaved?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al guardar la receta");
@@ -238,7 +309,7 @@ export function RecetaForm({ onSaved }: RecetaFormProps = {}) {
       if (!id) return;
       await clinicApi.sendPrescription(id);
       toast.success("Receta enviada por email al paciente");
-      resetForm();
+      if (!editingId) resetForm();
       onSaved?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al enviar la receta");
@@ -262,6 +333,14 @@ export function RecetaForm({ onSaved }: RecetaFormProps = {}) {
       setIsDownloading(false);
     }
   };
+
+  if (isLoadingEdit) {
+    return (
+      <div className="flex items-center justify-center py-10">
+        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -424,13 +503,17 @@ export function RecetaForm({ onSaved }: RecetaFormProps = {}) {
       </div>
 
       <div className="flex flex-wrap gap-2 pt-2">
-        <Button onClick={handleSaveDraft} disabled={isSaving || isSending} className="gap-2">
+        <Button
+          onClick={handleSaveDraft}
+          disabled={isSaving || isSending || isLoadingEdit}
+          className="gap-2"
+        >
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Guardar borrador
         </Button>
         <Button
           onClick={handleSendReceta}
-          disabled={isSaving || isSending}
+          disabled={isSaving || isSending || isLoadingEdit}
           className="gap-2 bg-teal-600 hover:bg-teal-700"
         >
           {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}

@@ -168,6 +168,24 @@ export async function createPrescription(
   return supabase.from("prescriptions").insert(data).select().single();
 }
 
+/** Returns a single prescription by id, unscoped by org/doctor — callers are
+ * responsible for their own ownership/org checks (see the `[id]` route,
+ * which verifies `doctor_id` matches the authenticated médico). */
+export async function getPrescriptionById(supabase: AnyClient, id: string) {
+  return supabase.from("prescriptions").select("*").eq("id", id).maybeSingle();
+}
+
+/** Updates an existing prescription. Used by the edit-draft flow (Fase 6) —
+ * the `[id]` route rejects the update before calling this if the receta was
+ * already sent or paid. */
+export async function updatePrescription(
+  supabase: AnyClient,
+  id: string,
+  data: Partial<PrescriptionInsert>,
+) {
+  return supabase.from("prescriptions").update(data).eq("id", id).select().single();
+}
+
 /** Returns the recetas history (standalone + live-consultation) issued by a
  * doctor — Fase 5 of "Recetas". Joins `patients(full_name)` so records that
  * predate patient_full_name being snapshotted (live-consultation recetas,
