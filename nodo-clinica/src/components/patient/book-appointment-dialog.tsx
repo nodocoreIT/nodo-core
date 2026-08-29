@@ -176,6 +176,35 @@ function WizardProgress({
   );
 }
 
+function SlotButton({
+  slot,
+  isSelected,
+  onSelect,
+}: {
+  slot: { iso: string; label: string; status: "available" | "booked" };
+  isSelected: boolean;
+  onSelect: (iso: string) => void;
+}) {
+  const isBooked = slot.status === "booked";
+  return (
+    <button
+      type="button"
+      disabled={isBooked}
+      title={isBooked ? "Turno ocupado" : undefined}
+      onClick={() => !isBooked && onSelect(slot.iso)}
+      className={`h-9 rounded-md border text-sm transition-colors ${
+        isBooked
+          ? "bg-red-50 text-red-400 border-red-200 line-through cursor-not-allowed"
+          : isSelected
+            ? "bg-emerald-600 text-white border-emerald-600"
+            : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+      }`}
+    >
+      {slot.label}
+    </button>
+  );
+}
+
 export function BookAppointmentDialog({
   doctorId,
   doctorName,
@@ -184,10 +213,18 @@ export function BookAppointmentDialog({
   onBooked,
 }: BookAppointmentDialogProps) {
   const [step, setStep] = useState<WizardStep>("slot");
+  const [appointmentType, setAppointmentType] = useState<"virtual" | "in_person">("virtual");
+  const [offersInPerson, setOffersInPerson] = useState(false);
   const [dates, setDates] = useState<CalendarDay[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [slots, setSlots] = useState<
-    { iso: string; label: string; status: "available" | "booked" }[]
+    {
+      iso: string;
+      label: string;
+      status: "available" | "booked";
+      institutionName?: string;
+      institutionAddress?: string;
+    }[]
   >([]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [loadingDates, setLoadingDates] = useState(false);
@@ -228,11 +265,13 @@ export function BookAppointmentDialog({
   const loadDoctorPayment = useCallback(async () => {
     const doctor = await clinicApi.getDoctorForBooking(doctorId);
     setResolvedPayment(doctor.payment);
+    setOffersInPerson(Boolean(doctor.offersInPerson));
     return doctor.payment;
   }, [doctorId]);
 
   const resetWizard = () => {
     setStep("slot");
+    setAppointmentType("virtual");
     setShareHealthProfile(true);
     setReceiptFile(null);
     setIntakeReason("");
@@ -251,20 +290,12 @@ export function BookAppointmentDialog({
   useEffect(() => {
     if (!open) return;
     resetWizard();
-    setLoadingDates(true);
     setPaymentSettingsReady(false);
 
     let cancelled = false;
-
-    Promise.all([
-      loadDoctorPayment(),
-      clinicApi.getAvailableDates(doctorId),
-    ])
-      .then(([, dateData]) => {
-        if (cancelled) return;
-        setDates(dateData.dates ?? []);
-        setDuration(dateData.slotDurationMinutes ?? 30);
-        setPaymentSettingsReady(true);
+    loadDoctorPayment()
+      .then(() => {
+        if (!cancelled) setPaymentSettingsReady(true);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -274,14 +305,33 @@ export function BookAppointmentDialog({
             : "No se pudieron cargar los honorarios del médico",
         );
         setPaymentSettingsReady(false);
-        clinicApi
-          .getAvailableDates(doctorId)
-          .then((dateData) => {
-            if (cancelled) return;
-            setDates(dateData.dates ?? []);
-            setDuration(dateData.slotDurationMinutes ?? 30);
-          })
-          .catch(() => undefined);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, doctorId, loadDoctorPayment]);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoadingDates(true);
+    setSelectedDate(null);
+    setDates([]);
+
+    let cancelled = false;
+    clinicApi
+      .getAvailableDates(doctorId, appointmentType)
+      .then((dateData) => {
+        if (cancelled) return;
+        setDates(dateData.dates ?? []);
+        setDuration(dateData.slotDurationMinutes ?? 30);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        toast.error(
+          err instanceof Error ? err.message : "No se pudieron cargar los días disponibles",
+        );
+        setDates([]);
       })
       .finally(() => {
         if (!cancelled) setLoadingDates(false);
@@ -290,7 +340,7 @@ export function BookAppointmentDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, doctorId, loadDoctorPayment]);
+  }, [open, doctorId, appointmentType]);
 
   useEffect(() => {
     if (!open || step !== "payment") return;
@@ -308,19 +358,17 @@ export function BookAppointmentDialog({
     setLoadingSlots(true);
     setSelectedSlot(null);
     clinicApi
-      .getSlots(doctorId, selectedDate)
+      .getSlots(doctorId, selectedDate, appointmentType)
       .then((data) => {
         const nextSlots = data.slots ?? [];
         setSlots(nextSlots);
-        const availableSlots = nextSlots.filter(
-          (s: { status: string }) => s.status === "available",
-        );
+        const availableSlots = nextSlots.filter((s) => s.status === "available");
         if (availableSlots.length === 1) {
           setSelectedSlot(availableSlots[0].iso);
         }
       })
       .finally(() => setLoadingSlots(false));
-  }, [selectedDate, doctorId]);
+  }, [selectedDate, doctorId, appointmentType]);
 
   useEffect(() => {
     if (!selectedDate || loadingSlots) return;
@@ -490,6 +538,7 @@ export function BookAppointmentDialog({
       const result = await clinicApi.bookAppointment({
         doctorId,
         scheduledAt: selectedSlot,
+        appointmentType,
         paymentMethod: mode === "mercadopago" ? "mercadopago" : "transfer",
         shareHealthProfile,
         receipt,
@@ -580,6 +629,25 @@ export function BookAppointmentDialog({
 
         {step === "slot" && (
           <div className="space-y-4">
+            {offersInPerson && (
+              <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
+                {(["virtual", "in_person"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setAppointmentType(t)}
+                    className={`h-8 rounded-md text-sm font-medium transition-colors ${
+                      appointmentType === t
+                        ? "bg-white text-slate-800 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    {t === "virtual" ? "Virtual" : "Presencial"}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div>
               <p className="text-sm font-medium text-slate-700 mb-2">Elegí el día</p>
               {loadingDates && dates.length === 0 ? (
@@ -616,30 +684,48 @@ export function BookAppointmentDialog({
                   <p className="text-sm text-amber-700 text-center py-4 bg-amber-50 rounded-lg border border-amber-100">
                     No hay horarios libres este día. Probá con otro día.
                   </p>
+                ) : appointmentType === "in_person" ? (
+                  <div className="space-y-3">
+                    {Array.from(
+                      slots.reduce((groups, slot) => {
+                        const key = slot.institutionName ?? "Otro consultorio";
+                        if (!groups.has(key)) {
+                          groups.set(key, { address: slot.institutionAddress, items: [] });
+                        }
+                        groups.get(key)!.items.push(slot);
+                        return groups;
+                      }, new Map<string, { address?: string; items: typeof slots }>()),
+                    ).map(([institutionName, group]) => (
+                      <div key={institutionName}>
+                        <p className="text-xs font-medium text-slate-600 mb-1">
+                          {institutionName}
+                          {group.address && (
+                            <span className="text-slate-400 font-normal"> — {group.address}</span>
+                          )}
+                        </p>
+                        <div className="grid grid-cols-4 gap-2">
+                          {group.items.map((slot) => (
+                            <SlotButton
+                              key={slot.iso}
+                              slot={slot}
+                              isSelected={selectedSlot === slot.iso}
+                              onSelect={setSelectedSlot}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <div className="grid grid-cols-4 gap-2">
-                    {slots.map((slot) => {
-                      const isBooked = slot.status === "booked";
-                      const isSelected = selectedSlot === slot.iso;
-                      return (
-                        <button
-                          key={slot.iso}
-                          type="button"
-                          disabled={isBooked}
-                          title={isBooked ? "Turno ocupado" : undefined}
-                          onClick={() => !isBooked && setSelectedSlot(slot.iso)}
-                          className={`h-9 rounded-md border text-sm transition-colors ${
-                            isBooked
-                              ? "bg-red-50 text-red-400 border-red-200 line-through cursor-not-allowed"
-                              : isSelected
-                                ? "bg-emerald-600 text-white border-emerald-600"
-                                : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
-                          }`}
-                        >
-                          {slot.label}
-                        </button>
-                      );
-                    })}
+                    {slots.map((slot) => (
+                      <SlotButton
+                        key={slot.iso}
+                        slot={slot}
+                        isSelected={selectedSlot === slot.iso}
+                        onSelect={setSelectedSlot}
+                      />
+                    ))}
                   </div>
                 )}
               </div>

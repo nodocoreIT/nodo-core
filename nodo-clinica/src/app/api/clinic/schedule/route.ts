@@ -17,6 +17,7 @@ import {
   getAllSlotsForDate,
   normalizeAvailability,
   localDateKeyFromIso,
+  findMatchingInstitutionId,
   type DoctorAvailability,
 } from "@/lib/clinic/schedule";
 
@@ -203,6 +204,7 @@ export async function GET(request: NextRequest) {
 
   const doctorId = searchParams.get("doctorId");
   const dateStr = searchParams.get("date");
+  const isInPerson = searchParams.get("type") === "in_person";
 
   if (!doctorId) {
     return NextResponse.json({ error: "doctorId requerido" }, { status: 400 });
@@ -275,13 +277,46 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Médico no encontrado" }, { status: 404 });
   }
 
-  const { data: officeSettings } = await serviceClient
-    .from("office_settings")
-    .select("availability")
-    .eq("professional_id", doctorId)
-    .maybeSingle();
+  let availability: DoctorAvailability;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let presencialInstitutions: any[] = [];
 
-  const availability = getAvailability(officeSettings);
+  if (isInPerson) {
+    const [{ data: inPersonRow }, { data: institutionsData }] = await Promise.all([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (serviceClient as any)
+        .from("in_person_availability")
+        .select("enabled, availability")
+        .eq("professional_id", doctorId)
+        .maybeSingle(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (serviceClient as any)
+        .from("institutions")
+        .select("id, name, address, city, schedule")
+        .eq("professional_id", doctorId)
+        .eq("active", true),
+    ]);
+
+    if (!inPersonRow?.enabled) {
+      return NextResponse.json(
+        { error: "El médico no atiende pacientes de forma presencial" },
+        { status: 404 },
+      );
+    }
+
+    presencialInstitutions = institutionsData ?? [];
+    availability = normalizeAvailability({
+      slotDurationMinutes: inPersonRow.availability?.slotDurationMinutes ?? 30,
+      days: presencialInstitutions.flatMap((i) => i.schedule?.days ?? []),
+    });
+  } else {
+    const { data: officeSettings } = await serviceClient
+      .from("office_settings")
+      .select("availability")
+      .eq("professional_id", doctorId)
+      .maybeSingle();
+    availability = getAvailability(officeSettings);
+  }
 
   const { data: bookedApts } = await serviceClient
     .from("appointments")
@@ -309,6 +344,26 @@ export async function GET(request: NextRequest) {
 
   const booked = allBooked.filter((t) => localDateKeyFromIso(t) === dateStr);
   const slots = getAllSlotsForDate(dateStr, availability, booked);
+
+  if (isInPerson) {
+    const enrichedSlots = slots.map((slot) => {
+      if (slot.status !== "available") return slot;
+      const institutionId = findMatchingInstitutionId(slot.iso, presencialInstitutions);
+      const institution = presencialInstitutions.find((i) => i.id === institutionId);
+      return {
+        ...slot,
+        institutionName: institution?.name,
+        institutionAddress: institution
+          ? [institution.address, institution.city].filter(Boolean).join(", ")
+          : undefined,
+      };
+    });
+    return NextResponse.json({
+      slots: enrichedSlots,
+      slotDurationMinutes: availability.slotDurationMinutes,
+    });
+  }
+
   return NextResponse.json({
     slots,
     slotDurationMinutes: availability.slotDurationMinutes,

@@ -77,12 +77,19 @@ export async function GET(request: NextRequest) {
     const consultationFee =
       typeof safePayment.consultationFee === "number" ? safePayment.consultationFee : 0;
 
+    const { data: inPersonRow } = await serviceClient
+      .from("in_person_availability")
+      .select("enabled")
+      .eq("professional_id", professional.id)
+      .maybeSingle();
+
     return NextResponse.json({
       id: professional.id,
       fullName: professional.full_name,
       specialty: professional.specialty,
       licenseNumber: professional.license_number,
       profilePhotoUrl: professional.profile_photo_url,
+      offersInPerson: Boolean(inPersonRow?.enabled),
       payment: {
         ...safePayment,
         ...withTransferFallback(safePayment),

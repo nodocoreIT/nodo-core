@@ -649,6 +649,7 @@ export const clinicApi = {
     return data as {
       id: string;
       fullName: string;
+      offersInPerson?: boolean;
       payment?: import("@/lib/clinic/types").DoctorPaymentSettings & {
         requirePaymentBeforeBooking?: boolean;
         mercadopagoEnabled?: boolean;
@@ -659,6 +660,7 @@ export const clinicApi = {
   async bookAppointment(payload: {
     doctorId: string;
     scheduledAt?: string;
+    appointmentType?: "virtual" | "in_person";
     paymentMethod?: "transfer" | "mercadopago";
     shareHealthProfile?: boolean;
     receipt?: {
@@ -676,6 +678,7 @@ export const clinicApi = {
     const {
       doctorId,
       scheduledAt,
+      appointmentType,
       paymentMethod = "transfer",
       shareHealthProfile = false,
       receipt,
@@ -689,6 +692,7 @@ export const clinicApi = {
       body: JSON.stringify({
         doctorId,
         scheduledAt,
+        appointmentType,
         paymentMethod,
         shareHealthProfile,
         receipt,
@@ -1215,20 +1219,27 @@ export const clinicApi = {
     return res.json();
   },
 
-  async getAvailableDates(doctorId: string) {
-    const res = await fetch(
-      `${BASE}/api/clinic/schedule?doctorId=${doctorId}`,
-      clinicFetchOpts()
-    );
+  async getAvailableDates(doctorId: string, appointmentType?: "virtual" | "in_person") {
+    const params = new URLSearchParams({ doctorId });
+    if (appointmentType === "in_person") params.set("type", "in_person");
+    const res = await fetch(`${BASE}/api/clinic/schedule?${params}`, clinicFetchOpts());
     return res.json();
   },
 
-  async getSlots(doctorId: string, date: string) {
-    const res = await fetch(
-      `${BASE}/api/clinic/schedule?doctorId=${doctorId}&date=${date}`,
-      clinicFetchOpts()
-    );
-    return res.json();
+  async getSlots(doctorId: string, date: string, appointmentType?: "virtual" | "in_person") {
+    const params = new URLSearchParams({ doctorId, date });
+    if (appointmentType === "in_person") params.set("type", "in_person");
+    const res = await fetch(`${BASE}/api/clinic/schedule?${params}`, clinicFetchOpts());
+    return res.json() as Promise<{
+      slots: Array<{
+        iso: string;
+        label: string;
+        status: "available" | "booked";
+        institutionName?: string;
+        institutionAddress?: string;
+      }>;
+      slotDurationMinutes: number;
+    }>;
   },
 
   async getDoctorSchedule(doctorId?: string) {
