@@ -345,6 +345,36 @@ export function appointmentMatchesScheduleGrid(
   });
 }
 
+export interface InstitutionScheduleSource {
+  id: string;
+  schedule?: { days: DaySchedule[] } | null;
+}
+
+/** Given a scheduled_at that already matches the doctor's merged presencial
+ * grid (union of all institutions' schedules), find which institution's own
+ * schedule block it falls into — used to tag a booked in-person appointment
+ * with the right institution/address. */
+export function findMatchingInstitutionId(
+  scheduledAtIso: string,
+  institutions: InstitutionScheduleSource[],
+): string | null {
+  const dateKey = localDateKeyFromIso(scheduledAtIso);
+  const dow = clinicDayOfWeek(dateKey);
+  const aptMinutes = clinicMinutesFromIso(scheduledAtIso);
+
+  for (const institution of institutions) {
+    const days = institution.schedule?.days ?? [];
+    const matches = days.some((block) => {
+      if (block.dayOfWeek !== dow) return false;
+      const startMin = timeToMinutes(block.startTime);
+      const endMin = timeToMinutes(block.endTime);
+      return aptMinutes >= startMin && aptMinutes < endMin;
+    });
+    if (matches) return institution.id;
+  }
+  return null;
+}
+
 export function slotKeyFromIso(iso: string): string {
   return new Date(iso).toISOString().slice(0, 16);
 }

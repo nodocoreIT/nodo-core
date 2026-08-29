@@ -20,6 +20,7 @@ import {
   localDateKeyFromDate,
   localDateKeyFromIso,
   appointmentMatchesScheduleGrid,
+  findMatchingInstitutionId,
   slotKeyFromIso,
   addDaysToDateKey,
   formatAppointmentLabelFromIso,
@@ -33,7 +34,10 @@ import {
 } from "@/lib/clinic/payment";
 import { isStrictPaymentValidation } from "@/lib/clinic/payment-validation";
 import { professionalHasMercadoPagoConnection } from "@/lib/clinic/db/payments";
-import { sendAppointmentConfirmationEmail } from "@/lib/email/resend";
+import {
+  sendAppointmentConfirmationEmail,
+  sendInPersonConfirmationEmail,
+} from "@/lib/email/resend";
 import { formatReminderLabel } from "@/lib/email/reminder-label";
 import { buildCheckoutForAppointment } from "@/lib/mercadopago/checkout";
 import {
@@ -710,8 +714,19 @@ export async function POST(request: NextRequest) {
 
   const { professional, officeSettings } = bookable;
 
-  // Fetch in_person_availability if booking presencial appointment
+  // Fetch in_person_availability + each institution's own schedule if
+  // booking a presencial appointment — the doctor's presencial hours are the
+  // union of all their active institutions' schedules (each institution
+  // manages its own days/times in Instituciones), not a single shared grid.
   let inPersonAvailability: { availability?: DoctorAvailability; location_info?: Record<string, unknown> } | null = null;
+  let presencialInstitutions: Array<{
+    id: string;
+    name: string;
+    address: string | null;
+    city: string | null;
+    extra_info: string | null;
+    schedule: { days: DoctorAvailability["days"] } | null;
+  }> = [];
   if (type === 'in_person') {
     const { data } = await supabase
       .from('in_person_availability')
@@ -723,6 +738,20 @@ export async function POST(request: NextRequest) {
     if (!inPersonAvailability?.enabled) {
       return NextResponse.json(
         { error: 'El médico no atiende pacientes de forma presencial' },
+        { status: 404 },
+      );
+    }
+
+    const { data: institutionsData } = await supabase
+      .from('institutions')
+      .select('id, name, address, city, extra_info, schedule')
+      .eq('professional_id', doctorId)
+      .eq('active', true);
+    presencialInstitutions = institutionsData ?? [];
+
+    if (presencialInstitutions.length === 0) {
+      return NextResponse.json(
+        { error: 'El médico no tiene instituciones cargadas para atención presencial' },
         { status: 404 },
       );
     }
@@ -836,10 +865,14 @@ export async function POST(request: NextRequest) {
     validatedReceipt = receiptPayload;
   }
 
-  // Validate against appropriate availability (virtual or presencial)
-  const scheduleToValidate = type === 'in_person'
-    ? (inPersonAvailability?.availability ?? DEFAULT_AVAILABILITY)
-    : availability;
+  // Validate against appropriate availability (virtual, or the union of all
+  // of the doctor's institutions' own presencial schedules)
+  const presencialSlotDuration = inPersonAvailability?.availability?.slotDurationMinutes ?? 30;
+  const presencialSchedule: DoctorAvailability = {
+    slotDurationMinutes: presencialSlotDuration,
+    days: presencialInstitutions.flatMap((i) => i.schedule?.days ?? []),
+  };
+  const scheduleToValidate = type === 'in_person' ? presencialSchedule : availability;
 
   if (!appointmentMatchesScheduleGrid(when.toISOString(), scheduleToValidate)) {
     return NextResponse.json(
@@ -859,7 +892,7 @@ export async function POST(request: NextRequest) {
   // For presencial: check overlap with ANY existing appointment (virtual or presencial)
   // For virtual: only check overlap with other virtuals
   const aptDuration = type === 'in_person'
-    ? (inPersonAvailability?.availability?.slotDurationMinutes ?? 30)
+    ? presencialSlotDuration
     : (availability.slotDurationMinutes ?? 30);
 
   const conflictingApt = (existingApts ?? []).find((a) => {
@@ -898,6 +931,16 @@ export async function POST(request: NextRequest) {
 
   const tokenExpires = new Date(when.getTime() + 24 * 60 * 60 * 1000);
 
+  // Resolve which institution's own schedule the chosen time falls into —
+  // the patient just sees a merged set of free times, the institution is a
+  // property of the slot they picked, not something they choose upfront.
+  const matchedInstitutionId = type === 'in_person'
+    ? findMatchingInstitutionId(when.toISOString(), presencialInstitutions)
+    : null;
+  const matchedInstitution = matchedInstitutionId
+    ? presencialInstitutions.find((i) => i.id === matchedInstitutionId) ?? null
+    : null;
+
   const { data: apt, error: insertError } = await createAppointment(supabase, {
     org_id: professional.org_id ?? patientRow.org_id,
     doctor_id: doctorId,
@@ -917,6 +960,15 @@ export async function POST(request: NextRequest) {
     intake_reason: intakeReason ? String(intakeReason).slice(0, 4000) : null,
     payment_receipt_audit: receiptAudit ?? null,
     appointment_type: type,
+    institution_id: matchedInstitution?.id ?? null,
+    institution_snapshot: matchedInstitution
+      ? {
+          name: matchedInstitution.name,
+          address: matchedInstitution.address,
+          city: matchedInstitution.city,
+          extra_info: matchedInstitution.extra_info,
+        }
+      : null,
   });
 
   if (insertError || !apt) {
@@ -1016,14 +1068,18 @@ export async function POST(request: NextRequest) {
 
   if (type === 'in_person') {
     const locationInfo = inPersonAvailability?.location_info as Record<string, string> | undefined;
-    // TODO: implement sendInPersonConfirmationEmail
-    // For now, send standard confirmation (email template can be added later)
-    sendAppointmentConfirmationEmail({
+    const address = matchedInstitution
+      ? [matchedInstitution.address, matchedInstitution.city].filter(Boolean).join(", ")
+      : undefined;
+    sendInPersonConfirmationEmail({
       patientEmail: patientRow.email,
       patientName: patientRow.full_name,
       doctorName: professional.full_name,
       scheduledAt: scheduledLabel,
       waitingRoomUrl: patientLoginUrl(baseUrl),
+      address: address || undefined,
+      phone: locationInfo?.phone,
+      parkingNotes: locationInfo?.parkingNotes,
       reminderNote,
     }).catch((err) => console.error("[Email] confirmation failed", err));
   } else {

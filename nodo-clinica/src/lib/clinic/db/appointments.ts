@@ -67,6 +67,9 @@ export interface AppointmentInsert {
   intake_reason?: string | null;
   share_health_profile?: boolean;
   payment_receipt_audit?: Record<string, unknown> | null;
+  appointment_type?: "virtual" | "in_person";
+  institution_id?: string | null;
+  institution_snapshot?: Record<string, unknown> | null;
 }
 
 export interface AppointmentUpdate {

@@ -349,6 +349,7 @@ interface InPersonAppointmentEmailParams {
   patientName: string;
   doctorName: string;
   scheduledAt: string;
+  waitingRoomUrl: string;
   address?: string;
   phone?: string;
   parkingNotes?: string;
@@ -363,6 +364,7 @@ export async function sendInPersonConfirmationEmail(
     patientName,
     doctorName,
     scheduledAt,
+    waitingRoomUrl,
     address,
     phone,
     parkingNotes,
@@ -397,7 +399,7 @@ export async function sendInPersonConfirmationEmail(
           `Ingresá a la app como paciente para ver tu turno en <strong>Mis turnos</strong>:`,
         )}
         <div style="text-align:center;margin:32px 0;">
-          <a href="https://nodo-clinica.vercel.app/paciente/turnos"
+          <a href="${waitingRoomUrl}"
              style="background:#0f766e;color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;word-wrap:break-word;">
             Ver mi turno
           </a>
@@ -426,7 +428,7 @@ export async function sendInPersonConfirmationEmail(
     textLines.push("");
   }
 
-  textLines.push("Ver mi turno: https://nodo-clinica.vercel.app/paciente/turnos");
+  textLines.push(`Ver mi turno: ${waitingRoomUrl}`);
 
   return sendClinicEmail({
     to: patientEmail,

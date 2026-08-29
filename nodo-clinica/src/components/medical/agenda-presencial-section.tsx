@@ -12,39 +12,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { WeeklyScheduleEditor } from "@/components/medical/weekly-schedule-editor";
-import { MapPin, Phone, AlertCircle, Loader2, Plus } from "lucide-react";
+import { Building2, Phone, Info, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi, type InstitutionRecord } from "@/lib/clinic/client-api";
-import { dayLabel, findScheduleConflictDays, type DaySchedule } from "@/lib/clinic/schedule";
+import { dayLabel } from "@/lib/clinic/schedule";
 
 function institutionLabel(inst: InstitutionRecord): string {
   return inst.city ? `${inst.name} — ${inst.city}` : inst.name;
 }
 
+function scheduleSummary(inst: InstitutionRecord): string {
+  const days = inst.schedule?.days ?? [];
+  if (days.length === 0) return "Sin horarios cargados";
+  return days
+    .map((d) => `${dayLabel(d.dayOfWeek)} ${d.startTime}-${d.endTime}`)
+    .join(" · ");
+}
+
+/** "Turnos Presenciales" — global on/off + contact info shared across all of
+ * the doctor's institutions. Each institution owns its own weekly schedule
+ * (managed in Instituciones); this section only shows a read-only summary,
+ * so there's a single source of truth instead of two competing editors. */
 export function AgendaPresencialSection({
-  virtualDays,
   onSaved,
   onGoToInstituciones,
 }: {
-  /** The doctor's virtual (non-presencial) hours, from the main Agenda tab —
-   * used to block saving turnos presenciales that overlap with them. */
-  virtualDays: DaySchedule[];
   onSaved?: () => void;
   onGoToInstituciones?: () => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [institutions, setInstitutions] = useState<InstitutionRecord[]>([]);
   const [enabled, setEnabled] = useState(false);
-  const [institutionId, setInstitutionId] = useState("");
   const [phone, setPhone] = useState("");
   const [parkingNotes, setParkingNotes] = useState("");
   const [slotDuration, setSlotDuration] = useState(30);
-  const [slots, setSlots] = useState<DaySchedule[]>([
-    { dayOfWeek: 1, startTime: "09:00", endTime: "13:00" },
-    { dayOfWeek: 1, startTime: "16:00", endTime: "19:00" },
-    { dayOfWeek: 2, startTime: "09:00", endTime: "13:00" },
-  ]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -54,16 +55,10 @@ export function AgendaPresencialSection({
         if (!active) return;
         setInstitutions(institutionsRes.institutions.filter((i) => i.active));
         setEnabled(availabilityRes.enabled);
-        setInstitutionId(availabilityRes.institution_id ?? "");
         setPhone(availabilityRes.location_info?.phone ?? "");
         setParkingNotes(availabilityRes.location_info?.parkingNotes ?? "");
         if (availabilityRes.availability?.slotDurationMinutes) {
           setSlotDuration(availabilityRes.availability.slotDurationMinutes);
-        }
-        if (availabilityRes.availability?.days?.length) {
-          setSlots(
-            availabilityRes.availability.days,
-          );
         }
       })
       .catch((err) => {
@@ -79,11 +74,9 @@ export function AgendaPresencialSection({
     };
   }, []);
 
-  const selectedInstitution = institutions.find((i) => i.id === institutionId);
-
   const handleSave = async () => {
-    if (enabled && !institutionId) {
-      toast.error("Elegí la institución donde atendés de forma presencial");
+    if (enabled && institutions.length === 0) {
+      toast.error("Cargá al menos una institución para atender de forma presencial");
       return;
     }
 
@@ -92,38 +85,15 @@ export function AgendaPresencialSection({
       return;
     }
 
-    if (enabled) {
-      const conflictDays = findScheduleConflictDays(slots, virtualDays);
-      if (conflictDays.length > 0) {
-        toast.error(
-          `Los horarios presenciales chocan con tus turnos virtuales el ${conflictDays
-            .map(dayLabel)
-            .join(", ")}. Ajustá los horarios para que no se superpongan.`,
-        );
-        return;
-      }
-    }
-
     setSaving(true);
     try {
       await clinicApi.saveInPersonAvailability({
         enabled,
         availability: {
           slotDurationMinutes: slotDuration,
-          days: enabled ? slots : [],
+          days: [],
         },
-        location_info: enabled
-          ? {
-              address: selectedInstitution
-                ? [selectedInstitution.address, selectedInstitution.city]
-                    .filter(Boolean)
-                    .join(", ")
-                : "",
-              phone,
-              parkingNotes,
-            }
-          : {},
-        institution_id: enabled ? institutionId || null : null,
+        location_info: enabled ? { phone, parkingNotes } : {},
       });
       toast.success("Agenda presencial guardada");
       onSaved?.();
@@ -162,61 +132,46 @@ export function AgendaPresencialSection({
 
       {enabled && (
         <>
-          <div className="space-y-4 p-4 bg-slate-50 rounded-lg">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                <MapPin className="inline h-4 w-4 mr-1" />
-                Institución
-              </label>
-              {institutions.length === 0 ? (
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <span>Todavía no cargaste ninguna institución.</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={onGoToInstituciones}
-                    className="gap-1"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Agregar institución
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <select
-                    value={institutionId}
-                    onChange={(e) => setInstitutionId(e.target.value)}
-                    className="h-9 flex-1 rounded border border-slate-200 px-2 text-sm bg-white"
-                  >
-                    <option value="">Seleccioná una institución…</option>
-                    {institutions.map((inst) => (
-                      <option key={inst.id} value={inst.id}>
-                        {institutionLabel(inst)}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={onGoToInstituciones}
-                    className="gap-1 shrink-0"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Agregar institución
-                  </Button>
-                </div>
-              )}
-              {selectedInstitution?.address && (
-                <p className="text-xs text-slate-400 mt-1">
-                  {[selectedInstitution.address, selectedInstitution.city]
-                    .filter(Boolean)
-                    .join(", ")}
-                </p>
-              )}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Instituciones</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onGoToInstituciones}
+                className="gap-1"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {institutions.length === 0 ? "Agregar institución" : "Editar horarios"}
+              </Button>
             </div>
 
+            {institutions.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                Todavía no cargaste ninguna institución.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {institutions.map((inst) => (
+                  <div
+                    key={inst.id}
+                    className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                  >
+                    <p className="text-sm font-medium text-slate-800 flex items-center gap-1.5">
+                      <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      {institutionLabel(inst)}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {scheduleSummary(inst)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4 p-4 bg-slate-50 rounded-lg">
             <div>
               <label className="block text-sm font-medium mb-1">
                 <Phone className="inline h-4 w-4 mr-1" />
@@ -258,16 +213,13 @@ export function AgendaPresencialSection({
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-xs">Días y horarios</Label>
-            <WeeklyScheduleEditor days={slots} onChange={setSlots} />
-          </div>
-
           <div className="flex gap-2 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <Info className="h-4 w-4 shrink-0 mt-0.5" />
             <p>
-              Los turnos presenciales no pueden chocar con tus turnos virtuales.
-              La validación es automática.
+              Los días y horarios se cargan por institución en la pestaña
+              Instituciones. El paciente ve los horarios libres de cada una
+              según el día que elija — no hace falta elegir una institución
+              principal acá.
             </p>
           </div>
         </>

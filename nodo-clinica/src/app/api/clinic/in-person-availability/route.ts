@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
-import { dayLabel, findScheduleConflictDays, type DaySchedule } from "@/lib/clinic/schedule";
 
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth(request);
@@ -24,7 +23,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await (supabase as any)
     .from("in_person_availability")
-    .select("enabled, availability, location_info, institution_id")
+    .select("enabled, availability, location_info")
     .eq("professional_id", professional.id)
     .maybeSingle();
 
@@ -40,7 +39,6 @@ export async function GET(request: NextRequest) {
     enabled: data?.enabled ?? false,
     availability: data?.availability ?? { slotDurationMinutes: 30, days: [] },
     location_info: data?.location_info ?? {},
-    institution_id: data?.institution_id ?? null,
   });
 }
 
@@ -68,38 +66,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "org_id requerido" }, { status: 403 });
   }
 
-  const { enabled, availability, location_info, institution_id } = await request.json();
+  const { enabled, availability, location_info } = await request.json();
 
-  if (enabled) {
-    const { data: officeSettings } = await (supabase as any)
-      .from("office_settings")
-      .select("availability")
-      .eq("professional_id", professional.id)
-      .maybeSingle();
-    const virtualDays = (officeSettings?.availability?.days ?? []) as DaySchedule[];
-    const presencialDays = (availability?.days ?? []) as DaySchedule[];
-    const conflictDays = findScheduleConflictDays(presencialDays, virtualDays);
-    if (conflictDays.length > 0) {
-      return NextResponse.json(
-        {
-          error: `Los horarios presenciales chocan con tus turnos virtuales el ${conflictDays
-            .map(dayLabel)
-            .join(", ")}. Ajustá los horarios para que no se superpongan.`,
-        },
-        { status: 409 },
-      );
-    }
-  }
-
+  // Days/times are no longer configured here — each institution owns its
+  // own schedule (nodo_clinica.institutions.schedule, validated for
+  // conflicts on its own save). This row only keeps the global on/off,
+  // contact info, and slot duration shared across all institutions.
   const { data, error } = await (supabase as any)
     .from("in_person_availability")
     .upsert({
       professional_id: professional.id,
       org_id: user.org_id,
       enabled: enabled ?? false,
-      availability: availability ?? { slotDurationMinutes: 30, days: [] },
+      availability: {
+        slotDurationMinutes: availability?.slotDurationMinutes ?? 30,
+        days: [],
+      },
       location_info: location_info ?? {},
-      institution_id: institution_id ?? null,
       updated_at: new Date().toISOString(),
     })
     .select()

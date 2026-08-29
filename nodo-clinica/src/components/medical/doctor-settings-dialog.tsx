@@ -568,7 +568,6 @@ export function DoctorSettingsDialog({
                   <div className="border-t border-slate-200 pt-6 mt-6">
                     <h3 className="text-sm font-semibold mb-4">Turnos Presenciales</h3>
                     <AgendaPresencialSection
-                      virtualDays={availability.days}
                       onSaved={() => {
                         toast.success("Agenda presencial guardada");
                       }}

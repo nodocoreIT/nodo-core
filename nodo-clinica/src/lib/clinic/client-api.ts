@@ -1231,7 +1231,7 @@ export const clinicApi = {
     return res.json();
   },
 
-  async getDoctorSchedule(doctorId: string) {
+  async getDoctorSchedule(doctorId?: string) {
     const res = await fetch(`${BASE}/api/clinic/schedule?own=true`, clinicFetchOpts());
     const data = await res.json();
     if (!res.ok) {
@@ -2141,16 +2141,14 @@ export const clinicApi = {
     return data as {
       enabled: boolean;
       availability: { slotDurationMinutes: number; days: Array<{ dayOfWeek: number; startTime: string; endTime: string }> };
-      location_info: { address?: string; phone?: string; parkingNotes?: string };
-      institution_id: string | null;
+      location_info: { phone?: string; parkingNotes?: string };
     };
   },
 
   async saveInPersonAvailability(payload: {
     enabled: boolean;
     availability: { slotDurationMinutes: number; days: Array<{ dayOfWeek: number; startTime: string; endTime: string }> };
-    location_info: { address?: string; phone?: string; parkingNotes?: string };
-    institution_id?: string | null;
+    location_info: { phone?: string; parkingNotes?: string };
   }) {
     const res = await fetch(`${BASE}/api/clinic/in-person-availability`, {
       method: "POST",

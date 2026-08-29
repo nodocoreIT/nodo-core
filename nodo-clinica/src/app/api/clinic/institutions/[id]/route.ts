@@ -4,6 +4,8 @@ import {
   deactivateInstitution,
   updateInstitution,
 } from "@/lib/clinic/db/institutions";
+import { checkInstitutionScheduleConflict } from "@/lib/clinic/institution-schedule-conflict";
+import type { DaySchedule } from "@/lib/clinic/schedule";
 
 async function resolveOwnedInstitution(
   request: NextRequest,
@@ -54,7 +56,7 @@ async function resolveOwnedInstitution(
     };
   }
 
-  return { supabase };
+  return { supabase, professionalId: professional.id };
 }
 
 /** Updates an institution owned by the authenticated doctor. */
@@ -65,7 +67,7 @@ export async function PATCH(
   const { id } = await params;
   const resolved = await resolveOwnedInstitution(request, id);
   if ("error" in resolved) return resolved.error;
-  const { supabase } = resolved;
+  const { supabase, professionalId } = resolved;
 
   const { name, city, address, extra_info, schedule } = await request.json();
 
@@ -74,6 +76,18 @@ export async function PATCH(
       { error: "El nombre de la institución es requerido" },
       { status: 400 },
     );
+  }
+
+  if (schedule !== undefined) {
+    const conflictError = await checkInstitutionScheduleConflict(
+      supabase,
+      professionalId,
+      (schedule?.days ?? []) as DaySchedule[],
+      id,
+    );
+    if (conflictError) {
+      return NextResponse.json({ error: conflictError }, { status: 409 });
+    }
   }
 
   const updates: Record<string, unknown> = {};

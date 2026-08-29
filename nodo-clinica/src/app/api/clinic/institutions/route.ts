@@ -4,6 +4,8 @@ import {
   createInstitution,
   getInstitutions,
 } from "@/lib/clinic/db/institutions";
+import { checkInstitutionScheduleConflict } from "@/lib/clinic/institution-schedule-conflict";
+import type { DaySchedule } from "@/lib/clinic/schedule";
 
 /** Lists the active institutions for the authenticated doctor. */
 export async function GET(request: NextRequest) {
@@ -70,6 +72,15 @@ export async function POST(request: NextRequest) {
       { error: "El nombre de la institución es requerido" },
       { status: 400 },
     );
+  }
+
+  const conflictError = await checkInstitutionScheduleConflict(
+    supabase,
+    professional.id,
+    (schedule?.days ?? []) as DaySchedule[],
+  );
+  if (conflictError) {
+    return NextResponse.json({ error: conflictError }, { status: 409 });
   }
 
   const { data, error } = await createInstitution(supabase, {
