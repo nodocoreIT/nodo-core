@@ -4,27 +4,8 @@ import { sendAppointmentConfirmationEmail } from "@/lib/email/resend";
 import { formatReminderLabel } from "@/lib/email/reminder-label";
 import { formatAppointmentLabelFromIso } from "@/lib/clinic/schedule";
 
-export function appBaseUrl() {
-  const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
-  if (fromEnv) return fromEnv;
-  if (process.env.CLINIC_APP_URL?.trim()) {
-    return process.env.CLINIC_APP_URL.trim().replace(/\/$/, "");
-  }
-  if (process.env.NEXT_PUBLIC_BASE_URL?.trim()) {
-    return process.env.NEXT_PUBLIC_BASE_URL.trim().replace(/\/$/, "");
-  }
-  const vercelProduction = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  if (vercelProduction) {
-    return `https://${vercelProduction.replace(/\/$/, "")}`;
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`.replace(/\/$/, "");
-  }
-  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
-    return "https://clinica.nodocore.com.ar";
-  }
-  return "http://localhost:3002";
-}
+export { appBaseUrl } from "@/lib/clinic/app-base-url";
+import { appBaseUrl } from "@/lib/clinic/app-base-url";
 
 const LOCAL_HOST = /localhost|127\.0\.0\.1|0\.0\.0\.0/i;
 

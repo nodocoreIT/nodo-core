@@ -1,5 +1,6 @@
 import "server-only";
 import { CLINIC_BRAND_LOGO_SRC } from "@/lib/clinic/brand";
+import { appBaseUrl } from "@/lib/clinic/app-base-url";
 
 function escapeHtml(value: string): string {
   return value
@@ -11,11 +12,7 @@ function escapeHtml(value: string): string {
 }
 
 function clinicEmailLogoUrl(): string {
-  const base =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    process.env.NEXT_PUBLIC_BASE_URL ??
-    "https://clinica.nodocore.com.ar";
-  return `${base.replace(/\/$/, "")}${CLINIC_BRAND_LOGO_SRC}`;
+  return `${appBaseUrl()}${CLINIC_BRAND_LOGO_SRC}`;
 }
 
 const BODY_TEXT =
