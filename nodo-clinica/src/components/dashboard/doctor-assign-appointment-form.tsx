@@ -69,11 +69,21 @@ export function DoctorAssignAppointmentForm({
   const [patientEmail, setPatientEmail] = useState("");
   const [intakeReason, setIntakeReason] = useState("");
   const [requirePayment, setRequirePayment] = useState(true);
+  const [appointmentType, setAppointmentType] = useState<"virtual" | "in_person">(
+    "virtual",
+  );
+  const [offersInPerson, setOffersInPerson] = useState(false);
 
   const [dates, setDates] = useState<CalendarDay[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [slots, setSlots] = useState<
-    { iso: string; label: string; status: "available" | "booked" }[]
+    {
+      iso: string;
+      label: string;
+      status: "available" | "booked";
+      institutionName?: string;
+      institutionAddress?: string;
+    }[]
   >([]);
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [loadingDates, setLoadingDates] = useState(false);
@@ -90,6 +100,7 @@ export function DoctorAssignAppointmentForm({
     setPatientEmail("");
     setIntakeReason("");
     setRequirePayment(true);
+    setAppointmentType("virtual");
     setSelectedDate(null);
     setSelectedSlots([]);
     setSlots([]);
@@ -113,25 +124,34 @@ export function DoctorAssignAppointmentForm({
       setPatientEmail(prefill.patientEmail ?? "");
     }
 
-    setLoadingDates(true);
-    clinicApi
-      .getAvailableDates(doctorId)
-      .then((data) => setDates(data.dates ?? []))
-      .catch(() => toast.error("No se pudieron cargar los días disponibles"))
-      .finally(() => setLoadingDates(false));
-
     // Default the checkbox to this doctor's actual payment setting instead
     // of hardcoding it — a doctor with payment disabled shouldn't have to
     // notice and uncheck it every time to avoid forcing payment by accident.
+    // Also tells us whether this doctor offers presencial attention at all,
+    // so the Virtual/Presencial switch only shows up when relevant.
     clinicApi
       .getDoctorForBooking(doctorId)
-      .then((data) =>
-        setRequirePayment(data.payment?.requirePaymentBeforeBooking !== false),
-      )
+      .then((data) => {
+        setRequirePayment(data.payment?.requirePaymentBeforeBooking !== false);
+        setOffersInPerson(Boolean(data.offersInPerson));
+      })
       .catch(() => {
-        /* keep the safe default (true) if this fetch fails */
+        /* keep the safe defaults if this fetch fails */
       });
   }, [active, doctorId, prefill, resetState]);
+
+  useEffect(() => {
+    if (!active) return;
+    setLoadingDates(true);
+    setSelectedDate(null);
+    setSelectedSlots([]);
+    setDates([]);
+    clinicApi
+      .getAvailableDates(doctorId, appointmentType)
+      .then((data) => setDates(data.dates ?? []))
+      .catch(() => toast.error("No se pudieron cargar los días disponibles"))
+      .finally(() => setLoadingDates(false));
+  }, [active, doctorId, appointmentType]);
 
   useEffect(() => {
     if (!active || prefill) return;
@@ -159,10 +179,10 @@ export function DoctorAssignAppointmentForm({
 
     setLoadingSlots(true);
     clinicApi
-      .getSlots(doctorId, selectedDate)
+      .getSlots(doctorId, selectedDate, appointmentType)
       .then((data) => setSlots(data.slots ?? []))
       .finally(() => setLoadingSlots(false));
-  }, [selectedDate, doctorId]);
+  }, [selectedDate, doctorId, appointmentType]);
 
   useEffect(() => {
     const onPointerDown = (e: MouseEvent) => {
@@ -223,6 +243,7 @@ export function DoctorAssignAppointmentForm({
         scheduledAtList: selectedSlots,
         intakeReason: intakeReason.trim() || undefined,
         requirePayment,
+        appointmentType,
       });
 
       toast.success(
@@ -398,6 +419,28 @@ export function DoctorAssignAppointmentForm({
         </span>
       </label>
 
+      {offersInPerson && (
+        <div className="space-y-2">
+          <Label>Modalidad</Label>
+          <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
+            {(["virtual", "in_person"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setAppointmentType(t)}
+                className={`h-8 rounded-md text-sm font-medium transition-colors ${
+                  appointmentType === t
+                    ? "bg-white text-slate-800 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {t === "virtual" ? "Virtual" : "Presencial"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label>Fecha y horarios</Label>
         {loadingDates ? (
@@ -425,6 +468,50 @@ export function DoctorAssignAppointmentForm({
               <p className="text-sm text-slate-400 text-center py-4">
                 No hay horarios libres este día
               </p>
+            ) : appointmentType === "in_person" ? (
+              <div className="space-y-3">
+                {Array.from(
+                  availableSlots.reduce((groups, slot) => {
+                    const key = slot.institutionName ?? "Otro consultorio";
+                    if (!groups.has(key)) {
+                      groups.set(key, { address: slot.institutionAddress, items: [] });
+                    }
+                    groups.get(key)!.items.push(slot);
+                    return groups;
+                  }, new Map<string, { address?: string; items: typeof availableSlots }>()),
+                ).map(([institutionName, group]) => (
+                  <div key={institutionName}>
+                    <p className="text-xs font-medium text-slate-600 mb-1">
+                      {institutionName}
+                      {group.address && (
+                        <span className="text-slate-400 font-normal"> — {group.address}</span>
+                      )}
+                    </p>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {group.items.map((slot) => {
+                        const picked = selectedSlots.includes(slot.iso);
+                        return (
+                          <button
+                            key={slot.iso}
+                            type="button"
+                            onClick={() => toggleSlot(slot.iso)}
+                            className={`rounded-lg border px-2 py-2 text-sm transition-colors ${
+                              picked
+                                ? "border-brand bg-brand/10 text-brand font-medium"
+                                : "border-slate-200 hover:border-brand/40 hover:bg-slate-50"
+                            }`}
+                          >
+                            <span className="flex items-center justify-center gap-1">
+                              {picked && <Check className="h-3.5 w-3.5" />}
+                              {slot.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {availableSlots.map((slot) => {

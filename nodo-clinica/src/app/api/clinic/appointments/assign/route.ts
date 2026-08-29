@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     scheduledAtList,
     intakeReason,
     requirePayment,
+    appointmentType,
   } = body as {
     patientId?: string;
     patientEmail?: string;
@@ -41,6 +42,7 @@ export async function POST(request: NextRequest) {
     scheduledAtList?: string[];
     intakeReason?: string;
     requirePayment?: boolean;
+    appointmentType?: "virtual" | "in_person";
   };
 
   if (!patientId) {
@@ -58,12 +60,14 @@ export async function POST(request: NextRequest) {
     const result = await doctorAssignAppointments({
       supabase: svc,
       doctorId: professional.id,
+      doctorUserId: user.id,
       orgId: user.org_id ?? "",
       patientId,
       patientEmail,
       scheduledAtList: slots,
       intakeReason,
       requirePayment,
+      appointmentType,
     });
 
     return NextResponse.json({

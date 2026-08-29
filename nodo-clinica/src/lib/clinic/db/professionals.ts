@@ -162,6 +162,7 @@ export type BookableProfessional = {
   specialty: string | null;
   subscription_status: string | null;
   trial_ends_at: string | null;
+  user_id: string | null;
 };
 
 export type ProfessionalOfficeSettings = {
@@ -179,7 +180,7 @@ export async function getBookableProfessional(doctorId: string): Promise<{
 
   const { data: professional } = await service
     .from("professionals")
-    .select("id, org_id, full_name, email, specialty, subscription_status, trial_ends_at")
+    .select("id, org_id, full_name, email, specialty, subscription_status, trial_ends_at, user_id")
     .eq("id", doctorId)
     .maybeSingle();
 

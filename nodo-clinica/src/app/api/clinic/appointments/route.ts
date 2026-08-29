@@ -754,7 +754,8 @@ export async function POST(request: NextRequest) {
       .from('institutions')
       .select('id, name, address, city, extra_info, schedule')
       .eq('professional_id', doctorId)
-      .eq('active', true);
+      .eq('active', true)
+      .order('id', { ascending: true });
     presencialInstitutions = institutionsData ?? [];
 
     if (presencialInstitutions.length === 0) {
@@ -778,6 +779,17 @@ export async function POST(request: NextRequest) {
         error: "Tu sesión no coincide con un paciente registrado. Cerrá sesión e ingresá de nuevo.",
       },
       { status: 404 },
+    );
+  }
+
+  // A médico can also have a patient account under the same auth.users
+  // identity (professionals.user_id / patients.profile_id share the same
+  // id on purpose — see 20260742_professionals_patients_paused_at.sql).
+  // That doesn't mean they can book a turno with themselves as the doctor.
+  if (professional.user_id && professional.user_id === user.id) {
+    return NextResponse.json(
+      { error: "No podés reservar un turno con vos mismo" },
+      { status: 400 },
     );
   }
 

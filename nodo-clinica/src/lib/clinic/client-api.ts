@@ -736,6 +736,7 @@ export const clinicApi = {
     scheduledAtList: string[];
     intakeReason?: string;
     requirePayment?: boolean;
+    appointmentType?: "virtual" | "in_person";
   }) {
     const res = await fetch(`${BASE}/api/clinic/appointments/assign`, {
       method: "POST",
