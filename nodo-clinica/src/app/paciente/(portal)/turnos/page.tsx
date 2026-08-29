@@ -25,6 +25,7 @@ type PatientAppointment = {
   cancelledBy?: "patient" | "doctor" | null;
   paymentRejected?: boolean;
   needsReview?: boolean;
+  appointmentType?: "virtual" | "in_person";
   doctor?: { fullName: string; specialty?: string; profilePhotoUrl?: string };
 };
 
@@ -201,7 +202,11 @@ function PacienteTurnosContent() {
                         }`}
                         onClick={() => setOpenToken(apt.accessToken)}
                       >
-                        {isPending ? "Completar pago" : "Entrar a sala de espera"}
+                        {isPending
+                          ? "Completar pago"
+                          : apt.appointmentType === "in_person"
+                            ? "Ver turno"
+                            : "Entrar a sala de espera"}
                         <ChevronRight className="h-3 w-3 ml-0.5" />
                       </Button>
                     ) : (

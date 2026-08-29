@@ -19,6 +19,7 @@ import {
   Trash2,
   Eye,
   Download,
+  Building2,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -220,6 +221,8 @@ export function WaitingRoom({
           token_expires_at: apt.tokenExpiresAt,
           created_at: apt.createdAt,
           updated_at: apt.updatedAt,
+          appointment_type: apt.appointmentType,
+          institution_snapshot: apt.institution ?? null,
         });
         setMeta({
           patientName: data.patient?.fullName || "Paciente",
@@ -646,6 +649,8 @@ export function WaitingRoom({
 
   const isInConsultation = appointment.status === "in_consultation";
   const isCompleted = appointment.status === "completed";
+  const isInPerson = appointment.appointment_type === "in_person";
+  const institution = appointment.institution_snapshot;
 
   const backLink = embedded ? null : (
     <Link
@@ -1053,6 +1058,42 @@ export function WaitingRoom({
     );
   }
 
+  // Turnos presenciales nunca abren videollamada — el médico atiende a la
+  // vista, no por Jitsi. jitsi_room_id queda null a propósito para estos
+  // turnos (ver migración 20260834), así que este branch tiene que salir
+  // antes de llegar a los checks de videoEnded/JitsiMeet de más abajo.
+  if (isInConsultation && isInPerson) {
+    return (
+      <div className={outerClass("bg-slate-50")}>
+        <div className={embedded ? "space-y-4" : "max-w-lg mx-auto space-y-4"}>
+          {backLink}
+          <Card className="border-emerald-200">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Badge className="bg-emerald-600 text-white">Consulta en curso</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <p className="text-sm text-slate-700">
+                Estás siendo atendido/a por Dr/a. {doctorName} en persona.
+              </p>
+              {institution && (
+                <div className="text-sm text-slate-600 space-y-0.5">
+                  {institution.name && <p className="font-medium">{institution.name}</p>}
+                  {(institution.address || institution.city) && (
+                    <p>{[institution.address, institution.city].filter(Boolean).join(", ")}</p>
+                  )}
+                  {institution.extra_info && <p>{institution.extra_info}</p>}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <ConsultationSessionDocumentsCard documents={sessionDocuments} />
+        </div>
+      </div>
+    );
+  }
+
   if (isInConsultation && videoEnded) {
     return (
       <div className={outerClass("bg-slate-900")}>
@@ -1092,7 +1133,7 @@ export function WaitingRoom({
           </div>
           <JitsiMeet
             key={`${appointment.jitsi_room_id}-${videoSessionKey}`}
-            roomName={appointment.jitsi_room_id}
+            roomName={appointment.jitsi_room_id ?? ""}
             displayName={patientName}
             accessToken={accessToken}
             height={embedded ? "min(70vh, 640px)" : 560}
@@ -1183,7 +1224,7 @@ export function WaitingRoom({
           <div>
             <Badge className="bg-emerald-600 text-white mb-2">Turno confirmado</Badge>
             <h1 className="text-xl font-semibold text-slate-900">
-              Sala de espera
+              {isInPerson ? "Turno presencial" : "Sala de espera"}
             </h1>
             <p className="text-sm text-slate-600 mt-1">
               Hola, {patientName}
@@ -1199,28 +1240,57 @@ export function WaitingRoom({
           </div>
         </div>
 
-        <Card className="border-emerald-100 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-700">
-              Tu lugar en la fila
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-bold text-emerald-700">
-                  #{queuePosition}
+        {isInPerson ? (
+          <Card className="border-emerald-100 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-emerald-600" />
+                Dónde es tu turno
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1.5">
+              {institution?.name && (
+                <p className="text-sm font-medium text-slate-800">{institution.name}</p>
+              )}
+              {(institution?.address || institution?.city) && (
+                <p className="text-sm text-slate-600">
+                  {[institution?.address, institution?.city].filter(Boolean).join(", ")}
                 </p>
-                <p className="text-xs text-slate-400">Posición actual</p>
+              )}
+              {institution?.extra_info && (
+                <p className="text-sm text-slate-600">{institution.extra_info}</p>
+              )}
+              {!institution && (
+                <p className="text-sm text-slate-500">
+                  Consultá la dirección con tu médico.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-emerald-100 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-slate-700">
+                Tu lugar en la fila
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-3xl font-bold text-emerald-700">
+                    #{queuePosition}
+                  </p>
+                  <p className="text-xs text-slate-400">Posición actual</p>
+                </div>
+                <div className="text-right text-xs text-slate-500">
+                  <Users className="h-4 w-4 inline mr-1 text-emerald-600" />
+                  {totalWaiting} en espera
+                </div>
               </div>
-              <div className="text-right text-xs text-slate-500">
-                <Users className="h-4 w-4 inline mr-1 text-emerald-600" />
-                {totalWaiting} en espera
-              </div>
-            </div>
-            <Progress value={progressPercent} className="h-2" />
-          </CardContent>
-        </Card>
+              <Progress value={progressPercent} className="h-2" />
+            </CardContent>
+          </Card>
+        )}
 
         {paymentReceiptAudit && (
           <ReceiptValidationCard

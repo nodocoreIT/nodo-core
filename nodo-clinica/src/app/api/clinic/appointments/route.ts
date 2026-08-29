@@ -216,6 +216,10 @@ export async function GET(request: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         paymentReceiptAudit: (apt as any).payment_receipt_audit,
         intakeReason: apt.intake_reason,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        appointmentType: (apt as any).appointment_type,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        institution: (apt as any).institution_snapshot ?? null,
       },
       patient: patient
         ? {
@@ -322,6 +326,10 @@ export async function GET(request: NextRequest) {
           scheduledAt: apt.scheduled_at,
           status: apt.status,
           accessToken: apt.access_token,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          appointmentType: (apt as any).appointment_type,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          institution: (apt as any).institution_snapshot ?? null,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           paymentStatus: (apt as any).payment_status,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any

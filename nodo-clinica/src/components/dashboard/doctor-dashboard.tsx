@@ -4,6 +4,7 @@ import { useEffect, useCallback, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Stethoscope, LogOut, CheckCircle, Settings, CalendarPlus } from "lucide-react";
 // import { Brain } from "lucide-react"; // SOAP tab disabled, see below
 import { PatientQueue } from "@/components/dashboard/patient-queue";
@@ -858,36 +859,61 @@ export function DoctorDashboard({
                 healthProfile={activeHealthProfile}
                 patientName={patientProfile?.profile?.full_name || "Paciente"}
               />
-              <JitsiMeet
-                key={`${activeAppointment.jitsi_room_id}-${videoSessionKey}`}
-                roomName={activeAppointment.jitsi_room_id}
-                displayName={doctorName}
-                isModerator
-                enableConsultorioBackground
-                height={520}
-                onMeetingEnd={() => {
-                  toast.message(
-                    "Saliste de la videollamada. Reingresá o usá «Finalizar consulta» cuando termines.",
-                  );
-                }}
-                endScreen={
-                  <ConsultationEndScreen
-                    role="doctor"
-                    autoRedirectSeconds={0}
-                    onRejoin={() => setVideoSessionKey((k) => k + 1)}
-                    onReturn={handleDismissConsultation}
-                    onGenerateReport={() =>
-                      openReportForPatient({
-                        appointmentId: activeAppointment.id,
-                        patientId: activeAppointment.patient_id,
-                        patientName:
-                          patientProfile?.profile?.full_name || "Paciente",
-                        patientEmail: patientProfile?.profile?.email,
-                      })
-                    }
-                  />
-                }
-              />
+              {activeAppointment.appointment_type === "in_person" ? (
+                // Turno presencial: no hay sala de Jitsi (jitsi_room_id es
+                // null a propósito, ver migración 20260834) — el médico
+                // atiende a la vista, esto solo confirma dónde.
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-1.5">
+                  <Badge className="bg-emerald-600 text-white">Turno presencial</Badge>
+                  {activeAppointment.institution_snapshot?.name && (
+                    <p className="text-sm font-medium text-slate-800 mt-1">
+                      {activeAppointment.institution_snapshot.name}
+                    </p>
+                  )}
+                  {(activeAppointment.institution_snapshot?.address ||
+                    activeAppointment.institution_snapshot?.city) && (
+                    <p className="text-sm text-slate-600">
+                      {[
+                        activeAppointment.institution_snapshot?.address,
+                        activeAppointment.institution_snapshot?.city,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <JitsiMeet
+                  key={`${activeAppointment.jitsi_room_id}-${videoSessionKey}`}
+                  roomName={activeAppointment.jitsi_room_id ?? ""}
+                  displayName={doctorName}
+                  isModerator
+                  enableConsultorioBackground
+                  height={520}
+                  onMeetingEnd={() => {
+                    toast.message(
+                      "Saliste de la videollamada. Reingresá o usá «Finalizar consulta» cuando termines.",
+                    );
+                  }}
+                  endScreen={
+                    <ConsultationEndScreen
+                      role="doctor"
+                      autoRedirectSeconds={0}
+                      onRejoin={() => setVideoSessionKey((k) => k + 1)}
+                      onReturn={handleDismissConsultation}
+                      onGenerateReport={() =>
+                        openReportForPatient({
+                          appointmentId: activeAppointment.id,
+                          patientId: activeAppointment.patient_id,
+                          patientName:
+                            patientProfile?.profile?.full_name || "Paciente",
+                          patientEmail: patientProfile?.profile?.email,
+                        })
+                      }
+                    />
+                  }
+                />
+              )}
 
               {/* En modo local, Acción Inmediata sigue debajo del video —
                   en modo clínica real (no local) se movió a la columna

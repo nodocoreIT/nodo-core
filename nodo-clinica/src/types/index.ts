@@ -33,6 +33,15 @@ export interface Patient {
   profile?: Profile;
 }
 
+export type AppointmentType = "virtual" | "in_person";
+
+export interface AppointmentInstitutionSnapshot {
+  name?: string;
+  address?: string;
+  city?: string;
+  extra_info?: string;
+}
+
 export interface Appointment {
   id: string;
   patient_id: string;
@@ -40,11 +49,14 @@ export interface Appointment {
   scheduled_at: string;
   status: AppointmentStatus;
   queue_position: number;
-  jitsi_room_id: string;
+  // null for turnos presenciales — they never need a video room.
+  jitsi_room_id: string | null;
   access_token: string;
   token_expires_at: string;
   created_at: string;
   updated_at: string;
+  appointment_type?: AppointmentType;
+  institution_snapshot?: AppointmentInstitutionSnapshot | null;
   patient?: Patient & { profile?: Profile };
   doctor?: Profile;
 }
