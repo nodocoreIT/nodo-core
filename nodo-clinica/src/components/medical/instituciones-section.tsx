@@ -5,7 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Building2, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { AlertCircle, Building2, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi, type InstitutionRecord } from "@/lib/clinic/client-api";
 
@@ -49,6 +57,7 @@ export function InstitucionesSection() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<InstitutionRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const loadInstitutions = () => {
     setLoading(true);
@@ -131,7 +140,7 @@ export function InstitucionesSection() {
       cancelEdit();
       loadInstitutions();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "No se pudo guardar la institución");
+      setSaveError(err instanceof Error ? err.message : "No se pudo guardar la institución");
     } finally {
       setSaving(false);
     }
@@ -262,6 +271,23 @@ export function InstitucionesSection() {
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      <Dialog open={!!saveError} onOpenChange={(open) => !open && setSaveError(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-4 w-4" />
+              No se pudo guardar
+            </DialogTitle>
+            <DialogDescription>{saveError}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" onClick={() => setSaveError(null)}>
+              Entendido
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
