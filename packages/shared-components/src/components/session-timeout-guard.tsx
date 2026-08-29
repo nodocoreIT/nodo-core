@@ -28,6 +28,23 @@ const CHECK_INTERVAL_MS = 5 * 1000;
 const ACTIVITY_THROTTLE_MS = 5 * 1000;
 const ACTIVITY_EVENTS = ["mousemove", "keydown", "click", "scroll", "touchstart"] as const;
 
+/**
+ * Clears the idle/absolute-timeout clock for a given nodo. MUST be called from
+ * every sign-out path (manual, forced, or fail-closed deny), not just this
+ * component's own `signOut`. Without this, a login right after a sign-out that
+ * happened somewhere else (AuthProvider's fail-closed deny, enforceNodeAccess's
+ * deny path, password reset, a logout button that hits a backend session
+ * endpoint instead of this component) inherits the previous session's stale
+ * `_last_activity`/`_login_at` values — the periodic check then reads the new
+ * session as already idle/expired and bounces the user with
+ * `session_error=sesion_inactividad` within one `CHECK_INTERVAL_MS` tick,
+ * even though they just logged in.
+ */
+export function clearSessionClock(storageKeyPrefix: string) {
+  localStorage.removeItem(`${storageKeyPrefix}_last_activity`);
+  localStorage.removeItem(`${storageKeyPrefix}_login_at`);
+}
+
 export interface SessionTimeoutGuardProps {
   /** Where to send the user after a forced sign-out, e.g. "/login". */
   loginPath: string;
@@ -60,14 +77,13 @@ export function SessionTimeoutGuard({
 
   const signOut = useCallback(
     async (reason: "sesion_inactividad" | "sesion_expirada") => {
-      localStorage.removeItem(lastActivityKey);
-      localStorage.removeItem(loginAtKey);
+      clearSessionClock(storageKeyPrefix);
       await supabase.auth.signOut({ scope: "local" });
       const url = new URL(loginPath, window.location.origin);
       url.searchParams.set(errorParam, reason);
       window.location.href = url.toString();
     },
-    [supabase, loginPath, lastActivityKey, loginAtKey, errorParam],
+    [supabase, loginPath, storageKeyPrefix, errorParam],
   );
 
   const touchActivity = useCallback(() => {
@@ -84,6 +100,23 @@ export function SessionTimeoutGuard({
     if (!localStorage.getItem(lastActivityKey)) {
       localStorage.setItem(lastActivityKey, String(Date.now()));
     }
+
+    // Defense-in-depth: if a fresh sign-in happens while this guard is already
+    // mounted (e.g. same-tab re-login after a sign-out that didn't go through
+    // this component's own signOut), reset the clock instead of leaving the
+    // previous session's stale login_at/last_activity in place — otherwise the
+    // periodic check below can read the brand-new session as already idle.
+    // INITIAL_SESSION always fires on subscribe, even for an existing valid
+    // session, so it's deliberately excluded here — only a real subsequent
+    // SIGNED_IN should reset the clock.
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") {
+        const now = Date.now();
+        localStorage.setItem(loginAtKey, String(now));
+        localStorage.setItem(lastActivityKey, String(now));
+        lastWriteRef.current = now;
+      }
+    });
 
     for (const event of ACTIVITY_EVENTS) {
       window.addEventListener(event, touchActivity, { passive: true });
@@ -111,12 +144,22 @@ export function SessionTimeoutGuard({
     }, CHECK_INTERVAL_MS);
 
     return () => {
+      authListener.subscription.unsubscribe();
       for (const event of ACTIVITY_EVENTS) {
         window.removeEventListener(event, touchActivity);
       }
       window.clearInterval(interval);
     };
-  }, [touchActivity, signOut, idleTimeoutMs, absoluteTimeoutMs, warningBeforeMs, lastActivityKey, loginAtKey]);
+  }, [
+    supabase,
+    touchActivity,
+    signOut,
+    idleTimeoutMs,
+    absoluteTimeoutMs,
+    warningBeforeMs,
+    lastActivityKey,
+    loginAtKey,
+  ]);
 
   function handleStaySignedIn() {
     const now = Date.now();

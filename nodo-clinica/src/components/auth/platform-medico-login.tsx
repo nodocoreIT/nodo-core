@@ -7,11 +7,17 @@ import {
   fetchMustSetPassword,
   RequiredPasswordForm,
   PAUSED_NODE_MESSAGE,
+  clearSessionClock,
 } from "@nodocore/shared-components";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-import { CLINICA_REGISTRATION_URL, CLINICA_AUTH_CONFIG, NODO_LANDING_URL } from "@/lib/clinic/platform-config";
+import {
+  CLINICA_REGISTRATION_URL,
+  CLINICA_AUTH_CONFIG,
+  CLINICA_SESSION_STORAGE_KEY_PREFIX,
+  NODO_LANDING_URL,
+} from "@/lib/clinic/platform-config";
 
 interface PlatformMedicoLoginProps {
   email: string;
@@ -85,7 +91,11 @@ export function PlatformMedicoLoginFields({
         return;
       }
 
-      const access = await enforceNodeAccess(supabase, CLINICA_AUTH_CONFIG.unitCode);
+      const access = await enforceNodeAccess(
+        supabase,
+        CLINICA_AUTH_CONFIG.unitCode,
+        CLINICA_AUTH_CONFIG.sessionStorageKeyPrefix,
+      );
       if (!access.ok) {
         if (access.reason === "paused") {
           setPausedModal(true);
@@ -112,6 +122,7 @@ export function PlatformMedicoLoginFields({
       });
       if (!verifyRes.ok) {
         await supabase.auth.signOut({ scope: "local" });
+        clearSessionClock(CLINICA_SESSION_STORAGE_KEY_PREFIX);
         const verifyData = await verifyRes.json().catch(() => ({}));
         setGeneralError(
           verifyData.error ?? "No existe un médico registrado con ese correo.",

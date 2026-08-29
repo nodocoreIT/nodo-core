@@ -3,4 +3,5 @@ export interface AuthConfig {
   roleDestinations: Record<string, string>;
   unitCode?: string;
   allowedRoles?: string[];
+  sessionStorageKeyPrefix?: string;
 }

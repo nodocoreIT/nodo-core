@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { clearSessionClock } from "../components/session-timeout-guard";
 
 /** Shown at login when auth fails or the user has no access to this nodo (same UX). */
 export const INVALID_LOGIN_MESSAGE =
@@ -176,12 +177,24 @@ export type EnforceNodeAccessResult =
 export async function enforceNodeAccess(
   supabase: SupabaseClient,
   unitCode: string,
+  /**
+   * Matching `storageKeyPrefix` for this nodo's <SessionTimeoutGuard>, if it
+   * uses one. When passed, the deny path also clears that guard's idle/
+   * absolute-timeout clock so a following successful login doesn't inherit a
+   * stale clock and get bounced with `sesion_inactividad` right after signing
+   * in. Optional because this function is shared across nodos and not all
+   * call sites know (or need) that prefix.
+   */
+  storageKeyPrefix?: string,
 ): Promise<EnforceNodeAccessResult> {
   const allowed = await userHasNodeAccess(supabase, unitCode);
   if (allowed) return { ok: true };
 
   // Reason must be read BEFORE sign-out — the RPC uses auth.uid().
   const reason = await getNodeAccessReason(supabase, unitCode);
+  if (storageKeyPrefix) {
+    clearSessionClock(storageKeyPrefix);
+  }
   await supabase.auth.signOut({ scope: "local" });
 
   if (reason === "paused") {

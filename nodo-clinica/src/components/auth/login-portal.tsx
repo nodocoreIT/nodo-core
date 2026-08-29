@@ -9,11 +9,13 @@ import {
   mapAuthPasswordError,
   isSamePasswordAuthError,
   usePasswordRecoveryBootstrap,
+  clearSessionClock,
 } from "@nodocore/shared-components";
 import { clinicApi, invalidateClinicApiCache } from "@/lib/clinic/client-api";
 import { safePatientNextPath } from "@/lib/clinic/patient-login-redirect";
 import {
   CLINICA_REGISTRATION_URL,
+  CLINICA_SESSION_STORAGE_KEY_PREFIX,
   isOpenRegistrationAllowed,
   isPlatformMode,
 } from "@/lib/clinic/platform-config";
@@ -458,6 +460,9 @@ export function LoginPortal() {
       }
     }
 
+    // Clear this nodo's idle/absolute-timeout clock so the login right after
+    // this reset doesn't inherit it and get bounced with sesion_inactividad.
+    clearSessionClock(CLINICA_SESSION_STORAGE_KEY_PREFIX);
     await supabase.auth.signOut({ scope: "local" });
     setResetSuccess(true);
     setAuthMode("login");

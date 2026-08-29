@@ -18,6 +18,14 @@ export const CLINICA_REGISTRATION_URL =
 
 export const CLINICA_UNIT_CODES = ["clinica", "Clínica", "salud", "Salud"] as const;
 
+/**
+ * Shared by <SessionTimeoutGuard storageKeyPrefix>, CLINICA_AUTH_CONFIG
+ * (AuthProvider's sign-out paths), and every other place that needs to clear
+ * this nodo's idle/absolute-timeout localStorage clock — keep it a single
+ * source of truth instead of retyping the string.
+ */
+export const CLINICA_SESSION_STORAGE_KEY_PREFIX = "nodo_clinica_session";
+
 export const CLINICA_AUTH_CONFIG: AuthConfig = {
   // Must match nodo_core.client_units/planes.unit_code exactly ("Clínica",
   // capitalized with accent) — user_has_node_access does an exact string
@@ -27,6 +35,7 @@ export const CLINICA_AUTH_CONFIG: AuthConfig = {
   // until the billing-lockout gate).
   unitCode: "Clínica",
   allowedRoles: ["super_admin", "admin", "medico", "agent"],
+  sessionStorageKeyPrefix: CLINICA_SESSION_STORAGE_KEY_PREFIX,
   roleDestinations: {
     super_admin: "/medico/dashboard",
     admin: "/medico/dashboard",

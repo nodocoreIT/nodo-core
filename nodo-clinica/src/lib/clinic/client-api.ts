@@ -1,6 +1,8 @@
 import type { ClinicSession } from "@/lib/clinic/types";
 import type { AppointmentStatus } from "@/lib/clinic/types";
 import type { MedicationSearchResponse } from "@/lib/clinic/medication-catalog";
+import { clearSessionClock } from "@nodocore/shared-components";
+import { CLINICA_SESSION_STORAGE_KEY_PREFIX } from "@/lib/clinic/platform-config";
 
 export interface InstitutionRecord {
   id: string;
@@ -553,6 +555,11 @@ export const clinicApi = {
   async logout() {
     clearClientSession();
     invalidateClinicApiCache();
+    // Also clears SessionTimeoutGuard's idle/absolute-timeout clock — this is
+    // the "Cerrar sesión" path used across every layout, and without this the
+    // next login on this browser inherits the previous session's stale clock
+    // and gets bounced with sesion_inactividad seconds after signing in.
+    clearSessionClock(CLINICA_SESSION_STORAGE_KEY_PREFIX);
     // Sign out from browser Supabase client (clears cookies)
     const client = getBrowserSupabase();
     if (client) {

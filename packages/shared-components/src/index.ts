@@ -104,6 +104,7 @@ export { filterAdminCommandItems } from "./lib/filter-admin-command-items";
 export { RequireAuth } from "./components/require-auth";
 export {
   SessionTimeoutGuard,
+  clearSessionClock,
   type SessionTimeoutGuardProps,
 } from "./components/session-timeout-guard";
 

@@ -19,6 +19,7 @@ import {
   type NodeAccessReason,
   type NodeIdentity,
 } from "../lib/verify-node-access";
+import { clearSessionClock } from "../components/session-timeout-guard";
 
 // ─── Public interfaces ──────────────────────────────────────────────────────
 
@@ -29,6 +30,16 @@ export interface AuthConfig {
   unitCode?: string;
   /** When set, JWT role must be one of these values (blocks cross-nodo role bleed). */
   allowedRoles?: string[];
+  /**
+   * Must match the `storageKeyPrefix` passed to this nodo's <SessionTimeoutGuard>.
+   * When set, every sign-out this provider performs (explicit `signOut()` and the
+   * fail-closed deny path below) also clears that guard's idle/absolute-timeout
+   * clock, so the next login doesn't inherit a stale clock and get bounced with
+   * `sesion_inactividad` seconds after signing in. Left unset, this provider
+   * doesn't touch session-timeout localStorage at all (back-compat for nodos not
+   * passing it yet).
+   */
+  sessionStorageKeyPrefix?: string;
 }
 
 export interface AuthContextValue {
@@ -174,6 +185,9 @@ export function AuthProvider({
             setAccessDenied(true);
             setAccessReason(reason === "ok" ? "invalid_credentials" : reason);
             setNodeIdentity(null);
+            if (config.sessionStorageKeyPrefix) {
+              clearSessionClock(config.sessionStorageKeyPrefix);
+            }
             await supabase.auth.signOut({ scope: "local" });
           }
           return;
@@ -281,8 +295,11 @@ export function AuthProvider({
   );
 
   const signOut = useCallback(async () => {
+    if (config.sessionStorageKeyPrefix) {
+      clearSessionClock(config.sessionStorageKeyPrefix);
+    }
     await supabase.auth.signOut({ scope: "local" });
-  }, [supabase]);
+  }, [supabase, config.sessionStorageKeyPrefix]);
 
   const claims = readClaims(session);
   // While nodeIdentity is still resolving for a unitCode'd nodo, don't fall
