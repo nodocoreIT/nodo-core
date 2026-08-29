@@ -1854,12 +1854,18 @@ export const clinicApi = {
     return data as {
       entries: Array<{
         id: string;
+        source?: "appointment" | "prescription";
+        status?: string;
         scheduledAt: string;
+        createdAt?: string;
         patientName: string;
         patientPhone?: string;
         paymentStatus?: string;
         paymentProvider?: string;
+        concept?: string;
         audit?: import("@/lib/clinic/types").PaymentReceiptAudit;
+        needsReview?: boolean;
+        documents?: Array<{ id: string; fileName: string; downloadUrl: string }>;
       }>;
     };
   },

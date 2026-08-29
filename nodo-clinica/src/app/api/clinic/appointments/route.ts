@@ -434,7 +434,7 @@ export async function GET(request: NextRequest) {
         .order("scheduled_at", { ascending: false })
         .limit(500);
 
-      const entries = (ledger ?? [])
+      const appointmentEntries = (ledger ?? [])
         .filter((apt) =>
           appointmentIncludedInPaymentLedger(apt as never, {
             receiptDocumentCount: (
@@ -445,6 +445,7 @@ export async function GET(request: NextRequest) {
         )
         .map((apt) => ({
           id: apt.id,
+          source: "appointment" as const,
           status: apt.status,
           scheduledAt: apt.scheduled_at,
           createdAt: apt.created_at,
@@ -472,6 +473,64 @@ export async function GET(request: NextRequest) {
               downloadUrl: `/api/clinic/documents?id=${d.id}&download=1`,
             })),
         }));
+
+      // Recetas standalone pagadas por Mercado Pago (Fase 4 de "Recetas")
+      // nunca tocan `appointments` — se confirman directo sobre
+      // `prescriptions` (ver confirmPrescriptionPaymentAndNotify). Las
+      // sumamos acá mapeadas al mismo shape que las filas de turnos para que
+      // el médico las vea en la misma pantalla de Cobros.
+      // The Fase 2 `prescriptions` columns (payment_status, price_amount,
+      // etc) predate the generated Database type — same untyped-cast
+      // pattern already used for this table elsewhere in Fase 2/3/4.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: paidPrescriptions } = await (svc as any)
+        .from("prescriptions")
+        .select(
+          "id, patient_id, patient_full_name, medications, price_amount, price_currency, payment_status, payment_confirmed_at, mercadopago_payment_id, created_at, patients(full_name, phone)",
+        )
+        .eq("doctor_id", doctorId)
+        .eq("payment_status", "confirmed")
+        .order("payment_confirmed_at", { ascending: false })
+        .limit(500);
+
+      const prescriptionEntries = (
+        (paidPrescriptions ?? []) as Array<Record<string, unknown>>
+      ).map((rx) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const row = rx as any;
+        const paidAt = row.payment_confirmed_at ?? row.created_at;
+        const medications = Array.isArray(row.medications) ? row.medications : [];
+        const firstMedicationName =
+          typeof medications[0]?.name === "string" ? medications[0].name : null;
+        return {
+          id: row.id,
+          source: "prescription" as const,
+          status: "completed",
+          scheduledAt: paidAt,
+          createdAt: paidAt,
+          patientName: row.patient_full_name ?? row.patients?.full_name ?? "Paciente",
+          patientPhone: row.patients?.phone ?? undefined,
+          paymentStatus: row.payment_status,
+          paymentProvider: "mercadopago" as const,
+          concept: firstMedicationName
+            ? `Receta médica · ${firstMedicationName}`
+            : "Receta médica",
+          audit: {
+            validatedAt: paidAt,
+            valid: true,
+            confidence: 1,
+            amount: typeof row.price_amount === "number" ? row.price_amount : undefined,
+            currency: row.price_currency ?? "ARS",
+            operationId: row.mercadopago_payment_id ?? undefined,
+          },
+          needsReview: false,
+          documents: [] as Array<{ id: string; fileName: string; downloadUrl: string }>,
+        };
+      });
+
+      const entries = [...appointmentEntries, ...prescriptionEntries].sort(
+        (a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime(),
+      );
 
       return NextResponse.json({ entries });
     }

@@ -45,6 +45,7 @@ interface DoctorCobrosListProps {
 
 type CobroRow = {
   id: string;
+  source?: "appointment" | "prescription";
   status?: string;
   patientName: string;
   patientPhone?: string;
@@ -52,6 +53,7 @@ type CobroRow = {
   createdAt?: string;
   paymentStatus?: string;
   paymentProvider?: "transfer" | "mercadopago";
+  concept?: string;
   audit?: PaymentReceiptAudit;
   needsReview?: boolean;
   documents?: Array<{ id: string; fileName: string; downloadUrl: string }>;
@@ -455,12 +457,17 @@ export function DoctorCobrosList({
                           {row.patientName}
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-400">
-                          {row.paymentProvider === "mercadopago" ? (
+                          {row.source === "prescription" ? (
+                            <FileText className="h-3 w-3" />
+                          ) : row.paymentProvider === "mercadopago" ? (
                             <CreditCard className="h-3 w-3" />
                           ) : (
                             <Receipt className="h-3 w-3" />
                           )}
-                          {providerLabel(row.paymentProvider)} · Turno{" "}
+                          {providerLabel(row.paymentProvider)} ·{" "}
+                          {row.source === "prescription"
+                            ? (row.concept ?? "Receta médica")
+                            : "Turno"}{" "}
                           {format(new Date(row.scheduledAt), "dd/MM HH:mm", {
                             locale: es,
                           })}
@@ -556,6 +563,10 @@ export function DoctorCobrosList({
                               Rechazar
                             </Button>
                           </div>
+                        ) : row.source === "prescription" ? (
+                          // Las recetas pagadas no tienen un turno que
+                          // cancelar desde acá — la fila es solo informativa.
+                          <span className="text-slate-300 text-xs">—</span>
                         ) : (
                           <Button
                             size="sm"
