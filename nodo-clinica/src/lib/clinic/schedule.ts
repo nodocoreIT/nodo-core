@@ -41,6 +41,34 @@ export function parseLocalDate(dateStr: string): Date {
   return new Date(y, m - 1, d);
 }
 
+function timeRangesOverlap(
+  aStart: string,
+  aEnd: string,
+  bStart: string,
+  bEnd: string,
+): boolean {
+  return aStart < bEnd && bStart < aEnd;
+}
+
+/** Days (0-6) where a block in `a` overlaps a block in `b` at the same
+ * dayOfWeek — used to block saving turnos presenciales that collide with
+ * the doctor's virtual hours (or vice versa). */
+export function findScheduleConflictDays(
+  a: DaySchedule[],
+  b: DaySchedule[],
+): number[] {
+  const conflictDays = new Set<number>();
+  for (const blockA of a) {
+    for (const blockB of b) {
+      if (blockA.dayOfWeek !== blockB.dayOfWeek) continue;
+      if (timeRangesOverlap(blockA.startTime, blockA.endTime, blockB.startTime, blockB.endTime)) {
+        conflictDays.add(blockA.dayOfWeek);
+      }
+    }
+  }
+  return [...conflictDays].sort((x, y) => x - y);
+}
+
 /** Merge overlapping blocks; keep separate morning/afternoon shifts. */
 function mergeDayBlocks(blocks: DaySchedule[]): DaySchedule[] {
   if (blocks.length <= 1) return blocks;

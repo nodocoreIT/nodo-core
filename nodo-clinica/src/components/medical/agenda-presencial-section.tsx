@@ -16,16 +16,20 @@ import { WeeklyScheduleEditor } from "@/components/medical/weekly-schedule-edito
 import { MapPin, Phone, AlertCircle, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi, type InstitutionRecord } from "@/lib/clinic/client-api";
-import type { DaySchedule } from "@/lib/clinic/schedule";
+import { dayLabel, findScheduleConflictDays, type DaySchedule } from "@/lib/clinic/schedule";
 
 function institutionLabel(inst: InstitutionRecord): string {
   return inst.city ? `${inst.name} — ${inst.city}` : inst.name;
 }
 
 export function AgendaPresencialSection({
+  virtualDays,
   onSaved,
   onGoToInstituciones,
 }: {
+  /** The doctor's virtual (non-presencial) hours, from the main Agenda tab —
+   * used to block saving turnos presenciales that overlap with them. */
+  virtualDays: DaySchedule[];
   onSaved?: () => void;
   onGoToInstituciones?: () => void;
 }) {
@@ -86,6 +90,18 @@ export function AgendaPresencialSection({
     if (enabled && !phone) {
       toast.error("Ingresá el teléfono de contacto");
       return;
+    }
+
+    if (enabled) {
+      const conflictDays = findScheduleConflictDays(slots, virtualDays);
+      if (conflictDays.length > 0) {
+        toast.error(
+          `Los horarios presenciales chocan con tus turnos virtuales el ${conflictDays
+            .map(dayLabel)
+            .join(", ")}. Ajustá los horarios para que no se superpongan.`,
+        );
+        return;
+      }
     }
 
     setSaving(true);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, resolveProfessional } from "@/lib/supabase/auth-guard";
+import { dayLabel, findScheduleConflictDays, type DaySchedule } from "@/lib/clinic/schedule";
 
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth(request);
@@ -68,6 +69,27 @@ export async function POST(request: NextRequest) {
   }
 
   const { enabled, availability, location_info, institution_id } = await request.json();
+
+  if (enabled) {
+    const { data: officeSettings } = await (supabase as any)
+      .from("office_settings")
+      .select("availability")
+      .eq("professional_id", professional.id)
+      .maybeSingle();
+    const virtualDays = (officeSettings?.availability?.days ?? []) as DaySchedule[];
+    const presencialDays = (availability?.days ?? []) as DaySchedule[];
+    const conflictDays = findScheduleConflictDays(presencialDays, virtualDays);
+    if (conflictDays.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Los horarios presenciales chocan con tus turnos virtuales el ${conflictDays
+            .map(dayLabel)
+            .join(", ")}. Ajustá los horarios para que no se superpongan.`,
+        },
+        { status: 409 },
+      );
+    }
+  }
 
   const { data, error } = await (supabase as any)
     .from("in_person_availability")
