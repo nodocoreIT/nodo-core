@@ -16,6 +16,7 @@ import {
   Map,
   MessageSquare,
   Settings,
+  ShieldAlert,
   UserCog,
   Users,
   UsersRound,
@@ -83,6 +84,7 @@ const TOOLS_ITEMS: NavItem[] = [
   { label: "Bóveda de contraseñas", href: "/panel/passwords", icon: KeyRound },
   { label: "Backups", href: "/panel/backups", icon: DatabaseBackup },
   { label: "Informes", href: "/panel/informes", icon: BarChart3 },
+  { label: "Auditorías", href: "/panel/auditorias", icon: ShieldAlert },
 ];
 
 
