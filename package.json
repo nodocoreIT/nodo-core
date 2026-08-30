@@ -8,6 +8,8 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks || true",
+    "audit:build": "node scripts/qa-audit/build-audit-html.mjs",
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",

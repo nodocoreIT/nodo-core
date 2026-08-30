@@ -1,0 +1,24 @@
+#!/bin/sh
+# Auto-regenerate the QA audit artifacts (docs/qa/AUDITORIA.html and the
+# dashboard content module) whenever the audit source docs or the generator
+# change, then re-stage them so the commit always includes fresh output.
+# Activated via the root "prepare" script (git config core.hooksPath .githooks).
+
+changed=$(git diff --cached --name-only)
+need=0
+for f in $changed; do
+  case "$f" in
+    docs/qa/*.md|scripts/qa-audit/build-audit-html.mjs) need=1 ;;
+  esac
+done
+
+if [ "$need" = "1" ]; then
+  echo "[pre-commit] audit docs changed → regenerating artifacts…"
+  if ! node scripts/qa-audit/build-audit-html.mjs; then
+    echo "[pre-commit] audit generator failed — aborting commit."
+    exit 1
+  fi
+  git add docs/qa/AUDITORIA.html nodo-landing/lib/auditorias/content.generated.ts
+fi
+
+exit 0
