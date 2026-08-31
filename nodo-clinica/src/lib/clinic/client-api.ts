@@ -2056,6 +2056,21 @@ export const clinicApi = {
     };
   },
 
+  async createPatient(input: { fullName: string; dni: string; email?: string }) {
+    const res = await fetch(`${BASE}/api/clinic/medico/pacientes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...clinicFetchOpts().headers },
+      credentials: "include",
+      body: JSON.stringify(input),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al crear el paciente");
+    return data as {
+      patient: { id: string; fullName: string; dni: string | null; email: string | null };
+      reused: boolean;
+    };
+  },
+
   async getMyPatientHistory(patientId: string) {
     const res = await fetch(
       `${BASE}/api/clinic/medico/pacientes/${encodeURIComponent(patientId)}`,

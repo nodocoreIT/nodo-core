@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, ChevronRight, Users, Loader2, CalendarDays } from "lucide-react";
+import { Search, ChevronRight, Users, Loader2, CalendarDays, UserPlus } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { clinicApi } from "@/lib/clinic/client-api";
@@ -95,8 +95,14 @@ export function PatientsHistoryPage() {
           <p className="max-w-xs text-xs text-slate2">
             {patients.length === 0
               ? "Cuando finalices tu primera consulta, el paciente va a aparecer acá con su historial."
-              : "Probá con otro nombre."}
+              : "¿No lo encontrás? Podés agregarlo y asignarle un turno."}
           </p>
+          <Link
+            href="/medico/asignar-turnos"
+            className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            <UserPlus className="h-4 w-4" /> Agregar paciente
+          </Link>
         </div>
       ) : (
         <ul className="space-y-2">
