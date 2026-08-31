@@ -348,6 +348,30 @@ async function fetchSessionUncached(): Promise<ClinicSessionResult> {
 
 // ── Public API ────────────────────────────────────────────────────────────
 
+/** Patient-level clinical header (antecedentes / alergias / medicación). */
+export interface HealthProfile {
+  bloodType: string | null;
+  allergies: string[] | null;
+  chronicConditions: string[] | null;
+  medications: string | null;
+  heightCm: number | null;
+  weightKg: number | null;
+  insuranceProvider: string | null;
+  insuranceNumber: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  updatedAt: string | null;
+}
+
+/** One append-only evolution entry in the patient's clinical history. */
+export interface HistoryEntry {
+  id: string;
+  body: string;
+  appointmentId: string | null;
+  doctorId: string | null;
+  createdAt: string;
+}
+
 export const clinicApi = {
   /**
    * Returns the current session.
@@ -2071,6 +2095,8 @@ export const clinicApi = {
         dateOfBirth: string | null;
         dni: string | null;
       };
+      healthProfile: HealthProfile | null;
+      historyEntries: HistoryEntry[];
       consultations: Array<{
         id: string;
         scheduledAt: string;
@@ -2101,6 +2127,36 @@ export const clinicApi = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al guardar las notas");
     return data as { content: string; updatedAt: string };
+  },
+
+  async updatePatientHealthProfile(patientId: string, patch: Partial<HealthProfile>) {
+    const res = await fetch(
+      `${BASE}/api/clinic/medico/pacientes/${encodeURIComponent(patientId)}/health-profile`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...clinicFetchOpts().headers },
+        credentials: "include",
+        body: JSON.stringify(patch),
+      },
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al guardar la ficha del paciente");
+    return data as HealthProfile;
+  },
+
+  async addPatientHistoryEntry(patientId: string, body: string, appointmentId?: string | null) {
+    const res = await fetch(
+      `${BASE}/api/clinic/medico/pacientes/${encodeURIComponent(patientId)}/history`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...clinicFetchOpts().headers },
+        credentials: "include",
+        body: JSON.stringify({ body, appointmentId: appointmentId ?? null }),
+      },
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al agregar la evolución");
+    return data as HistoryEntry;
   },
 
   async getCobrosUnreadCount() {
