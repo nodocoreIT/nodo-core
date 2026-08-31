@@ -856,31 +856,6 @@ export const clinicApi = {
     return data as { initPoint: string };
   },
 
-  async startPatientSubscriptionCheckout(planId: string, billingCycle: "monthly" | "annual" = "monthly") {
-    const res = await fetch(`${BASE}/api/clinic/patient-subscription/checkout`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId, billingCycle }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al iniciar la suscripción");
-    return data as { initPoint: string };
-  },
-
-  async getPatientSubscriptionPricing() {
-    const res = await fetch(`${BASE}/api/clinic/patient-subscription/checkout`, {
-      credentials: "include",
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al obtener precios");
-    return data as {
-      plan: string;
-      hasPreapproval: boolean;
-      pricing?: { amount: number; currency: string } | null;
-    };
-  },
-
   async testMercadoPagoConnection() {
     const res = await fetch(`${BASE}/api/clinic/mercadopago/test/connection`, {
       credentials: "include",
@@ -1766,7 +1741,6 @@ export const clinicApi = {
       medications: string;
       emergencyContactName: string;
       emergencyContactPhone: string;
-      subscriptionPlan: string | null;
     };
   },
 

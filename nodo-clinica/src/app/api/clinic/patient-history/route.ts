@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
   if (user.role === "patient") {
     const { data: ownRow } = await svc
       .from("patients")
-      .select("id, org_id, profile_id, subscription_plan")
+      .select("id, org_id, profile_id")
       .eq("profile_id", user.id)
       .maybeSingle();
 
@@ -43,18 +43,6 @@ export async function GET(request: NextRequest) {
       patientIdParam === ownRow.id || patientIdParam === ownRow.profile_id;
     if (!paramMatches) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
-
-    // Free-tier patients don't get historial/estudios/archivos — only "pago".
-    // Fail closed: anything other than the exact paid plan id is treated as free.
-    if (ownRow.subscription_plan !== "pago") {
-      return NextResponse.json({
-        locked: true,
-        appointments: [],
-        clinicalRecords: [],
-        timeline: [],
-        healthProfile: null,
-      });
     }
 
     patientRow = { id: ownRow.id, org_id: ownRow.org_id };
