@@ -4,7 +4,6 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { ALLOWED_MIME, MAX_FILE_BYTES } from "@/lib/clinic/storage";
 import { markTransferReceiptPendingReview } from "@/lib/clinic/transfer-receipt-pending";
 import { createPatientDocument } from "@/lib/clinic/db/clinical-records";
-import { resolvePatientPlanId } from "@/lib/clinic/patient-subscription-plans";
 import { isLocalMode } from "@/lib/clinic/config";
 import { resolveAppointmentByAccessToken } from "@/lib/clinic/appointment-token-auth";
 import {
@@ -308,9 +307,8 @@ async function uploadReceiptForAppointment(
 }
 
 /**
- * Patient-personal study upload — no appointment context at all.
- * PRO-plan patients only; plan is resolved server-side, never trusted from
- * the client. Storage path is scoped under `personal/{patientId}/...` since
+ * Patient-personal study upload — no appointment context at all. Available to
+ * every patient. Storage path is scoped under `personal/{patientId}/...` since
  * these documents may exist before the patient ever has an org-scoped
  * appointment.
  */
@@ -326,7 +324,7 @@ async function uploadPersonalStudy(
 
   const { data: patientRow } = await supabase
     .from("patients")
-    .select("id, org_id, subscription_plan")
+    .select("id, org_id")
     .eq("profile_id", user.id)
     .maybeSingle();
 
@@ -334,13 +332,6 @@ async function uploadPersonalStudy(
     return NextResponse.json(
       { error: "Paciente no encontrado" },
       { status: 404 },
-    );
-  }
-
-  if (resolvePatientPlanId(patientRow.subscription_plan) !== "pago") {
-    return NextResponse.json(
-      { error: "Esta función requiere el plan Pago" },
-      { status: 403 },
     );
   }
 
@@ -450,8 +441,7 @@ export async function POST(request: NextRequest) {
   const { user, supabase } = authResult;
 
   // Appointment-less personal study upload (patient's own library, no turno
-  // selected). FREE-plan patients are blocked server-side inside the branch
-  // regardless of what the UI shows.
+  // selected). Available to every patient.
   if (!accessToken && !appointmentIdParam && documentType === "study") {
     return uploadPersonalStudy(file, user, supabase);
   }

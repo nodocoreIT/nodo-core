@@ -21,7 +21,6 @@ import {
   PatientPerfilSection,
   PatientPersonalizacionSection,
   PatientSaludSection,
-  PatientSuscripcionSection,
   type PatientProfileData,
 } from "@/components/patient/patient-settings-sections";
 import {
@@ -29,7 +28,7 @@ import {
   mergeThemeSettings,
 } from "@/lib/clinic/theme-settings";
 import { usePatientThemeSettings } from "@/hooks/use-theme-settings";
-import { HeartPulse, Loader2, Palette, Plug, Receipt, User } from "lucide-react";
+import { HeartPulse, Loader2, Palette, Plug, User } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
@@ -37,8 +36,7 @@ export type PatientSettingsSectionId =
   | "perfil"
   | "salud"
   | "personalizacion"
-  | "integraciones"
-  | "suscripcion";
+  | "integraciones";
 
 const SECTIONS: {
   id: PatientSettingsSectionId;
@@ -49,7 +47,6 @@ const SECTIONS: {
   { id: "salud", label: "Mi salud", icon: HeartPulse },
   { id: "personalizacion", label: "Personalización", icon: Palette },
   { id: "integraciones", label: "Integraciones", icon: Plug },
-  { id: "suscripcion", label: "Suscripción", icon: Receipt },
 ];
 
 const PATIENT_SETTINGS_NAV: SettingsSectionNavItem<PatientSettingsSectionId>[] =
@@ -62,9 +59,7 @@ const PATIENT_SETTINGS_NAV: SettingsSectionNavItem<PatientSettingsSectionId>[] =
         ? "Tema"
         : id === "integraciones"
           ? "IA"
-          : id === "suscripcion"
-            ? "Plan"
-            : label,
+          : label,
   }));
 
 const PROFILE_CACHE_KEY = "clinic_patient_profile_cache";
@@ -176,9 +171,7 @@ export function PatientSettingsDialog({
         ? "Cobertura médica y datos de salud."
         : activeSection === "personalizacion"
           ? "Ajustá los colores y tipografía del portal."
-          : activeSection === "integraciones"
-            ? "Conectores e integraciones con IA."
-            : "Información de tu plan de paciente en Nodo Clínica.";
+          : "Conectores e integraciones con IA.";
 
   return (
     <>
@@ -227,9 +220,7 @@ export function PatientSettingsDialog({
           <ScrollArea className="flex-1 min-h-0">
             <div className="p-6 space-y-4 max-w-xl">
               {profileLoading &&
-              (activeSection === "perfil" ||
-                activeSection === "salud" ||
-                activeSection === "suscripcion") ? (
+              (activeSection === "perfil" || activeSection === "salud") ? (
                 <div className="flex justify-center py-10">
                   <Loader2 className="h-6 w-6 animate-spin text-[var(--color-primary)]" />
                 </div>
@@ -249,12 +240,6 @@ export function PatientSettingsDialog({
 
                   {activeSection === "integraciones" ? (
                     <PatientIntegracionesSection />
-                  ) : null}
-
-                  {activeSection === "suscripcion" && profileData ? (
-                    <PatientSuscripcionSection
-                      subscriptionPlan={profileData.subscriptionPlan}
-                    />
                   ) : null}
                 </>
               )}

@@ -17,12 +17,6 @@ import { ThemeSettingsPanel } from "@/components/settings/theme-settings-panel";
 import { clinicApi } from "@/lib/clinic/client-api";
 import { createClient } from "@/lib/supabase/client";
 import { usePatientThemeSettings } from "@/hooks/use-theme-settings";
-import {
-  getPatientPlanById,
-  PATIENT_SUBSCRIPTION_PLANS,
-  patientPlanRequiresCheckout,
-  resolvePatientPlanId,
-} from "@/lib/clinic/patient-subscription-plans";
 import { cn } from "@/lib/utils";
 import { Camera, Eye, EyeOff, Loader2, Plug } from "lucide-react";
 import { toast } from "sonner";
@@ -49,7 +43,6 @@ export interface PatientProfileData {
   medications: string;
   emergencyContactName: string;
   emergencyContactPhone: string;
-  subscriptionPlan: string | null;
 }
 
 function readImageFile(file: File, maxKb = 400): Promise<string> {
@@ -622,130 +615,6 @@ export function PatientIntegracionesSection() {
       <p className="text-sm text-slate-400 max-w-xs">
         Las integraciones para pacientes estarán disponibles próximamente.
       </p>
-    </div>
-  );
-}
-
-export function PatientSuscripcionSection({
-  subscriptionPlan,
-}: {
-  subscriptionPlan: string | null;
-}) {
-  const currentId = resolvePatientPlanId(subscriptionPlan);
-  const current = getPatientPlanById(subscriptionPlan);
-  const [selectedPlanId, setSelectedPlanId] = useState<string>(currentId);
-  const [checkingOut, setCheckingOut] = useState(false);
-  const [pricing, setPricing] = useState<{ amount: number; currency: string } | null>(null);
-  const [loadingPricing, setLoadingPricing] = useState(true);
-
-  useEffect(() => {
-    clinicApi
-      .getPatientSubscriptionPricing()
-      .then((res) => setPricing(res.pricing ?? null))
-      .catch((e) => console.error("Failed to load pricing:", e))
-      .finally(() => setLoadingPricing(false));
-  }, []);
-
-  const canCheckout = patientPlanRequiresCheckout(subscriptionPlan, selectedPlanId);
-
-  const handleCheckout = async () => {
-    if (!canCheckout) return;
-    setCheckingOut(true);
-    try {
-      const result = await clinicApi.startPatientSubscriptionCheckout(selectedPlanId);
-      window.location.href = result.initPoint;
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo iniciar el pago");
-    } finally {
-      setCheckingOut(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-violet-200 bg-violet-50/60 p-3 space-y-1.5">
-        <p className="text-sm font-medium text-violet-950">Tu plan de paciente</p>
-        <p className="text-[11px] text-violet-900/90 leading-relaxed">
-          Elegí un plan y completá el pago en Mercado Pago para activarlo en tu cuenta.
-        </p>
-      </div>
-
-      <div className="rounded-md border border-emerald-200 bg-emerald-50/80 p-3 space-y-1">
-        <p className="text-sm font-medium text-emerald-900">Plan actual: {current.name}</p>
-        <p className="text-base font-bold text-emerald-800">
-          {current.price}{" "}
-          <span className="text-xs font-normal text-emerald-700/80">{current.period}</span>
-        </p>
-        <ul className="mt-2 space-y-1">
-          {current.features.map((feature) => (
-            <li key={feature} className="text-xs text-emerald-900/90 flex items-center gap-1.5">
-              <span className="text-emerald-600">✓</span>
-              {feature}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="grid sm:grid-cols-2 gap-3">
-        {PATIENT_SUBSCRIPTION_PLANS.map((plan) => {
-          const isCurrent = plan.id === currentId;
-          const isSelected = plan.id === selectedPlanId;
-
-          return (
-            <button
-              key={plan.id}
-              type="button"
-              onClick={() => setSelectedPlanId(plan.id)}
-              className={cn(
-                "rounded-lg border p-3 space-y-2 text-left transition-colors",
-                isSelected
-                  ? "border-[var(--color-primary)] bg-[var(--color-primary)]/5 ring-1 ring-[var(--color-primary)]/20"
-                  : "border-slate-200 bg-white hover:border-[var(--color-primary)]/60",
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-800">{plan.name}</p>
-                {isCurrent ? (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                    Actual
-                  </span>
-                ) : null}
-              </div>
-              <p className="text-base font-bold text-slate-800">
-                {plan.id === "pago" && pricing
-                  ? `${pricing.currency === "USD" ? "US$ " : "$ "}${pricing.currency === "USD" ? pricing.amount : pricing.amount.toLocaleString("es-AR")}`
-                  : plan.price}{" "}
-                <span className="text-xs font-normal text-slate-400">/mes</span>
-              </p>
-              <ul className="space-y-1">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="text-xs text-slate-500 flex items-center gap-1">
-                    <span className="text-emerald-500">✓</span> {feature}
-                  </li>
-                ))}
-              </ul>
-            </button>
-          );
-        })}
-      </div>
-
-      {canCheckout ? (
-        <div className="flex justify-end">
-          <Button
-            type="button"
-            disabled={checkingOut}
-            onClick={() => void handleCheckout()}
-            className="bg-[var(--color-primary)] hover:opacity-90 text-white gap-2"
-          >
-            {checkingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Cambiar a este plan
-          </Button>
-        </div>
-      ) : selectedPlanId === "gratuito" && currentId === "pago" ? (
-        <p className="text-[11px] text-slate-500 leading-relaxed">
-          Para volver al plan gratuito contactá al equipo de Nodo Clínica.
-        </p>
-      ) : null}
     </div>
   );
 }

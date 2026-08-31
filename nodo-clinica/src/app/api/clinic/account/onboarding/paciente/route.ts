@@ -23,8 +23,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const dni = formData.get("dni") as string | null;
     const address = formData.get("address") as string | null;
     const obraSocial = formData.get("obraSocial") as string | null;
-    const plan = formData.get("plan") as string | null;
-    const billingCycle = formData.get("billingCycle") === "annual" ? "annual" : "monthly";
+    // Patients are always free with full access — no subscription tier.
+    const plan = "gratuito";
+    const billingCycle = "monthly" as const;
     const dniFront = formData.get("dniFront") as File | null;
     const dniBack = formData.get("dniBack") as File | null;
     const phone = formData.get("phone") as string | null;
@@ -36,9 +37,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    if (!fullName || !plan || !dni) {
+    if (!fullName || !dni) {
       return NextResponse.json(
-        { error: "Se requieren fullName, dni y plan." },
+        { error: "Se requieren fullName y dni." },
         { status: 400 },
       );
     }

@@ -34,7 +34,6 @@ const PATIENT_SETTINGS_SECTIONS = new Set<PatientSettingsSectionId>([
   "salud",
   "personalizacion",
   "integraciones",
-  "suscripcion",
 ]);
 
 function parseSettingsSection(value: string | null): PatientSettingsSectionId | undefined {
