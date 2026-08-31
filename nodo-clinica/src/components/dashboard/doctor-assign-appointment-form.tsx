@@ -13,6 +13,7 @@ import {
   Mail,
   Search,
   User,
+  UserPlus,
   X,
 } from "lucide-react";
 import { clinicApi } from "@/lib/clinic/client-api";
@@ -67,6 +68,9 @@ export function DoctorAssignAppointmentForm({
     null,
   );
   const [patientEmail, setPatientEmail] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newPatient, setNewPatient] = useState({ fullName: "", dni: "", email: "" });
   const [intakeReason, setIntakeReason] = useState("");
   const [requirePayment, setRequirePayment] = useState(true);
   const [appointmentType, setAppointmentType] = useState<"virtual" | "in_person">(
@@ -215,6 +219,46 @@ export function DoctorAssignAppointmentForm({
     setQuery("");
   }
 
+  function openCreate() {
+    // Prefill the name with the current query when it doesn't look like a DNI.
+    const looksLikeDni = /^\d[\d.\s]*$/.test(query.trim());
+    setNewPatient({
+      fullName: looksLikeDni ? "" : query.trim(),
+      dni: looksLikeDni ? query.trim().replace(/\D/g, "") : "",
+      email: "",
+    });
+    setSearchOpen(false);
+    setShowCreate(true);
+  }
+
+  async function handleCreatePatient() {
+    if (!newPatient.fullName.trim() || !newPatient.dni.trim()) {
+      toast.error("Nombre y DNI son requeridos");
+      return;
+    }
+    setCreating(true);
+    try {
+      const { patient, reused } = await clinicApi.createPatient({
+        fullName: newPatient.fullName.trim(),
+        dni: newPatient.dni.trim(),
+        email: newPatient.email.trim() || undefined,
+      });
+      selectPatient({
+        id: patient.id,
+        fullName: patient.fullName,
+        email: patient.email ?? "",
+        dni: patient.dni,
+      });
+      setShowCreate(false);
+      setNewPatient({ fullName: "", dni: "", email: "" });
+      if (reused) toast.info("Ese paciente ya existía en el sistema — lo seleccionamos.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al crear el paciente");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   function toggleSlot(iso: string) {
     setSelectedSlots((prev) =>
       prev.includes(iso) ? prev.filter((s) => s !== iso) : [...prev, iso],
@@ -348,11 +392,20 @@ export function DoctorAssignAppointmentForm({
                     <Loader2 className="h-5 w-5 animate-spin text-brand" />
                   </div>
                 ) : searchResults.length === 0 ? (
-                  <p className="text-sm text-slate-400 text-center py-6 px-4">
-                    {query
-                      ? "Sin resultados — probá con otro nombre o DNI"
-                      : "Escribí para buscar pacientes inscriptos"}
-                  </p>
+                  <div className="py-5 px-4 text-center">
+                    <p className="text-sm text-slate-400">
+                      {query ? "Sin resultados" : "Escribí para buscar pacientes inscriptos"}
+                    </p>
+                    {query && (
+                      <button
+                        type="button"
+                        onClick={openCreate}
+                        className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:underline"
+                      >
+                        <UserPlus className="h-4 w-4" /> Crear paciente nuevo
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <div className="p-1">
                     {searchResults.map((patient) => (
@@ -379,6 +432,54 @@ export function DoctorAssignAppointmentForm({
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {showCreate && !selectedPatient && (
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-800">Nuevo paciente</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                onClick={() => setShowCreate(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-slate-500">
+              Cargá el nombre y el DNI. El paciente completará el resto de sus datos cuando se
+              registre con ese DNI, y heredará esta historia clínica.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Input
+                placeholder="Nombre completo"
+                value={newPatient.fullName}
+                onChange={(e) => setNewPatient({ ...newPatient, fullName: e.target.value })}
+              />
+              <Input
+                placeholder="DNI"
+                value={newPatient.dni}
+                onChange={(e) => setNewPatient({ ...newPatient, dni: e.target.value })}
+              />
+            </div>
+            <Input
+              type="email"
+              placeholder="Email (opcional, para enviarle el turno)"
+              value={newPatient.email}
+              onChange={(e) => setNewPatient({ ...newPatient, email: e.target.value })}
+            />
+            <Button
+              type="button"
+              onClick={() => void handleCreatePatient()}
+              disabled={creating}
+              className="w-full gap-2"
+            >
+              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+              Crear y seleccionar
+            </Button>
           </div>
         )}
       </div>
