@@ -42,6 +42,25 @@ export async function GET(
     return NextResponse.json({ error: "Paciente no encontrado" }, { status: 404 });
   }
 
+  // Patient-level clinical header (antecedentes / alergias / medicación
+  // habitual). Current-state, not append-only: it reflects the patient's
+  // present status. May be null if never filled in.
+  const { data: healthProfile } = await svc
+    .from("patient_health_profiles")
+    .select(
+      "blood_type, allergies, chronic_conditions, medications, height_cm, weight_kg, " +
+        "insurance_provider, insurance_number, emergency_contact_name, emergency_contact_phone, updated_at",
+    )
+    .eq("patient_id", patientId)
+    .maybeSingle();
+
+  // Append-only longitudinal evolution log (historia clínica). Newest first.
+  const { data: historyEntries } = await svc
+    .from("clinical_history_entries")
+    .select("id, body, appointment_id, doctor_id, created_at")
+    .eq("patient_id", patientId)
+    .order("created_at", { ascending: false });
+
   const { data: apts, error } = await svc
     .from("appointments")
     .select(
@@ -103,6 +122,29 @@ export async function GET(
       dateOfBirth: patient.date_of_birth ?? null,
       dni: patient.dni ?? null,
     },
+    healthProfile: healthProfile
+      ? {
+          bloodType: healthProfile.blood_type ?? null,
+          allergies: healthProfile.allergies ?? null,
+          chronicConditions: healthProfile.chronic_conditions ?? null,
+          medications: healthProfile.medications ?? null,
+          heightCm: healthProfile.height_cm ?? null,
+          weightKg: healthProfile.weight_kg ?? null,
+          insuranceProvider: healthProfile.insurance_provider ?? null,
+          insuranceNumber: healthProfile.insurance_number ?? null,
+          emergencyContactName: healthProfile.emergency_contact_name ?? null,
+          emergencyContactPhone: healthProfile.emergency_contact_phone ?? null,
+          updatedAt: healthProfile.updated_at ?? null,
+        }
+      : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    historyEntries: (historyEntries ?? []).map((e: any) => ({
+      id: e.id,
+      body: e.body,
+      appointmentId: e.appointment_id ?? null,
+      doctorId: e.doctor_id ?? null,
+      createdAt: e.created_at,
+    })),
     consultations,
   });
 }
