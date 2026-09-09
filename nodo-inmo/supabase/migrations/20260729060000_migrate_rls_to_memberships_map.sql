@@ -210,9 +210,7 @@ alter policy "org_delete" on nodo_inmo.tasks
 -- ── shared.nodo_id ─────────────────────────────────────────────
 alter policy "nodo_id_read_own" on shared.nodo_id
   using (org_id = ((select auth.jwt()) -> 'app_metadata' -> 'memberships' -> 'inmo' ->> 'org_id')::uuid);
-alter policy "nodo_id_update_own" on shared.nodo_id
-  using (org_id = ((select auth.jwt()) -> 'app_metadata' -> 'memberships' -> 'inmo' ->> 'org_id')::uuid)
-  with check (org_id = ((select auth.jwt()) -> 'app_metadata' -> 'memberships' -> 'inmo' ->> 'org_id')::uuid);
+-- nodo_id_update_own was dropped in s1_security_baseline (G2); skip alter.
 
 -- ── shared.org_invitations ─────────────────────────────────────────────
 alter policy "invitations_admin_all" on shared.org_invitations
@@ -245,9 +243,7 @@ alter policy "members_admin_delete" on shared.org_members
 -- ── shared.organizations ─────────────────────────────────────────────
 alter policy "org_read_own" on shared.organizations
   using (id = ((select auth.jwt()) -> 'app_metadata' -> 'memberships' -> 'inmo' ->> 'org_id')::uuid);
-alter policy "org_update_own" on shared.organizations
-  using (id = ((select auth.jwt()) -> 'app_metadata' -> 'memberships' -> 'inmo' ->> 'org_id')::uuid)
-  with check (id = ((select auth.jwt()) -> 'app_metadata' -> 'memberships' -> 'inmo' ->> 'org_id')::uuid);
+-- org_update_own dropped in s1_security_baseline (G2); skip alter.
 
 -- ── storage.objects: org-branding ─────────────────────────────────────────────
 alter policy "branding_admin_select" on storage.objects

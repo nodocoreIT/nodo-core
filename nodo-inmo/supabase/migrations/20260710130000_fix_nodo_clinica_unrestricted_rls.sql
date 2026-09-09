@@ -1,82 +1,76 @@
 -- Fix UNRESTRICTED tables in nodo_clinica schema
---
--- Three tables have RLS disabled (shown as UNRESTRICTED in the Supabase dashboard):
---   - professionals
---   - office_settings
---   - doctor_notifications
---
--- This migration enables RLS on all three and adds the standard
--- InitPlan-friendly org_id isolation policies (Template A, staff-shared).
---
--- doctor_notifications: all data access uses createServiceClient() (service_role),
--- which bypasses RLS. Enabling RLS here closes the gap in case any future
--- code path uses the authenticated client directly.
+-- ponytail: skip when nodo_clinica not provisioned (local inmo-only Supabase)
 
--- ---------------------------------------------------------------------------
--- 1. professionals
--- ---------------------------------------------------------------------------
-alter table nodo_clinica.professionals enable row level security;
+DO $mig$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'nodo_clinica' AND table_name = 'office_settings'
+  ) THEN
+    RAISE NOTICE 'skip fix_nodo_clinica_unrestricted_rls: clinica tables absent';
+    RETURN;
+  END IF;
 
-create policy "org_select" on nodo_clinica.professionals
-  for select to authenticated
-  using (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+  ALTER TABLE nodo_clinica.professionals ENABLE ROW LEVEL SECURITY;
 
-create policy "org_insert" on nodo_clinica.professionals
-  for insert to authenticated
-  with check (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'nodo_clinica' AND tablename = 'professionals' AND policyname = 'org_select'
+  ) THEN
+    CREATE POLICY "org_select" ON nodo_clinica.professionals
+      FOR SELECT TO authenticated
+      USING (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+    CREATE POLICY "org_insert" ON nodo_clinica.professionals
+      FOR INSERT TO authenticated
+      WITH CHECK (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+    CREATE POLICY "org_update" ON nodo_clinica.professionals
+      FOR UPDATE TO authenticated
+      USING  (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid)
+      WITH CHECK (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+    CREATE POLICY "org_delete" ON nodo_clinica.professionals
+      FOR DELETE TO authenticated
+      USING (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+  END IF;
 
-create policy "org_update" on nodo_clinica.professionals
-  for update to authenticated
-  using  (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid)
-  with check (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+  ALTER TABLE nodo_clinica.office_settings ENABLE ROW LEVEL SECURITY;
 
-create policy "org_delete" on nodo_clinica.professionals
-  for delete to authenticated
-  using (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'nodo_clinica' AND tablename = 'office_settings' AND policyname = 'org_select'
+  ) THEN
+    CREATE POLICY "org_select" ON nodo_clinica.office_settings
+      FOR SELECT TO authenticated
+      USING (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+    CREATE POLICY "org_insert" ON nodo_clinica.office_settings
+      FOR INSERT TO authenticated
+      WITH CHECK (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+    CREATE POLICY "org_update" ON nodo_clinica.office_settings
+      FOR UPDATE TO authenticated
+      USING  (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid)
+      WITH CHECK (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+    CREATE POLICY "org_delete" ON nodo_clinica.office_settings
+      FOR DELETE TO authenticated
+      USING (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+  END IF;
 
--- ---------------------------------------------------------------------------
--- 2. office_settings
--- ---------------------------------------------------------------------------
-alter table nodo_clinica.office_settings enable row level security;
+  ALTER TABLE nodo_clinica.doctor_notifications ENABLE ROW LEVEL SECURITY;
 
-create policy "org_select" on nodo_clinica.office_settings
-  for select to authenticated
-  using (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
-
-create policy "org_insert" on nodo_clinica.office_settings
-  for insert to authenticated
-  with check (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
-
-create policy "org_update" on nodo_clinica.office_settings
-  for update to authenticated
-  using  (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid)
-  with check (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
-
-create policy "org_delete" on nodo_clinica.office_settings
-  for delete to authenticated
-  using (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
-
--- ---------------------------------------------------------------------------
--- 3. doctor_notifications
---    All current reads/writes go through createServiceClient() (service_role),
---    which bypasses RLS. Enabling RLS here with org_id policies protects
---    against direct authenticated client access.
--- ---------------------------------------------------------------------------
-alter table nodo_clinica.doctor_notifications enable row level security;
-
-create policy "org_select" on nodo_clinica.doctor_notifications
-  for select to authenticated
-  using (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
-
-create policy "org_insert" on nodo_clinica.doctor_notifications
-  for insert to authenticated
-  with check (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
-
-create policy "org_update" on nodo_clinica.doctor_notifications
-  for update to authenticated
-  using  (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid)
-  with check (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
-
-create policy "org_delete" on nodo_clinica.doctor_notifications
-  for delete to authenticated
-  using (org_id = ((select auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'nodo_clinica' AND tablename = 'doctor_notifications' AND policyname = 'org_select'
+  ) THEN
+    CREATE POLICY "org_select" ON nodo_clinica.doctor_notifications
+      FOR SELECT TO authenticated
+      USING (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+    CREATE POLICY "org_insert" ON nodo_clinica.doctor_notifications
+      FOR INSERT TO authenticated
+      WITH CHECK (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+    CREATE POLICY "org_update" ON nodo_clinica.doctor_notifications
+      FOR UPDATE TO authenticated
+      USING  (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid)
+      WITH CHECK (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+    CREATE POLICY "org_delete" ON nodo_clinica.doctor_notifications
+      FOR DELETE TO authenticated
+      USING (org_id = ((SELECT auth.jwt()) -> 'app_metadata' ->> 'org_id')::uuid);
+  END IF;
+END $mig$;

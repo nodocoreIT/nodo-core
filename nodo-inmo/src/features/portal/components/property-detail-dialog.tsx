@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Share2, Check, Home, Phone, Mail, Copy } from "lucide-react";
+import { Share2, Check, Home, Phone, Mail, Copy, Link2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -18,42 +18,36 @@ import {
   formatPortalPrice,
 } from "../lib/portal-filters";
 import { usePropertyPhotoUrl } from "@/features/properties/hooks/use-property-photo-url";
+import {
+  buildPropertyShareText,
+  getPublicPropertyUrl,
+  openWhatsAppShare,
+} from "@/features/properties/lib/property-share";
 
 interface PropertyDetailDialogProps {
   property: PortalProperty | null;
   onClose: () => void;
 }
 
-function buildShareText(property: PortalProperty): string {
-  const op = OPERATION_LABELS[property.operation] ?? property.operation;
-  const type = PROPERTY_TYPE_LABELS[property.property_type] ?? property.property_type;
-  const price = formatPortalPrice(property.sale_price, property.currency);
-  const lines = [
-    `🏠 ${property.address}`,
-    `${type} en ${op} · ${price}`,
-  ];
-  if (property.rooms || property.total_sqm) {
-    const parts = [];
-    if (property.rooms) parts.push(`${property.rooms} amb.`);
-    if (property.bathrooms) parts.push(`${property.bathrooms} baños`);
-    if (property.total_sqm) parts.push(`${property.total_sqm} m²`);
-    lines.push(`🛏 ${parts.join(" · ")}`);
-  }
-  if (property.description) lines.push(`\n${property.description}`);
-  return lines.join("\n");
-}
-
 export function PropertyDetailDialog({ property, onClose }: PropertyDetailDialogProps) {
   const { data: photoUrl } = usePropertyPhotoUrl(property?.main_photo);
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
 
   const isMobile = typeof window !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
   if (!property) return null;
 
+  const shareToken = (property as PortalProperty & { share_token?: string }).share_token;
+  const publicUrl = shareToken ? getPublicPropertyUrl(shareToken) : undefined;
+
+  function shareText() {
+    return buildPropertyShareText(property!, { publicUrl });
+  }
+
   async function handleNativeShare() {
-    const text = buildShareText(property!);
+    const text = shareText();
     let filesArray: File[] = [];
 
     if (photoUrl) {
@@ -91,21 +85,27 @@ export function PropertyDetailDialog({ property, onClose }: PropertyDetailDialog
   }
 
   async function handleCopy() {
-    const text = buildShareText(property!);
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(shareText());
     setCopied(true);
     setShowShareMenu(false);
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function handleCopyLink() {
+    if (!publicUrl) return;
+    await navigator.clipboard.writeText(publicUrl);
+    setLinkCopied(true);
+    setShowShareMenu(false);
+    setTimeout(() => setLinkCopied(false), 2000);
+  }
+
   function handleWhatsApp() {
-    const text = buildShareText(property!);
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+    openWhatsAppShare(shareText());
     setShowShareMenu(false);
   }
 
   function handleMail() {
-    const text = buildShareText(property!);
+    const text = shareText();
     window.location.href = `mailto:?subject=${encodeURIComponent(property!.address)}&body=${encodeURIComponent(text)}`;
     setShowShareMenu(false);
   }
@@ -141,7 +141,7 @@ export function PropertyDetailDialog({ property, onClose }: PropertyDetailDialog
                 className="shrink-0 gap-1.5"
                 onClick={handleShareClick}
               >
-                {copied ? (
+                {copied || linkCopied ? (
                   <><Check className="h-3.5 w-3.5 text-green-600" />¡Copiado!</>
                 ) : (
                   <><Share2 className="h-3.5 w-3.5" />Compartir</>
@@ -150,6 +150,15 @@ export function PropertyDetailDialog({ property, onClose }: PropertyDetailDialog
 
               {showShareMenu && !isMobile && (
                 <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-md border border-border bg-card p-1 shadow-md">
+                  {publicUrl ? (
+                    <button
+                      onClick={() => void handleCopyLink()}
+                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
+                    >
+                      <Link2 className="h-4 w-4" />
+                      Copiar link web
+                    </button>
+                  ) : null}
                   <button
                     onClick={handleWhatsApp}
                     className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted"
