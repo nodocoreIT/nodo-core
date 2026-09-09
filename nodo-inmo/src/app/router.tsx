@@ -3,6 +3,7 @@ import { RoleRouter } from "@/app/auth/role-router";
 import { RequireAuth } from "@nodocore/shared-components";
 
 import { AuthCallbackPage } from "@/features/auth/callback/auth-callback-page";
+import { PublicPropertyPage } from "@/features/public-property/components/public-property-page";
 import { AdminPortalPage } from "@/portals/admin/admin-portal-page";
 import { OwnerPortalPage } from "@/portals/owner/owner-portal-page";
 import { TenantPortalPage } from "@/portals/tenant/tenant-portal-page";
@@ -29,6 +30,7 @@ export function AppRouter() {
         {/* /inmo/login redirects to nodo-landing's login — single source of truth */}
         <Route path="/login" element={<LoginRedirect />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        <Route path="/p/:token" element={<PublicPropertyPage />} />
 
         {/* Role dispatch: "/" → admin/owner/tenant portal based on app_metadata.role */}
         <Route path="/" element={<RoleRouter />} />
