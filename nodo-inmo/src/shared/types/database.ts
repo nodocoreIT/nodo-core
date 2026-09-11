@@ -365,6 +365,7 @@ export type Database = {
           expenses_amount: number
           expenses_paid_by: string
           id: string
+          last_adjustment_date: string | null
           next_adjustment_date: string | null
           notes: string | null
           org_id: string
@@ -390,6 +391,7 @@ export type Database = {
           expenses_amount?: number
           expenses_paid_by?: string
           id?: string
+          last_adjustment_date?: string | null
           next_adjustment_date?: string | null
           notes?: string | null
           org_id: string
@@ -415,6 +417,7 @@ export type Database = {
           expenses_amount?: number
           expenses_paid_by?: string
           id?: string
+          last_adjustment_date?: string | null
           next_adjustment_date?: string | null
           notes?: string | null
           org_id?: string
