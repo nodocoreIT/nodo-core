@@ -305,7 +305,7 @@ export function GananciasPage() {
       )}
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden p-0">
+        <DialogContent className="max-h-[90vh] max-w-6xl overflow-hidden p-0">
           <DialogHeader className="px-6 pt-6">
             <DialogTitle>Balance mensual — {formatPeriodTitle(periodYm)}</DialogTitle>
           </DialogHeader>

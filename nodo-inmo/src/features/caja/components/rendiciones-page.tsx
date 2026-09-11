@@ -288,7 +288,7 @@ export function RendicionesPage() {
       )}
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="flex h-[85vh] max-w-4xl flex-col gap-0 p-0">
+        <DialogContent className="flex h-[85vh] max-w-6xl flex-col gap-0 p-0">
           <DialogHeader className="border-b border-border px-6 py-4">
             <DialogTitle>
               {previewStatement
@@ -305,7 +305,7 @@ export function RendicionesPage() {
       </Dialog>
 
       <Dialog open={finalizeOpen} onOpenChange={setFinalizeOpen}>
-        <DialogContent className="flex h-[85vh] max-w-4xl flex-col gap-0 p-0">
+        <DialogContent className="flex h-[85vh] max-w-6xl flex-col gap-0 p-0">
           <DialogHeader className="border-b border-border px-6 py-4">
             <DialogTitle>
               {finalizedStatement

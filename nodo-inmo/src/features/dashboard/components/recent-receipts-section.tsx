@@ -104,7 +104,7 @@ export function RecentReceiptsSection({ items }: RecentReceiptsSectionProps) {
           if (!open) setViewPayment(null);
         }}
       >
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-6xl">
           <DialogHeader>
             <DialogTitle>Recibo de Cobro</DialogTitle>
             <DialogDescription>

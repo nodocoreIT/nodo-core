@@ -47,8 +47,12 @@ const DialogContent = React.forwardRef<
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           // Mobile: top-pinned with safe margins, scrollable so content is always reachable
           "inset-x-4 top-4 w-[calc(100%-2rem)] translate-x-0 translate-y-0 max-h-[calc(100dvh-2rem)] overflow-y-auto",
-          // Desktop: centered as usual
-          "sm:inset-x-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-lg sm:max-h-[calc(100dvh-4rem)]",
+          // Desktop: centered as usual. max-w-lg has no sm: prefix so it
+          // shares tailwind-merge's unprefixed "max-w" slot with any
+          // per-dialog override passed via `className` (e.g. max-w-4xl) —
+          // a `sm:`-scoped default would otherwise always win the cascade
+          // at desktop widths regardless of what a caller passes.
+          "sm:inset-x-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] max-w-lg sm:max-h-[calc(100dvh-4rem)]",
           "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
           className,
           // Maximize override: comes after `className` so it always wins over

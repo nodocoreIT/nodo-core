@@ -425,7 +425,7 @@ export function ContractsList() {
           if (!open) setViewContract(null);
         }}
       >
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-6xl">
           <DialogHeader>
             <DialogTitle>Contrato</DialogTitle>
             <DialogDescription>
