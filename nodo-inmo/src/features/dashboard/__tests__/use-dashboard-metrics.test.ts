@@ -47,7 +47,15 @@ function makePayment(overrides: Partial<{
   currency: string;
   paid_date: string | null;
   paid_amount: number | null;
-  contract: { property: { address: string } | null; tenant: { name: string } | null } | null;
+  expenses_amount: number;
+  contract_id: string;
+  contract: {
+    property: { address: string } | null;
+    tenant: { name: string } | null;
+    adjustment_index?: string;
+    last_adjustment_date?: string | null;
+    adjustment_period_months?: number;
+  } | null;
 }> = {}) {
   return {
     id: overrides.id ?? "p-1",
@@ -57,6 +65,8 @@ function makePayment(overrides: Partial<{
     currency: overrides.currency ?? "ARS",
     paid_date: overrides.paid_date !== undefined ? overrides.paid_date : null,
     paid_amount: overrides.paid_amount !== undefined ? overrides.paid_amount : null,
+    expenses_amount: overrides.expenses_amount ?? 0,
+    contract_id: overrides.contract_id ?? "c-1",
     contract: overrides.contract !== undefined ? overrides.contract : {
       property: { address: "Av. Corrientes 1234" },
       tenant: { name: "Juan Pérez" },
@@ -417,6 +427,29 @@ describe("useDashboardMetrics", () => {
 
     expect(result.current.recentReceipts).toHaveLength(1);
     expect(result.current.recentReceipts[0].tenantName).toBe("Ana");
+    expect(result.current.recentReceipts[0].amount).toBe(1000);
+  });
+
+  it("includes expensas/servicios charges in the receipt's amount, not just rent", () => {
+    mockUsePayments.mockReturnValue({
+      data: [
+        makePayment({
+          id: "p-1",
+          due_date: "2026-05-10",
+          status: "paid",
+          paid_date: "2026-06-01",
+          paid_amount: 500000,
+          expenses_amount: 50000,
+          contract: { property: { address: "A" }, tenant: { name: "Ana" } },
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    const { result } = renderHook(() => useDashboardMetrics(FIXED_TODAY));
+
+    expect(result.current.recentReceipts[0].amount).toBe(550000);
   });
 
   it("includes overdue partial payments in overdue count with the remaining amount", () => {
@@ -474,5 +507,120 @@ describe("useDashboardMetrics", () => {
       { type: "expiration", text: "Vence en 26 días" },
       { type: "adjustment", text: "Ajuste en 11 días" },
     ]);
+  });
+
+  it("shows the IPC-pending alert and exposes pendingIndexAdjustment once the adjustment's month has arrived", () => {
+    // FIXED_TODAY is 2026-06-06. Adjustment due 2026-06-01 (same month, already past the day).
+    mockUsePayments.mockReturnValue({
+      data: [
+        makePayment({
+          id: "p-1",
+          due_date: "2026-06-15",
+          status: "pending",
+          amount: 1000,
+          contract_id: "contract-ipc-1",
+          contract: {
+            rent_amount: 1000,
+            commission_amount: null,
+            end_date: "2027-01-01",
+            next_adjustment_date: "2026-06-01",
+            last_adjustment_date: "2025-12-01",
+            adjustment_index: "IPC",
+            adjustment_period_months: 6,
+            property: { address: "Mitre 100", commission_rate: null, owner: null },
+            tenant: { name: "Juan Pérez" },
+          },
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    const { result } = renderHook(() => useDashboardMetrics(FIXED_TODAY));
+
+    const item = result.current.currentMonthCollections[0];
+    expect(item.alerts).toEqual([
+      { type: "adjustment", text: "Esperando aplicar aumento por IPC" },
+    ]);
+    expect(item.pendingIndexAdjustment).toEqual({
+      contractId: "contract-ipc-1",
+      adjustmentIndex: "IPC",
+      rentAmount: 1000,
+      currency: "ARS",
+      lastAdjustmentDate: "2025-12-01",
+      adjustmentPeriodMonths: 6,
+    });
+  });
+
+  it("shows the ICL-pending alert and exposes pendingIndexAdjustment once the adjustment's month has arrived", () => {
+    mockUsePayments.mockReturnValue({
+      data: [
+        makePayment({
+          id: "p-1",
+          due_date: "2026-06-15",
+          status: "pending",
+          amount: 1000,
+          contract_id: "contract-icl-1",
+          contract: {
+            rent_amount: 1000,
+            commission_amount: null,
+            end_date: "2027-01-01",
+            next_adjustment_date: "2026-06-01",
+            last_adjustment_date: "2026-05-01",
+            adjustment_index: "ICL",
+            adjustment_period_months: 1,
+            property: { address: "Mitre 100", commission_rate: null, owner: null },
+            tenant: { name: "Juan Pérez" },
+          },
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    const { result } = renderHook(() => useDashboardMetrics(FIXED_TODAY));
+
+    const item = result.current.currentMonthCollections[0];
+    expect(item.alerts).toEqual([
+      { type: "adjustment", text: "Esperando aplicar aumento por ICL" },
+    ]);
+    expect(item.pendingIndexAdjustment).toEqual({
+      contractId: "contract-icl-1",
+      adjustmentIndex: "ICL",
+      rentAmount: 1000,
+      currency: "ARS",
+      lastAdjustmentDate: "2026-05-01",
+      adjustmentPeriodMonths: 1,
+    });
+  });
+
+  it("does not flag pendingIndexAdjustment for fixed/USD indices even when the adjustment month has arrived", () => {
+    mockUsePayments.mockReturnValue({
+      data: [
+        makePayment({
+          id: "p-1",
+          due_date: "2026-06-15",
+          status: "pending",
+          amount: 1000,
+          contract: {
+            rent_amount: 1000,
+            commission_amount: null,
+            end_date: "2027-01-01",
+            next_adjustment_date: "2026-06-01",
+            adjustment_index: "fixed",
+            property: { address: "Mitre 100", commission_rate: null, owner: null },
+            tenant: { name: "Juan Pérez" },
+          },
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    const { result } = renderHook(() => useDashboardMetrics(FIXED_TODAY));
+
+    const item = result.current.currentMonthCollections[0];
+    expect(item.alerts).toEqual([]);
+    expect(item.pendingIndexAdjustment).toBeNull();
   });
 });

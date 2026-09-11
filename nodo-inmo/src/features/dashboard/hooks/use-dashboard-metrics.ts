@@ -58,6 +58,17 @@ export interface MonthCollectionPayment {
   remaining: number;
 }
 
+export type IndexAdjustmentKind = "IPC" | "ICL";
+
+export interface PendingIndexAdjustment {
+  contractId: string;
+  adjustmentIndex: IndexAdjustmentKind;
+  rentAmount: number;
+  currency: string;
+  lastAdjustmentDate: string;
+  adjustmentPeriodMonths: number;
+}
+
 export interface MonthCollectionItem {
   key: string;
   tenantName: string;
@@ -67,6 +78,7 @@ export interface MonthCollectionItem {
   currency: string;
   payments: MonthCollectionPayment[];
   alerts: { type: "expiration" | "adjustment"; text: string }[];
+  pendingIndexAdjustment: PendingIndexAdjustment | null;
 }
 
 export interface RecentReceiptItem {
@@ -155,6 +167,7 @@ function buildCurrentMonthCollections(
       const contract = first.contract;
 
       const alerts: { type: "expiration" | "adjustment"; text: string }[] = [];
+      let pendingIndexAdjustment: PendingIndexAdjustment | null = null;
       if (contract) {
         const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
@@ -182,7 +195,25 @@ function buildCurrentMonthCollections(
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           const limitDays = alertSettings.rentAdjustmentMonths * 30;
 
-          if (diffDays >= 0 && diffDays <= limitDays) {
+          const adjMonthKey = `${adjYear}-${String(adjMonth).padStart(2, "0")}`;
+          const todayMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+          const indexKind: IndexAdjustmentKind | null =
+            contract.adjustment_index === "IPC" || contract.adjustment_index === "ICL"
+              ? contract.adjustment_index
+              : null;
+          const isIndexAdjustmentDue = indexKind !== null && adjMonthKey <= todayMonthKey;
+
+          if (isIndexAdjustmentDue && indexKind) {
+            alerts.push({ type: "adjustment", text: `Esperando aplicar aumento por ${indexKind}` });
+            pendingIndexAdjustment = {
+              contractId: first.contract_id,
+              adjustmentIndex: indexKind,
+              rentAmount: contract.rent_amount,
+              currency: first.currency,
+              lastAdjustmentDate: contract.last_adjustment_date ?? contract.next_adjustment_date,
+              adjustmentPeriodMonths: contract.adjustment_period_months ?? 12,
+            };
+          } else if (diffDays >= 0 && diffDays <= limitDays) {
             const text = diffDays === 0
               ? "Ajuste hoy"
               : diffDays === 1
@@ -205,6 +236,7 @@ function buildCurrentMonthCollections(
           remaining: remainingAmount(p),
         })),
         alerts,
+        pendingIndexAdjustment,
       };
     })
     .filter((item) => item.balance > 0)
@@ -221,7 +253,7 @@ function buildRecentReceipts(
     .map((p) => ({
       id: p.id,
       tenantName: p.contract?.tenant?.name ?? "—",
-      amount: p.paid_amount ?? p.amount,
+      amount: (p.paid_amount ?? p.amount) + (p.expenses_amount ?? 0),
       currency: p.currency,
       paidDate: p.paid_date!,
     }));

@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, Plus } from "lucide-react";
+import { Clock, Plus, TrendingUp } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import {
   Table,
@@ -10,9 +11,10 @@ import {
   TableRow,
 } from "@nodocore/shared-components";
 import { formatMoney } from "@/features/contracts/lib/contract-labels";
-import type { MonthCollectionItem } from "../hooks/use-dashboard-metrics";
+import type { MonthCollectionItem, PendingIndexAdjustment } from "../hooks/use-dashboard-metrics";
 import { currentMonthLabel } from "../lib/dashboard-payment-utils";
 import { cn } from "@/shared/lib/utils";
+import { ApplyRentAdjustmentDialog } from "./apply-rent-adjustment-dialog";
 
 interface MonthCollectionsSectionProps {
   items: MonthCollectionItem[];
@@ -31,6 +33,8 @@ const STATUS_CLASS = {
 export function MonthCollectionsSection({ items }: MonthCollectionsSectionProps) {
   const navigate = useNavigate();
   const monthLabel = currentMonthLabel();
+  const [pendingIndexAdjustment, setPendingIndexAdjustment] =
+    useState<PendingIndexAdjustment | null>(null);
 
   function handleCollect(item: MonthCollectionItem) {
     const firstPaymentId = item.payments[0]?.id;
@@ -103,8 +107,23 @@ export function MonthCollectionsSection({ items }: MonthCollectionsSectionProps)
                     {STATUS_LABEL[item.status]}
                   </span>
                 </TableCell>
-                <TableCell className="px-2 md:px-4 py-3 font-bold text-xs sm:text-sm text-destructive whitespace-nowrap">
-                  {formatMoney(item.balance, item.currency)}
+                <TableCell className="px-2 md:px-4 py-3 whitespace-nowrap">
+                  <div className="flex flex-col items-start gap-1">
+                    <span className="font-bold text-xs sm:text-sm text-destructive">
+                      {formatMoney(item.balance, item.currency)}
+                    </span>
+                    {item.pendingIndexAdjustment && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 gap-1 px-2 text-[10px] font-semibold uppercase text-brand border-brand hover:bg-brand/10"
+                        onClick={() => setPendingIndexAdjustment(item.pendingIndexAdjustment)}
+                      >
+                        <TrendingUp className="h-3 w-3 shrink-0" />
+                        Aplicar aumento por {item.pendingIndexAdjustment.adjustmentIndex}
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="px-2 md:px-4 py-3 text-right">
                   <Button
@@ -124,6 +143,12 @@ export function MonthCollectionsSection({ items }: MonthCollectionsSectionProps)
           </TableBody>
         </Table>
       )}
+
+      <ApplyRentAdjustmentDialog
+        open={pendingIndexAdjustment !== null}
+        pendingIndexAdjustment={pendingIndexAdjustment}
+        onClose={() => setPendingIndexAdjustment(null)}
+      />
     </section>
   );
 }
