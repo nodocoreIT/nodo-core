@@ -1,3 +1,7 @@
+import {
+  computeCommissionAmount,
+  resolveCommissionRatePercent as resolveContractCommissionRate,
+} from "@/features/contracts/lib/resolve-commission-rate";
 import type { PaymentWithRelations } from "../hooks/use-payments";
 
 export interface CobroBreakdown {
@@ -7,20 +11,17 @@ export interface CobroBreakdown {
   commissionRate: number;
   commissionAmount: number;
   ownerShare: number;
+  commissionOnGross: boolean;
 }
 
 export function resolveCommissionRatePercent(payment: PaymentWithRelations): number {
   const contract = payment.contract;
-  if (contract?.commission_amount != null && contract.rent_amount > 0) {
-    return Math.round((contract.commission_amount / contract.rent_amount) * 10000) / 100;
-  }
-  if (contract?.property?.commission_rate != null) {
-    return contract.property.commission_rate;
-  }
-  if (contract?.property?.owner?.commission_rate != null) {
-    return contract.property.owner.commission_rate;
-  }
-  return 10;
+  return resolveContractCommissionRate({
+    contractCommissionAmount: contract?.commission_amount,
+    contractRentAmount: contract?.rent_amount,
+    propertyCommissionRate: contract?.property?.commission_rate,
+    ownerCommissionRate: contract?.property?.owner?.commission_rate,
+  });
 }
 
 export function buildCobroBreakdown(
@@ -30,15 +31,22 @@ export function buildCobroBreakdown(
   const rentAmount = payment.paid_amount ?? payment.amount;
   const expensesAmount = payment.expenses_amount ?? 0;
   const grossAmount = rentAmount + expensesAmount;
+  const commissionOnGross = payment.contract?.commission_on_gross ?? false;
   const commissionRate = resolveCommissionRatePercent(payment);
 
   const commissionAmount =
     commissionAmountFromCaja != null
       ? commissionAmountFromCaja
-      : Math.round(rentAmount * commissionRate) / 100;
+      : computeCommissionAmount(
+          commissionRate,
+          rentAmount,
+          expensesAmount,
+          commissionOnGross,
+        );
 
-  const effectiveRate =
-    rentAmount > 0
+  const displayRate = commissionOnGross
+    ? commissionRate
+    : rentAmount > 0
       ? Math.round((commissionAmount / rentAmount) * 10000) / 100
       : commissionRate;
 
@@ -46,8 +54,9 @@ export function buildCobroBreakdown(
     rentAmount,
     expensesAmount,
     grossAmount,
-    commissionRate: effectiveRate,
+    commissionRate: displayRate,
     commissionAmount,
     ownerShare: grossAmount - commissionAmount,
+    commissionOnGross,
   };
 }
