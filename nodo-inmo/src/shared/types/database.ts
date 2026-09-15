@@ -357,6 +357,7 @@ export type Database = {
           adjustment_index: string
           adjustment_period_months: number
           commission_amount: number | null
+          commission_on_gross: boolean
           contract_type: string
           created_at: string
           currency: string
@@ -383,6 +384,7 @@ export type Database = {
           adjustment_index?: string
           adjustment_period_months?: number
           commission_amount?: number | null
+          commission_on_gross?: boolean
           contract_type?: string
           created_at?: string
           currency?: string
@@ -409,6 +411,7 @@ export type Database = {
           adjustment_index?: string
           adjustment_period_months?: number
           commission_amount?: number | null
+          commission_on_gross?: boolean
           contract_type?: string
           created_at?: string
           currency?: string

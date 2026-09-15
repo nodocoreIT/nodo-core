@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   commissionRateFromProperty,
+  computeCommissionAmount,
   resolveCommissionRatePercent,
 } from "./resolve-commission-rate";
 
@@ -47,5 +48,15 @@ describe("commissionRateFromProperty", () => {
         owner: { commission_rate: 8 },
       }),
     ).toBe(8);
+  });
+});
+
+describe("computeCommissionAmount", () => {
+  it("uses rent only by default", () => {
+    expect(computeCommissionAmount(8, 500000, 50000, false)).toBe(40000);
+  });
+
+  it("includes expenses when commission_on_gross", () => {
+    expect(computeCommissionAmount(8, 500000, 50000, true)).toBe(44000);
   });
 });

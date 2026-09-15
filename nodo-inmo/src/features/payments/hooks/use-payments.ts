@@ -10,6 +10,7 @@ export type PaymentWithRelations = PaymentRow & {
   contract: {
     rent_amount: number;
     commission_amount: number | null;
+    commission_on_gross?: boolean;
     end_date?: string | null;
     next_adjustment_date?: string | null;
     last_adjustment_date?: string | null;
@@ -40,7 +41,7 @@ export function usePayments() {
         .schema("nodo_inmo")
         .from("payments")
         .select(
-          "*, contract:contracts!payments_contract_id_fkey(rent_amount, commission_amount, end_date, next_adjustment_date, last_adjustment_date, adjustment_index, adjustment_period_months, archived_at, property:properties!contracts_property_id_fkey(address, commission_rate, owner:contacts!properties_owner_contact_id_fkey(name, commission_rate)), tenant:contacts!contracts_tenant_id_fkey(name))",
+          "*, contract:contracts!payments_contract_id_fkey(rent_amount, commission_amount, commission_on_gross, end_date, next_adjustment_date, last_adjustment_date, adjustment_index, adjustment_period_months, archived_at, property:properties!contracts_property_id_fkey(address, commission_rate, owner:contacts!properties_owner_contact_id_fkey(name, commission_rate)), tenant:contacts!contracts_tenant_id_fkey(name))",
         )
         .order("due_date", { ascending: true });
 

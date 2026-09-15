@@ -4,6 +4,7 @@ import {
   type OwnerPropertyGroup,
   type PropertyGroup,
 } from "@/features/caja/lib/caja-math";
+import { resolveCommissionRatePercent } from "@/features/contracts/lib/resolve-commission-rate";
 import {
   buildStatementData,
   combineSealedBreakdowns,
@@ -38,6 +39,17 @@ async function computePendingPropertyBreakdown(
     .in("id", paymentIds);
 
   if (paymentsError) throw paymentsError;
+
+  const contractIds = [...new Set((payments ?? []).map((p) => p.contract_id).filter(Boolean))];
+  const { data: contracts, error: contractsError } = await supabase
+    .schema("nodo_inmo")
+    .from("contracts")
+    .select(
+      "id, rent_amount, commission_amount, commission_on_gross, property:properties!contracts_property_id_fkey(commission_rate, owner:contacts!properties_owner_contact_id_fkey(commission_rate))",
+    )
+    .in("id", contractIds);
+
+  if (contractsError) throw contractsError;
 
   const { data: movements, error: movementsError } = await supabase
     .schema("nodo_inmo")
@@ -101,12 +113,24 @@ async function computePendingPropertyBreakdown(
       })),
   );
 
-  // Commission is computed on rent only (never on gross) — the displayed
-  // rate must divide by rent_gross too, or it understates the real %.
+  const contractualRates = (contracts ?? []).map((c) =>
+    resolveCommissionRatePercent({
+      contractCommissionAmount: c.commission_amount,
+      contractRentAmount: c.rent_amount,
+      propertyCommissionRate: (c.property as { commission_rate?: number | null } | null)
+        ?.commission_rate,
+      ownerCommissionRate: (
+        c.property as { owner?: { commission_rate?: number | null } | null } | null
+      )?.owner?.commission_rate,
+    }),
+  );
+  const contractualRate = contractualRates.length > 0 ? Math.max(...contractualRates) : 0;
+  const anyOnGross = (contracts ?? []).some((c) => c.commission_on_gross);
+
   const effectiveRate =
-    breakdown.rent_gross && breakdown.rent_gross > 0
-      ? Math.round((breakdown.commission / breakdown.rent_gross) * 10000) / 100
-      : 0;
+    anyOnGross || !breakdown.rent_gross
+      ? contractualRate
+      : Math.round((breakdown.commission / breakdown.rent_gross) * 10000) / 100;
 
   const cobros_detail = (payments ?? [])
     .filter((p) => p.period)

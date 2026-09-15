@@ -22,6 +22,7 @@ function samplePayment(overrides: Partial<PaymentWithRelations> = {}): PaymentWi
     contract: {
       rent_amount: 440000,
       commission_amount: 44000,
+      commission_on_gross: false,
       property: {
         address: "Calle 123",
         commission_rate: null,
@@ -54,5 +55,20 @@ describe("buildCobroBreakdown", () => {
     const result = buildCobroBreakdown(samplePayment(), null);
     expect(result.commissionAmount).toBe(44000);
     expect(result.ownerShare).toBe(446000);
+  });
+
+  it("computes commission on gross when contract has commission_on_gross", () => {
+    const result = buildCobroBreakdown(
+      samplePayment({
+        contract: {
+          ...samplePayment().contract!,
+          commission_on_gross: true,
+        },
+      }),
+      null,
+    );
+    expect(result.commissionAmount).toBe(49000);
+    expect(result.ownerShare).toBe(441000);
+    expect(result.commissionRate).toBe(10);
   });
 });

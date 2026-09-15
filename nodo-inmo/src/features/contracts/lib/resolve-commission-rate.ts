@@ -42,3 +42,14 @@ export function commissionRateFromProperty(
     fallback,
   });
 }
+
+/** Commission amount for a cobro, respecting per-contract gross vs rent-only base. */
+export function computeCommissionAmount(
+  ratePercent: number,
+  rentAmount: number,
+  expensesAmount: number,
+  commissionOnGross: boolean,
+): number {
+  const base = commissionOnGross ? rentAmount + expensesAmount : rentAmount;
+  return Math.round(base * ratePercent) / 100;
+}
