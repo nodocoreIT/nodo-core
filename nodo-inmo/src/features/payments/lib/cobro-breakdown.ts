@@ -11,7 +11,6 @@ export interface CobroBreakdown {
   commissionRate: number;
   commissionAmount: number;
   ownerShare: number;
-  commissionOnGross: boolean;
 }
 
 export function resolveCommissionRatePercent(payment: PaymentWithRelations): number {
@@ -31,32 +30,19 @@ export function buildCobroBreakdown(
   const rentAmount = payment.paid_amount ?? payment.amount;
   const expensesAmount = payment.expenses_amount ?? 0;
   const grossAmount = rentAmount + expensesAmount;
-  const commissionOnGross = payment.contract?.commission_on_gross ?? false;
   const commissionRate = resolveCommissionRatePercent(payment);
 
   const commissionAmount =
     commissionAmountFromCaja != null
       ? commissionAmountFromCaja
-      : computeCommissionAmount(
-          commissionRate,
-          rentAmount,
-          expensesAmount,
-          commissionOnGross,
-        );
-
-  const displayRate = commissionOnGross
-    ? commissionRate
-    : rentAmount > 0
-      ? Math.round((commissionAmount / rentAmount) * 10000) / 100
-      : commissionRate;
+      : computeCommissionAmount(commissionRate, rentAmount, expensesAmount);
 
   return {
     rentAmount,
     expensesAmount,
     grossAmount,
-    commissionRate: displayRate,
+    commissionRate,
     commissionAmount,
     ownerShare: grossAmount - commissionAmount,
-    commissionOnGross,
   };
 }
