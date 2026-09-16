@@ -45,7 +45,7 @@ async function computePendingPropertyBreakdown(
     .schema("nodo_inmo")
     .from("contracts")
     .select(
-      "id, rent_amount, commission_amount, commission_on_gross, property:properties!contracts_property_id_fkey(commission_rate, owner:contacts!properties_owner_contact_id_fkey(commission_rate))",
+      "id, rent_amount, commission_amount, property:properties!contracts_property_id_fkey(commission_rate, owner:contacts!properties_owner_contact_id_fkey(commission_rate))",
     )
     .in("id", contractIds);
 
@@ -125,12 +125,6 @@ async function computePendingPropertyBreakdown(
     }),
   );
   const contractualRate = contractualRates.length > 0 ? Math.max(...contractualRates) : 0;
-  const anyOnGross = (contracts ?? []).some((c) => c.commission_on_gross);
-
-  const effectiveRate =
-    anyOnGross || !breakdown.rent_gross
-      ? contractualRate
-      : Math.round((breakdown.commission / breakdown.rent_gross) * 10000) / 100;
 
   const cobros_detail = (payments ?? [])
     .filter((p) => p.period)
@@ -149,7 +143,7 @@ async function computePendingPropertyBreakdown(
 
   return {
     ...breakdown,
-    commission_rate: effectiveRate,
+    commission_rate: contractualRate,
     currency: group.currency,
     cobro_count: batch.length,
     cobros_detail,

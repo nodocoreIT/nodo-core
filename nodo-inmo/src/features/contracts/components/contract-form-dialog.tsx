@@ -57,7 +57,6 @@ const schema = z.object({
   currency: z.enum(["ARS", "USD"]),
   deposit_amount: z.string().optional(),
   commission_rate: z.string().optional(),
-  commission_on_gross: z.boolean(),
   expenses_paid_by: z.enum(["tenant", "owner"]),
   adjustment_index: z.enum(["IPC", "ICL", "fixed", "USD"]),
   adjustment_period_months: z.string().min(1, "Periodicidad requerida"),
@@ -121,7 +120,7 @@ function buildPayload(
     currency: values.currency,
     deposit_amount: parseCurrencyInput(values.deposit_amount),
     commission_amount: commissionAmount,
-    commission_on_gross: values.commission_on_gross,
+    commission_on_gross: true,
     expenses_paid_by: values.expenses_paid_by,
     adjustment_index: values.adjustment_index,
     adjustment_period_months: Number(values.adjustment_period_months),
@@ -215,7 +214,6 @@ export function ContractFormDialog({
       currency: (contract?.currency as any) ?? "ARS",
       deposit_amount: formatCurrencyInput(contract?.deposit_amount, contract?.currency as any ?? "ARS"),
       commission_rate: commissionRateFromContract(contract),
-      commission_on_gross: contract?.commission_on_gross ?? false,
       expenses_paid_by: (contract?.expenses_paid_by as any) ?? "tenant",
       adjustment_index: (contract?.adjustment_index as any) ?? "IPC",
       adjustment_period_months: toStr(contract?.adjustment_period_months) || "12",
@@ -237,19 +235,15 @@ export function ContractFormDialog({
   const propertyId = form.watch("property_id");
   const rentAmount = form.watch("rent_amount") || "";
   const commissionRate = form.watch("commission_rate") || "";
-  const commissionOnGross = form.watch("commission_on_gross");
   const computedCommission = useMemo(() => {
     const rent = parseCurrencyInput(rentAmount) ?? 0;
     const rate = Number(commissionRate.replace(",", "."));
     if (!rent || !rate) return null;
-    const expensesEstimate = commissionOnGross
-      ? chargeConcepts
-          .filter((cc) => !cc.retained_by_agency && cc.label.trim())
-          .reduce((sum, cc) => sum + (parseCurrencyInput(cc.default_amount) ?? 0), 0)
-      : 0;
-    const base = rent + expensesEstimate;
-    return Math.round((base * rate) / 100);
-  }, [rentAmount, commissionRate, commissionOnGross, chargeConcepts]);
+    const expensesEstimate = chargeConcepts
+      .filter((cc) => !cc.retained_by_agency && cc.label.trim())
+      .reduce((sum, cc) => sum + (parseCurrencyInput(cc.default_amount) ?? 0), 0);
+    return Math.round(((rent + expensesEstimate) * rate) / 100);
+  }, [rentAmount, commissionRate, chargeConcepts]);
   const selectedProperty = useMemo(
     () => properties.find((p) => p.id === propertyId),
     [properties, propertyId],
@@ -639,37 +633,10 @@ export function ContractFormDialog({
                     {computedCommission != null ? (
                       <p className="text-xs text-slate2">
                         ≈ {formatCurrencyInput(String(computedCommission), currency)} de{" "}
-                        {ADMINISTRACION_INMOBILIARIA.toLowerCase()}{" "}
-                        {commissionOnGross
-                          ? "sobre el total cobrado (alquiler + expensas)"
-                          : "solo sobre el alquiler"}
+                        {ADMINISTRACION_INMOBILIARIA.toLowerCase()} sobre el total cobrado
+                        (alquiler + expensas)
                       </p>
                     ) : null}
-                    <FormField
-                      control={form.control as any}
-                      name="commission_on_gross"
-                      render={({ field }) => (
-                        <FormItem className="mt-2">
-                          <label
-                            htmlFor="commission-on-gross"
-                            className="flex cursor-pointer items-start gap-2 text-xs text-slate2"
-                          >
-                            <input
-                              id="commission-on-gross"
-                              type="checkbox"
-                              checked={field.value}
-                              onChange={(e) => field.onChange(e.target.checked)}
-                              className="mt-0.5 h-4 w-4 rounded-sm border border-input accent-brand"
-                              aria-label="Comisión sobre total cobrado"
-                            />
-                            <span>
-                              Comisión sobre total cobrado (alquiler + expensas y otros conceptos
-                              no retenidos)
-                            </span>
-                          </label>
-                        </FormItem>
-                      )}
-                    />
                     <FormMessage />
                   </FormItem>
                 )}

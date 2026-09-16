@@ -151,8 +151,8 @@ export function combineSealedBreakdowns(
   // own property's rate instead, but this keeps the combined value honest
   // for any other reader of the merged breakdown.
   const commissionRate =
-    combined.rent_gross && combined.rent_gross > 0
-      ? Math.round((combined.commission / combined.rent_gross) * 10000) / 100
+    combined.gross > 0
+      ? Math.round((combined.commission / combined.gross) * 10000) / 100
       : 0;
 
   return { ...combined, charges, commission_rate: commissionRate };

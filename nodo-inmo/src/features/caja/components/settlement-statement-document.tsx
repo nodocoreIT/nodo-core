@@ -218,6 +218,21 @@ function PropertySection({
           </View>
         ) : null}
 
+        {/* Non-retained concepts (e.g. Expensas) — included in the commission base */}
+        {breakdown.charges.map((c, i) => (
+          <View key={i} style={styles.tableRow}>
+            <Text style={styles.cellLabel}>{c.label}</Text>
+            <Text style={styles.cellAmount}>{fmtAmount(c.amount, currency)}</Text>
+          </View>
+        ))}
+
+        {breakdown.charges.length > 0 && breakdown.gross > 0 ? (
+          <View style={styles.tableRow}>
+            <Text style={styles.cellLabel}>Total cobrado</Text>
+            <Text style={styles.cellAmount}>{fmtAmount(breakdown.gross, currency)}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.tableRow}>
           <Text style={styles.cellLabel}>
             {administracionInmobiliariaLabel(breakdown.commission_rate)}
@@ -226,14 +241,6 @@ function PropertySection({
             - {fmtAmount(breakdown.commission, currency)}
           </Text>
         </View>
-
-        {/* Non-retained concepts (e.g. Expensas) — pass through to the owner in full */}
-        {breakdown.charges.map((c, i) => (
-          <View key={i} style={styles.tableRow}>
-            <Text style={styles.cellLabel}>{c.label}</Text>
-            <Text style={styles.cellAmount}>{fmtAmount(c.amount, currency)}</Text>
-          </View>
-        ))}
 
         {/* Retained concepts + manual property expenses — deducted from the owner */}
         {breakdown.deductions.map((d, i) => (

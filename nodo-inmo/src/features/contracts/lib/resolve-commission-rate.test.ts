@@ -52,11 +52,8 @@ describe("commissionRateFromProperty", () => {
 });
 
 describe("computeCommissionAmount", () => {
-  it("uses rent only by default", () => {
-    expect(computeCommissionAmount(8, 500000, 50000, false)).toBe(40000);
-  });
-
-  it("includes expenses when commission_on_gross", () => {
-    expect(computeCommissionAmount(8, 500000, 50000, true)).toBe(44000);
+  it("applies the rate to rent plus expenses", () => {
+    expect(computeCommissionAmount(8, 490502, 50000)).toBe(43240.16);
+    expect(computeCommissionAmount(8, 500000, 50000)).toBe(44000);
   });
 });

@@ -1,11 +1,10 @@
--- Per-contract toggle: admin commission on rent only (default) or on gross
--- (rent + expenses_amount / expensas cobradas al inquilino).
+-- Agency commission always on rent + expenses_amount (expensas cobradas).
 
 alter table nodo_inmo.contracts
-  add column if not exists commission_on_gross boolean not null default false;
+  add column if not exists commission_on_gross boolean not null default true;
 
 comment on column nodo_inmo.contracts.commission_on_gross is
-  'When true, agency commission is calculated on rent + expenses_amount; otherwise on rent only.';
+  'Agency commission is always calculated on rent + expenses_amount. Column kept for compatibility.';
 
 create or replace function nodo_inmo.contract_commission_rate_pct(p_contract_id uuid)
 returns numeric
@@ -57,7 +56,7 @@ begin
     where k.id = new.contract_id;
 
     if v_owner_id is not null then
-      v_commission_base := case when v_on_gross then v_gross else new.amount end;
+      v_commission_base := v_gross;
       v_commission  := round(v_commission_base * v_rate / 100, 2);
       v_owner_share := v_gross - v_commission;
 
@@ -107,7 +106,7 @@ begin
     where k.id = new.contract_id;
 
     if v_owner_id is not null then
-      v_commission_base := case when v_on_gross then v_gross else new.amount end;
+      v_commission_base := v_gross;
       v_commission  := round(v_commission_base * v_rate / 100, 2);
       v_owner_share := v_gross - v_commission;
 
@@ -170,7 +169,7 @@ begin
     return;
   end if;
 
-  v_commission_base := case when v_on_gross then v_gross else v_payment.amount end;
+  v_commission_base := v_gross;
   v_commission  := round(v_commission_base * v_rate / 100, 2);
   v_owner_share := v_gross - v_commission;
 
