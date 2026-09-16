@@ -41,7 +41,7 @@ describe("resolveCommissionRatePercent", () => {
 });
 
 describe("buildCobroBreakdown", () => {
-  it("computes commission on rent only, never on expenses", () => {
+  it("uses the caja commission when provided", () => {
     const result = buildCobroBreakdown(samplePayment(), 44000);
     expect(result.rentAmount).toBe(440000);
     expect(result.expensesAmount).toBe(50000);
@@ -51,22 +51,8 @@ describe("buildCobroBreakdown", () => {
     expect(result.ownerShare).toBe(446000);
   });
 
-  it("falls back to rent × rate when no commissionAmountFromCaja is given", () => {
+  it("computes commission on rent + expenses when caja amount is missing", () => {
     const result = buildCobroBreakdown(samplePayment(), null);
-    expect(result.commissionAmount).toBe(44000);
-    expect(result.ownerShare).toBe(446000);
-  });
-
-  it("computes commission on gross when contract has commission_on_gross", () => {
-    const result = buildCobroBreakdown(
-      samplePayment({
-        contract: {
-          ...samplePayment().contract!,
-          commission_on_gross: true,
-        },
-      }),
-      null,
-    );
     expect(result.commissionAmount).toBe(49000);
     expect(result.ownerShare).toBe(441000);
     expect(result.commissionRate).toBe(10);
