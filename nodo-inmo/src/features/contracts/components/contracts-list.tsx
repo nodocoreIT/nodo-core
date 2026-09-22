@@ -45,6 +45,7 @@ import {
   formatDate,
 } from "@/features/contracts/lib/contract-labels";
 import { PAGE_SIZE } from "@/shared/lib/constants";
+import { useSendWhatsApp } from "@/features/contracts/hooks/use-send-whatsapp";
 
 export function ContractsList() {
   const [showArchived, setShowArchived] = useState(false);
@@ -57,6 +58,7 @@ export function ContractsList() {
     useState<ContractWithRelations | null>(null);
   const archiveContract = useArchiveContract();
   const updateContract = useUpdateContract();
+  const { sendFromContract } = useSendWhatsApp();
   const [generateForContract, setGenerateForContract] = useState<{
     id: string;
     start_date: string;
@@ -327,9 +329,18 @@ export function ContractsList() {
                           variant="ghost"
                           size="sm"
                           aria-label="Avisar aumento por WhatsApp"
-                          title="Funcionalidad en desarrollo"
-                          disabled
-                          className="text-slate-400 cursor-not-allowed"
+                          title={
+                            contract.tenant?.phone
+                              ? "Avisar aumento por WhatsApp"
+                              : "Sin teléfono registrado"
+                          }
+                          disabled={!contract.tenant?.phone}
+                          className={
+                            contract.tenant?.phone
+                              ? "text-green-600 hover:text-green-700"
+                              : "cursor-not-allowed text-slate-400"
+                          }
+                          onClick={() => sendFromContract(contract)}
                         >
                           <MessageCircle className="h-4 w-4" />
                           <span className="sr-only">Enviar aviso WhatsApp</span>

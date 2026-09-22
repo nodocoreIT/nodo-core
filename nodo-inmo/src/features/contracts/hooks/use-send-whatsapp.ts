@@ -1,15 +1,19 @@
-import { useState } from "react";
-import { supabase } from "@/shared/lib/supabase";
+import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import type { ContractWithRelations } from "./use-contracts";
+import {
+  buildRentIncreaseWhatsAppMessage,
+  openRentIncreaseWhatsApp,
+} from "@/features/contracts/lib/rent-increase-whatsapp";
 
-export interface WhatsAppPayload {
-  phone: string;
-  tenantName: string;
+export interface AdjustmentWhatsAppInput {
   contractId: string;
+  tenantName: string;
+  tenantPhone: string | null;
+  propertyAddress: string;
   rentAmount: number;
   currency: string;
   adjustmentIndex: string;
-  nextAdjustmentDate: string | null;
+  nextAdjustmentDate: string;
 }
 
 interface SendResult {
@@ -17,76 +21,52 @@ interface SendResult {
   error?: string;
 }
 
-async function callSendWhatsApp(payload: WhatsAppPayload): Promise<SendResult> {
-  const { data: { session } } = await supabase.auth.getSession();
-
-  const res = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-whatsapp`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session?.access_token ?? ""}`,
-      },
-      body: JSON.stringify(payload),
-    },
-  );
-
-  const result = await res.json();
-  if (!res.ok) return { success: false, error: result.error ?? "Error al enviar el mensaje." };
-  return { success: true };
-}
-
-/** Hook for sending WhatsApp adjustment notices. Tracks loading state per contractId. */
 export function useSendWhatsApp() {
-  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const { data: agency } = useOrgProfile();
+  const agencyName = agency?.legal_name?.trim() || "la inmobiliaria";
 
-  async function sendFromContract(contract: ContractWithRelations): Promise<SendResult> {
+  function sendFromContract(contract: ContractWithRelations): SendResult {
     const phone = contract.tenant?.phone;
     if (!phone) return { success: false, error: "El inquilino no tiene teléfono registrado." };
 
-    setLoadingId(contract.id);
-    try {
-      return await callSendWhatsApp({
-        phone,
+    const ok = openRentIncreaseWhatsApp(
+      phone,
+      buildRentIncreaseWhatsAppMessage({
         tenantName: contract.tenant?.name ?? "Inquilino",
-        contractId: contract.id,
-        rentAmount: contract.rent_amount,
-        currency: contract.currency,
+        agencyName,
+        propertyAddress: contract.property?.address ?? "la propiedad",
         adjustmentIndex: contract.adjustment_index,
         nextAdjustmentDate: contract.next_adjustment_date,
-      });
-    } finally {
-      setLoadingId(null);
-    }
+        rentAmount: contract.rent_amount,
+        currency: contract.currency,
+      }),
+    );
+    return ok
+      ? { success: true }
+      : { success: false, error: "El teléfono del inquilino no es válido." };
   }
 
-  async function sendFromAdjustment(adj: {
-    contractId: string;
-    tenantName: string;
-    tenantPhone: string | null;
-    rentAmount: number;
-    currency: string;
-    adjustmentIndex: string;
-    nextAdjustmentDate: string;
-  }): Promise<SendResult> {
-    if (!adj.tenantPhone) return { success: false, error: "El inquilino no tiene teléfono registrado." };
+  function sendFromAdjustment(adj: AdjustmentWhatsAppInput): SendResult {
+    if (!adj.tenantPhone) {
+      return { success: false, error: "El inquilino no tiene teléfono registrado." };
+    }
 
-    setLoadingId(adj.contractId);
-    try {
-      return await callSendWhatsApp({
-        phone: adj.tenantPhone,
+    const ok = openRentIncreaseWhatsApp(
+      adj.tenantPhone,
+      buildRentIncreaseWhatsAppMessage({
         tenantName: adj.tenantName,
-        contractId: adj.contractId,
-        rentAmount: adj.rentAmount,
-        currency: adj.currency,
+        agencyName,
+        propertyAddress: adj.propertyAddress,
         adjustmentIndex: adj.adjustmentIndex,
         nextAdjustmentDate: adj.nextAdjustmentDate,
-      });
-    } finally {
-      setLoadingId(null);
-    }
+        rentAmount: adj.rentAmount,
+        currency: adj.currency,
+      }),
+    );
+    return ok
+      ? { success: true }
+      : { success: false, error: "El teléfono del inquilino no es válido." };
   }
 
-  return { sendFromContract, sendFromAdjustment, loadingId };
+  return { sendFromContract, sendFromAdjustment };
 }

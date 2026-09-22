@@ -1,4 +1,4 @@
-import { History, Calendar, TrendingUp, MessageCircle, Loader2 } from "lucide-react";
+import { History, Calendar, TrendingUp, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@nodocore/shared-components";
@@ -39,7 +39,7 @@ export function DashboardPage() {
   const { data: tasks = [] } = useTasks();
   const pendingTasks = tasks.filter((t) => t.status !== "completada");
   const { data: upcomingAdjustments = [] } = useUpcomingAdjustments();
-  const { sendFromAdjustment, loadingId: whatsappLoadingId } = useSendWhatsApp();
+  const { sendFromAdjustment } = useSendWhatsApp();
   const [whatsappResult, setWhatsappResult] = useState<{ id: string; ok: boolean } | null>(null);
 
   if (metrics.loading) {
@@ -194,7 +194,7 @@ export function DashboardPage() {
                       {")"}
                     </span>
                     <button
-                      disabled={!adj.tenantPhone || whatsappLoadingId === adj.contractId}
+                      disabled={!adj.tenantPhone}
                       title={adj.tenantPhone ? "Avisar por WhatsApp" : "Sin teléfono registrado"}
                       className={[
                         "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors",
@@ -203,19 +203,16 @@ export function DashboardPage() {
                             ? "bg-green-100 text-green-700"
                             : "bg-red-100 text-red-600"
                           : adj.tenantPhone
-                            ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                            ? "bg-green-100 text-green-700 hover:bg-green-200"
                             : "cursor-not-allowed bg-gray-100 text-gray-400",
                       ].join(" ")}
-                      onClick={async () => {
-                        const result = await sendFromAdjustment(adj);
+                      onClick={() => {
+                        const result = sendFromAdjustment(adj);
                         setWhatsappResult({ id: adj.contractId, ok: result.success });
                         setTimeout(() => setWhatsappResult(null), 4000);
                       }}
                     >
-                      {whatsappLoadingId === adj.contractId
-                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        : <MessageCircle className="h-3.5 w-3.5" />
-                      }
+                      <MessageCircle className="h-3.5 w-3.5" />
                       Avisar
                     </button>
                   </li>
