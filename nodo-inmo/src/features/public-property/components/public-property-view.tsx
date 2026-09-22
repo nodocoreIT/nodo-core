@@ -1,4 +1,5 @@
-import { Home, Mail, Phone } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, Home, Mail, Phone, X } from "lucide-react";
 import { PropertyAmenityIconsLarge } from "@/features/portal/components/amenity-icons";
 import type { PortalProperty } from "@/features/portal/hooks/use-portal-properties";
 import {
@@ -8,6 +9,7 @@ import {
   STATUS_LABELS,
   formatPortalPrice,
 } from "@/features/portal/lib/portal-filters";
+import { cn } from "@/shared/lib/utils";
 import type { PublicProperty } from "../hooks/use-public-property";
 
 function toAmenityShape(property: PublicProperty): PortalProperty {
@@ -34,12 +36,36 @@ function InfoCell({
 }
 
 export function PublicPropertyView({ property }: { property: PublicProperty }) {
+  const photos = property.photo_urls;
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const statusColor = STATUS_COLORS[property.status] ?? "bg-slate-100 text-slate-700";
   const statusLabel = STATUS_LABELS[property.status] ?? property.status;
   const operationLabel = OPERATION_LABELS[property.operation] ?? property.operation;
   const typeLabel = PROPERTY_TYPE_LABELS[property.property_type] ?? property.property_type;
-  const mainPhoto = property.photo_urls[0];
+  const mainPhoto = photos[activeIndex];
   const location = [property.localidad, property.provincia].filter(Boolean).join(", ");
+
+  function prevPhoto() {
+    if (photos.length < 2) return;
+    setActiveIndex((i) => (i - 1 + photos.length) % photos.length);
+  }
+
+  function nextPhoto() {
+    if (photos.length < 2) return;
+    setActiveIndex((i) => (i + 1) % photos.length);
+  }
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "ArrowLeft") prevPhoto();
+      if (e.key === "ArrowRight") nextPhoto();
+      if (e.key === "Escape") setLightboxOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8">
@@ -58,26 +84,110 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
         {location ? <p className="text-sm text-slate2">📍 {location}</p> : null}
       </header>
 
-      <div className="aspect-video overflow-hidden rounded-lg bg-mist">
+      <div className="relative aspect-video overflow-hidden rounded-lg bg-mist">
         {mainPhoto ? (
-          <img src={mainPhoto} alt={property.address} className="h-full w-full object-cover" />
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(true)}
+            className="h-full w-full"
+            aria-label="Ver foto en grande"
+          >
+            <img src={mainPhoto} alt={property.address} className="h-full w-full object-cover" />
+          </button>
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <Home className="h-16 w-16 text-slate-300" />
           </div>
         )}
+        {photos.length > 1 ? (
+          <>
+            <button
+              type="button"
+              onClick={prevPhoto}
+              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
+              aria-label="Foto anterior"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={nextPhoto}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
+              aria-label="Foto siguiente"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </>
+        ) : null}
       </div>
 
-      {property.photo_urls.length > 1 ? (
+      {photos.length > 1 ? (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {property.photo_urls.slice(1).map((url) => (
-            <img
-              key={url}
-              src={url}
-              alt=""
-              className="aspect-square w-full rounded-md object-cover"
-            />
+          {photos.map((url, index) => (
+            <button
+              key={`${url}-${index}`}
+              type="button"
+              onClick={() => setActiveIndex(index)}
+              className={cn(
+                "overflow-hidden rounded-md ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
+                index === activeIndex ? "ring-2 ring-brand" : "opacity-80 hover:opacity-100",
+              )}
+              aria-label={`Ver foto ${index + 1}`}
+              aria-current={index === activeIndex}
+            >
+              <img src={url} alt="" className="aspect-square w-full object-cover" />
+            </button>
           ))}
+        </div>
+      ) : null}
+
+      {lightboxOpen && mainPhoto ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setLightboxOpen(false)}
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(false)}
+            className="absolute right-4 top-4 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
+            aria-label="Cerrar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          {photos.length > 1 ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                prevPhoto();
+              }}
+              className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
+              aria-label="Foto anterior"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+          ) : null}
+          <img
+            src={mainPhoto}
+            alt={property.address}
+            className="max-h-[90vh] max-w-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          {photos.length > 1 ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                nextPhoto();
+              }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
+              aria-label="Foto siguiente"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          ) : null}
         </div>
       ) : null}
 
