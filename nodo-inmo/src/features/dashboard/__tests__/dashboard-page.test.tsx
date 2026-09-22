@@ -42,6 +42,10 @@ vi.mock("@/features/agency-profile/hooks/use-org-profile", () => ({
   useOrgProfile: () => ({ data: null, isLoading: false }),
 }));
 
+vi.mock("../hooks/use-upcoming-adjustments", () => ({
+  useUpcomingAdjustments: () => ({ data: [], isLoading: false }),
+}));
+
 
 import { DashboardStatCard } from "../components/dashboard-stat-card";
 import { DashboardPage } from "../components/dashboard-page";

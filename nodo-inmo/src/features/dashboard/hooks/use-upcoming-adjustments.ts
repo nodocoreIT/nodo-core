@@ -38,7 +38,7 @@ export function useUpcomingAdjustments() {
           adjustment_index,
           rent_amount,
           currency,
-          contacts:tenant_id ( name, phone ),
+          tenant:contacts!contracts_tenant_id_fkey ( name, phone ),
           properties:property_id ( address )
         `)
         .eq("org_id", orgId!)
@@ -54,8 +54,8 @@ export function useUpcomingAdjustments() {
 
       return data.map((row: any) => ({
         contractId: row.id,
-        tenantName: row.contacts?.name ?? "Inquilino",
-        tenantPhone: row.contacts?.phone ?? null,
+        tenantName: row.tenant?.name ?? "Inquilino",
+        tenantPhone: row.tenant?.phone ?? null,
         propertyAddress: row.properties?.address ?? "Propiedad",
         nextAdjustmentDate: row.next_adjustment_date,
         adjustmentIndex: row.adjustment_index,
