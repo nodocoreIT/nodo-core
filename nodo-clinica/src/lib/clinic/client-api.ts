@@ -1269,6 +1269,7 @@ export const clinicApi = {
     profilePhotoData?: string;
     bio?: string;
     city?: string;
+    province?: string;
     payment?: import("@/lib/clinic/types").DoctorPaymentSettings;
     reminderSettings?: import("@/lib/clinic/types").DoctorReminderSettings;
     googleCalendarId?: string;

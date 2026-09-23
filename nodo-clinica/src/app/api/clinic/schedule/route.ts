@@ -78,6 +78,7 @@ function doctorOfficePayload(professional: any, officeSettings: any, orgConnecte
     profilePhotoData: professional?.profile_photo_url ?? "",
     bio: professional?.bio ?? "",
     city: professional?.city ?? "",
+    province: professional?.province ?? "",
     payment: ownPaymentForProfessional(officeSettings?.payment, orgConnected),
     reminderSettings: officeSettings?.reminder_settings ?? {
       enabled: false,
@@ -101,6 +102,7 @@ function localDoctorOfficePayload(doctor: {
   profilePhotoData?: string;
   bio?: string;
   city?: string;
+  province?: string;
   payment?: DoctorPaymentSettings;
   reminderSettings?: DoctorReminderSettings;
   googleCalendarId?: string;
@@ -129,6 +131,7 @@ function localDoctorOfficePayload(doctor: {
     profilePhotoData: doctor.profilePhotoData ?? "",
     bio: doctor.bio ?? "",
     city: doctor.city ?? "",
+    province: doctor.province ?? "",
     payment: payment
       ? {
           ...payment,
@@ -393,6 +396,7 @@ export async function PUT(request: NextRequest) {
       profilePhotoData,
       bio,
       city,
+      province,
       payment,
       blockedDates,
       googleCalendarId,
@@ -409,6 +413,7 @@ export async function PUT(request: NextRequest) {
       profilePhotoData?: string;
       bio?: string;
       city?: string;
+      province?: string;
       payment?: DoctorPaymentSettings;
       blockedDates?: string[];
       googleCalendarId?: string;
@@ -446,6 +451,7 @@ export async function PUT(request: NextRequest) {
         if (profilePhotoData !== undefined) doctor.profilePhotoData = profilePhotoData;
         if (bio !== undefined) doctor.bio = bio;
         if (city !== undefined) doctor.city = String(city).trim();
+        if (province !== undefined) doctor.province = String(province).trim();
         if (googleCalendarId !== undefined) doctor.googleCalendarId = googleCalendarId;
         if (reminderSettings !== undefined) doctor.reminderSettings = reminderSettings;
         if (themeSettings !== undefined) {
@@ -503,6 +509,7 @@ export async function PUT(request: NextRequest) {
     profilePhotoData,
     bio,
     city,
+    province,
     payment,
     blockedDates,
     googleCalendarId,
@@ -516,6 +523,7 @@ export async function PUT(request: NextRequest) {
     profilePhotoData?: string;
     bio?: string;
     city?: string;
+    province?: string;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     payment?: any;
     blockedDates?: string[];
@@ -586,6 +594,7 @@ export async function PUT(request: NextRequest) {
   if (profilePhotoData !== undefined) professionalUpdate.profile_photo_url = profilePhotoData;
   if (bio !== undefined) professionalUpdate.bio = bio;
   if (city !== undefined) professionalUpdate.city = String(city).trim() || null;
+  if (province !== undefined) professionalUpdate.province = String(province).trim() || null;
   if (googleCalendarId !== undefined) professionalUpdate.google_calendar_id = googleCalendarId;
 
   if (Object.keys(professionalUpdate).length > 0) {

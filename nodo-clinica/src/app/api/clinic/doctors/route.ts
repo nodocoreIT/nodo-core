@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/supabase/auth-guard";
 import { createServiceClient } from "@/lib/supabase/server";
 import { professionalHasMercadoPagoConnection } from "@/lib/clinic/db/payments";
 import { isUnassignedSpecialty } from "@/lib/clinic/unassigned-specialty";
+import { formatDoctorLocation } from "@/lib/clinic/location";
 
 export const dynamic = "force-dynamic";
 
@@ -100,7 +101,7 @@ export async function GET(request: NextRequest) {
 
   const { data: professionals } = await serviceClient
     .from("professionals")
-    .select("id, full_name, specialty, license_number, profile_photo_url, city")
+    .select("id, full_name, specialty, license_number, profile_photo_url, city, province")
     .not("enabled_at", "is", null);
 
   const activeProfessionals = (professionals ?? []).filter(
@@ -128,10 +129,17 @@ export async function GET(request: NextRequest) {
     }
     citiesByProfessionalId.set(professionalId, current);
   }
+  const withProfileCity = new Set<string>();
   for (const p of activeProfessionals) {
-    addCity(p.id, p.city);
+    const label = formatDoctorLocation(p.city, p.province);
+    if (label) {
+      addCity(p.id, label);
+      withProfileCity.add(p.id);
+    }
   }
+  // Perfil gana: si el médico cargó localidad, no mezclar ciudades de instituciones.
   for (const row of institutionRows ?? []) {
+    if (withProfileCity.has(row.professional_id)) continue;
     addCity(row.professional_id, row.city);
   }
 
