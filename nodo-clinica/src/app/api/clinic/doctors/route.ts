@@ -5,7 +5,11 @@ import { requireAuth } from "@/lib/supabase/auth-guard";
 import { createServiceClient } from "@/lib/supabase/server";
 import { professionalHasMercadoPagoConnection } from "@/lib/clinic/db/payments";
 import { isUnassignedSpecialty } from "@/lib/clinic/unassigned-specialty";
-import { formatDoctorLocation } from "@/lib/clinic/location";
+import {
+  formatLocationEntry,
+  normalizeLocations,
+  type DoctorLocation,
+} from "@/lib/clinic/location";
 
 export const dynamic = "force-dynamic";
 
@@ -101,7 +105,7 @@ export async function GET(request: NextRequest) {
 
   const { data: professionals } = await serviceClient
     .from("professionals")
-    .select("id, full_name, specialty, license_number, profile_photo_url, city, province")
+    .select("id, full_name, specialty, license_number, profile_photo_url, city, province, locations")
     .not("enabled_at", "is", null);
 
   const activeProfessionals = (professionals ?? []).filter(
@@ -129,11 +133,13 @@ export async function GET(request: NextRequest) {
     }
     citiesByProfessionalId.set(professionalId, current);
   }
+  const locationsByProfessionalId = new Map<string, DoctorLocation[]>();
   const withProfileCity = new Set<string>();
   for (const p of activeProfessionals) {
-    const label = formatDoctorLocation(p.city, p.province);
-    if (label) {
-      addCity(p.id, label);
+    const locs = normalizeLocations(p.locations, p.city, p.province);
+    locationsByProfessionalId.set(p.id, locs);
+    if (locs.length) {
+      for (const loc of locs) addCity(p.id, formatLocationEntry(loc));
       withProfileCity.add(p.id);
     }
   }
@@ -176,6 +182,7 @@ export async function GET(request: NextRequest) {
       licenseNumber: p.license_number,
       profilePhotoUrl: p.profile_photo_url,
       cities: citiesByProfessionalId.get(p.id) ?? [],
+      locations: locationsByProfessionalId.get(p.id) ?? [],
       payment: paymentByProfessionalId.get(p.id) ?? {},
     })),
   );

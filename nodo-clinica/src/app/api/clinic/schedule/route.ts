@@ -8,6 +8,7 @@ import { getSessionFromRequest } from "@/lib/clinic/session";
 import { professionalHasMercadoPagoConnection } from "@/lib/clinic/db/payments";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isUnassignedSpecialty } from "@/lib/clinic/unassigned-specialty";
+import { normalizeLocations } from "@/lib/clinic/location";
 
 const DOCTOR_ROLES = new Set(["admin", "super_admin", "medico", "agent", "doctor"]);
 import { mergeThemeSettings } from "@/lib/clinic/theme-settings";
@@ -79,6 +80,11 @@ function doctorOfficePayload(professional: any, officeSettings: any, orgConnecte
     bio: professional?.bio ?? "",
     city: professional?.city ?? "",
     province: professional?.province ?? "",
+    locations: normalizeLocations(
+      professional?.locations,
+      professional?.city,
+      professional?.province,
+    ),
     payment: ownPaymentForProfessional(officeSettings?.payment, orgConnected),
     reminderSettings: officeSettings?.reminder_settings ?? {
       enabled: false,
@@ -103,6 +109,7 @@ function localDoctorOfficePayload(doctor: {
   bio?: string;
   city?: string;
   province?: string;
+  locations?: import("@/lib/clinic/location").DoctorLocation[];
   payment?: DoctorPaymentSettings;
   reminderSettings?: DoctorReminderSettings;
   googleCalendarId?: string;
@@ -132,6 +139,7 @@ function localDoctorOfficePayload(doctor: {
     bio: doctor.bio ?? "",
     city: doctor.city ?? "",
     province: doctor.province ?? "",
+    locations: normalizeLocations(doctor.locations, doctor.city, doctor.province),
     payment: payment
       ? {
           ...payment,
@@ -397,6 +405,7 @@ export async function PUT(request: NextRequest) {
       bio,
       city,
       province,
+      locations,
       payment,
       blockedDates,
       googleCalendarId,
@@ -414,6 +423,7 @@ export async function PUT(request: NextRequest) {
       bio?: string;
       city?: string;
       province?: string;
+      locations?: import("@/lib/clinic/location").DoctorLocation[];
       payment?: DoctorPaymentSettings;
       blockedDates?: string[];
       googleCalendarId?: string;
@@ -450,8 +460,16 @@ export async function PUT(request: NextRequest) {
         if (signatureImageData !== undefined) doctor.signatureImageData = signatureImageData;
         if (profilePhotoData !== undefined) doctor.profilePhotoData = profilePhotoData;
         if (bio !== undefined) doctor.bio = bio;
-        if (city !== undefined) doctor.city = String(city).trim();
-        if (province !== undefined) doctor.province = String(province).trim();
+        if (locations !== undefined || city !== undefined || province !== undefined) {
+          const next = normalizeLocations(
+            locations,
+            city !== undefined ? String(city) : doctor.city,
+            province !== undefined ? String(province) : doctor.province,
+          );
+          doctor.locations = next;
+          doctor.city = next[0]?.city ?? "";
+          doctor.province = next[0]?.province ?? "";
+        }
         if (googleCalendarId !== undefined) doctor.googleCalendarId = googleCalendarId;
         if (reminderSettings !== undefined) doctor.reminderSettings = reminderSettings;
         if (themeSettings !== undefined) {
@@ -510,6 +528,7 @@ export async function PUT(request: NextRequest) {
     bio,
     city,
     province,
+    locations,
     payment,
     blockedDates,
     googleCalendarId,
@@ -524,6 +543,7 @@ export async function PUT(request: NextRequest) {
     bio?: string;
     city?: string;
     province?: string;
+    locations?: import("@/lib/clinic/location").DoctorLocation[];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     payment?: any;
     blockedDates?: string[];
@@ -593,8 +613,12 @@ export async function PUT(request: NextRequest) {
   if (signatureImageData !== undefined) professionalUpdate.signature_image_url = signatureImageData;
   if (profilePhotoData !== undefined) professionalUpdate.profile_photo_url = profilePhotoData;
   if (bio !== undefined) professionalUpdate.bio = bio;
-  if (city !== undefined) professionalUpdate.city = String(city).trim() || null;
-  if (province !== undefined) professionalUpdate.province = String(province).trim() || null;
+  if (locations !== undefined || city !== undefined || province !== undefined) {
+    const next = normalizeLocations(locations, city, province);
+    professionalUpdate.locations = next;
+    professionalUpdate.city = next[0]?.city || null;
+    professionalUpdate.province = next[0]?.province || null;
+  }
   if (googleCalendarId !== undefined) professionalUpdate.google_calendar_id = googleCalendarId;
 
   if (Object.keys(professionalUpdate).length > 0) {

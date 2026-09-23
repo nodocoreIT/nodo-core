@@ -35,17 +35,30 @@ import {
   Receipt,
   Wallet,
   Building2,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { clinicApi } from "@/lib/clinic/client-api";
-import { LOCALIDADES_BY_PROVINCIA, PROVINCIAS, type Provincia } from "@/lib/clinic/argentina-geo";
-import { isProvincia, parseLegacyLocation } from "@/lib/clinic/location";
+import { LOCALIDADES_BY_PROVINCIA, PROVINCIAS } from "@/lib/clinic/argentina-geo";
+import {
+  ALL_LOCALITIES,
+  isProvincia,
+  normalizeLocations,
+} from "@/lib/clinic/location";
 import { currencySymbol, formatThousands, parseThousands } from "@/lib/clinic/currency";
 
 function localityOptions(province: string, city: string): string[] {
   const listed = isProvincia(province) ? [...LOCALIDADES_BY_PROVINCIA[province]] : [];
-  if (city && !listed.includes(city)) listed.unshift(city);
+  if (city && city !== ALL_LOCALITIES && !listed.includes(city)) listed.unshift(city);
   return listed;
+}
+
+function locationsFromOffice(data: Record<string, unknown>) {
+  return normalizeLocations(
+    data.locations,
+    data.city != null ? String(data.city) : "",
+    data.province != null ? String(data.province) : "",
+  );
 }
 import { PAID_SUBSCRIPTION_PLANS, formatPlanPrice } from "@/lib/clinic/subscription-plans";
 
@@ -171,8 +184,9 @@ export function DoctorSettingsDialog({
   const [signatureImageData, setSignatureImageData] = useState("");
   const [profilePhotoData, setProfilePhotoData] = useState("");
   const [bio, setBio] = useState("");
-  const [city, setCity] = useState("");
-  const [province, setProvince] = useState("");
+  const [locations, setLocations] = useState<{ province: string; city?: string }[]>([
+    { province: "" },
+  ]);
   const [payment, setPayment] = useState<PaymentUiState>({
     currency: "ARS",
     requirePaymentBeforeBooking: true,
@@ -251,13 +265,9 @@ export function DoctorSettingsDialog({
       if (data.signatureImageData != null) setSignatureImageData(String(data.signatureImageData));
       if (data.profilePhotoData != null) setProfilePhotoData(String(data.profilePhotoData));
       if (data.bio != null) setBio(String(data.bio));
-      if (data.city != null || data.province != null) {
-        const parsed = parseLegacyLocation(
-          data.city != null ? String(data.city) : "",
-          data.province != null ? String(data.province) : "",
-        );
-        setCity(parsed.city);
-        setProvince(parsed.province);
+      if (data.locations != null || data.city != null || data.province != null) {
+        const next = locationsFromOffice(data);
+        setLocations(next.length ? next : [{ province: "" }]);
       }
       if (data.payment) {
         const fromApi = data.payment as PaymentUiState;
@@ -296,13 +306,7 @@ export function DoctorSettingsDialog({
           signatureImageData: data.signatureImageData ?? "",
           profilePhotoData: data.profilePhotoData ?? "",
           bio: data.bio ?? "",
-          ...(() => {
-            const parsed = parseLegacyLocation(
-              data.city != null ? String(data.city) : "",
-              data.province != null ? String(data.province) : "",
-            );
-            return { city: parsed.city, province: parsed.province };
-          })(),
+          locations: JSON.stringify(locationsFromOffice(data)),
           payment: JSON.stringify(data.payment ?? {}),
           reminderSettings: JSON.stringify(data.reminderSettings ?? {}),
           googleCalendarId: data.googleCalendarId ?? "",
@@ -376,8 +380,7 @@ export function DoctorSettingsDialog({
       signatureImageData,
       profilePhotoData,
       bio,
-      city,
-      province,
+      locations: JSON.stringify(locations),
       payment: JSON.stringify(payment),
       reminderSettings: JSON.stringify(reminderSettings),
       googleCalendarId,
@@ -385,7 +388,7 @@ export function DoctorSettingsDialog({
     };
     const hasChanges = JSON.stringify(currentState) !== JSON.stringify(initialStateRef.current);
     setIsDirty(hasChanges);
-  }, [open, availability, blockedDates, fullName, licenseNumber, specialties, signatureText, signatureImageData, profilePhotoData, bio, city, province, payment, reminderSettings, googleCalendarId, themeSettings]);
+  }, [open, availability, blockedDates, fullName, licenseNumber, specialties, signatureText, signatureImageData, profilePhotoData, bio, locations, payment, reminderSettings, googleCalendarId, themeSettings]);
 
   const handleSave = async () => {
     if (availability.days.length === 0) {
@@ -408,8 +411,7 @@ export function DoctorSettingsDialog({
         signatureImageData,
         profilePhotoData,
         bio,
-        city,
-        province,
+        locations: normalizeLocations(locations),
         payment,
         reminderSettings,
         googleCalendarId: parseGoogleCalendarSrc(googleCalendarId) ?? googleCalendarId.trim(),
@@ -633,57 +635,99 @@ export function DoctorSettingsDialog({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs">Provincia</Label>
-                      <Select
-                        value={province || undefined}
-                        onValueChange={(value) => {
-                          setProvince(value);
-                          const nextCities =
-                            LOCALIDADES_BY_PROVINCIA[value as Provincia] ?? [];
-                          if (!nextCities.includes(city)) setCity("");
-                        }}
-                      >
-                        <SelectTrigger className="mt-1 h-9 text-sm">
-                          <SelectValue placeholder="Seleccioná provincia" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PROVINCIAS.map((p) => (
-                            <SelectItem key={p} value={p}>
-                              {p}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-xs">Localidad</Label>
-                      <Select
-                        value={city || undefined}
-                        onValueChange={setCity}
-                        disabled={!province}
-                      >
-                        <SelectTrigger className="mt-1 h-9 text-sm">
-                          <SelectValue
-                            placeholder={
-                              province ? "Seleccioná localidad" : "Primero elegí provincia"
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {localityOptions(province, city).map((loc) => (
-                            <SelectItem key={loc} value={loc}>
-                              {loc}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Lugares de atención</Label>
+                    {locations.map((loc, i) => (
+                      <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                        <div>
+                          {i === 0 && <Label className="text-[11px] text-slate-500">Provincia</Label>}
+                          <Select
+                            value={loc.province || undefined}
+                            onValueChange={(value) => {
+                              setLocations((prev) =>
+                                prev.map((row, idx) =>
+                                  idx === i ? { province: value } : row,
+                                ),
+                              );
+                            }}
+                          >
+                            <SelectTrigger className="mt-1 h-9 text-sm">
+                              <SelectValue placeholder="Provincia" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PROVINCIAS.map((p) => (
+                                <SelectItem key={p} value={p}>
+                                  {p}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          {i === 0 && <Label className="text-[11px] text-slate-500">Localidad</Label>}
+                          <Select
+                            value={loc.city ? loc.city : loc.province ? ALL_LOCALITIES : undefined}
+                            onValueChange={(value) => {
+                              setLocations((prev) =>
+                                prev.map((row, idx) =>
+                                  idx === i
+                                    ? {
+                                        province: row.province,
+                                        city: value === ALL_LOCALITIES ? undefined : value,
+                                      }
+                                    : row,
+                                ),
+                              );
+                            }}
+                            disabled={!loc.province}
+                          >
+                            <SelectTrigger className="mt-1 h-9 text-sm">
+                              <SelectValue
+                                placeholder={
+                                  loc.province ? "Localidad" : "Provincia primero"
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={ALL_LOCALITIES}>
+                                Todas las localidades
+                              </SelectItem>
+                              {localityOptions(loc.province, loc.city ?? "").map((name) => (
+                                <SelectItem key={name} value={name}>
+                                  {name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 w-9 p-0 text-slate-400 hover:text-red-500"
+                          disabled={locations.length === 1}
+                          onClick={() =>
+                            setLocations((prev) => prev.filter((_, idx) => idx !== i))
+                          }
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => setLocations((prev) => [...prev, { province: "" }])}
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Agregar lugar
+                    </Button>
+                    <p className="text-[11px] text-slate-400">
+                      Podés atender en toda una provincia o en localidades sueltas, y combinar ambas.
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-400 -mt-1">
-                    Se muestra como “Localidad, Provincia” en Buscar médico.
-                  </p>
 
                   <div>
                     <Label className="text-xs">Especialidades</Label>
