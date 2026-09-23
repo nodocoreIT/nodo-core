@@ -112,6 +112,7 @@ export interface LocalDoctor {
   profilePhotoData?: string;
   bio?: string;
   city?: string;
+  province?: string;
   payment?: DoctorPaymentSettings;
   reminderSettings?: DoctorReminderSettings;
   googleCalendarId?: string;

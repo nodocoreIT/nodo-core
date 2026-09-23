@@ -6,6 +6,7 @@ import { getClinicDataDir, getClinicDbPath } from "@/lib/clinic/data-dir";
 import type { DoctorThemeSettings } from "@/lib/clinic/theme-settings";
 import { buildClinicSeed, CLINIC_SEED_VERSION } from "@/lib/clinic/seed";
 import { doctorHasMercadoPagoConnection } from "@/lib/mercadopago/connection";
+import { formatDoctorLocation } from "@/lib/clinic/location";
 
 export type SubscriptionStatus = "demo" | "pending_payment" | "active" | "expired";
 export type AppointmentStatus =
@@ -106,6 +107,7 @@ export interface LocalDoctor {
   profilePhotoData?: string;
   bio?: string;
   city?: string;
+  province?: string;
   payment?: DoctorPaymentSettings;
   reminderSettings?: DoctorReminderSettings;
   googleCalendarId?: string;
@@ -704,10 +706,10 @@ export function publicDoctorSummary(doctor: LocalDoctor) {
 
 export function publicDoctor(doctor: LocalDoctor) {
   const { password: _, ...rest } = doctor;
-  const city = doctor.city?.trim();
+  const location = formatDoctorLocation(doctor.city, doctor.province);
   return {
     ...rest,
-    cities: city ? [city] : [],
+    cities: location ? [location] : [],
     payment: publicPaymentSettings(doctor.payment, doctor),
   };
 }
