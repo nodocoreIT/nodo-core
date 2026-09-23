@@ -17,6 +17,10 @@ import { toast } from "sonner";
 import { BookAppointmentDialog } from "@/components/patient/book-appointment-dialog";
 import { WaitingRoomModal } from "@/components/patient/waiting-room-modal";
 import { clinicApi } from "@/lib/clinic/client-api";
+import {
+  doctorMatchesLocationFilter,
+  type DoctorLocation,
+} from "@/lib/clinic/location";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
 // ── Specialty filter combobox (local data, no API) ─────────────────────────
@@ -164,6 +168,7 @@ interface Doctor {
   licenseNumber: string;
   profilePhotoUrl?: string;
   cities?: string[];
+  locations?: DoctorLocation[];
   payment?: {
     requirePaymentBeforeBooking?: boolean;
     mercadopagoEnabled?: boolean;
@@ -235,7 +240,7 @@ export function PacienteInicioPage() {
       const cities = doc.cities ?? [];
       if (
         locationFilter !== "all" &&
-        !cities.some((c) => c.trim().toLowerCase() === locationFilter.toLowerCase())
+        !doctorMatchesLocationFilter(doc.locations ?? [], cities, locationFilter)
       ) {
         return false;
       }

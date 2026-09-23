@@ -1270,6 +1270,7 @@ export const clinicApi = {
     bio?: string;
     city?: string;
     province?: string;
+    locations?: import("@/lib/clinic/location").DoctorLocation[];
     payment?: import("@/lib/clinic/types").DoctorPaymentSettings;
     reminderSettings?: import("@/lib/clinic/types").DoctorReminderSettings;
     googleCalendarId?: string;

@@ -113,6 +113,7 @@ export interface LocalDoctor {
   bio?: string;
   city?: string;
   province?: string;
+  locations?: import("@/lib/clinic/location").DoctorLocation[];
   payment?: DoctorPaymentSettings;
   reminderSettings?: DoctorReminderSettings;
   googleCalendarId?: string;
