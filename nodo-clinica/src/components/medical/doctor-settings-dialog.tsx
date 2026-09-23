@@ -163,6 +163,7 @@ export function DoctorSettingsDialog({
   const [signatureImageData, setSignatureImageData] = useState("");
   const [profilePhotoData, setProfilePhotoData] = useState("");
   const [bio, setBio] = useState("");
+  const [city, setCity] = useState("");
   const [payment, setPayment] = useState<PaymentUiState>({
     currency: "ARS",
     requirePaymentBeforeBooking: true,
@@ -241,6 +242,7 @@ export function DoctorSettingsDialog({
       if (data.signatureImageData != null) setSignatureImageData(String(data.signatureImageData));
       if (data.profilePhotoData != null) setProfilePhotoData(String(data.profilePhotoData));
       if (data.bio != null) setBio(String(data.bio));
+      if (data.city != null) setCity(String(data.city));
       if (data.payment) {
         const fromApi = data.payment as PaymentUiState;
         const next: PaymentUiState = {
@@ -278,6 +280,7 @@ export function DoctorSettingsDialog({
           signatureImageData: data.signatureImageData ?? "",
           profilePhotoData: data.profilePhotoData ?? "",
           bio: data.bio ?? "",
+          city: data.city ?? "",
           payment: JSON.stringify(data.payment ?? {}),
           reminderSettings: JSON.stringify(data.reminderSettings ?? {}),
           googleCalendarId: data.googleCalendarId ?? "",
@@ -351,6 +354,7 @@ export function DoctorSettingsDialog({
       signatureImageData,
       profilePhotoData,
       bio,
+      city,
       payment: JSON.stringify(payment),
       reminderSettings: JSON.stringify(reminderSettings),
       googleCalendarId,
@@ -358,7 +362,7 @@ export function DoctorSettingsDialog({
     };
     const hasChanges = JSON.stringify(currentState) !== JSON.stringify(initialStateRef.current);
     setIsDirty(hasChanges);
-  }, [open, availability, blockedDates, fullName, licenseNumber, specialties, signatureText, signatureImageData, profilePhotoData, bio, payment, reminderSettings, googleCalendarId, themeSettings]);
+  }, [open, availability, blockedDates, fullName, licenseNumber, specialties, signatureText, signatureImageData, profilePhotoData, bio, city, payment, reminderSettings, googleCalendarId, themeSettings]);
 
   const handleSave = async () => {
     if (availability.days.length === 0) {
@@ -381,6 +385,7 @@ export function DoctorSettingsDialog({
         signatureImageData,
         profilePhotoData,
         bio,
+        city,
         payment,
         reminderSettings,
         googleCalendarId: parseGoogleCalendarSrc(googleCalendarId) ?? googleCalendarId.trim(),
@@ -602,6 +607,19 @@ export function DoctorSettingsDialog({
                         className="mt-1 h-9 text-sm"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs">Localidad</Label>
+                    <Input
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Santa Rosa"
+                      className="mt-1 h-9 text-sm"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Se muestra en Buscar médico y se puede filtrar por localidad.
+                    </p>
                   </div>
 
                   <div>

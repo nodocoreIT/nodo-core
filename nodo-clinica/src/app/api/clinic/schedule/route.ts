@@ -77,6 +77,7 @@ function doctorOfficePayload(professional: any, officeSettings: any, orgConnecte
     signatureImageData: professional?.signature_image_url ?? "",
     profilePhotoData: professional?.profile_photo_url ?? "",
     bio: professional?.bio ?? "",
+    city: professional?.city ?? "",
     payment: ownPaymentForProfessional(officeSettings?.payment, orgConnected),
     reminderSettings: officeSettings?.reminder_settings ?? {
       enabled: false,
@@ -99,6 +100,7 @@ function localDoctorOfficePayload(doctor: {
   signatureImageData?: string;
   profilePhotoData?: string;
   bio?: string;
+  city?: string;
   payment?: DoctorPaymentSettings;
   reminderSettings?: DoctorReminderSettings;
   googleCalendarId?: string;
@@ -126,6 +128,7 @@ function localDoctorOfficePayload(doctor: {
     signatureImageData: doctor.signatureImageData ?? "",
     profilePhotoData: doctor.profilePhotoData ?? "",
     bio: doctor.bio ?? "",
+    city: doctor.city ?? "",
     payment: payment
       ? {
           ...payment,
@@ -389,6 +392,7 @@ export async function PUT(request: NextRequest) {
       signatureImageData,
       profilePhotoData,
       bio,
+      city,
       payment,
       blockedDates,
       googleCalendarId,
@@ -404,6 +408,7 @@ export async function PUT(request: NextRequest) {
       signatureImageData?: string;
       profilePhotoData?: string;
       bio?: string;
+      city?: string;
       payment?: DoctorPaymentSettings;
       blockedDates?: string[];
       googleCalendarId?: string;
@@ -440,6 +445,7 @@ export async function PUT(request: NextRequest) {
         if (signatureImageData !== undefined) doctor.signatureImageData = signatureImageData;
         if (profilePhotoData !== undefined) doctor.profilePhotoData = profilePhotoData;
         if (bio !== undefined) doctor.bio = bio;
+        if (city !== undefined) doctor.city = String(city).trim();
         if (googleCalendarId !== undefined) doctor.googleCalendarId = googleCalendarId;
         if (reminderSettings !== undefined) doctor.reminderSettings = reminderSettings;
         if (themeSettings !== undefined) {
@@ -496,6 +502,7 @@ export async function PUT(request: NextRequest) {
     signatureImageData,
     profilePhotoData,
     bio,
+    city,
     payment,
     blockedDates,
     googleCalendarId,
@@ -508,6 +515,7 @@ export async function PUT(request: NextRequest) {
     signatureImageData?: string;
     profilePhotoData?: string;
     bio?: string;
+    city?: string;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     payment?: any;
     blockedDates?: string[];
@@ -577,6 +585,7 @@ export async function PUT(request: NextRequest) {
   if (signatureImageData !== undefined) professionalUpdate.signature_image_url = signatureImageData;
   if (profilePhotoData !== undefined) professionalUpdate.profile_photo_url = profilePhotoData;
   if (bio !== undefined) professionalUpdate.bio = bio;
+  if (city !== undefined) professionalUpdate.city = String(city).trim() || null;
   if (googleCalendarId !== undefined) professionalUpdate.google_calendar_id = googleCalendarId;
 
   if (Object.keys(professionalUpdate).length > 0) {

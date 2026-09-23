@@ -111,6 +111,7 @@ export interface LocalDoctor {
   signatureImageData?: string;
   profilePhotoData?: string;
   bio?: string;
+  city?: string;
   payment?: DoctorPaymentSettings;
   reminderSettings?: DoctorReminderSettings;
   googleCalendarId?: string;

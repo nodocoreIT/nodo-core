@@ -105,6 +105,7 @@ export interface LocalDoctor {
   signatureImageData?: string;
   profilePhotoData?: string;
   bio?: string;
+  city?: string;
   payment?: DoctorPaymentSettings;
   reminderSettings?: DoctorReminderSettings;
   googleCalendarId?: string;
@@ -703,8 +704,10 @@ export function publicDoctorSummary(doctor: LocalDoctor) {
 
 export function publicDoctor(doctor: LocalDoctor) {
   const { password: _, ...rest } = doctor;
+  const city = doctor.city?.trim();
   return {
     ...rest,
+    cities: city ? [city] : [],
     payment: publicPaymentSettings(doctor.payment, doctor),
   };
 }

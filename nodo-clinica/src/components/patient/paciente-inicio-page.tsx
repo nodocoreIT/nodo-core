@@ -295,8 +295,8 @@ export function PacienteInicioPage() {
                 value={locationFilter}
                 onChange={setLocationFilter}
                 options={locationOptions}
-                placeholder="Buscar por lugar..."
-                allLabel="Todas las ciudades"
+                placeholder="Buscar por localidad..."
+                allLabel="Todas las localidades"
               />
             </div>
           </div>
