@@ -42,12 +42,18 @@ const ALL_SPECIALTIES = [
   "Urología",
 ];
 
-function SpecialtyFilterCombobox({
+function FilterCombobox({
   value,
   onChange,
+  options,
+  placeholder,
+  allLabel,
 }: {
   value: string;
   onChange: (v: string) => void;
+  options: string[];
+  placeholder: string;
+  allLabel: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -56,8 +62,8 @@ function SpecialtyFilterCombobox({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return q ? ALL_SPECIALTIES.filter((s) => s.toLowerCase().includes(q)) : ALL_SPECIALTIES;
-  }, [query]);
+    return q ? options.filter((s) => s.toLowerCase().includes(q)) : options;
+  }, [query, options]);
 
   // Close on outside click
   useEffect(() => {
@@ -84,7 +90,7 @@ function SpecialtyFilterCombobox({
     setQuery("");
   }
 
-  const label = value === "all" ? "Buscar por especialidad..." : value;
+  const label = value === "all" ? placeholder : value;
   const hasValue = value !== "all";
 
   return (
@@ -115,7 +121,7 @@ function SpecialtyFilterCombobox({
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar especialidad..."
+              placeholder={placeholder}
               className="w-full rounded border-0 bg-slate-50 px-2.5 py-1.5 text-sm outline-none placeholder:text-slate-400"
             />
           </div>
@@ -126,7 +132,7 @@ function SpecialtyFilterCombobox({
               onClick={() => select("all")}
               className="cursor-pointer px-3 py-1.5 text-sm text-slate-500 hover:bg-[var(--color-primary)]/10 hover:text-[var(--color-primary)]"
             >
-              Todas las especialidades
+              {allLabel}
             </li>
             {filtered.length === 0 && (
               <li className="px-3 py-2 text-xs text-slate-400">Sin resultados</li>
@@ -157,6 +163,7 @@ interface Doctor {
   specialty: string;
   licenseNumber: string;
   profilePhotoUrl?: string;
+  cities?: string[];
   payment?: {
     requirePaymentBeforeBooking?: boolean;
     mercadopagoEnabled?: boolean;
@@ -176,6 +183,7 @@ export function PacienteInicioPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
 
   // Mercado Pago returns here (not to a full-page /paciente/sala route) after
   // a portal-initiated booking, so the confirmation/retry UI shows inside the
@@ -209,18 +217,37 @@ export function PacienteInicioPage() {
     void load();
   }, []);
 
+  const locationOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const doc of doctors) {
+      for (const city of doc.cities ?? []) {
+        const key = city.trim().toLowerCase();
+        if (key && !seen.has(key)) seen.set(key, city.trim());
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b, "es"));
+  }, [doctors]);
+
   const filteredDoctors = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return doctors.filter((doc) => {
       if (specialtyFilter !== "all" && doc.specialty?.trim() !== specialtyFilter) return false;
+      const cities = doc.cities ?? [];
+      if (
+        locationFilter !== "all" &&
+        !cities.some((c) => c.trim().toLowerCase() === locationFilter.toLowerCase())
+      ) {
+        return false;
+      }
       if (!q) return true;
       return (
         (doc.fullName ?? "").toLowerCase().includes(q) ||
         (doc.specialty ?? "").toLowerCase().includes(q) ||
-        (doc.licenseNumber ?? "").toLowerCase().includes(q)
+        (doc.licenseNumber ?? "").toLowerCase().includes(q) ||
+        cities.some((c) => c.toLowerCase().includes(q))
       );
     });
-  }, [doctors, searchQuery, specialtyFilter]);
+  }, [doctors, searchQuery, specialtyFilter, locationFilter]);
 
   if (loading) {
     return (
@@ -255,9 +282,21 @@ export function PacienteInicioPage() {
               )}
             </div>
             <div className="w-full sm:w-56">
-              <SpecialtyFilterCombobox
+              <FilterCombobox
                 value={specialtyFilter}
                 onChange={setSpecialtyFilter}
+                options={ALL_SPECIALTIES}
+                placeholder="Buscar por especialidad..."
+                allLabel="Todas las especialidades"
+              />
+            </div>
+            <div className="w-full sm:w-56">
+              <FilterCombobox
+                value={locationFilter}
+                onChange={setLocationFilter}
+                options={locationOptions}
+                placeholder="Buscar por lugar..."
+                allLabel="Todas las ciudades"
               />
             </div>
           </div>
@@ -268,9 +307,13 @@ export function PacienteInicioPage() {
             <p className="text-sm text-slate-400 col-span-1 sm:col-span-2 lg:col-span-3 text-center py-8 bg-white rounded-xl border">
               {doctors.length === 0
                 ? "No hay médicos disponibles en este momento."
-                : specialtyFilter !== "all"
-                  ? `No hay médicos registrados en ${specialtyFilter} por el momento.`
-                  : "No hay médicos con ese criterio de búsqueda."}
+                : specialtyFilter !== "all" && locationFilter !== "all"
+                  ? `No hay médicos de ${specialtyFilter} en ${locationFilter} por el momento.`
+                  : specialtyFilter !== "all"
+                    ? `No hay médicos registrados en ${specialtyFilter} por el momento.`
+                    : locationFilter !== "all"
+                      ? `No hay médicos en ${locationFilter} por el momento.`
+                      : "No hay médicos con ese criterio de búsqueda."}
             </p>
           ) : (
             filteredDoctors.map((doc) => (
@@ -290,6 +333,11 @@ export function PacienteInicioPage() {
                           {doc.fullName}
                         </p>
                         <p className="text-sm text-slate-500">{doc.specialty}</p>
+                        {(doc.cities ?? []).length > 0 ? (
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {(doc.cities ?? []).join(" · ")}
+                          </p>
+                        ) : null}
                         <Badge variant="outline" className="text-xs mt-1">
                           Mat. {doc.licenseNumber}
                         </Badge>

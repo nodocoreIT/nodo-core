@@ -107,6 +107,28 @@ export async function GET(request: NextRequest) {
     (p) => !isUnassignedSpecialty(p.specialty),
   );
 
+  const { data: institutionRows } = activeProfessionals.length
+    ? await serviceClient
+        .from("institutions")
+        .select("professional_id, city")
+        .eq("active", true)
+        .in(
+          "professional_id",
+          activeProfessionals.map((p) => p.id),
+        )
+    : { data: [] };
+
+  const citiesByProfessionalId = new Map<string, string[]>();
+  for (const row of institutionRows ?? []) {
+    const city = row.city?.trim();
+    if (!city) continue;
+    const current = citiesByProfessionalId.get(row.professional_id) ?? [];
+    if (!current.some((c) => c.toLowerCase() === city.toLowerCase())) {
+      current.push(city);
+    }
+    citiesByProfessionalId.set(row.professional_id, current);
+  }
+
   const { data: officeSettingsRows } = activeProfessionals.length
     ? await serviceClient
         .from("office_settings")
@@ -139,6 +161,7 @@ export async function GET(request: NextRequest) {
       specialty: p.specialty,
       licenseNumber: p.license_number,
       profilePhotoUrl: p.profile_photo_url,
+      cities: citiesByProfessionalId.get(p.id) ?? [],
       payment: paymentByProfessionalId.get(p.id) ?? {},
     })),
   );
