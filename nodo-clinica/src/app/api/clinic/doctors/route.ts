@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
 
   const { data: professionals } = await serviceClient
     .from("professionals")
-    .select("id, full_name, specialty, license_number, profile_photo_url")
+    .select("id, full_name, specialty, license_number, profile_photo_url, city")
     .not("enabled_at", "is", null);
 
   const activeProfessionals = (professionals ?? []).filter(
@@ -119,14 +119,20 @@ export async function GET(request: NextRequest) {
     : { data: [] };
 
   const citiesByProfessionalId = new Map<string, string[]>();
-  for (const row of institutionRows ?? []) {
-    const city = row.city?.trim();
-    if (!city) continue;
-    const current = citiesByProfessionalId.get(row.professional_id) ?? [];
+  function addCity(professionalId: string, raw: string | null | undefined) {
+    const city = raw?.trim();
+    if (!city) return;
+    const current = citiesByProfessionalId.get(professionalId) ?? [];
     if (!current.some((c) => c.toLowerCase() === city.toLowerCase())) {
       current.push(city);
     }
-    citiesByProfessionalId.set(row.professional_id, current);
+    citiesByProfessionalId.set(professionalId, current);
+  }
+  for (const p of activeProfessionals) {
+    addCity(p.id, p.city);
+  }
+  for (const row of institutionRows ?? []) {
+    addCity(row.professional_id, row.city);
   }
 
   const { data: officeSettingsRows } = activeProfessionals.length
