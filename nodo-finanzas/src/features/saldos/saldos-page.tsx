@@ -1109,13 +1109,19 @@ export function SaldosPage() {
                 name="saldoActual"
                 control={controlCuenta}
                 render={({ field }) => (
-                  <MoneyInput
-                    label="Saldo actual"
-                    value={field.value}
-                    onChange={field.onChange}
-                    moneda={monedaCuenta}
-                    error={errCuenta.saldoActual?.message}
-                  />
+                  <div className="space-y-1">
+                    <MoneyInput
+                      label="Saldo actual"
+                      value={field.value}
+                      onChange={field.onChange}
+                      moneda={monedaCuenta}
+                      error={errCuenta.saldoActual?.message}
+                      allowNegative
+                    />
+                    <p className="text-xs text-slate2">
+                      Podés cargar un saldo negativo (por ejemplo, un descubierto).
+                    </p>
+                  </div>
                 )}
               />
 
