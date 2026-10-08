@@ -6,7 +6,7 @@ function monthKey(isoDate: string): string {
 }
 
 /** Latest published ICL level within a given month (ICL is published daily). */
-function levelForMonth(history: ICLHistoryEntry[], key: string): number | null {
+export function levelForMonth(history: ICLHistoryEntry[], key: string): number | null {
   const entries = history.filter((entry) => monthKey(entry.period) === key);
   if (entries.length === 0) return null;
   return entries.reduce((latest, entry) => (entry.period > latest.period ? entry : latest)).value;

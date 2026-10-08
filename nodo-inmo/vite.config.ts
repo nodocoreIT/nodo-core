@@ -17,6 +17,9 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     origin: "http://localhost:3000",
+    // The page is served through nodo-landing (:3000), which doesn't proxy
+    // websockets — connect HMR straight to this Vite server.
+    hmr: { host: "localhost", clientPort: 5173 },
   },
   resolve: {
     dedupe: ["react", "react-dom", "react/jsx-runtime", "@tanstack/react-query"],

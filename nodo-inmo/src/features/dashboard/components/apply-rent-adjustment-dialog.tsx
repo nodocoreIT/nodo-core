@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
 import {
@@ -10,13 +9,10 @@ import {
   DialogFooter,
 } from "@/shared/components/ui/dialog";
 import { formatMoney, formatDate } from "@/features/contracts/lib/contract-labels";
-import { useIPCHistory } from "@/features/ipc/hooks/use-ipc-history";
-import { useICLHistory } from "@/features/ipc/hooks/use-icl-history";
-import { computeIpcAdjustment } from "@/features/ipc/lib/ipc-adjustment";
-import { computeIclAdjustment } from "@/features/ipc/lib/icl-adjustment";
-import type { IndexAdjustmentResult } from "@/features/ipc/lib/index-adjustment-result";
+import { adjustmentWindow } from "@/features/ipc/lib/accumulated-adjustment";
 import { useApplyRentAdjustment } from "@/features/contracts/hooks/use-apply-rent-adjustment";
 import type { PendingIndexAdjustment } from "../hooks/use-dashboard-metrics";
+import { useIndexAdjustment } from "../hooks/use-index-adjustment";
 
 interface ApplyRentAdjustmentDialogProps {
   open: boolean;
@@ -24,30 +20,20 @@ interface ApplyRentAdjustmentDialogProps {
   onClose: () => void;
 }
 
-const currentMonthYearLabel = (date: Date) =>
-  date.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+/** "YYYY-MM" -> "septiembre de 2026". */
+const monthKeyLabel = (key: string) => {
+  const [year, month] = key.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("es-AR", {
+    month: "long",
+    year: "numeric",
+  });
+};
 
-/** Picks the right history source and calculation for the contract's adjustment index. */
-function useIndexAdjustment(
-  pendingIndexAdjustment: PendingIndexAdjustment | null,
-): { result: IndexAdjustmentResult | null; isLoading: boolean } {
-  const { data: ipcHistory = [], isLoading: isIpcLoading } = useIPCHistory();
-  const { data: iclHistory = [], isLoading: isIclLoading } = useICLHistory();
-
-  return useMemo(() => {
-    if (!pendingIndexAdjustment) return { result: null, isLoading: false };
-
-    if (pendingIndexAdjustment.adjustmentIndex === "ICL") {
-      return {
-        result: computeIclAdjustment(iclHistory, pendingIndexAdjustment.rentAmount),
-        isLoading: isIclLoading,
-      };
-    }
-    return {
-      result: computeIpcAdjustment(ipcHistory, pendingIndexAdjustment.rentAmount),
-      isLoading: isIpcLoading,
-    };
-  }, [pendingIndexAdjustment, ipcHistory, iclHistory, isIpcLoading, isIclLoading]);
+function periodLabel({ nextAdjustmentDate, adjustmentPeriodMonths }: PendingIndexAdjustment) {
+  const months = adjustmentWindow(nextAdjustmentDate, adjustmentPeriodMonths);
+  const first = monthKeyLabel(months[0]);
+  const last = monthKeyLabel(months[months.length - 1]);
+  return months.length === 1 ? last : `${first} a ${last}`;
 }
 
 export function ApplyRentAdjustmentDialog({
@@ -96,21 +82,22 @@ export function ApplyRentAdjustmentDialog({
         </DialogHeader>
 
         {isHistoryLoading && (
-          <p className="text-sm text-slate2">Buscando el {indexLabel} del mes actual…</p>
+          <p className="text-sm text-slate2">Buscando el {indexLabel} acumulado…</p>
         )}
 
         {!isHistoryLoading && adjustment && pendingIndexAdjustment && (
           <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
             {!adjustment.available ? (
               <p className="text-sm text-slate2">
-                Todavía no se publicó el {indexLabel} de {currentMonthYearLabel(new Date())}. No se
-                puede aplicar el aumento hasta que esté disponible.
+                Todavía no se puede aplicar el aumento: falta el {indexLabel} de{" "}
+                {adjustment.missingMonth ? monthKeyLabel(adjustment.missingMonth) : "un mes anterior"}.
+                Se publica a mediados de cada mes.
               </p>
             ) : (
               <>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate2">
-                    {indexLabel} de {currentMonthYearLabel(new Date())}
+                    {indexLabel} acumulado ({periodLabel(pendingIndexAdjustment)})
                   </span>
                   <span className="font-bold text-navy">+{adjustment.percentage}%</span>
                 </div>

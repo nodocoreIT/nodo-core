@@ -548,6 +548,7 @@ describe("useDashboardMetrics", () => {
       rentAmount: 1000,
       currency: "ARS",
       lastAdjustmentDate: "2025-12-01",
+      nextAdjustmentDate: "2026-06-01",
       adjustmentPeriodMonths: 6,
     });
   });
@@ -590,6 +591,7 @@ describe("useDashboardMetrics", () => {
       rentAmount: 1000,
       currency: "ARS",
       lastAdjustmentDate: "2026-05-01",
+      nextAdjustmentDate: "2026-06-01",
       adjustmentPeriodMonths: 1,
     });
   });

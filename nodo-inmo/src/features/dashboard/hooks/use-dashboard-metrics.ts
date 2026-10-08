@@ -66,6 +66,8 @@ export interface PendingIndexAdjustment {
   rentAmount: number;
   currency: string;
   lastAdjustmentDate: string;
+  /** Due date of this adjustment — anchors which months of index it covers. */
+  nextAdjustmentDate: string;
   adjustmentPeriodMonths: number;
 }
 
@@ -211,6 +213,7 @@ function buildCurrentMonthCollections(
               rentAmount: contract.rent_amount,
               currency: first.currency,
               lastAdjustmentDate: contract.last_adjustment_date ?? contract.next_adjustment_date,
+              nextAdjustmentDate: contract.next_adjustment_date,
               adjustmentPeriodMonths: contract.adjustment_period_months ?? 12,
             };
           } else if (diffDays >= 0 && diffDays <= limitDays) {

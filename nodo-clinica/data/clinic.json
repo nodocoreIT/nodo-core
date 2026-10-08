@@ -1,0 +1,278 @@
+{
+  "meta": {
+    "seedVersion": 3
+  },
+  "doctors": [
+    {
+      "id": "doc-demo-1",
+      "fullName": "Dr. Demo 1",
+      "email": "doc.demo1@nodo.demo",
+      "password": "Probando1",
+      "specialty": "Medicina General",
+      "licenseNumber": "MN 10001",
+      "subscriptionStatus": "active",
+      "subscriptionPlan": "profesional",
+      "availability": {
+        "slotDurationMinutes": 30,
+        "days": [
+          {
+            "dayOfWeek": 1,
+            "startTime": "09:00",
+            "endTime": "13:00"
+          },
+          {
+            "dayOfWeek": 1,
+            "startTime": "16:00",
+            "endTime": "19:00"
+          },
+          {
+            "dayOfWeek": 2,
+            "startTime": "09:00",
+            "endTime": "13:00"
+          },
+          {
+            "dayOfWeek": 3,
+            "startTime": "09:00",
+            "endTime": "13:00"
+          },
+          {
+            "dayOfWeek": 4,
+            "startTime": "09:00",
+            "endTime": "13:00"
+          },
+          {
+            "dayOfWeek": 5,
+            "startTime": "09:00",
+            "endTime": "12:00"
+          }
+        ]
+      },
+      "signatureText": "Dr. Demo 1 — MN 10001",
+      "bio": "Consultorio demo Nodo Salud — Doc. Demo 1.",
+      "payment": {
+        "currency": "ARS",
+        "consultationFee": 100,
+        "alias": "toulemonde.ramiro",
+        "cbu": "0720102488000038115640",
+        "beneficiaryName": "TOULEMONDE RAMIRO SANTIAGO",
+        "requirePaymentBeforeBooking": true,
+        "mercadopagoEnabled": false
+      },
+      "reminderSettings": {
+        "enabled": false,
+        "minutesBefore": 1440
+      },
+      "themeSettings": {
+        "primaryColor": "#0D9488",
+        "secondaryColor": "#121e2f",
+        "sidebarTextColor": "#9dacbe",
+        "fontColor": "#16202e",
+        "buttonFontColor": "#ffffff",
+        "borderRadius": "md",
+        "fontFamily": "Inter",
+        "logoType": "default",
+        "brandText": "NODO Clínica"
+      },
+      "createdAt": "2026-09-23T11:57:23.852Z"
+    },
+    {
+      "id": "doc-demo-2",
+      "fullName": "Dr. Demo 2",
+      "email": "doc.demo2@nodo.demo",
+      "password": "Probando1",
+      "specialty": "Cardiología",
+      "licenseNumber": "MN 10002",
+      "subscriptionStatus": "active",
+      "subscriptionPlan": "profesional",
+      "availability": {
+        "slotDurationMinutes": 30,
+        "days": [
+          {
+            "dayOfWeek": 1,
+            "startTime": "09:00",
+            "endTime": "13:00"
+          },
+          {
+            "dayOfWeek": 1,
+            "startTime": "16:00",
+            "endTime": "19:00"
+          },
+          {
+            "dayOfWeek": 2,
+            "startTime": "09:00",
+            "endTime": "13:00"
+          },
+          {
+            "dayOfWeek": 3,
+            "startTime": "09:00",
+            "endTime": "13:00"
+          },
+          {
+            "dayOfWeek": 4,
+            "startTime": "09:00",
+            "endTime": "13:00"
+          },
+          {
+            "dayOfWeek": 5,
+            "startTime": "09:00",
+            "endTime": "12:00"
+          }
+        ]
+      },
+      "signatureText": "Dr. Demo 2 — MN 10002",
+      "bio": "Consultorio demo Nodo Salud — Doc. Demo 2.",
+      "payment": {
+        "currency": "ARS",
+        "consultationFee": 30000,
+        "alias": "demo2.salud.mp",
+        "requirePaymentBeforeBooking": true
+      },
+      "reminderSettings": {
+        "enabled": false,
+        "minutesBefore": 1440
+      },
+      "createdAt": "2026-09-23T11:57:23.852Z"
+    },
+    {
+      "id": "doc-demo-3",
+      "fullName": "Dra. Demo 3",
+      "email": "doc.demo3@nodo.demo",
+      "specialty": "Gastroenterología",
+      "licenseNumber": "MN 10003",
+      "password": "Probando1",
+      "subscriptionStatus": "active",
+      "subscriptionPlan": "profesional",
+      "availability": {
+        "slotDurationMinutes": 30,
+        "days": [
+          {
+            "dayOfWeek": 1,
+            "startTime": "09:00",
+            "endTime": "13:00"
+          },
+          {
+            "dayOfWeek": 3,
+            "startTime": "09:00",
+            "endTime": "13:00"
+          },
+          {
+            "dayOfWeek": 5,
+            "startTime": "09:00",
+            "endTime": "12:00"
+          }
+        ]
+      },
+      "signatureText": "Dra. Demo 3 — MN 10003",
+      "bio": "Consultorio demo Nodo Salud — Dra. Demo 3.",
+      "payment": {
+        "currency": "ARS",
+        "consultationFee": 35000,
+        "requirePaymentBeforeBooking": true,
+        "alias": "nodo.demo",
+        "paymentInstructions": "Transferí el honorario y subí el comprobante en la sala de espera para validar tu turno."
+      },
+      "reminderSettings": {
+        "enabled": false,
+        "minutesBefore": 1440
+      },
+      "createdAt": "2026-09-23T11:57:23.852Z"
+    },
+    {
+      "id": "doc-demo-4",
+      "fullName": "Lic. Demo 4",
+      "email": "doc.demo4@nodo.demo",
+      "specialty": "Psicología",
+      "licenseNumber": "MN 10004",
+      "password": "Probando1",
+      "subscriptionStatus": "active",
+      "subscriptionPlan": "profesional",
+      "availability": {
+        "slotDurationMinutes": 30,
+        "days": [
+          {
+            "dayOfWeek": 1,
+            "startTime": "09:00",
+            "endTime": "13:00"
+          },
+          {
+            "dayOfWeek": 3,
+            "startTime": "09:00",
+            "endTime": "13:00"
+          },
+          {
+            "dayOfWeek": 5,
+            "startTime": "09:00",
+            "endTime": "12:00"
+          }
+        ]
+      },
+      "signatureText": "Lic. Demo 4 — MN 10004",
+      "bio": "Consultorio demo Nodo Salud — Lic. Demo 4.",
+      "payment": {
+        "currency": "ARS",
+        "consultationFee": 35000,
+        "requirePaymentBeforeBooking": true,
+        "alias": "nodo.demo",
+        "paymentInstructions": "Transferí el honorario y subí el comprobante en la sala de espera para validar tu turno."
+      },
+      "reminderSettings": {
+        "enabled": false,
+        "minutesBefore": 1440
+      },
+      "createdAt": "2026-09-23T11:57:23.852Z"
+    }
+  ],
+  "patients": [
+    {
+      "id": "pat-demo-1",
+      "fullName": "Paciente 1",
+      "email": "paciente1@nodo.demo",
+      "password": "Probando1",
+      "phone": "11 5555-0001",
+      "createdAt": "2026-09-23T11:57:23.852Z"
+    },
+    {
+      "id": "pat-demo-2",
+      "fullName": "Paciente 2",
+      "email": "paciente2@nodo.demo",
+      "password": "Probando1",
+      "phone": "11 5555-0002",
+      "createdAt": "2026-09-23T11:57:23.852Z"
+    }
+  ],
+  "appointments": [],
+  "documents": [],
+  "clinicalRecords": [],
+  "clinicalNotes": {},
+  "doctorTasks": [
+    {
+      "id": "task-demo-1",
+      "doctorId": "doc-demo-1",
+      "title": "Revisar estudios de Paciente 1",
+      "dueDate": "2026-09-23",
+      "done": false,
+      "createdAt": "2026-09-23T11:57:23.852Z"
+    }
+  ],
+  "interconsultMessages": [
+    {
+      "id": "ic-welcome-001",
+      "fromDoctorId": "doc-demo-1",
+      "fromDoctorName": "Dr. Demo 1",
+      "toDoctorId": null,
+      "content": "Bienvenidos a la sala de interconsultas de Nodo Salud. Consultá casos entre colegas Pro.",
+      "createdAt": "2026-09-23T10:57:23.852Z"
+    },
+    {
+      "id": "ic-demo-dm-001",
+      "fromDoctorId": "doc-demo-2",
+      "fromDoctorName": "Dr. Demo 2",
+      "toDoctorId": "doc-demo-1",
+      "content": "Demo 1, ¿podés ver este ECG de un paciente con palpitaciones?",
+      "createdAt": "2026-09-23T11:55:23.852Z"
+    }
+  ],
+  "doctorPresence": {},
+  "nodoChatReadAt": {},
+  "doctorNotifications": []
+}

@@ -7,9 +7,10 @@ export interface IPCHistoryEntry {
 
 export const IPC_HISTORY_QUERY_KEY = ["ipc", "history"] as const;
 
-export function useIPCHistory() {
+/** `months` = how many of the latest published months to return (newest first). */
+export function useIPCHistory(months = 12) {
   return useQuery({
-    queryKey: IPC_HISTORY_QUERY_KEY,
+    queryKey: [...IPC_HISTORY_QUERY_KEY, months],
     queryFn: async (): Promise<IPCHistoryEntry[]> => {
       const res = await fetch("https://api.argentinadatos.com/v1/finanzas/indices/inflacion");
       if (!res.ok) throw new Error(`API error ${res.status}`);
@@ -17,7 +18,7 @@ export function useIPCHistory() {
       if (!data || data.length === 0) return [];
 
       return (data as Array<{ fecha: string; valor: number }>)
-        .slice(-12)
+        .slice(-months)
         .map((item) => {
           let value = item.valor;
           if (value < 1 && value > 0) value = parseFloat((value * 100).toFixed(2));

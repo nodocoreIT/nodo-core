@@ -15,6 +15,7 @@ import type { MonthCollectionItem, PendingIndexAdjustment } from "../hooks/use-d
 import { currentMonthLabel } from "../lib/dashboard-payment-utils";
 import { cn } from "@/shared/lib/utils";
 import { ApplyRentAdjustmentDialog } from "./apply-rent-adjustment-dialog";
+import { useIndexAdjustment } from "../hooks/use-index-adjustment";
 
 interface MonthCollectionsSectionProps {
   items: MonthCollectionItem[];
@@ -29,6 +30,64 @@ const STATUS_CLASS = {
   sin_cobrar: "bg-red-100 text-red-700",
   pago_parcial: "bg-yellow-100 text-yellow-800",
 } as const;
+
+interface BalanceCellProps {
+  item: MonthCollectionItem;
+  onApplyAdjustment: (adjustment: PendingIndexAdjustment) => void;
+}
+
+/**
+ * Balance plus, when an index adjustment is due, in parentheses: the new monthly
+ * rent (accumulated increase applied) once the index is published, or "Esperando
+ * <índice> acumulado" while it isn't. The apply button is filled with the brand
+ * color when it can be applied, muted otherwise (clicking it explains which
+ * month is pending).
+ */
+function BalanceCell({ item, onApplyAdjustment }: BalanceCellProps) {
+  const pending = item.pendingIndexAdjustment;
+  const { result, isLoading } = useIndexAdjustment(pending);
+  const canApply = !!result?.available && result.newRentAmount !== null;
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <span className="font-bold text-xs sm:text-sm text-destructive">
+        {formatMoney(item.balance, item.currency)}
+        {pending && !isLoading && (
+          <span
+            className={cn("ml-1.5 font-semibold", canApply ? "text-brand" : "text-slate2")}
+            title={
+              canApply
+                ? `Nuevo alquiler mensual con ${pending.adjustmentIndex} acumulado +${result!.percentage}%`
+                : undefined
+            }
+          >
+            (
+            {canApply
+              ? formatMoney(result!.newRentAmount!, item.currency)
+              : `Esperando ${pending.adjustmentIndex} acumulado`}
+            )
+          </span>
+        )}
+      </span>
+      {pending && (
+        <Button
+          size="sm"
+          variant="outline"
+          className={cn(
+            "h-6 gap-1 px-2 text-[10px] font-semibold uppercase",
+            canApply
+              ? "border-brand bg-brand text-white hover:bg-brand-600 hover:text-white"
+              : "border-border text-slate2 hover:bg-mist",
+          )}
+          onClick={() => onApplyAdjustment(pending)}
+        >
+          <TrendingUp className="h-3 w-3 shrink-0" />
+          Aplicar aumento por {pending.adjustmentIndex}
+        </Button>
+      )}
+    </div>
+  );
+}
 
 export function MonthCollectionsSection({ items }: MonthCollectionsSectionProps) {
   const navigate = useNavigate();
@@ -108,22 +167,7 @@ export function MonthCollectionsSection({ items }: MonthCollectionsSectionProps)
                   </span>
                 </TableCell>
                 <TableCell className="px-2 md:px-4 py-3 whitespace-nowrap">
-                  <div className="flex flex-col items-start gap-1">
-                    <span className="font-bold text-xs sm:text-sm text-destructive">
-                      {formatMoney(item.balance, item.currency)}
-                    </span>
-                    {item.pendingIndexAdjustment && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-6 gap-1 px-2 text-[10px] font-semibold uppercase text-brand border-brand hover:bg-brand/10"
-                        onClick={() => setPendingIndexAdjustment(item.pendingIndexAdjustment)}
-                      >
-                        <TrendingUp className="h-3 w-3 shrink-0" />
-                        Aplicar aumento por {item.pendingIndexAdjustment.adjustmentIndex}
-                      </Button>
-                    )}
-                  </div>
+                  <BalanceCell item={item} onApplyAdjustment={setPendingIndexAdjustment} />
                 </TableCell>
                 <TableCell className="px-2 md:px-4 py-3 text-right">
                   <Button

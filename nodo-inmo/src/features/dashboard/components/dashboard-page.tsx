@@ -11,6 +11,7 @@ import { formatMoney } from "@/features/contracts/lib/contract-labels";
 import { useUpcomingAdjustments } from "../hooks/use-upcoming-adjustments";
 import { useSendWhatsApp } from "@/features/contracts/hooks/use-send-whatsapp";
 import { GuestDashboard } from "./guest-dashboard";
+import { useAutoGenerateInstallments } from "@/features/payments/hooks/use-auto-generate-installments";
 
 function greetingName(user: ReturnType<typeof useAuth>["user"]): string {
   const fullName = (user?.user_metadata?.full_name as string | undefined) ?? "";
@@ -35,6 +36,7 @@ export function DashboardPage() {
   // Invited employees see a branded welcome instead of the owner's financial dashboard.
   if (role === "agent") return <GuestDashboard />;
 
+  useAutoGenerateInstallments();
   const metrics = useDashboardMetrics();
   const { data: tasks = [] } = useTasks();
   const pendingTasks = tasks.filter((t) => t.status !== "completada");
