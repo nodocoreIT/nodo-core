@@ -204,7 +204,7 @@ export interface SettingsModuleContextValue {
   bankAccounts?: BankAccountsApi;
   companyExtraContent?: ReactNode;
 
-  saveManualIpc?: (value: number) => Promise<void>;
+  saveManualIpc?: (value: number, period?: string) => Promise<void>;
   isSavingManualIpc?: boolean;
 
   saveManualIcl?: (value: number) => Promise<void>;
