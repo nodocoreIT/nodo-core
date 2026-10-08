@@ -17,6 +17,8 @@ import {
   type CollectionStatus,
   isOperationalPayment,
 } from "../lib/dashboard-payment-utils";
+import { rentForIndexAdjustment } from "@/features/ipc/lib/rent-for-index-adjustment";
+import { previousRentBeforeAdjustment } from "@/features/contracts/lib/previous-rent-before-adjustment";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -63,12 +65,23 @@ export type IndexAdjustmentKind = "IPC" | "ICL";
 export interface PendingIndexAdjustment {
   contractId: string;
   adjustmentIndex: IndexAdjustmentKind;
+  /** Alquiler only — never includes expensas. */
   rentAmount: number;
+  expensesAmount: number;
   currency: string;
   lastAdjustmentDate: string;
   /** Due date of this adjustment — anchors which months of index it covers. */
   nextAdjustmentDate: string;
   adjustmentPeriodMonths: number;
+}
+
+export interface RevertibleIndexAdjustment {
+  contractId: string;
+  previousRentAmount: number;
+  currentRentAmount: number;
+  lastAdjustmentDate: string;
+  adjustmentPeriodMonths: number;
+  currency: string;
 }
 
 export interface MonthCollectionItem {
@@ -81,6 +94,7 @@ export interface MonthCollectionItem {
   payments: MonthCollectionPayment[];
   alerts: { type: "expiration" | "adjustment"; text: string }[];
   pendingIndexAdjustment: PendingIndexAdjustment | null;
+  revertibleIndexAdjustment: RevertibleIndexAdjustment | null;
 }
 
 export interface RecentReceiptItem {
@@ -170,6 +184,7 @@ function buildCurrentMonthCollections(
 
       const alerts: { type: "expiration" | "adjustment"; text: string }[] = [];
       let pendingIndexAdjustment: PendingIndexAdjustment | null = null;
+      let revertibleIndexAdjustment: RevertibleIndexAdjustment | null = null;
       if (contract) {
         const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
@@ -203,6 +218,28 @@ function buildCurrentMonthCollections(
             contract.adjustment_index === "IPC" || contract.adjustment_index === "ICL"
               ? contract.adjustment_index
               : null;
+          const lastAdjKey = contract.last_adjustment_date?.slice(0, 7);
+          const appliedThisMonth =
+            indexKind !== null &&
+            lastAdjKey === todayMonthKey &&
+            adjMonthKey > todayMonthKey;
+          const previousRent = appliedThisMonth
+            ? previousRentBeforeAdjustment(
+                paymentRows,
+                first.contract_id,
+                contract.last_adjustment_date!,
+              )
+            : null;
+          if (appliedThisMonth && previousRent != null) {
+            revertibleIndexAdjustment = {
+              contractId: first.contract_id,
+              previousRentAmount: previousRent,
+              currentRentAmount: contract.rent_amount,
+              lastAdjustmentDate: contract.last_adjustment_date!,
+              adjustmentPeriodMonths: contract.adjustment_period_months ?? 12,
+              currency: first.currency,
+            };
+          }
           const isIndexAdjustmentDue = indexKind !== null && adjMonthKey <= todayMonthKey;
 
           if (isIndexAdjustmentDue && indexKind) {
@@ -210,7 +247,12 @@ function buildCurrentMonthCollections(
             pendingIndexAdjustment = {
               contractId: first.contract_id,
               adjustmentIndex: indexKind,
-              rentAmount: contract.rent_amount,
+              rentAmount: rentForIndexAdjustment(
+                contract.rent_amount,
+                first.amount,
+                first.expenses_amount ?? 0,
+              ),
+              expensesAmount: first.expenses_amount ?? 0,
               currency: first.currency,
               lastAdjustmentDate: contract.last_adjustment_date ?? contract.next_adjustment_date,
               nextAdjustmentDate: contract.next_adjustment_date,
@@ -240,6 +282,7 @@ function buildCurrentMonthCollections(
         })),
         alerts,
         pendingIndexAdjustment,
+        revertibleIndexAdjustment,
       };
     })
     .filter((item) => item.balance > 0)

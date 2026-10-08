@@ -50,6 +50,17 @@ export function useUpdateContract() {
 
       if (error) throw error;
 
+      if (typeof fields.rent_amount === "number") {
+        const { error: paymentsError } = await supabase
+          .schema("nodo_inmo")
+          .from("payments")
+          .update({ amount: fields.rent_amount })
+          .eq("contract_id", id)
+          .eq("status", "pending");
+
+        if (paymentsError) throw paymentsError;
+      }
+
       // Reconcile guarantor links: clear the contract's links, then re-insert
       // the desired set. Simple and correct for the volumes involved.
       if (guarantor_ids) {

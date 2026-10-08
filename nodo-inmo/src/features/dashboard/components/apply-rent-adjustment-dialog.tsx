@@ -113,6 +113,34 @@ export function ApplyRentAdjustmentDialog({
                     {formatMoney(adjustment.newRentAmount, pendingIndexAdjustment.currency)}
                   </span>
                 </div>
+                {pendingIndexAdjustment.expensesAmount > 0 ? (
+                  <>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate2">Expensas (sin cambio)</span>
+                      <span className="text-navy">
+                        {formatMoney(
+                          pendingIndexAdjustment.expensesAmount,
+                          pendingIndexAdjustment.currency,
+                        )}
+                      </span>
+                    </div>
+                    {adjustment.newRentAmount != null ? (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-slate2">Total de la cuota</span>
+                        <span className="font-bold text-navy">
+                          {formatMoney(
+                            adjustment.newRentAmount + pendingIndexAdjustment.expensesAmount,
+                            pendingIndexAdjustment.currency,
+                          )}
+                        </span>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="text-2xs text-slate2">
+                    El aumento es solo sobre el alquiler. Las expensas no se modifican.
+                  </p>
+                )}
               </>
             )}
           </div>

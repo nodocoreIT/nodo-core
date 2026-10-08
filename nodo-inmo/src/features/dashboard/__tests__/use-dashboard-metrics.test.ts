@@ -43,6 +43,7 @@ function makePayment(overrides: Partial<{
   id: string;
   status: string;
   due_date: string;
+  period: string;
   amount: number;
   currency: string;
   paid_date: string | null;
@@ -61,6 +62,7 @@ function makePayment(overrides: Partial<{
     id: overrides.id ?? "p-1",
     status: overrides.status ?? "pending",
     due_date: overrides.due_date ?? "2020-01-01", // past → overdue
+    period: overrides.period ?? overrides.due_date ?? "2020-01-01",
     amount: overrides.amount ?? 1000,
     currency: overrides.currency ?? "ARS",
     paid_date: overrides.paid_date !== undefined ? overrides.paid_date : null,
@@ -546,6 +548,7 @@ describe("useDashboardMetrics", () => {
       contractId: "contract-ipc-1",
       adjustmentIndex: "IPC",
       rentAmount: 1000,
+      expensesAmount: 0,
       currency: "ARS",
       lastAdjustmentDate: "2025-12-01",
       nextAdjustmentDate: "2026-06-01",
@@ -589,10 +592,46 @@ describe("useDashboardMetrics", () => {
       contractId: "contract-icl-1",
       adjustmentIndex: "ICL",
       rentAmount: 1000,
+      expensesAmount: 0,
       currency: "ARS",
       lastAdjustmentDate: "2026-05-01",
       nextAdjustmentDate: "2026-06-01",
       adjustmentPeriodMonths: 1,
+    });
+  });
+
+  it("uses alquiler only for IPC even if rent_amount was saved as alquiler + expensas", () => {
+    mockUsePayments.mockReturnValue({
+      data: [
+        makePayment({
+          id: "p-1",
+          due_date: "2026-06-15",
+          status: "pending",
+          amount: 527400,
+          expenses_amount: 50000,
+          contract_id: "contract-ipc-exp",
+          contract: {
+            rent_amount: 577400,
+            commission_amount: null,
+            end_date: "2027-01-01",
+            next_adjustment_date: "2026-06-01",
+            last_adjustment_date: "2025-12-01",
+            adjustment_index: "IPC",
+            adjustment_period_months: 6,
+            property: { address: "Congreso 1750", commission_rate: null, owner: null },
+            tenant: { name: "Marcelo" },
+          },
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    const { result } = renderHook(() => useDashboardMetrics(FIXED_TODAY));
+
+    expect(result.current.currentMonthCollections[0].pendingIndexAdjustment).toMatchObject({
+      rentAmount: 527400,
+      expensesAmount: 50000,
     });
   });
 
@@ -624,5 +663,64 @@ describe("useDashboardMetrics", () => {
     const item = result.current.currentMonthCollections[0];
     expect(item.alerts).toEqual([]);
     expect(item.pendingIndexAdjustment).toBeNull();
+  });
+
+  it("exposes revertibleIndexAdjustment when IPC was applied this month and a prior cobro exists", () => {
+    mockUsePayments.mockReturnValue({
+      data: [
+        makePayment({
+          id: "p-paid",
+          due_date: "2026-05-10",
+          period: "2026-05-01",
+          status: "paid",
+          amount: 468000,
+          paid_amount: 468000,
+          contract_id: "contract-ipc-applied",
+          contract: {
+            rent_amount: 577400,
+            commission_amount: null,
+            end_date: "2027-01-01",
+            next_adjustment_date: "2026-12-01",
+            last_adjustment_date: "2026-06-01",
+            adjustment_index: "IPC",
+            adjustment_period_months: 6,
+            property: { address: "Congreso 1750", commission_rate: null, owner: null },
+            tenant: { name: "Marcelo Rohwain" },
+          },
+        }),
+        makePayment({
+          id: "p-open",
+          due_date: "2026-06-15",
+          period: "2026-06-01",
+          status: "pending",
+          amount: 577400,
+          contract_id: "contract-ipc-applied",
+          contract: {
+            rent_amount: 577400,
+            commission_amount: null,
+            end_date: "2027-01-01",
+            next_adjustment_date: "2026-12-01",
+            last_adjustment_date: "2026-06-01",
+            adjustment_index: "IPC",
+            adjustment_period_months: 6,
+            property: { address: "Congreso 1750", commission_rate: null, owner: null },
+            tenant: { name: "Marcelo Rohwain" },
+          },
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    const { result } = renderHook(() => useDashboardMetrics(FIXED_TODAY));
+    expect(result.current.currentMonthCollections[0].pendingIndexAdjustment).toBeNull();
+    expect(result.current.currentMonthCollections[0].revertibleIndexAdjustment).toEqual({
+      contractId: "contract-ipc-applied",
+      previousRentAmount: 468000,
+      currentRentAmount: 577400,
+      lastAdjustmentDate: "2026-06-01",
+      adjustmentPeriodMonths: 6,
+      currency: "ARS",
+    });
   });
 });
