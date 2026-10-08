@@ -2,6 +2,12 @@ export function monthKey(period: string): string {
   return period.slice(0, 7);
 }
 
+/** Keep two decimals when needed (1.66), without rounding 1.66 to 1.7. */
+export function formatIpcPercent(value: number): string {
+  const body = parseFloat(value.toFixed(2)).toString();
+  return `${value > 0 ? "+" : ""}${body}%`;
+}
+
 /**
  * Combine official API rows with provisional (manual) rows.
  * When the API already has that month, it replaces the manual value.

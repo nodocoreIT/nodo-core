@@ -3,6 +3,7 @@ import { RefreshCw, ChevronDown } from "lucide-react";
 import { useCurrentIPC } from "../hooks/use-current-ipc";
 import { useRefreshIPC } from "../hooks/use-refresh-ipc";
 import { useIPCHistory } from "../hooks/use-ipc-history";
+import { formatIpcPercent } from "../lib/merge-index-history";
 
 function formatPeriod(period: string): string {
   const d = new Date(period + "T12:00:00");
@@ -46,8 +47,7 @@ function HistoryDropdown({ onClose }: { onClose: () => void }) {
             >
               <span className="capitalize text-slate2">{formatPeriod(entry.period)}</span>
               <span className="font-semibold text-navy">
-                {entry.value > 0 ? "+" : ""}
-                {entry.value.toFixed(1)}%
+                {formatIpcPercent(entry.value)}
               </span>
             </div>
           ))
@@ -78,8 +78,7 @@ export function IPCBadge() {
           {ipc ? (
             <>
               <span className="text-navy">
-                {ipc.value > 0 ? "+" : ""}
-                {ipc.value.toFixed(1)}%
+                {formatIpcPercent(ipc.value)}
               </span>
               <span className="hidden min-[420px]:inline text-slate2/70">{formatPeriod(ipc.period)}</span>
             </>

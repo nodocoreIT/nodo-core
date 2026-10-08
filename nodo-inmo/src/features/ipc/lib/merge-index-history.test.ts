@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   closedMonthOrPrevious,
+  formatIpcPercent,
   keepClosedMonths,
   mergeIndexHistory,
   previousMonthPeriod,
@@ -47,6 +48,13 @@ describe("keepClosedMonths", () => {
       { period: "2026-09-01", value: 1.6 },
       { period: "2026-08-01", value: 1.7 },
     ]);
+  });
+});
+
+describe("formatIpcPercent", () => {
+  it("keeps two decimals instead of rounding to one", () => {
+    expect(formatIpcPercent(1.66)).toBe("+1.66%");
+    expect(formatIpcPercent(1.7)).toBe("+1.7%");
   });
 });
 
