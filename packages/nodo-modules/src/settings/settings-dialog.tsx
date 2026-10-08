@@ -440,18 +440,25 @@ function AlertsSettingsSection() {
   );
 }
 
+function defaultIpcMonth(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function IpcSettingsSection() {
   const { saveManualIpc, isSavingManualIpc } = useSettingsModule();
   const [ipcValue, setIpcValue] = useState("");
+  const [ipcMonth, setIpcMonth] = useState(defaultIpcMonth);
   const [success, setSuccess] = useState(false);
   const isPending = isSavingManualIpc ?? false;
 
   const handleSave = async () => {
     if (!saveManualIpc) return;
     const parsed = parseFloat(ipcValue);
-    if (isNaN(parsed)) return;
+    if (isNaN(parsed) || !ipcMonth) return;
     try {
-      await saveManualIpc(parsed);
+      await saveManualIpc(parsed, `${ipcMonth}-01`);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
       setIpcValue("");
@@ -466,11 +473,20 @@ function IpcSettingsSection() {
       <div>
         <h3 className="text-base font-bold text-navy">Carga Manual de IPC</h3>
         <p className="text-xs text-slate2">
-          Si la actualización automática falla o trae un valor incorrecto, podés forzar el valor del mes actual acá.
+          Cargá un valor provisorio del mes que todavía no publicó INDEC. Los aumentos lo usan ya;
+          cuando la API traiga el oficial, lo reemplaza.
         </p>
       </div>
 
       <div className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-bold text-navy">Mes</Label>
+          <Input
+            type="month"
+            value={ipcMonth}
+            onChange={(e) => setIpcMonth(e.target.value)}
+          />
+        </div>
         <div className="space-y-2">
           <Label className="text-sm font-bold text-navy">
             Valor del IPC (%)
@@ -478,14 +494,16 @@ function IpcSettingsSection() {
           <Input
             type="number"
             step="0.01"
-            placeholder="Ej: 4.2"
+            placeholder="Ej: 1.60"
             value={ipcValue}
             onChange={(e) => setIpcValue(e.target.value)}
           />
-          <p className="text-[10px] text-slate2">Ingresá el porcentaje (ej. 4.2). Se aplicará para el mes actual.</p>
+          <p className="text-[10px] text-slate2">
+            Porcentaje mensual (ej. 1.60). Queda hasta que exista el dato oficial de ese mes.
+          </p>
         </div>
 
-        <Button onClick={handleSave} disabled={isPending || !ipcValue} className="w-full">
+        <Button onClick={handleSave} disabled={isPending || !ipcValue || !ipcMonth} className="w-full">
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Guardar
         </Button>

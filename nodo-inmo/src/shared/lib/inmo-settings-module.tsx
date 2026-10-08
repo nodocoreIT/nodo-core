@@ -31,6 +31,7 @@ import {
   INMO_MANAGED_NAV,
   INMO_STAFF_ROLE_OPTIONS,
 } from "@/shared/lib/inmo-staff-nav";
+import { previousMonthPeriod } from "@/features/ipc/lib/merge-index-history";
 
 const INMO_MANAGED_NAV_LIST = INMO_MANAGED_NAV.map((item) => ({ ...item }));
 
@@ -47,19 +48,20 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
   const queryClient = useQueryClient();
 
   const ipcMutation = useMutation({
-    mutationFn: async (val: number) => {
-      const now = new Date();
-      const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    mutationFn: async ({ value, period }: { value: number; period?: string }) => {
+      const resolved = period?.slice(0, 7)
+        ? `${period.slice(0, 7)}-01`
+        : previousMonthPeriod();
       const { error } = await supabase.schema("shared").rpc("upsert_index_value", {
         p_kind: "IPC",
-        p_period: period,
-        p_value: val,
+        p_period: resolved,
+        p_value: value,
         p_source: "Manual",
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ipc", "current"] });
+      queryClient.invalidateQueries({ queryKey: ["ipc"] });
     },
   });
 
@@ -157,7 +159,7 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
         isUpdating: cashAccounts.isUpdating,
         isRemoving: cashAccounts.isRemoving,
       },
-      saveManualIpc: ipcMutation.mutateAsync,
+      saveManualIpc: (value, period) => ipcMutation.mutateAsync({ value, period }),
       isSavingManualIpc: ipcMutation.isPending,
       saveManualIcl: iclMutation.mutateAsync,
       isSavingManualIcl: iclMutation.isPending,
