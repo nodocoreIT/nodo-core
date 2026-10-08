@@ -11,10 +11,15 @@ import {
   TableRow,
 } from "@nodocore/shared-components";
 import { formatMoney } from "@/features/contracts/lib/contract-labels";
-import type { MonthCollectionItem, PendingIndexAdjustment } from "../hooks/use-dashboard-metrics";
+import type {
+  MonthCollectionItem,
+  PendingIndexAdjustment,
+  RevertibleIndexAdjustment,
+} from "../hooks/use-dashboard-metrics";
 import { currentMonthLabel } from "../lib/dashboard-payment-utils";
 import { cn } from "@/shared/lib/utils";
 import { ApplyRentAdjustmentDialog } from "./apply-rent-adjustment-dialog";
+import { RevertRentAdjustmentDialog } from "./revert-rent-adjustment-dialog";
 import { useIndexAdjustment } from "../hooks/use-index-adjustment";
 
 interface MonthCollectionsSectionProps {
@@ -34,6 +39,7 @@ const STATUS_CLASS = {
 interface BalanceCellProps {
   item: MonthCollectionItem;
   onApplyAdjustment: (adjustment: PendingIndexAdjustment) => void;
+  onRevertAdjustment: (adjustment: RevertibleIndexAdjustment) => void;
 }
 
 /**
@@ -43,8 +49,9 @@ interface BalanceCellProps {
  * color when it can be applied, muted otherwise (clicking it explains which
  * month is pending).
  */
-function BalanceCell({ item, onApplyAdjustment }: BalanceCellProps) {
+function BalanceCell({ item, onApplyAdjustment, onRevertAdjustment }: BalanceCellProps) {
   const pending = item.pendingIndexAdjustment;
+  const revertible = item.revertibleIndexAdjustment;
   const { result, isLoading } = useIndexAdjustment(pending);
   const canApply = !!result?.available && result.newRentAmount !== null;
 
@@ -57,7 +64,7 @@ function BalanceCell({ item, onApplyAdjustment }: BalanceCellProps) {
             className={cn("ml-1.5 font-semibold", canApply ? "text-brand" : "text-slate2")}
             title={
               canApply
-                ? `Nuevo alquiler mensual con ${pending.adjustmentIndex} acumulado +${result!.percentage}%`
+                ? `Nuevo alquiler (sin expensas) con ${pending.adjustmentIndex} acumulado +${result!.percentage}%`
                 : undefined
             }
           >
@@ -85,6 +92,16 @@ function BalanceCell({ item, onApplyAdjustment }: BalanceCellProps) {
           Aplicar aumento por {pending.adjustmentIndex}
         </Button>
       )}
+      {revertible && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 gap-1 px-2 text-[10px] font-semibold uppercase border-border text-slate2 hover:bg-mist"
+          onClick={() => onRevertAdjustment(revertible)}
+        >
+          Deshacer aumento
+        </Button>
+      )}
     </div>
   );
 }
@@ -94,6 +111,8 @@ export function MonthCollectionsSection({ items }: MonthCollectionsSectionProps)
   const monthLabel = currentMonthLabel();
   const [pendingIndexAdjustment, setPendingIndexAdjustment] =
     useState<PendingIndexAdjustment | null>(null);
+  const [revertibleIndexAdjustment, setRevertibleIndexAdjustment] =
+    useState<RevertibleIndexAdjustment | null>(null);
 
   function handleCollect(item: MonthCollectionItem) {
     const firstPaymentId = item.payments[0]?.id;
@@ -167,7 +186,11 @@ export function MonthCollectionsSection({ items }: MonthCollectionsSectionProps)
                   </span>
                 </TableCell>
                 <TableCell className="px-2 md:px-4 py-3 whitespace-nowrap">
-                  <BalanceCell item={item} onApplyAdjustment={setPendingIndexAdjustment} />
+                  <BalanceCell
+                    item={item}
+                    onApplyAdjustment={setPendingIndexAdjustment}
+                    onRevertAdjustment={setRevertibleIndexAdjustment}
+                  />
                 </TableCell>
                 <TableCell className="px-2 md:px-4 py-3 text-right">
                   <Button
@@ -192,6 +215,11 @@ export function MonthCollectionsSection({ items }: MonthCollectionsSectionProps)
         open={pendingIndexAdjustment !== null}
         pendingIndexAdjustment={pendingIndexAdjustment}
         onClose={() => setPendingIndexAdjustment(null)}
+      />
+      <RevertRentAdjustmentDialog
+        open={revertibleIndexAdjustment !== null}
+        adjustment={revertibleIndexAdjustment}
+        onClose={() => setRevertibleIndexAdjustment(null)}
       />
     </section>
   );

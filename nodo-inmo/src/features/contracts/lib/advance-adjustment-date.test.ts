@@ -15,4 +15,8 @@ describe("advanceAdjustmentDate", () => {
   it("rolls over the year when months push past December", () => {
     expect(advanceAdjustmentDate("2026-11-01", 12)).toBe("2027-11-01");
   });
+
+  it("rewinds months when given a negative offset", () => {
+    expect(advanceAdjustmentDate("2026-10-01", -12)).toBe("2025-10-01");
+  });
 });

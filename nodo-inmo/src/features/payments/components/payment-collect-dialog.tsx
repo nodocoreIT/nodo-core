@@ -59,6 +59,7 @@ import {
 } from "@/features/contracts/hooks/use-contract-charge-concepts";
 import { formatPeriod } from "../lib/payment-labels";
 import { remainingAmount } from "@/features/dashboard/lib/dashboard-payment-utils";
+import { pactadoRentAfterCobro } from "@/features/payments/lib/pactado-rent-after-cobro";
 import { formatMoney, formatDate } from "@/features/contracts/lib/contract-labels";
 import { formatCurrencyInput, parseCurrencyInput } from "@/shared/lib/format-money";
 import { useCashAccounts } from "@/shared/hooks/use-cash-accounts";
@@ -280,8 +281,8 @@ export function PaymentCollectDialog({
 
     const alreadyPaid = isPaid ? 0 : (payment.paid_amount ?? 0);
     const newPaidTotal = alreadyPaid + received;
-    const cobroAmount = isPaid ? received : Math.max(payment.amount, newPaidTotal);
-    const isFullyPaid = isPaid || newPaidTotal >= payment.amount;
+    const cobroAmount = pactadoRentAfterCobro(isPaid, payment.amount, received);
+    const isFullyPaid = isPaid || newPaidTotal >= cobroAmount;
 
     try {
       if (chargeConcepts.length > 0) {

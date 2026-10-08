@@ -46,6 +46,22 @@ vi.mock("../hooks/use-upcoming-adjustments", () => ({
   useUpcomingAdjustments: () => ({ data: [], isLoading: false }),
 }));
 
+vi.mock("@/features/payments/hooks/use-auto-generate-installments", () => ({
+  useAutoGenerateInstallments: () => undefined,
+}));
+
+vi.mock("@/features/contracts/hooks/use-apply-rent-adjustment", () => ({
+  useApplyRentAdjustment: () => ({ mutateAsync: vi.fn(), isPending: false, isError: false }),
+}));
+
+vi.mock("@/features/contracts/hooks/use-revert-rent-adjustment", () => ({
+  useRevertRentAdjustment: () => ({ mutateAsync: vi.fn(), isPending: false, isError: false }),
+}));
+
+vi.mock("../hooks/use-index-adjustment", () => ({
+  useIndexAdjustment: () => ({ result: null, isLoading: false }),
+}));
+
 
 import { DashboardStatCard } from "../components/dashboard-stat-card";
 import { DashboardPage } from "../components/dashboard-page";
@@ -88,6 +104,9 @@ function resolvedMetrics(overrides: Partial<DashboardMetrics> = {}): DashboardMe
         balance: 490502,
         currency: "ARS",
         payments: [{ id: "p-2", remaining: 490502 }],
+        alerts: [],
+        pendingIndexAdjustment: null,
+        revertibleIndexAdjustment: null,
       },
     ],
     recentReceipts: [

@@ -60,6 +60,8 @@ const schema = z.object({
   expenses_paid_by: z.enum(["tenant", "owner"]),
   adjustment_index: z.enum(["IPC", "ICL", "fixed", "USD"]),
   adjustment_period_months: z.string().min(1, "Periodicidad requerida"),
+  last_adjustment_date: z.string().optional(),
+  next_adjustment_date: z.string().optional(),
   status: z.enum(["draft", "active", "terminated", "expired"]),
   notes: z.string().optional(),
   // Phase C — contract generator metadata
@@ -124,6 +126,8 @@ function buildPayload(
     expenses_paid_by: values.expenses_paid_by,
     adjustment_index: values.adjustment_index,
     adjustment_period_months: Number(values.adjustment_period_months),
+    last_adjustment_date: values.last_adjustment_date || null,
+    next_adjustment_date: values.next_adjustment_date || null,
     status: values.status,
     notes: values.notes || null,
     guarantor_ids: guarantorIds,
@@ -217,6 +221,8 @@ export function ContractFormDialog({
       expenses_paid_by: (contract?.expenses_paid_by as any) ?? "tenant",
       adjustment_index: (contract?.adjustment_index as any) ?? "IPC",
       adjustment_period_months: toStr(contract?.adjustment_period_months) || "12",
+      last_adjustment_date: contract?.last_adjustment_date ?? "",
+      next_adjustment_date: contract?.next_adjustment_date ?? "",
       status: (contract?.status as any) ?? "active",
       notes: contract?.notes ?? "",
       // Phase C — contract generator metadata
@@ -690,7 +696,40 @@ export function ContractFormDialog({
               />
             </div>
 
-          
+            {isEdit ? (
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control as any}
+                  name="last_adjustment_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Último aumento</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control as any}
+                  name="next_adjustment_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Próximo aumento</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <p className="text-2xs text-slate2">
+                        Si el próximo aumento es este mes o anterior, vuelve a
+                        aparecer en el dashboard para aplicar el índice.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-2 gap-4">
               <FormField

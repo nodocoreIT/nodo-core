@@ -10,6 +10,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const mockUpdateSingle = vi.fn();
 const mockUpdateSelect = vi.fn();
 const mockUpdateEq = vi.fn();
+const mockPaymentsUpdateEq2 = vi.fn();
+const mockPaymentsUpdateEq1 = vi.fn();
 const mockDeleteEq = vi.fn();
 const mockInsert = vi.fn();
 const mockUpsert = vi.fn();
@@ -47,12 +49,14 @@ describe("useUpdateContract", () => {
     mockDeleteEq.mockResolvedValue({ error: null });
     mockInsert.mockResolvedValue({ error: null });
     mockUpsert.mockResolvedValue({ error: null });
+    mockPaymentsUpdateEq2.mockResolvedValue({ error: null });
+    mockPaymentsUpdateEq1.mockReturnValue({ eq: mockPaymentsUpdateEq2 });
     mockFrom.mockImplementation((table: string) => {
       if (table === "contracts") {
         return { update: () => ({ eq: mockUpdateEq }) };
       }
       if (table === "payments") {
-        return { upsert: mockUpsert };
+        return { update: () => ({ eq: mockPaymentsUpdateEq1 }), upsert: mockUpsert };
       }
       // contract_guarantors
       return {
@@ -85,6 +89,8 @@ describe("useUpdateContract", () => {
       { org_id: "org-1", contract_id: "c-1", guarantor_id: "guar-1" },
       { org_id: "org-1", contract_id: "c-1", guarantor_id: "guar-2" },
     ]);
+    expect(mockPaymentsUpdateEq1).toHaveBeenCalledWith("contract_id", "c-1");
+    expect(mockPaymentsUpdateEq2).toHaveBeenCalledWith("status", "pending");
   });
 
   it("clears links without inserting when guarantor_ids is empty", async () => {
