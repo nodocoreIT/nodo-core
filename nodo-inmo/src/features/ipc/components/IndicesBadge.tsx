@@ -8,6 +8,7 @@ import { useIPCHistory } from "../hooks/use-ipc-history";
 import { useICLHistory } from "../hooks/use-icl-history";
 import { computeIclAdjustment } from "../lib/icl-adjustment";
 import { buildIclMonthlyHistory } from "../lib/icl-monthly-history";
+import { formatIpcPercent } from "../lib/merge-index-history";
 
 function formatPeriod(period: string): string {
   const [year, month] = period.slice(0, 7).split("-").map(Number);
@@ -65,7 +66,7 @@ function HistoryDropdown({ onClose }: { onClose: () => void }) {
             <div key={entry.period} className="flex items-center justify-between px-3 py-1.5 text-xs hover:bg-slate-50">
               <span className="capitalize text-slate2">{formatPeriod(entry.period)}</span>
               <span className="font-semibold text-navy">
-                {entry.value > 0 ? "+" : ""}{entry.value.toFixed(1)}%
+                {formatIpcPercent(entry.value)}
               </span>
             </div>
           ))
@@ -138,7 +139,7 @@ export function IndicesBadge() {
       >
         <span className="font-bold uppercase tracking-wide text-slate2">IPC</span>
         {ipc ? (
-          <span className="text-navy">{ipc.value > 0 ? "+" : ""}{ipc.value.toFixed(1)}%</span>
+          <span className="text-navy">{formatIpcPercent(ipc.value)}</span>
         ) : (
           <span className="text-slate2/70">—</span>
         )}

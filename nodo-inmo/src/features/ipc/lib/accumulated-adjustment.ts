@@ -7,7 +7,7 @@ function monthKey(isoDate: string): string {
   return isoDate.slice(0, 7);
 }
 
-function shiftMonth(key: string, delta: number): string {
+export function shiftMonth(key: string, delta: number): string {
   const [year, month] = key.split("-").map(Number);
   const total = year * 12 + (month - 1) + delta;
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
@@ -41,9 +41,15 @@ function fromRatio(ratio: number, currentRentAmount: number): IndexAdjustmentRes
   };
 }
 
+function ipcLevelForMonth(history: IPCHistoryEntry[], key: string): number | null {
+  const entry = history.find((h) => monthKey(h.period) === key);
+  return entry?.level != null && Number.isFinite(entry.level) ? entry.level : null;
+}
+
 /**
- * IPC increase compounded over the adjustment window. Unavailable until every
- * month of the window has been published; `missingMonth` is the first gap.
+ * Same as the official calculator: IPC_end / IPC_start using index levels.
+ * Start is the month before the window. Falls back to compounding monthly
+ * rates when levels are missing. `missingMonth` is the first gap.
  */
 export function computeAccumulatedIpcAdjustment(
   history: IPCHistoryEntry[],
@@ -51,8 +57,17 @@ export function computeAccumulatedIpcAdjustment(
   nextAdjustmentDate: string,
   periodMonths: number,
 ): IndexAdjustmentResult {
+  const window = adjustmentWindow(nextAdjustmentDate, periodMonths);
+  const endKey = window[window.length - 1];
+  const baseKey = shiftMonth(window[0], -1);
+  const endLevel = ipcLevelForMonth(history, endKey);
+  const baseLevel = ipcLevelForMonth(history, baseKey);
+  if (endLevel != null && baseLevel != null && baseLevel !== 0) {
+    return fromRatio(endLevel / baseLevel, currentRentAmount);
+  }
+
   let ratio = 1;
-  for (const key of adjustmentWindow(nextAdjustmentDate, periodMonths)) {
+  for (const key of window) {
     const entry = history.find((h) => monthKey(h.period) === key);
     if (!entry) return unavailable(key);
     ratio *= 1 + entry.value / 100;
