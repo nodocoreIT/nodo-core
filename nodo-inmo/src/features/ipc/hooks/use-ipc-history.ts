@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/shared/lib/supabase";
-import { mergeIndexHistory } from "../lib/merge-index-history";
+import { keepClosedMonths, mergeIndexHistory } from "../lib/merge-index-history";
 
 export interface IPCHistoryEntry {
   period: string; // "YYYY-MM-DD"
@@ -51,8 +51,8 @@ export function useIPCHistory(months = 12) {
       } catch (err) {
         console.warn("No se pudieron leer IPC manuales de shared.indices", err);
       }
-      return mergeIndexHistory(official, manual).slice(0, months);
+      return keepClosedMonths(mergeIndexHistory(official, manual)).slice(0, months);
     },
-    staleTime: 1000 * 60 * 60,
+    staleTime: 1000 * 60 * 5,
   });
 }

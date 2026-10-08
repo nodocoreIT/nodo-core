@@ -10,8 +10,11 @@ import { computeIclAdjustment } from "../lib/icl-adjustment";
 import { buildIclMonthlyHistory } from "../lib/icl-monthly-history";
 
 function formatPeriod(period: string): string {
-  const d = new Date(period + "T12:00:00");
-  return d.toLocaleDateString("es-AR", { month: "short", year: "numeric" });
+  const [year, month] = period.slice(0, 7).split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("es-AR", {
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function HistoryDropdown({ onClose }: { onClose: () => void }) {
