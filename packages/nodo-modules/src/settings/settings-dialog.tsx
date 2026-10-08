@@ -457,14 +457,21 @@ function IpcSettingsSection() {
     if (!saveManualIpc) return;
     const parsed = parseFloat(ipcValue);
     if (isNaN(parsed) || !ipcMonth) return;
+    const lastClosed = defaultIpcMonth();
+    const month = ipcMonth > lastClosed ? lastClosed : ipcMonth;
     try {
-      await saveManualIpc(parsed, `${ipcMonth}-01`);
+      await saveManualIpc(parsed, `${month}-01`);
+      setIpcMonth(month);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
       setIpcValue("");
     } catch (err) {
       console.error(err);
-      alert("Error al guardar el IPC manual");
+      alert(
+        err instanceof Error && err.message
+          ? `Error al guardar el IPC: ${err.message}`
+          : "Error al guardar el IPC manual",
+      );
     }
   };
 
@@ -473,8 +480,8 @@ function IpcSettingsSection() {
       <div>
         <h3 className="text-base font-bold text-navy">Carga Manual de IPC</h3>
         <p className="text-xs text-slate2">
-          Cargá un valor provisorio del mes que todavía no publicó INDEC. Los aumentos lo usan ya;
-          cuando la API traiga el oficial, lo reemplaza.
+          El IPC es a mes vencido. Hoy cargás septiembre (no octubre). Los aumentos lo usan ya;
+          cuando INDEC publique ese mes, la API lo reemplaza.
         </p>
       </div>
 
@@ -483,8 +490,13 @@ function IpcSettingsSection() {
           <Label className="text-sm font-bold text-navy">Mes</Label>
           <Input
             type="month"
+            max={defaultIpcMonth()}
             value={ipcMonth}
-            onChange={(e) => setIpcMonth(e.target.value)}
+            onChange={(e) => {
+              const lastClosed = defaultIpcMonth();
+              const next = e.target.value;
+              setIpcMonth(next && next > lastClosed ? lastClosed : next);
+            }}
           />
         </div>
         <div className="space-y-2">

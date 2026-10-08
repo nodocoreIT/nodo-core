@@ -1,4 +1,4 @@
-function monthKey(period: string): string {
+export function monthKey(period: string): string {
   return period.slice(0, 7);
 }
 
@@ -26,4 +26,18 @@ export function mergeIndexHistory<T extends { period: string }>(
 export function previousMonthPeriod(from = new Date()): string {
   const d = new Date(from.getFullYear(), from.getMonth() - 1, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+/** IPC is mes vencido: drop the current (and future) calendar month. */
+export function keepClosedMonths<T extends { period: string }>(
+  rows: T[],
+  from = new Date(),
+): T[] {
+  const lastClosed = monthKey(previousMonthPeriod(from));
+  return rows.filter((row) => monthKey(row.period) <= lastClosed);
+}
+
+export function closedMonthOrPrevious(period: string, from = new Date()): string {
+  const lastClosed = previousMonthPeriod(from);
+  return monthKey(period) <= monthKey(lastClosed) ? `${monthKey(period)}-01` : lastClosed;
 }

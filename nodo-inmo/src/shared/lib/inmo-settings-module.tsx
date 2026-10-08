@@ -31,7 +31,7 @@ import {
   INMO_MANAGED_NAV,
   INMO_STAFF_ROLE_OPTIONS,
 } from "@/shared/lib/inmo-staff-nav";
-import { previousMonthPeriod } from "@/features/ipc/lib/merge-index-history";
+import { closedMonthOrPrevious, previousMonthPeriod } from "@/features/ipc/lib/merge-index-history";
 
 const INMO_MANAGED_NAV_LIST = INMO_MANAGED_NAV.map((item) => ({ ...item }));
 
@@ -49,8 +49,8 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
 
   const ipcMutation = useMutation({
     mutationFn: async ({ value, period }: { value: number; period?: string }) => {
-      const resolved = period?.slice(0, 7)
-        ? `${period.slice(0, 7)}-01`
+      const resolved = period
+        ? closedMonthOrPrevious(period)
         : previousMonthPeriod();
       const { error } = await supabase.schema("shared").rpc("upsert_index_value", {
         p_kind: "IPC",
@@ -60,8 +60,8 @@ export function InmoSettingsModuleProvider({ children }: { children: React.React
       });
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ipc"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["ipc"] });
     },
   });
 
