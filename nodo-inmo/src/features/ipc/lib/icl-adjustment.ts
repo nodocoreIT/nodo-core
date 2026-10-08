@@ -36,7 +36,7 @@ export function computeIclAdjustment(
 
   const ratio = currentLevel / previousLevel;
   const percentage = Math.round((ratio - 1) * 100 * 100) / 100;
-  const newRentAmount = Math.round(currentRentAmount * ratio * 100) / 100;
+  const newRentAmount = Math.round(currentRentAmount * ratio);
 
   return { available: true, percentage, newRentAmount };
 }

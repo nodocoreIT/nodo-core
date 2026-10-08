@@ -59,7 +59,7 @@ import {
 } from "@/features/contracts/hooks/use-contract-charge-concepts";
 import { formatPeriod } from "../lib/payment-labels";
 import { remainingAmount } from "@/features/dashboard/lib/dashboard-payment-utils";
-import { pactadoRentAfterCobro } from "@/features/payments/lib/pactado-rent-after-cobro";
+import { roundPesos, settleCobroRent } from "@/features/payments/lib/pactado-rent-after-cobro";
 import { formatMoney, formatDate } from "@/features/contracts/lib/contract-labels";
 import { formatCurrencyInput, parseCurrencyInput } from "@/shared/lib/format-money";
 import { useCashAccounts } from "@/shared/hooks/use-cash-accounts";
@@ -183,8 +183,8 @@ export function PaymentCollectDialog({
 
     void (async () => {
       const defaultAmount = isPaid
-        ? (payment.paid_amount ?? payment.amount)
-        : payment.amount;
+        ? roundPesos(payment.paid_amount ?? payment.amount)
+        : Math.max(0, roundPesos(payment.amount) - roundPesos(payment.paid_amount ?? 0));
 
       const matchingAccounts = accounts.filter((a) => a.currency === currency);
       const pool = matchingAccounts.length > 0 ? matchingAccounts : accounts;
@@ -202,7 +202,8 @@ export function PaymentCollectDialog({
       form.reset({
         periodMonth: periodToMonthInput(payment.period),
         paidDate: payment.paid_date ?? today,
-        amountReceived: formatCurrencyInput(String(Math.round(defaultAmount)), currency),
+        amountReceived:
+          defaultAmount > 0 ? formatCurrencyInput(String(defaultAmount), currency) : "",
         expensesAmount:
           (payment.expenses_amount ?? 0) > 0
             ? formatCurrencyInput(String(Math.round(payment.expenses_amount ?? 0)), currency)
@@ -247,10 +248,6 @@ export function PaymentCollectDialog({
     }
 
     const received = parseCurrencyInput(values.amountReceived) ?? 0;
-    if (received <= 0) {
-      setSubmitError("El monto recibido debe ser mayor a cero.");
-      return;
-    }
 
     const expenses =
       chargeConcepts.length > 0
@@ -280,9 +277,16 @@ export function PaymentCollectDialog({
     }
 
     const alreadyPaid = isPaid ? 0 : (payment.paid_amount ?? 0);
-    const newPaidTotal = alreadyPaid + received;
-    const cobroAmount = pactadoRentAfterCobro(isPaid, payment.amount, received);
-    const isFullyPaid = isPaid || newPaidTotal >= cobroAmount;
+    const { amount: cobroAmount, paidAmount, isFullyPaid } = settleCobroRent({
+      isPaid,
+      pactado: payment.amount,
+      alreadyPaid,
+      received,
+    });
+    if (received <= 0 && !isFullyPaid) {
+      setSubmitError("El monto recibido debe ser mayor a cero.");
+      return;
+    }
 
     try {
       if (chargeConcepts.length > 0) {
@@ -302,7 +306,7 @@ export function PaymentCollectDialog({
         expenses_amount: expenses,
         status: isFullyPaid ? "paid" : "pending",
         paid_date: isFullyPaid ? values.paidDate : payment.paid_date,
-        paid_amount: isFullyPaid ? cobroAmount : newPaidTotal,
+        paid_amount: paidAmount,
         payment_method: "transfer",
       });
 
@@ -417,7 +421,7 @@ export function PaymentCollectDialog({
                         Alquiler pactado
                       </p>
                       <p className="text-sm font-semibold text-navy">
-                        {formatMoney(payment.amount, payment.currency)}
+                        {formatMoney(roundPesos(payment.amount), payment.currency)}
                       </p>
                     </div>
                     <div className="space-y-1">

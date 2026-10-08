@@ -15,7 +15,7 @@ describe("computeIclAdjustment", () => {
     const ratio = 33 / 31.5;
     expect(out.available).toBe(true);
     expect(out.percentage).toBeCloseTo((ratio - 1) * 100, 2);
-    expect(out.newRentAmount).toBeCloseTo(100000 * ratio, 1);
+    expect(out.newRentAmount).toBe(Math.round(100000 * ratio));
   });
 
   it("picks the latest published level within a month when several exist", () => {

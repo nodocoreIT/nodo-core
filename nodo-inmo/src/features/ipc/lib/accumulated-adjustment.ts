@@ -36,7 +36,7 @@ function fromRatio(ratio: number, currentRentAmount: number): IndexAdjustmentRes
   return {
     available: true,
     percentage: Math.round((ratio - 1) * 100 * 100) / 100,
-    newRentAmount: Math.round(currentRentAmount * ratio * 100) / 100,
+    newRentAmount: Math.round(currentRentAmount * ratio),
     missingMonth: null,
   };
 }
