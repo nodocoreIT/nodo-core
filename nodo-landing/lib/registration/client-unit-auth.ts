@@ -213,6 +213,7 @@ export async function setAuthUserPassword(
 
   const { error } = await authAdmin.auth.admin.updateUserById(userId, {
     password,
+    email_confirm: true,
     app_metadata: appMetadata,
   });
 
