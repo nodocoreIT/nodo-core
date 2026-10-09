@@ -37,6 +37,7 @@ import {
 } from "@/app/actions";
 import { submitNodeRegistration } from "@/app/actions/registration";
 import { resolvePublicOrigin } from "@/lib/auth/public-origin";
+import { acceptPendingInvitations } from "@/lib/auth/accept-pending-invitations";
 import {
   DEFAULT_ACCENT,
   getLoginAccent,
@@ -675,6 +676,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
         password: password.trim(),
       });
       if (!signInErr && signInData.session) {
+        await acceptPendingInvitations(authSupabase!);
         setNeedsNewPassword(false);
         redirectAfterSession(signInData.session);
         setLoading(false);
@@ -748,22 +750,7 @@ function LoginFormInner({ forcedNodeSlug }: { forcedNodeSlug?: string } = {}) {
         return;
       }
 
-      // For invite activation: accept pending invitations before checking access
-      // so the user gets added to org_members first.
-      if (modeParam === "activate-invite") {
-        try {
-          const { data: invitations } = await supabase.rpc("get_my_pending_invitations");
-          if (invitations?.length) {
-            for (const inv of invitations as { token: string }[]) {
-              await supabase.functions.invoke("accept-invitation", {
-                body: { token: inv.token, action: "accept" },
-              });
-            }
-          }
-        } catch (e) {
-          console.warn("accept-invitation:", e);
-        }
-      }
+      await acceptPendingInvitations(supabase);
 
       if (matchedNode?.code) {
         const access = await enforceNodeAccess(supabase, matchedNode.code);

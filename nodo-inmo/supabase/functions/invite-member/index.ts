@@ -111,6 +111,7 @@ Deno.serve(async (req) => {
 
       // Set must_set_password flag and store display name so the members table shows it correctly
       await adminClient.auth.admin.updateUserById(existingUserId, {
+        email_confirm: true,
         app_metadata: { must_set_password: true },
         user_metadata: { full_name: displayName },
       });
@@ -167,6 +168,7 @@ Deno.serve(async (req) => {
 
     // Set must_set_password flag so user must complete password setup
     await adminClient.auth.admin.updateUserById(userId, {
+      email_confirm: true,
       app_metadata: {
         must_set_password: true,
       },
