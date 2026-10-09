@@ -35,7 +35,11 @@ export function remainingAmount(payment: {
   expenses_amount?: number | null;
   paid_amount: number | null;
 }): number {
-  return payment.amount + (payment.expenses_amount ?? 0) - (payment.paid_amount ?? 0);
+  return (
+    Math.round(payment.amount) +
+    Math.round(payment.expenses_amount ?? 0) -
+    Math.round(payment.paid_amount ?? 0)
+  );
 }
 
 export function isPartialPayment(payment: {

@@ -42,6 +42,17 @@ describe("computeAccumulatedIpcAdjustment with levels", () => {
     const out = computeAccumulatedIpcAdjustment(history, 443200, "2026-10-01", 6);
     expect(out.available).toBe(true);
     expect(out.percentage).toBe(12.67);
-    expect(out.newRentAmount).toBeCloseTo(499355, 0);
+    expect(out.newRentAmount).toBe(499355);
+  });
+
+  it("applies the last 4 months of IPC to alquiler only (Rohwain cuatrimestral)", () => {
+    const history = buildIpcHistoryFromLevels(
+      officialLevels,
+      [{ period: "2026-09-01", value: 1.66 }],
+      new Date(2026, 9, 8),
+    );
+    const out = computeAccumulatedIpcAdjustment(history, 490502, "2026-10-01", 4);
+    expect(out.available).toBe(true);
+    expect(out.newRentAmount).toBe(527400);
   });
 });

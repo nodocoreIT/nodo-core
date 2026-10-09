@@ -30,7 +30,7 @@ describe("computeAccumulatedIpcAdjustment", () => {
     const ratio = 1.021 * 1.019 * 1.021 * 1.017;
     expect(out.available).toBe(true);
     expect(out.percentage).toBe(Math.round((ratio - 1) * 10000) / 100);
-    expect(out.newRentAmount).toBe(Math.round(1100000 * ratio * 100) / 100);
+    expect(out.newRentAmount).toBe(Math.round(1100000 * ratio));
   });
 
   it("is unavailable and names the month whose IPC isn't published yet", () => {

@@ -34,12 +34,13 @@ export function useApplyRentAdjustment() {
     }: ApplyRentAdjustmentInput) => {
       const appliedDate = firstDayOfMonth(new Date());
       const nextAdjustmentDate = advanceAdjustmentDate(appliedDate, adjustmentPeriodMonths);
+      const rent = Math.round(newRentAmount);
 
       const { error: contractError } = await supabase
         .schema("nodo_inmo")
         .from("contracts")
         .update({
-          rent_amount: newRentAmount,
+          rent_amount: rent,
           last_adjustment_date: appliedDate,
           next_adjustment_date: nextAdjustmentDate,
         })
@@ -50,7 +51,7 @@ export function useApplyRentAdjustment() {
       const { error: paymentsError } = await supabase
         .schema("nodo_inmo")
         .from("payments")
-        .update({ amount: newRentAmount })
+        .update({ amount: rent })
         .eq("contract_id", contractId)
         .eq("status", "pending");
 
