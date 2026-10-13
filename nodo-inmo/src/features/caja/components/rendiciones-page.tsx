@@ -41,6 +41,7 @@ export function RendicionesPage() {
   const [finalizedStatement, setFinalizedStatement] = useState<StatementData | null>(null);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const allSettlements = data ?? [];
   const pendingGroups = groupPendingByOwnerWithProperties(allSettlements);
@@ -48,6 +49,7 @@ export function RendicionesPage() {
   async function openPreview(group: (typeof pendingGroups)[number]) {
     const key = `${group.owner_id}:${group.currency}`;
     setPreviewLoadingKey(key);
+    setPreviewError(null);
     try {
       const statement = await buildPendingStatementDataForOwner(
         group,
@@ -57,6 +59,8 @@ export function RendicionesPage() {
       );
       setPreviewStatement(statement);
       setPreviewOpen(true);
+    } catch {
+      setPreviewError(`No se pudo abrir la liquidación de ${group.owner_name}. Intentá de nuevo.`);
     } finally {
       setPreviewLoadingKey(null);
     }
@@ -148,6 +152,15 @@ export function RendicionesPage() {
           className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
         >
           Error al cargar las rendiciones. Intentá de nuevo.
+        </div>
+      )}
+
+      {previewError && (
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          {previewError}
         </div>
       )}
 

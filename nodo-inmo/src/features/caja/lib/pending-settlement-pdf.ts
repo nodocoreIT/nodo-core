@@ -30,33 +30,45 @@ async function computePendingPropertyBreakdown(
       group.settlement_ids.includes(s.id),
   );
 
-  const paymentIds = batch.map((s) => s.payment_id);
+  const paymentIds = batch.map((s) => s.payment_id).filter(Boolean);
 
-  const { data: payments, error: paymentsError } = await supabase
-    .schema("nodo_inmo")
-    .from("payments")
-    .select("id, amount, expenses_amount, currency, contract_id, period")
-    .in("id", paymentIds);
+  const { data: payments, error: paymentsError } =
+    paymentIds.length === 0
+      ? { data: [], error: null }
+      : await supabase
+          .schema("nodo_inmo")
+          .from("payments")
+          .select("id, amount, expenses_amount, currency, contract_id, period")
+          .in("id", paymentIds);
 
   if (paymentsError) throw paymentsError;
 
-  const contractIds = [...new Set((payments ?? []).map((p) => p.contract_id).filter(Boolean))];
-  const { data: contracts, error: contractsError } = await supabase
-    .schema("nodo_inmo")
-    .from("contracts")
-    .select(
-      "id, rent_amount, commission_amount, property:properties!contracts_property_id_fkey(commission_rate, owner:contacts!properties_owner_contact_id_fkey(commission_rate))",
-    )
-    .in("id", contractIds);
+  let propertyCommissionRate: number | null = null;
+  let ownerCommissionRate: number | null = null;
+  if (group.property_id) {
+    const { data: property } = await supabase
+      .schema("nodo_inmo")
+      .from("properties")
+      .select(
+        "commission_rate, owner:contacts!properties_owner_contact_id_fkey(commission_rate)",
+      )
+      .eq("id", group.property_id)
+      .maybeSingle();
+    propertyCommissionRate = property?.commission_rate ?? null;
+    ownerCommissionRate =
+      (property?.owner as { commission_rate?: number | null } | null | undefined)
+        ?.commission_rate ?? null;
+  }
 
-  if (contractsError) throw contractsError;
-
-  const { data: movements, error: movementsError } = await supabase
-    .schema("nodo_inmo")
-    .from("cash_movements")
-    .select("payment_id, amount")
-    .eq("source", "commission")
-    .in("payment_id", paymentIds);
+  const { data: movements, error: movementsError } =
+    paymentIds.length === 0
+      ? { data: [], error: null }
+      : await supabase
+          .schema("nodo_inmo")
+          .from("cash_movements")
+          .select("payment_id, amount")
+          .eq("source", "commission")
+          .in("payment_id", paymentIds);
 
   if (movementsError) throw movementsError;
 
@@ -74,11 +86,14 @@ async function computePendingPropertyBreakdown(
 
   const ownerExpenses = expenses ?? [];
 
-  const { data: charges, error: chargesError } = await supabase
-    .schema("nodo_inmo")
-    .from("payment_charges")
-    .select("payment_id, amount, concept:contract_charge_concepts(label, retained_by_agency)")
-    .in("payment_id", paymentIds);
+  const { data: charges, error: chargesError } =
+    paymentIds.length === 0
+      ? { data: [], error: null }
+      : await supabase
+          .schema("nodo_inmo")
+          .from("payment_charges")
+          .select("payment_id, amount, concept:contract_charge_concepts(label, retained_by_agency)")
+          .in("payment_id", paymentIds);
 
   if (chargesError) throw chargesError;
 
@@ -113,18 +128,10 @@ async function computePendingPropertyBreakdown(
       })),
   );
 
-  const contractualRates = (contracts ?? []).map((c) =>
-    resolveCommissionRatePercent({
-      contractCommissionAmount: c.commission_amount,
-      contractRentAmount: c.rent_amount,
-      propertyCommissionRate: (c.property as { commission_rate?: number | null } | null)
-        ?.commission_rate,
-      ownerCommissionRate: (
-        c.property as { owner?: { commission_rate?: number | null } | null } | null
-      )?.owner?.commission_rate,
-    }),
-  );
-  const contractualRate = contractualRates.length > 0 ? Math.max(...contractualRates) : 0;
+  const contractualRate = resolveCommissionRatePercent({
+    propertyCommissionRate,
+    ownerCommissionRate,
+  });
 
   const cobros_detail = (payments ?? [])
     .filter((p) => p.period)
