@@ -22,10 +22,11 @@ function samplePayment(overrides: Partial<PaymentWithRelations> = {}): PaymentWi
     contract: {
       rent_amount: 440000,
       commission_amount: 44000,
+      commission_rate: 10,
       commission_on_gross: false,
       property: {
         address: "Calle 123",
-        commission_rate: null,
+        commission_rate: 10,
         owner: { name: "Propietario", commission_rate: 8 },
       },
       tenant: { name: "Inquilino" },
@@ -35,7 +36,7 @@ function samplePayment(overrides: Partial<PaymentWithRelations> = {}): PaymentWi
 }
 
 describe("resolveCommissionRatePercent", () => {
-  it("uses contract commission_amount over property rate", () => {
+  it("uses contract commission_rate over property/owner rates", () => {
     expect(resolveCommissionRatePercent(samplePayment())).toBe(10);
   });
 });

@@ -6,15 +6,35 @@ import {
 } from "./resolve-commission-rate";
 
 describe("resolveCommissionRatePercent", () => {
-  it("prefers contract snapshot over property and owner rates", () => {
+  it("prefers configured property/owner % over a drifted peso snapshot", () => {
     expect(
       resolveCommissionRatePercent({
+        contractCommissionAmount: 44320,
+        contractRentAmount: 499355,
+        propertyCommissionRate: 10,
+        ownerCommissionRate: 8,
+      }),
+    ).toBe(10);
+    expect(
+      resolveCommissionRatePercent({
+        contractCommissionAmount: 39240.16,
+        contractRentAmount: 527400,
+        propertyCommissionRate: null,
+        ownerCommissionRate: 8,
+      }),
+    ).toBe(8);
+  });
+
+  it("uses live property/owner config over a stored contract %", () => {
+    expect(
+      resolveCommissionRatePercent({
+        contractCommissionRate: 12,
         contractCommissionAmount: 80000,
         contractRentAmount: 1000000,
         propertyCommissionRate: 10,
         ownerCommissionRate: 5,
       }),
-    ).toBe(8);
+    ).toBe(10);
   });
 
   it("falls back to property rate when contract has no commission", () => {

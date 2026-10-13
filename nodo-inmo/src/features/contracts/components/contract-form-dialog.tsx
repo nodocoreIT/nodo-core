@@ -85,6 +85,7 @@ function toStr(v: number | string | null | undefined): string {
 
 function commissionRateFromContract(contract?: ContractWithRelations): string {
   const rate = resolveCommissionRatePercent({
+    contractCommissionRate: contract?.commission_rate,
     contractCommissionAmount: contract?.commission_amount,
     contractRentAmount: contract?.rent_amount,
     propertyCommissionRate: (contract?.property as { commission_rate?: number | null } | null)
@@ -122,6 +123,7 @@ function buildPayload(
     currency: values.currency,
     deposit_amount: parseCurrencyInput(values.deposit_amount),
     commission_amount: commissionAmount,
+    commission_rate: rate > 0 ? rate : null,
     commission_on_gross: true,
     expenses_paid_by: values.expenses_paid_by,
     adjustment_index: values.adjustment_index,

@@ -16,6 +16,7 @@ export interface CobroBreakdown {
 export function resolveCommissionRatePercent(payment: PaymentWithRelations): number {
   const contract = payment.contract;
   return resolveContractCommissionRate({
+    contractCommissionRate: contract?.commission_rate,
     contractCommissionAmount: contract?.commission_amount,
     contractRentAmount: contract?.rent_amount,
     propertyCommissionRate: contract?.property?.commission_rate,
