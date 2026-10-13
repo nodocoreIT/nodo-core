@@ -36,22 +36,7 @@ describe("useApplyRentAdjustment", () => {
 
     mockFrom.mockImplementation((table: string) => {
       if (table === "contracts") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: () =>
-                Promise.resolve({
-                  data: {
-                    rent_amount: 100000,
-                    commission_amount: 10000,
-                    commission_rate: 10,
-                  },
-                  error: null,
-                }),
-            }),
-          }),
-          update: () => ({ eq: mockContractUpdateEq }),
-        };
+        return { update: () => ({ eq: mockContractUpdateEq }) };
       }
       if (table === "payments") {
         return { update: () => ({ eq: mockPaymentsUpdateEq1 }) };

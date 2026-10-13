@@ -45,7 +45,7 @@ async function computePendingPropertyBreakdown(
     .schema("nodo_inmo")
     .from("contracts")
     .select(
-      "id, rent_amount, commission_amount, commission_rate, property:properties!contracts_property_id_fkey(commission_rate, owner:contacts!properties_owner_contact_id_fkey(commission_rate))",
+      "id, rent_amount, commission_amount, property:properties!contracts_property_id_fkey(commission_rate, owner:contacts!properties_owner_contact_id_fkey(commission_rate))",
     )
     .in("id", contractIds);
 
@@ -115,7 +115,6 @@ async function computePendingPropertyBreakdown(
 
   const contractualRates = (contracts ?? []).map((c) =>
     resolveCommissionRatePercent({
-      contractCommissionRate: (c as { commission_rate?: number | null }).commission_rate,
       contractCommissionAmount: c.commission_amount,
       contractRentAmount: c.rent_amount,
       propertyCommissionRate: (c.property as { commission_rate?: number | null } | null)
