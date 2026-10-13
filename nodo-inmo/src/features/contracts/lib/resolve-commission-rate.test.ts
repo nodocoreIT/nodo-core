@@ -75,5 +75,6 @@ describe("computeCommissionAmount", () => {
   it("applies the rate to rent plus expenses", () => {
     expect(computeCommissionAmount(8, 490502, 50000)).toBe(43240.16);
     expect(computeCommissionAmount(8, 500000, 50000)).toBe(44000);
+    expect(computeCommissionAmount(8, 537613, 50000)).toBe(47009.04);
   });
 });

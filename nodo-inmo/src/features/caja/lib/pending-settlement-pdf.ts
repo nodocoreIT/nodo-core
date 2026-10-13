@@ -4,7 +4,10 @@ import {
   type OwnerPropertyGroup,
   type PropertyGroup,
 } from "@/features/caja/lib/caja-math";
-import { resolveCommissionRatePercent } from "@/features/contracts/lib/resolve-commission-rate";
+import {
+  computeCommissionAmount,
+  resolveCommissionRatePercent,
+} from "@/features/contracts/lib/resolve-commission-rate";
 import {
   buildStatementData,
   combineSealedBreakdowns,
@@ -60,17 +63,10 @@ async function computePendingPropertyBreakdown(
         ?.commission_rate ?? null;
   }
 
-  const { data: movements, error: movementsError } =
-    paymentIds.length === 0
-      ? { data: [], error: null }
-      : await supabase
-          .schema("nodo_inmo")
-          .from("cash_movements")
-          .select("payment_id, amount")
-          .eq("source", "commission")
-          .in("payment_id", paymentIds);
-
-  if (movementsError) throw movementsError;
+  const contractualRate = resolveCommissionRatePercent({
+    propertyCommissionRate,
+    ownerCommissionRate,
+  });
 
   const { data: expenses, error: expensesError } = await supabase
     .schema("nodo_inmo")
@@ -97,6 +93,15 @@ async function computePendingPropertyBreakdown(
 
   if (chargesError) throw chargesError;
 
+  const configuredCommissions = (payments ?? []).map((p) => ({
+    payment_id: p.id,
+    amount: computeCommissionAmount(
+      contractualRate,
+      p.amount,
+      p.expenses_amount ?? 0,
+    ),
+  }));
+
   const breakdown = computeSettlementBreakdown(
     (payments ?? []).map((p) => ({
       id: p.id,
@@ -104,9 +109,7 @@ async function computePendingPropertyBreakdown(
       expenses_amount: p.expenses_amount ?? 0,
       currency: p.currency,
     })),
-    (movements ?? [])
-      .filter((m) => m.payment_id)
-      .map((m) => ({ payment_id: m.payment_id!, amount: m.amount })),
+    configuredCommissions,
     ownerExpenses.map((e) => ({
       id: e.id,
       amount: e.amount,
@@ -127,11 +130,6 @@ async function computePendingPropertyBreakdown(
         amount: c.amount,
       })),
   );
-
-  const contractualRate = resolveCommissionRatePercent({
-    propertyCommissionRate,
-    ownerCommissionRate,
-  });
 
   const cobros_detail = (payments ?? [])
     .filter((p) => p.period)
@@ -184,4 +182,72 @@ export async function buildPendingStatementDataForOwner(
     ownerName: group.owner_name,
     settledDate: new Date().toISOString().slice(0, 10),
   });
+}
+
+/** Rewrite pending caja rows so Rendir seals the configured % of rent+expensas. */
+export async function syncPendingCommissionsForOwner(
+  group: OwnerPropertyGroup,
+  settlements: SettlementWithOwner[],
+): Promise<void> {
+  for (const property of group.properties) {
+    const batch = settlements.filter(
+      (s) =>
+        s.status === "pending" &&
+        s.owner_id === property.owner_id &&
+        s.currency === property.currency &&
+        property.settlement_ids.includes(s.id),
+    );
+    const paymentIds = batch.map((s) => s.payment_id).filter(Boolean);
+    if (paymentIds.length === 0) continue;
+
+    const { data: payments, error: paymentsError } = await supabase
+      .schema("nodo_inmo")
+      .from("payments")
+      .select("id, amount, expenses_amount")
+      .in("id", paymentIds);
+    if (paymentsError) throw paymentsError;
+
+    let propertyCommissionRate: number | null = null;
+    let ownerCommissionRate: number | null = null;
+    const { data: prop } = await supabase
+      .schema("nodo_inmo")
+      .from("properties")
+      .select(
+        "commission_rate, owner:contacts!properties_owner_contact_id_fkey(commission_rate)",
+      )
+      .eq("id", property.property_id)
+      .maybeSingle();
+    propertyCommissionRate = prop?.commission_rate ?? null;
+    ownerCommissionRate =
+      (prop?.owner as { commission_rate?: number | null } | null | undefined)
+        ?.commission_rate ?? null;
+
+    const rate = resolveCommissionRatePercent({
+      propertyCommissionRate,
+      ownerCommissionRate,
+    });
+
+    for (const payment of payments ?? []) {
+      const rent = payment.amount ?? 0;
+      const expenses = payment.expenses_amount ?? 0;
+      const commission = computeCommissionAmount(rate, rent, expenses);
+      const ownerShare = Math.round((rent + expenses - commission) * 100) / 100;
+
+      const { error: movementError } = await supabase
+        .schema("nodo_inmo")
+        .from("cash_movements")
+        .update({ amount: commission })
+        .eq("payment_id", payment.id)
+        .eq("source", "commission");
+      if (movementError) throw movementError;
+
+      const { error: settlementError } = await supabase
+        .schema("nodo_inmo")
+        .from("owner_settlements")
+        .update({ amount: ownerShare })
+        .eq("payment_id", payment.id)
+        .eq("status", "pending");
+      if (settlementError) throw settlementError;
+    }
+  }
 }
