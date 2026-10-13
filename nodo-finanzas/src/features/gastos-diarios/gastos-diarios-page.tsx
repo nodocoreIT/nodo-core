@@ -15,6 +15,7 @@ import { useFinanzas } from '@/hooks/use-finanzas';
 import { useAiSettings, getActiveApiKey } from '@/hooks/use-ai-settings';
 import { useExtractGastoFromVoice } from './hooks/use-extract-gasto-from-voice';
 import { useRubros } from '@/hooks/use-rubros';
+import { compararMontoVisible } from '@/utils/comparar-monto';
 import { formatearMoneda, formatearFecha } from '@/utils/formatters';
 import { cuentaPillClass } from '@/utils/cuenta-colors';
 import type { GastoDiario } from '@/types';
@@ -168,7 +169,12 @@ export function GastosDiariosPage() {
           cmp = textOnly(a.rubro ?? '').localeCompare(textOnly(b.rubro ?? ''), 'es');
           break;
         }
-        case 'monto':       cmp = a.monto - b.monto; break;
+        case 'monto':
+          cmp = compararMontoVisible(
+            { ars: a.monto, usd: a.montoUSD },
+            { ars: b.monto, usd: b.montoUSD },
+          );
+          break;
         case 'formaPago':   cmp = a.formaPago.localeCompare(b.formaPago, 'es'); break;
       }
       return sortDir === 'asc' ? cmp : -cmp;

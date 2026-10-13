@@ -78,7 +78,7 @@ export async function completarConsumoRecurrenteHastaFinDeAnio(opts: {
     const creado = await opts.agregarConsumo({
       tarjetaId: opts.tarjetaId,
       lugar: opts.lugar,
-      fecha: new Date(`${fecha}T12:00:00`).toISOString(),
+      fecha,
       fechaCompra: opts.fechaCompra,
       rubro: (opts.rubro || 'OTROS') as RubroConsumo,
       rubroId: opts.rubroId,

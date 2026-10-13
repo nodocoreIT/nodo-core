@@ -14,12 +14,14 @@ import {
   ChevronsUpDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { MonthPicker } from '@/components/ui/month-picker';
 import { RubroDisplay } from '@/components/rubros/rubro-display';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { useFinanzas } from '@/hooks/use-finanzas';
+import { compararMontoVisible } from '@/utils/comparar-monto';
 import { formatearFecha, getFechaHoy } from '@/utils/formatters';
 import { ModalEditarConsumo } from './modal-editar-consumo';
 import { RegistroConsumo } from './registro-consumo';
@@ -27,7 +29,12 @@ import {
   consumosRecurrentesFuturos,
   esMismaSerieRecurrente,
 } from './completar-consumo-recurrente';
-import toast from 'react-hot-toast';
+import {
+  guardarInteresesFinanciacion,
+  montoInteresesFinanciacion,
+} from './intereses-financiacion';
+import { guardarSaldoMesAnterior, montoSaldoMesAnterior } from './saldo-mes-anterior';
+import { toast } from 'sonner';
 import type { ConsumoTarjeta } from '@/types';
 
 type SortField = 'fecha' | 'lugar' | 'rubro' | 'monto';
@@ -84,7 +91,12 @@ export function DetalleTarjetaPage() {
           cmp = textOnly(a.rubroInfo?.nombre ?? '').localeCompare(textOnly(b.rubroInfo?.nombre ?? ''), 'es');
           break;
         }
-        case 'monto': cmp = (a.importeARS || 0) - (b.importeARS || 0); break;
+        case 'monto':
+          cmp = compararMontoVisible(
+            { ars: a.importeARS, usd: a.importeUSD },
+            { ars: b.importeARS, usd: b.importeUSD },
+          );
+          break;
       }
       return sortDir === 'asc' ? cmp : -cmp;
     });
@@ -261,6 +273,51 @@ export function DetalleTarjetaPage() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-mist p-4 max-w-md space-y-4">
+        <div>
+          <MoneyInput
+            label="Saldo del mes anterior"
+            value={montoSaldoMesAnterior(finanzas.consumosTarjetas, tarjeta.id, filtroMes)}
+            onChange={() => {}}
+            onBlur={(valor) => {
+              const actual = montoSaldoMesAnterior(finanzas.consumosTarjetas, tarjeta.id, filtroMes);
+              if (Math.abs(valor - actual) <= 0.001) return;
+              void guardarSaldoMesAnterior(finanzas, tarjeta.id, filtroMes, valor).then(() => {
+                toast.success('Saldo del mes anterior actualizado');
+              });
+            }}
+            moneda="ARS"
+          />
+          <p className="text-xs text-slate2 mt-1">
+            Se suma al total del mes que estás viendo. Escribí el monto y hacé clic afuera para guardarlo.
+          </p>
+        </div>
+        {montoSaldoMesAnterior(finanzas.consumosTarjetas, tarjeta.id, filtroMes) > 0 && (
+          <div>
+            <MoneyInput
+              label="Intereses de financiación"
+              value={montoInteresesFinanciacion(finanzas.consumosTarjetas, tarjeta.id, filtroMes)}
+              onChange={() => {}}
+              onBlur={(valor) => {
+                const actual = montoInteresesFinanciacion(
+                  finanzas.consumosTarjetas,
+                  tarjeta.id,
+                  filtroMes,
+                );
+                if (Math.abs(valor - actual) <= 0.001) return;
+                void guardarInteresesFinanciacion(finanzas, tarjeta.id, filtroMes, valor).then(() => {
+                  toast.success('Intereses de financiación actualizados');
+                });
+              }}
+              moneda="ARS"
+            />
+            <p className="text-xs text-slate2 mt-1">
+              Se suma al total del mes. Escribí el monto y hacé clic afuera para guardarlo.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Filters */}

@@ -225,6 +225,10 @@ export interface GastoDiario {
   prestamoId?: string;
   pagoTarjetaId?: string;
   pagoParcial?: boolean;
+  /** Monto de interés de financiación cargado a mano en un pago parcial. No se persiste en el gasto. */
+  interesFinanciacion?: number;
+  /** Total del resumen al pagar, si se editó el saldo del mes anterior. No se persiste en el gasto. */
+  totalResumenARS?: number;
   pagoTarjetaMes?: string; // YYYY-MM
   esSilencioso?: boolean;
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { CreditCard, CheckCircle2, AlertTriangle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/ui/money-input';
@@ -9,12 +9,16 @@ interface ModalPagarTarjetaProps {
   tarjeta: Tarjeta;
   totalARS: number;
   totalUSD: number;
+  saldoAnteriorInicial: number;
   filtroMes: string;
   onClose: () => void;
   onConfirm: (params: {
     montoARS: number;
     montoUSD: number;
     esParcial: boolean;
+    interesFinanciacion: number;
+    saldoAnterior: number;
+    totalResumenARS: number;
   }) => Promise<void>;
 }
 
@@ -23,20 +27,26 @@ export function ModalPagarTarjeta({
   tarjeta,
   totalARS,
   totalUSD,
+  saldoAnteriorInicial,
   filtroMes,
   onClose,
   onConfirm,
 }: ModalPagarTarjetaProps) {
   const [montoARS, setMontoARS] = useState(totalARS);
   const [montoUSD, setMontoUSD] = useState(totalUSD);
+  const [saldoAnterior, setSaldoAnterior] = useState(saldoAnteriorInicial);
+  const [interesFinanciacion, setInteresFinanciacion] = useState(0);
   const [loading, setLoading] = useState(false);
+  const pagoEditado = useRef(false);
 
   if (!open) return null;
 
-  const esParcial =
-    montoARS < totalARS - 0.01 || (totalUSD > 0 && montoUSD < totalUSD - 0.001);
+  const totalAjustado = totalARS - saldoAnteriorInicial + saldoAnterior;
 
-  const pendienteARS = Math.max(0, totalARS - montoARS);
+  const esParcial =
+    montoARS < totalAjustado - 0.01 || (totalUSD > 0 && montoUSD < totalUSD - 0.001);
+
+  const pendienteARS = Math.max(0, totalAjustado - montoARS);
   const pendienteUSD = totalUSD > 0 ? Math.max(0, totalUSD - montoUSD) : 0;
 
   const [anio, mes] = filtroMes.split('-');
@@ -48,7 +58,14 @@ export function ModalPagarTarjeta({
   async function handleConfirm() {
     setLoading(true);
     try {
-      await onConfirm({ montoARS, montoUSD, esParcial });
+      await onConfirm({
+        montoARS,
+        montoUSD,
+        esParcial,
+        interesFinanciacion: esParcial ? interesFinanciacion : 0,
+        saldoAnterior,
+        totalResumenARS: totalAjustado,
+      });
       onClose();
     } finally {
       setLoading(false);
@@ -80,11 +97,23 @@ export function ModalPagarTarjeta({
         </div>
 
         {/* Totals */}
-        <div className="bg-paper rounded-lg p-4 space-y-2 text-sm">
+        <div className="bg-paper rounded-lg p-4 space-y-3 text-sm">
+          <MoneyInput
+            label="Saldo del mes anterior"
+            value={saldoAnterior}
+            onChange={(valor) => {
+              const prevTotal = totalARS - saldoAnteriorInicial + saldoAnterior;
+              const nextTotal = totalARS - saldoAnteriorInicial + valor;
+              setSaldoAnterior(valor);
+              if (!pagoEditado.current) setMontoARS(Math.max(0, nextTotal));
+              else if (montoARS === prevTotal) setMontoARS(Math.max(0, nextTotal));
+            }}
+            moneda="ARS"
+          />
           <div className="flex justify-between text-slate2">
             <span>Total del mes (ARS)</span>
             <span className="font-semibold text-ink">
-              ${totalARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+              ${totalAjustado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
             </span>
           </div>
           {totalUSD > 0 && (
@@ -102,7 +131,10 @@ export function ModalPagarTarjeta({
           <MoneyInput
             label="Importe abonado en pesos"
             value={montoARS}
-            onChange={setMontoARS}
+            onChange={(valor) => {
+              pagoEditado.current = true;
+              setMontoARS(valor);
+            }}
             moneda="ARS"
             required
           />
@@ -142,9 +174,26 @@ export function ModalPagarTarjeta({
                   </span>
                 )}
               </p>
-              <p className="text-orange-600 text-xs mt-1">
-                El saldo pendiente se agregará al mes siguiente con intereses de financiación.
-              </p>
+              <div className="mt-3">
+                <MoneyInput
+                  label="Interés de financiación"
+                  value={interesFinanciacion}
+                  onChange={setInteresFinanciacion}
+                  moneda="ARS"
+                />
+                <p className="text-orange-600 text-xs mt-1">
+                  Cargalo a mano. El saldo pendiente y este interés se agregan al mes siguiente.
+                  {interesFinanciacion > 0 && pendienteARS > 0 && (
+                    <>
+                      {' '}Total que pasa: $
+                      {(pendienteARS + interesFinanciacion).toLocaleString('es-AR', {
+                        minimumFractionDigits: 2,
+                      })}
+                      .
+                    </>
+                  )}
+                </p>
+              </div>
             </div>
           </div>
         ) : (

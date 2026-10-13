@@ -15,6 +15,7 @@ import { useFinanzas } from '@/hooks/use-finanzas';
 import { useRubros } from '@/hooks/use-rubros';
 import { useDolar } from '@/hooks/use-dolar';
 import { useExtractGastoFijoFromVoice, type ExtractedGastoFijo } from './hooks/use-extract-gasto-fijo-from-voice';
+import { compararMontoVisible } from '@/utils/comparar-monto';
 import { formatearMoneda, esFechaDelMesActual } from '@/utils/formatters';
 import { cuentaPillClass } from '@/utils/cuenta-colors';
 import { cuentaIdPorFormaPago } from '@/utils/cuenta-por-forma-pago';
@@ -90,7 +91,10 @@ export function GastosFijosPage() {
           cmp = a.descripcion.localeCompare(b.descripcion, 'es');
           break;
         case 'monto':
-          cmp = a.monto - b.monto;
+          cmp = compararMontoVisible(
+            a.moneda === 'USD' ? { usd: a.monto } : { ars: a.monto },
+            b.moneda === 'USD' ? { usd: b.monto } : { ars: b.monto },
+          );
           break;
         case 'formaDePago':
           cmp = a.formaDePago.localeCompare(b.formaDePago, 'es');

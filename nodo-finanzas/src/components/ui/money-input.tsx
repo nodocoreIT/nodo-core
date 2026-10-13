@@ -21,6 +21,8 @@ interface MoneyInputProps {
   compact?: boolean;
   /** Permite montos negativos (ajustes de caja, etc.). */
   allowNegative?: boolean;
+  /** Se llama al salir del campo, con el monto ya parseado. */
+  onBlur?: (value: number) => void;
 }
 
 function contarDigitosAntes(valor: string, posicion: number): number {
@@ -56,6 +58,7 @@ export function MoneyInput({
   disabled = false,
   compact = false,
   allowNegative = false,
+  onBlur,
 }: MoneyInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const cursorRef = useRef<number | null>(null);
@@ -123,6 +126,7 @@ export function MoneyInput({
     const parsed = parsearMontoInput(raw);
     setRaw(parsed === 0 ? '' : formatearMontoInput(parsed, moneda));
     onChange(parsed);
+    onBlur?.(parsed);
   }
 
   const symbol = simboloMoneda(moneda);

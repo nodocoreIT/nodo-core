@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Spinner } from '@/components/ui/spinner';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { getFechaHoy } from '@/utils/formatters';
@@ -20,6 +21,11 @@ import { ResumenTarjetas } from './resumen-tarjetas';
 import { RegistroConsumo } from './registro-consumo';
 import { ModalPagarTarjeta } from './modal-pagar-tarjeta';
 import { calcularEstadoPagoTarjetaMes } from './calcular-estado-pago-tarjeta';
+import {
+  guardarInteresesFinanciacion,
+  montoInteresesFinanciacion,
+} from './intereses-financiacion';
+import { guardarSaldoMesAnterior, montoSaldoMesAnterior } from './saldo-mes-anterior';
 import type { Tarjeta, RubroConsumo } from '@/types';
 
 type Vista = 'resumen' | 'registro';
@@ -56,6 +62,7 @@ export function TarjetasPage() {
     tarjeta: Tarjeta;
     totalARS: number;
     totalUSD: number;
+    saldoAnterior: number;
   } | null>(null);
 
   const cambiarMes = (incremento: number) => {
@@ -94,6 +101,12 @@ export function TarjetasPage() {
     );
 
     const limiteParaProgreso = tarjeta.limiteRecomendado || tarjeta.limiteCredito;
+    const saldoAnterior = montoSaldoMesAnterior(finanzas.consumosTarjetas, tarjeta.id, filtroMes);
+    const interesesFinanciacion = montoInteresesFinanciacion(
+      finanzas.consumosTarjetas,
+      tarjeta.id,
+      filtroMes,
+    );
 
     return {
       tarjeta,
@@ -111,6 +124,8 @@ export function TarjetasPage() {
       restanteARS,
       restanteUSD: totalUSD,
       marcadaSinGasto,
+      saldoAnterior,
+      interesesFinanciacion,
     };
   });
 
@@ -334,6 +349,41 @@ export function TarjetasPage() {
                       })}
                     </span>
                   </div>
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <MoneyInput
+                      label="Saldo del mes anterior"
+                      moneda="ARS"
+                      value={resumen.saldoAnterior}
+                      onChange={() => {}}
+                      onBlur={(valor) => {
+                        if (Math.abs(valor - resumen.saldoAnterior) <= 0.001) return;
+                        void guardarSaldoMesAnterior(finanzas, resumen.tarjeta.id, filtroMes, valor);
+                      }}
+                    />
+                    {resumen.saldoAnterior > 0 && (
+                      <div className="mt-2">
+                        <MoneyInput
+                          label="Intereses de financiación"
+                          moneda="ARS"
+                          value={resumen.interesesFinanciacion}
+                          onChange={() => {}}
+                          onBlur={(valor) => {
+                            if (Math.abs(valor - resumen.interesesFinanciacion) <= 0.001) return;
+                            void guardarInteresesFinanciacion(
+                              finanzas,
+                              resumen.tarjeta.id,
+                              filtroMes,
+                              valor,
+                            );
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-slate2">Transacciones:</span>
                     <span className="font-medium text-ink">{resumen.cantidadTransacciones}</span>
@@ -423,6 +473,7 @@ export function TarjetasPage() {
                         tarjeta: resumen.tarjeta,
                         totalARS: resumen.restanteARS,
                         totalUSD: resumen.restanteUSD ?? resumen.totalUSD,
+                        saldoAnterior: resumen.saldoAnterior,
                       });
                     }}
                   >
@@ -455,9 +506,11 @@ export function TarjetasPage() {
           tarjeta={tarjetaParaPago.tarjeta}
           totalARS={tarjetaParaPago.totalARS}
           totalUSD={tarjetaParaPago.totalUSD}
+          saldoAnteriorInicial={tarjetaParaPago.saldoAnterior}
           filtroMes={filtroMes}
           onClose={() => setTarjetaParaPago(null)}
-          onConfirm={async ({ montoARS, montoUSD, esParcial }) => {
+          onConfirm={async ({ montoARS, montoUSD, esParcial, interesFinanciacion, saldoAnterior, totalResumenARS }) => {
+            await guardarSaldoMesAnterior(finanzas, tarjetaParaPago.tarjeta.id, filtroMes, saldoAnterior);
             await finanzas.agregarGastoDiario({
               descripcion: `Pago tarjeta ${tarjetaParaPago.tarjeta.nombre}`,
               detalle: `Pago ${esParcial ? 'parcial' : 'total'} — ${formatearMesLabel(filtroMes)}`,
@@ -467,6 +520,8 @@ export function TarjetasPage() {
               formaPago: 'TRANSFERENCIA BANCO',
               pagoTarjetaId: tarjetaParaPago.tarjeta.id,
               pagoParcial: esParcial,
+              interesFinanciacion: esParcial ? interesFinanciacion : 0,
+              totalResumenARS,
             });
             await finanzas.recargarDatos(true);
           }}

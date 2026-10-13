@@ -5,7 +5,7 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { completarConsumoRecurrenteHastaFinDeAnio } from './completar-consumo-recurrente';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import type { ConsumoTarjeta, RubroConsumo } from '@/types';
 
 interface ModalEditarConsumoProps {
@@ -152,7 +152,7 @@ export function ModalEditarConsumo({
         // Simple single-installment update
         await finanzas.actualizarConsumo(consumo.id, {
           lugar,
-          fecha: new Date(`${fecha}T12:00:00`).toISOString(),
+          fecha,
           fechaCompra,
           rubroId: rubroId || undefined,
           detalle,
@@ -188,7 +188,7 @@ export function ModalEditarConsumo({
         const ops = cuotasDetalle.map((row) => {
           const montoARS = moneda === 'ARS' ? row.monto : 0;
           const montoUSD = moneda === 'USD' ? row.monto : 0;
-          const fechaISO = new Date(`${row.fecha}T12:00:00`).toISOString();
+          const fechaISO = row.fecha;
 
           if (row.existing) {
             return finanzas.actualizarConsumo(row.existing.id, {

@@ -7,7 +7,7 @@ import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { formatearMoneda, getFechaHoy } from '@/utils/formatters';
 import { completarConsumoRecurrenteHastaFinDeAnio } from './completar-consumo-recurrente';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import type { Tarjeta, RubroConsumo, ConsumoTarjeta } from '@/types';
 
 interface RegistroConsumoProps {
@@ -48,7 +48,11 @@ export function RegistroConsumo({
   // Pre-fill vencimiento when tarjeta changes
   useEffect(() => {
     const tarjeta = tarjetasActivas.find((t) => t.id === tarjetaId);
-    setFechaVencimiento(tarjeta?.fechaVencimiento ?? '');
+    const raw = tarjeta?.fechaVencimiento ?? '';
+    // input type=date only accepts YYYY-MM-DD. A timestamp makes the field
+    // invalid and the browser blocks submit with no visible error.
+    const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    setFechaVencimiento(match ? match[1] : '');
   }, [tarjetaId]);
 
   // Recalculate installment preview whenever cuotas, fecha, or monto change
@@ -90,7 +94,7 @@ export function RegistroConsumo({
         const promesas = cuotasDetalle.map((c, i) =>
           finanzas.agregarConsumo({
             tarjetaId,
-            fecha: new Date(`${c.fecha}T12:00:00`).toISOString(),
+            fecha: c.fecha,
             fechaCompra,
             lugar,
             rubro: (rubroCodigo || 'OTROS') as RubroConsumo,
@@ -109,7 +113,7 @@ export function RegistroConsumo({
       } else {
         await finanzas.agregarConsumo({
           tarjetaId,
-          fecha: new Date(`${fecha}T12:00:00`).toISOString(),
+          fecha,
           fechaCompra,
           lugar,
           rubro: (rubroCodigo || 'OTROS') as RubroConsumo,

@@ -13,6 +13,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { ModalConfirmacion } from '@/components/ui/modal-confirmacion';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { useDolar } from '@/hooks/use-dolar';
+import { compararMontoVisible } from '@/utils/comparar-monto';
 import { formatearMoneda, formatearFecha, obtenerFechaActual } from '@/utils/formatters';
 import { cuentaPillClass } from '@/utils/cuenta-colors';
 import { FinanzasService } from '@/services/finanzas-service';
@@ -317,11 +318,15 @@ function MovimientosModal({ cuenta, onClose, finanzas }: MovimientosModalProps) 
             ? a.descripcion.localeCompare(b.descripcion)
             : b.descripcion.localeCompare(a.descripcion);
         }
-        return sortDir === 'asc' ? a.monto - b.monto : b.monto - a.monto;
+        const cmp = compararMontoVisible(
+          cuenta.moneda === 'USD' ? { usd: a.monto } : { ars: a.monto },
+          cuenta.moneda === 'USD' ? { usd: b.monto } : { ars: b.monto },
+        );
+        return sortDir === 'asc' ? cmp : -cmp;
       });
     }
     return list;
-  }, [movimientosMes, filtroTipo, busqueda, sortField, sortDir]);
+  }, [movimientosMes, filtroTipo, busqueda, sortField, sortDir, cuenta.moneda]);
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">

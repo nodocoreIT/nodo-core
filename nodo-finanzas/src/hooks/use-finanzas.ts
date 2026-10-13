@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FinanzasService } from '@/services/finanzas-service';
 import { useAuth } from '@nodocore/shared-components';
+import { guardarInteresesFinanciacion } from '@/features/tarjetas/intereses-financiacion';
 import { calcularMesFacturacion } from '@/utils/tarjeta-fechas';
 import { getFechaHoy } from '@/utils/formatters';
 import type {
@@ -19,7 +20,16 @@ import type {
   PlanAhorro,
   MovimientoCuenta,
 } from '@/types';
-import { TASA_INTERES_TARJETA } from '@/types';
+
+/** Suma meses a YYYY-MM-DD en calendario local. Evita toISOString(), que Postgres rechaza en columnas date. */
+function sumarMesesFecha(iso: string, meses: number): string {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  const dt = new Date(y, m - 1 + meses, d);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
 
 // Module-level cache: survives component unmounts within the same page session.
 // Allows secondary hook instances (e.g. child forms) to start with already-loaded
@@ -477,10 +487,19 @@ export const useFinanzas = () => {
         setEstado(prev => ({
           ...prev,
           tarjetas: prev.tarjetas.filter(tarjeta => tarjeta.id !== id),
+          consumosTarjetas: prev.consumosTarjetas.filter(consumo => consumo.tarjetaId !== id),
+          gastosDiarios: prev.gastosDiarios.map(gasto =>
+            gasto.tarjetaId === id ? { ...gasto, tarjetaId: undefined } : gasto,
+          ),
+          gastosFijos: prev.gastosFijos.map(gasto =>
+            gasto.tarjetaId === id ? { ...gasto, tarjetaId: undefined } : gasto,
+          ),
         }));
       }
+      return success;
     } catch (error) {
       console.error('Error eliminando tarjeta:', error);
+      return false;
     }
   }, []);
 
@@ -651,14 +670,11 @@ export const useFinanzas = () => {
             const promesasCuotas = [];
 
             for (let cuota = 1; cuota <= totalCuotas; cuota++) {
-              const fechaCuotaFinal = new Date(fechaFacturacion);
-              if (cuota > 1) {
-                fechaCuotaFinal.setMonth(fechaCuotaFinal.getMonth() + (cuota - 1));
-              }
+              const fechaCuotaFinal = sumarMesesFecha(fechaFacturacion, cuota - 1);
 
               const consumoTarjeta: Omit<ConsumoTarjeta, 'id'> = {
                 tarjetaId: gasto.tarjetaId,
-                fecha: fechaCuotaFinal.toISOString(),
+                fecha: fechaCuotaFinal,
                 fechaCompra: gasto.fecha,
                 lugar: gasto.descripcion,
                 rubro: rubroConsumo,
@@ -733,9 +749,8 @@ export const useFinanzas = () => {
               c.tarjetaId === tarjeta.id && c.fecha.startsWith(mesDePago)
             );
 
-            const totalARS = consumosMes.reduce((acc, c) => acc + (c.importeARS || 0), 0);
+            const totalARS = gasto.totalResumenARS ?? consumosMes.reduce((acc, c) => acc + (c.importeARS || 0), 0);
             const totalUSD = consumosMes.reduce((acc, c) => acc + (c.importeUSD || 0), 0);
-            const cotizacion = estado.cotizacionDolar?.venta || 1350;
 
             const paidARS = Number(gasto.monto);
             const paidUSD = Number(gasto.montoUSD || 0);
@@ -795,19 +810,24 @@ export const useFinanzas = () => {
                 });
               }
 
-              const pendienteEquivalenteARS = pendienteARS + (pendienteUSD * cotizacion);
-              const intereses = pendienteEquivalenteARS * TASA_INTERES_TARJETA;
+              const intereses = isParcial ? Number(gasto.interesFinanciacion) || 0 : 0;
 
               if (intereses > 0) {
-                await FinanzasService.crearConsumoTarjeta({
-                  tarjetaId: tarjeta.id,
-                  fecha: fechaProximosCargos,
-                  lugar: `Intereses de Financiación`,
-                  rubroId: gasto.rubroId || 'OTROS',
-                  detalle: `Interés mensual aplicado (${(TASA_INTERES_TARJETA * 100).toFixed(2)}%) sobre saldo pendiente`,
-                  importeARS: intereses,
-                  codigoOperacion: opId
-                });
+                await guardarInteresesFinanciacion(
+                  {
+                    consumosTarjetas: estado.consumosTarjetas,
+                    eliminarConsumo,
+                    actualizarConsumo,
+                    agregarConsumo,
+                  },
+                  tarjeta.id,
+                  proxMesStr,
+                  intereses,
+                  {
+                    codigoOperacion: opId,
+                    detalle: `Interés de financiación cargado a mano sobre el saldo pendiente del mes ${mesDePago}`,
+                  },
+                );
               }
 
               // Link opId back to the payment gastoDiario so eliminarGastoDiario can clean up these consumos
@@ -853,7 +873,7 @@ export const useFinanzas = () => {
       throw error;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [estado.cuentas, estado.tarjetas, estado.configuracion, actualizarCuenta, agregarConsumo, syncEstado]);
+  }, [estado.cuentas, estado.tarjetas, estado.consumosTarjetas, estado.configuracion, actualizarCuenta, agregarConsumo, actualizarConsumo, eliminarConsumo, syncEstado]);
 
   const crearGastoDiarioSinConsumo = useCallback(async (gasto: Omit<GastoDiario, 'id'>) => {
     try {
