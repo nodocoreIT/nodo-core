@@ -123,7 +123,6 @@ function buildPayload(
     currency: values.currency,
     deposit_amount: parseCurrencyInput(values.deposit_amount),
     commission_amount: commissionAmount,
-    commission_rate: rate > 0 ? rate : null,
     commission_on_gross: true,
     expenses_paid_by: values.expenses_paid_by,
     adjustment_index: values.adjustment_index,

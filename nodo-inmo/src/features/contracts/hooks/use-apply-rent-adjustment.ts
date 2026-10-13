@@ -36,32 +36,11 @@ export function useApplyRentAdjustment() {
       const nextAdjustmentDate = advanceAdjustmentDate(appliedDate, adjustmentPeriodMonths);
       const rent = Math.round(newRentAmount);
 
-      const { data: current, error: loadError } = await supabase
-        .schema("nodo_inmo")
-        .from("contracts")
-        .select("rent_amount, commission_amount, commission_rate")
-        .eq("id", contractId)
-        .single();
-
-      if (loadError) throw loadError;
-
-      let commissionAmount = current?.commission_amount ?? null;
-      if (current?.commission_rate != null) {
-        commissionAmount = Math.round((rent * current.commission_rate) / 100);
-      } else if (
-        current?.rent_amount != null &&
-        current.rent_amount > 0 &&
-        current.commission_amount != null
-      ) {
-        commissionAmount = Math.round((current.commission_amount * rent) / current.rent_amount);
-      }
-
       const { error: contractError } = await supabase
         .schema("nodo_inmo")
         .from("contracts")
         .update({
           rent_amount: rent,
-          commission_amount: commissionAmount,
           last_adjustment_date: appliedDate,
           next_adjustment_date: nextAdjustmentDate,
         })
