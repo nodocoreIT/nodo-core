@@ -21,7 +21,10 @@ import { PartialSettleOwnerError, useSettleOwner } from "@/features/caja/hooks/u
 import { useOrgProfile } from "@/features/agency-profile/hooks/use-org-profile";
 import { usePdfLogoUrl } from "@/features/agency-profile/hooks/use-pdf-logo-url";
 import { groupPendingByOwnerWithProperties } from "@/features/caja/lib/caja-math";
-import { buildPendingStatementDataForOwner } from "@/features/caja/lib/pending-settlement-pdf";
+import {
+  buildPendingStatementDataForOwner,
+  syncPendingCommissionsForOwner,
+} from "@/features/caja/lib/pending-settlement-pdf";
 import { usePendingExpenses } from "@/features/caja/hooks/use-pending-expenses";
 import { buildStatementData, combineSealedBreakdowns, type StatementData } from "@/features/caja/lib/settlement-statement-data";
 import { handleDownload, handleShare } from "@/features/caja/lib/settlement-pdf-actions";
@@ -71,6 +74,7 @@ export function RendicionesPage() {
     setFinalizeLoading(key);
     setFinalizeError(null);
     try {
+      await syncPendingCommissionsForOwner(group, allSettlements);
       const results = await settleOwner.mutateAsync({
         owner_id: group.owner_id,
         owner_name: group.owner_name,
