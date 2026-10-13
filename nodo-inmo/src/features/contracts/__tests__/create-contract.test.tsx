@@ -169,6 +169,7 @@ describe("CreateContractDialog", () => {
       end_date: "2028-01-01",
       rent_amount: 250000,
       commission_amount: 20000,
+      commission_rate: 8,
       guarantor_ids: ["guar-1"],
     });
   });

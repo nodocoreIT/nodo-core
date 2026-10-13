@@ -1,5 +1,6 @@
-/** Matches SQL priority: contract snapshot → property rate → owner contact rate → fallback. */
+/** Matches SQL: property → owner contact → contract copy → peso snapshot → fallback. */
 export function resolveCommissionRatePercent(input: {
+  contractCommissionRate?: number | null;
   contractCommissionAmount?: number | null;
   contractRentAmount?: number | null;
   propertyCommissionRate?: number | null;
@@ -7,6 +8,7 @@ export function resolveCommissionRatePercent(input: {
   fallback?: number;
 }): number {
   const {
+    contractCommissionRate,
     contractCommissionAmount,
     contractRentAmount,
     propertyCommissionRate,
@@ -14,6 +16,9 @@ export function resolveCommissionRatePercent(input: {
     fallback = 10,
   } = input;
 
+  if (propertyCommissionRate != null) return propertyCommissionRate;
+  if (ownerCommissionRate != null) return ownerCommissionRate;
+  if (contractCommissionRate != null) return contractCommissionRate;
   if (
     contractCommissionAmount != null &&
     contractRentAmount != null &&
@@ -21,8 +26,6 @@ export function resolveCommissionRatePercent(input: {
   ) {
     return Math.round((contractCommissionAmount / contractRentAmount) * 10000) / 100;
   }
-  if (propertyCommissionRate != null) return propertyCommissionRate;
-  if (ownerCommissionRate != null) return ownerCommissionRate;
   return fallback;
 }
 
