@@ -302,7 +302,7 @@ export class FinanzasService {
   static async crearTarjeta(tarjeta: Omit<Tarjeta, 'id'>): Promise<Tarjeta | null> {
     const { data, error } = await db
       .from('tarjetas')
-      .insert([await this.withTenant(this.mapearTarjetaParaDB(tarjeta))])
+      .insert([await this.withTenant(this.mapearTarjetaParaDB({ ...tarjeta, pagada: tarjeta.pagada ?? false }))])
       .select()
       .single();
 
@@ -329,10 +329,28 @@ export class FinanzasService {
   }
 
   static async eliminarTarjeta(id: string): Promise<boolean> {
-    const { error } = await db
-      .from('tarjetas')
-      .delete()
-      .eq('id', id);
+    // gastos_diarios.tarjeta_id apunta a tarjetas sin ON DELETE. Si queda
+    // un gasto, Postgres responde 409 y no borra la tarjeta. El gasto queda.
+    const desvinculaciones = [
+      { tabla: 'gastos_diarios' as const, columna: 'tarjeta_id' as const },
+      { tabla: 'gastos_diarios' as const, columna: 'pago_tarjeta_id' as const },
+      { tabla: 'gastos_fijos' as const, columna: 'tarjeta_id' as const },
+      { tabla: 'gastos_fijos' as const, columna: 'pago_tarjeta_id' as const },
+    ];
+
+    for (const { tabla, columna } of desvinculaciones) {
+      const { error } = await db
+        .from(tabla)
+        .update({ [columna]: null })
+        .eq(columna, id);
+
+      if (error) {
+        console.error(`Error desvinculando ${tabla}.${columna}:`, error);
+        return false;
+      }
+    }
+
+    const { error } = await db.from('tarjetas').delete().eq('id', id);
 
     if (error) {
       console.error('Error eliminando tarjeta:', error);
@@ -1256,7 +1274,7 @@ export class FinanzasService {
       id: data.id,
       nombre: data.nombre,
       banco: data.banco,
-      tipo: data.tipo,
+      tipo: data.tipo === 'AMEX' ? 'AMERICAN_EXPRESS' : data.tipo,
       titular: data.titular,
       activa: data.activa,
       fechaVencimiento: data.fecha_vencimiento,
@@ -1271,18 +1289,22 @@ export class FinanzasService {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private static mapearTarjetaParaDB(tarjeta: Partial<Tarjeta>): any {
-    return {
+    const row: Record<string, unknown> = {
       nombre: tarjeta.nombre,
       banco: tarjeta.banco,
-      tipo: tarjeta.tipo,
+      ...(tarjeta.tipo
+        ? { tipo: tarjeta.tipo === 'AMERICAN_EXPRESS' ? 'AMEX' : tarjeta.tipo }
+        : {}),
       titular: tarjeta.titular,
       activa: tarjeta.activa,
       fecha_vencimiento: tarjeta.fechaVencimiento,
       limite_credito: tarjeta.limiteCredito,
       limite_recomendado: tarjeta.limiteRecomendado,
-      dia_cierre: tarjeta.diaCierre,
-      dia_vencimiento: tarjeta.diaVencimiento,
-      pagada: tarjeta.pagada,
+      ...(Number.isFinite(tarjeta.diaCierre) ? { dia_cierre: tarjeta.diaCierre } : {}),
+      ...(tarjeta.diaVencimiento !== undefined
+        ? { dia_vencimiento: Number.isFinite(tarjeta.diaVencimiento) ? tarjeta.diaVencimiento : null }
+        : {}),
+      ...('pagada' in tarjeta ? { pagada: Boolean(tarjeta.pagada) } : {}),
       // 'in' check so that explicitly passing undefined clears the column in
       // DB (sends null) instead of being silently skipped — same fix as
       // mapearPrestamoParaDB's ultimo_pago_mes, needed here too so
@@ -1290,6 +1312,8 @@ export class FinanzasService {
       // of leaving it looking paid forever.
       ...('ultimoPagoMes' in tarjeta ? { ultimo_pago_mes: tarjeta.ultimoPagoMes ?? null } : {}),
     };
+
+    return Object.fromEntries(Object.entries(row).filter(([, value]) => value !== undefined));
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

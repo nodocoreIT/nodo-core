@@ -11,10 +11,13 @@ import { diasHastaFecha, labelDiasVencimiento } from '@/utils/vencimientos';
 import { normalizarCodigoRubro } from '@/utils/rubro-formatters';
 import { calcularEstadoPagoTarjetaMes, montoAdeudado } from '@/features/tarjetas/calcular-estado-pago-tarjeta';
 import { barraColor, textoColor } from '@/features/presupuestos/presupuesto-colors';
+import { FaltaCobrarCard } from './falta-cobrar-card';
+import { useCobrosPendientes } from './use-cobros-pendientes';
 
 const CARD_LABELS = {
   saldo: 'Saldo del Mes',
   dineroCuentas: 'Dinero disponible',
+  faltaCobrar: 'Falta cobrar',
   gastosDia: 'Gastos del Día',
   gastosMes: 'Gastos del Mes',
   gastosFijosPendientes: 'Gastos Fijos Pendientes',
@@ -28,6 +31,7 @@ type CardKey = keyof typeof CARD_LABELS;
 const ALL_VISIBLE: Record<CardKey, boolean> = {
   saldo: true,
   dineroCuentas: true,
+  faltaCobrar: true,
   gastosDia: false,
   gastosMes: false,
   gastosFijosPendientes: true,
@@ -58,6 +62,7 @@ export function DashboardPage() {
   const { tarjetas, consumosTarjetas } = finanzas;
   const { notifications } = useNotifications();
   const { presupuestos } = usePresupuestos();
+  const { items: cobrosPendientes, guardar: guardarCobros } = useCobrosPendientes();
 
   const [mostrarPersonalizar, setMostrarPersonalizar] = useState(false);
   const [resumenAbierto, setResumenAbierto] = useState(false);
@@ -163,6 +168,10 @@ export function DashboardPage() {
     })
     .reduce((s, p) => s + (p.moneda === 'ARS' ? p.importeCuota : 0), 0);
 
+  const totalFaltaCobrar = cobrosPendientes.reduce((s, item) => s + item.monto, 0);
+  const saldoDisponible =
+    totalARS + totalFaltaCobrar - totalGastosFijosPendientes - totalPrestamos - totalTarjetas - totalPlanesAhorro;
+
   const ultimosGastos = [...finanzas.gastosDiarios]
     .filter((g) => !g.esSilencioso)
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
@@ -226,7 +235,7 @@ export function DashboardPage() {
           <div>
             <p className="text-[9px] font-extrabold uppercase tracking-wider text-white/80">Saldo disponible</p>
             <p className="text-base font-black text-white mt-1">
-              {formatearMoneda(totalARS - totalGastosFijosPendientes - totalPrestamos - totalTarjetas - totalPlanesAhorro)}
+              {formatearMoneda(saldoDisponible)}
             </p>
           </div>
           <PiggyBank className="h-6 w-6 text-white/60" />
@@ -258,7 +267,7 @@ export function DashboardPage() {
                   <p className="text-[9px] font-bold text-white/70 mt-0.5">disponible este mes</p>
                 </div>
               </div>
-              <p className="text-base font-black text-white leading-tight text-center md:text-left">{formatearMoneda(totalARS - totalGastosFijosPendientes - totalPrestamos - totalTarjetas - totalPlanesAhorro)}</p>
+              <p className="text-base font-black text-white leading-tight text-center md:text-left">{formatearMoneda(saldoDisponible)}</p>
             </div>
           )}
 
@@ -275,6 +284,10 @@ export function DashboardPage() {
               </div>
               <p className="text-base font-black text-white leading-tight text-center md:text-left">{formatearMoneda(totalARS)}</p>
             </div>
+          )}
+
+          {visibility.faltaCobrar && (
+            <FaltaCobrarCard items={cobrosPendientes} onChange={guardarCobros} />
           )}
 
           {visibility.gastosDia && (

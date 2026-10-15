@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import { FinanzasService } from '@/services/finanzas-service';
 import { useAuth } from '@nodocore/shared-components';
 import { guardarInteresesFinanciacion } from '@/features/tarjetas/intereses-financiacion';
@@ -489,16 +490,32 @@ export const useFinanzas = () => {
           tarjetas: prev.tarjetas.filter(tarjeta => tarjeta.id !== id),
           consumosTarjetas: prev.consumosTarjetas.filter(consumo => consumo.tarjetaId !== id),
           gastosDiarios: prev.gastosDiarios.map(gasto =>
-            gasto.tarjetaId === id ? { ...gasto, tarjetaId: undefined } : gasto,
+            gasto.tarjetaId === id || gasto.pagoTarjetaId === id
+              ? {
+                  ...gasto,
+                  tarjetaId: gasto.tarjetaId === id ? undefined : gasto.tarjetaId,
+                  pagoTarjetaId: gasto.pagoTarjetaId === id ? undefined : gasto.pagoTarjetaId,
+                }
+              : gasto,
           ),
           gastosFijos: prev.gastosFijos.map(gasto =>
-            gasto.tarjetaId === id ? { ...gasto, tarjetaId: undefined } : gasto,
+            gasto.tarjetaId === id || gasto.pagoTarjetaId === id
+              ? {
+                  ...gasto,
+                  tarjetaId: gasto.tarjetaId === id ? undefined : gasto.tarjetaId,
+                  pagoTarjetaId: gasto.pagoTarjetaId === id ? undefined : gasto.pagoTarjetaId,
+                }
+              : gasto,
           ),
         }));
+        toast.success('Tarjeta eliminada');
+      } else {
+        toast.error('No se pudo eliminar la tarjeta');
       }
       return success;
     } catch (error) {
       console.error('Error eliminando tarjeta:', error);
+      toast.error('No se pudo eliminar la tarjeta');
       return false;
     }
   }, []);

@@ -47,6 +47,12 @@ const schemaCuenta = z.object({
   cuentaSaldoId: z.string().optional(),
 });
 
+function diaVacio(value: unknown) {
+  if (value === '' || value == null) return undefined;
+  if (typeof value === 'number' && Number.isNaN(value)) return undefined;
+  return value;
+}
+
 const schemaTarjeta = z.object({
   nombre: z.string().min(1, 'El nombre es requerido'),
   banco: z.string().min(1, 'El banco es requerido'),
@@ -54,8 +60,17 @@ const schemaTarjeta = z.object({
   titular: z.string().min(1, 'El titular es requerido'),
   limiteCredito: z.number().min(0).optional(),
   limiteRecomendado: z.number().min(0).optional(),
-  diaCierre: z.number().min(1).max(31).optional(),
-  diaVencimiento: z.number().min(1).max(31).optional(),
+  diaCierre: z.preprocess(
+    diaVacio,
+    z.number({
+      required_error: 'Indicá el día de cierre',
+      invalid_type_error: 'Indicá el día de cierre',
+    }).int().min(1, 'Del 1 al 31').max(31, 'Del 1 al 31'),
+  ),
+  diaVencimiento: z.preprocess(
+    diaVacio,
+    z.number().int().min(1, 'Del 1 al 31').max(31, 'Del 1 al 31').optional(),
+  ),
 });
 
 const schemaCategoria = z.object({
@@ -131,6 +146,7 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
   });
 
   const formTarjeta = useForm<FormTarjeta>({
+    resolver: zodResolver(schemaTarjeta),
     defaultValues: { nombre: '', banco: '', tipo: 'VISA', titular: '' },
   });
 
@@ -1102,15 +1118,21 @@ export function ConfiguracionPage({ embedded = false }: { embedded?: boolean } =
                 />
                 <div className="grid grid-cols-2 gap-4">
                   <Input
-                    label="Día de Cierre"
+                    label="Día de cierre"
                     type="number"
+                    min={1}
+                    max={31}
                     {...formTarjeta.register('diaCierre', { valueAsNumber: true })}
+                    error={formTarjeta.formState.errors.diaCierre?.message}
                     placeholder="Ej: 20"
                   />
                   <Input
-                    label="Día de Vencimiento"
+                    label="Día de vencimiento"
                     type="number"
+                    min={1}
+                    max={31}
                     {...formTarjeta.register('diaVencimiento', { valueAsNumber: true })}
+                    error={formTarjeta.formState.errors.diaVencimiento?.message}
                     placeholder="Ej: 2"
                   />
                 </div>

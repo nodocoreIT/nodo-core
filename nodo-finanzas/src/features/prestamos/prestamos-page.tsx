@@ -29,6 +29,7 @@ import {
   mesActualYYYYMM,
   prestamoCuotaPagadaEsteMes,
 } from '@/utils/formatters';
+import { diasHastaFecha, vencimientoCuotaMesEnCurso } from '@/utils/vencimientos';
 import { GestionCuotasProgramadas } from './gestion-cuotas-programadas';
 import { ModalComprobantes } from './modal-comprobantes';
 import toast from 'react-hot-toast';
@@ -394,12 +395,6 @@ export function PrestamosPage() {
     return ((p.montoOriginal - p.saldoPendiente) / p.montoOriginal) * 100;
   };
 
-  const calcularDiasRestantes = (fechaVenc?: string) => {
-    if (!fechaVenc) return null;
-    const diff = new Date(fechaVenc).getTime() - Date.now();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -505,7 +500,13 @@ export function PrestamosPage() {
             <div className="space-y-4">
               {prestamosMostrar.map((prestamo) => {
                 const progreso = calcularProgreso(prestamo);
-                const diasRestantes = calcularDiasRestantes(prestamo.fechaVencimiento);
+                // La fecha guardada suele quedar en un mes anterior. El vencimiento
+                // real de la cuota es el día de pago dentro del mes en curso.
+                const vtoEfectivo = vencimientoCuotaMesEnCurso({
+                  diaPago: prestamo.diaPago,
+                  fechaVencimiento: prestamo.fechaVencimiento,
+                });
+                const diasRestantes = vtoEfectivo ? diasHastaFecha(vtoEfectivo) : null;
                 const vencido = diasRestantes !== null && diasRestantes < 0;
                 const proximoVencimiento = diasRestantes !== null && diasRestantes <= 30 && diasRestantes >= 0;
                 const estaPagadoEsteMes = prestamoCuotaPagadaEsteMes(prestamo, mesActual);
@@ -547,7 +548,7 @@ export function PrestamosPage() {
                           )}
                           {proximoVencimiento && !estaPagadoEsteMes && (
                             <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-                              <Calendar className="w-3 h-3" /> Vence pronto · {formatearFecha(prestamo.fechaVencimiento!)}
+                              <Calendar className="w-3 h-3" /> Vence pronto · {formatearFecha(vtoEfectivo!)}
                             </span>
                           )}
                         </div>
@@ -580,7 +581,7 @@ export function PrestamosPage() {
                         <div className="w-20">
                           <p className="text-[10px] text-slate2 uppercase font-bold mb-0.5">Vto.</p>
                           <p className="font-medium text-ink text-sm">
-                            {prestamo.fechaVencimiento ? formatearFecha(prestamo.fechaVencimiento) : '—'}
+                            {vtoEfectivo ? formatearFecha(vtoEfectivo) : '—'}
                           </p>
                         </div>
                       </div>
