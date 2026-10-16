@@ -1,3 +1,6 @@
+import type { CSSProperties } from "react";
+import { mergeThemeSettings } from "@nodocore/shared-components";
+import { DEFAULT_SETTINGS, type ThemeSettings } from "@/shared/hooks/use-theme-settings";
 import {
   OPERATION_LABELS,
   PROPERTY_TYPE_LABELS,
@@ -33,4 +36,23 @@ export function publicListingWhatsAppMessage(property: PublicProperty, pageUrl?:
   const lines = [`Hola, me interesa ${publicListingTitle(property)} (${price}).`];
   if (pageUrl) lines.push(pageUrl);
   return lines.join("\n");
+}
+
+export function publicListingTheme(property: PublicProperty): ThemeSettings {
+  return mergeThemeSettings(property.theme_settings, DEFAULT_SETTINGS);
+}
+
+export function publicListingThemeStyle(theme: ThemeSettings): CSSProperties {
+  return {
+    ["--color-brand" as string]: theme.primaryColor,
+    ["--color-brand-600" as string]: theme.primaryColor,
+    ["--color-brand-300" as string]: theme.primaryColor,
+    ["--color-navy" as string]: theme.secondaryColor,
+    ["--color-navy-700" as string]: theme.secondaryColor,
+    ["--color-navy-900" as string]: theme.secondaryColor,
+    ["--color-primary" as string]: theme.primaryColor,
+    ["--color-ink" as string]: theme.fontColor,
+    ["--color-foreground" as string]: theme.fontColor,
+    ["--color-paper" as string]: theme.backgroundColor || "#f5f8fc",
+  };
 }

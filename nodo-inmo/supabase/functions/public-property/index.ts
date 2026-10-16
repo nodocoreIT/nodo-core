@@ -42,7 +42,35 @@ Deno.serve(async (req) => {
     }
   }
 
-  const agency = data.agency && typeof data.agency === "object" ? { ...data.agency } as Record<string, unknown> : {};
+  const agency =
+    data.agency && typeof data.agency === "object"
+      ? { ...(data.agency as Record<string, unknown>) }
+      : {};
+
+  const { data: propRow } = await admin
+    .schema("nodo_inmo")
+    .from("properties")
+    .select("org_id")
+    .eq("share_token", token)
+    .maybeSingle();
+
+  let theme_settings: unknown = null;
+  if (propRow?.org_id) {
+    const { data: profile } = await admin
+      .schema("nodo_inmo")
+      .from("org_profiles")
+      .select("logo_path, pdf_logo_path, theme_settings, legal_name, phone, email")
+      .eq("org_id", propRow.org_id)
+      .maybeSingle();
+    if (profile) {
+      if (!agency.legal_name) agency.legal_name = profile.legal_name;
+      if (!agency.phone) agency.phone = profile.phone;
+      if (!agency.email) agency.email = profile.email;
+      agency.logo_path = profile.logo_path ?? profile.pdf_logo_path ?? agency.logo_path;
+      theme_settings = profile.theme_settings;
+    }
+  }
+
   const logoPath = typeof agency.logo_path === "string" ? agency.logo_path : null;
   let logo_url: string | null = null;
   if (logoPath) {
@@ -52,7 +80,7 @@ Deno.serve(async (req) => {
     logo_url = signedLogo?.signedUrl ?? null;
   }
 
-  return json({ ...data, photo_urls, agency: { ...agency, logo_url } }, 200);
+  return json({ ...data, photo_urls, theme_settings, agency: { ...agency, logo_url } }, 200);
 });
 
 function json(body: unknown, status: number): Response {

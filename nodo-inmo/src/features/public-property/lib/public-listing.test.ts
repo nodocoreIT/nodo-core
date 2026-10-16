@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   publicListingMapQuery,
+  publicListingTheme,
   publicListingTitle,
   whatsappConsultHref,
 } from "./public-listing";
@@ -24,6 +25,14 @@ describe("public listing copy", () => {
         provincia: "La Pampa",
       }),
     ).toBe("Cervantes 345, Santa Rosa, La Pampa, Argentina");
+  });
+
+  it("uses the agency theme colors on the public flyer", () => {
+    const theme = publicListingTheme({
+      theme_settings: { primaryColor: "#228B22", secondaryColor: "#0f3d2e" },
+    } as Parameters<typeof publicListingTheme>[0]);
+    expect(theme.primaryColor).toBe("#228B22");
+    expect(theme.secondaryColor).toBe("#0f3d2e");
   });
 
   it("builds a wa.me link from a formatted phone", () => {
