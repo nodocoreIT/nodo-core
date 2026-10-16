@@ -119,47 +119,47 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
         <div className="h-1 bg-brand" />
       </header>
 
-      <div className="relative aspect-[16/10] w-full bg-navy sm:aspect-[2.2/1]">
-        {mainPhoto ? (
-          <button
-            type="button"
-            onClick={() => setLightboxOpen(true)}
-            className="h-full w-full"
-            aria-label="Ver foto en grande"
-          >
-            <img src={mainPhoto} alt={property.address} className="h-full w-full object-cover" />
-          </button>
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <Home className="h-16 w-16 text-white/30" />
-          </div>
-        )}
-        <span className="absolute left-4 top-4 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow">
-          {operationLabel}
-        </span>
-        {photos.length > 1 ? (
-          <>
+      <main className="relative z-10 mx-auto max-w-5xl space-y-8 px-4 py-6">
+        <div className="relative h-52 w-full overflow-hidden rounded-2xl bg-navy sm:h-64">
+          {mainPhoto ? (
             <button
               type="button"
-              onClick={prevPhoto}
-              className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
-              aria-label="Foto anterior"
+              onClick={() => setLightboxOpen(true)}
+              className="h-full w-full"
+              aria-label="Ver foto en grande"
             >
-              <ChevronLeft className="h-5 w-5" />
+              <img src={mainPhoto} alt={property.address} className="h-full w-full object-cover" />
             </button>
-            <button
-              type="button"
-              onClick={nextPhoto}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
-              aria-label="Foto siguiente"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          </>
-        ) : null}
-      </div>
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <Home className="h-16 w-16 text-white/30" />
+            </div>
+          )}
+          <span className="absolute left-4 top-4 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow">
+            {operationLabel}
+          </span>
+          {photos.length > 1 ? (
+            <>
+              <button
+                type="button"
+                onClick={prevPhoto}
+                className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+                aria-label="Foto anterior"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={nextPhoto}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+                aria-label="Foto siguiente"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </>
+          ) : null}
+        </div>
 
-      <main className="relative z-10 mx-auto -mt-10 max-w-5xl space-y-10 px-4">
         <section className="rounded-2xl bg-white p-5 shadow-lg sm:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
@@ -248,13 +248,33 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
           </section>
         ) : null}
 
-        {property.agency?.email ? (
-          <p className="text-center text-sm text-slate2">
-            <a href={`mailto:${property.agency.email}`} className="inline-flex items-center gap-1.5 hover:text-navy">
-              <Mail className="h-3.5 w-3.5" />
-              {property.agency.email}
-            </a>
-          </p>
+        {property.agency?.legal_name || property.agency?.phone || property.agency?.email ? (
+          <section className="rounded-2xl border border-border bg-mist/40 p-5 shadow-sm sm:p-8">
+            <h2 className="font-display text-xl font-bold text-navy">Consultas</h2>
+            {property.agency.legal_name ? (
+              <p className="mt-2 text-sm font-semibold text-navy">{property.agency.legal_name}</p>
+            ) : null}
+            <div className="mt-3 flex flex-col gap-2 text-sm text-slate2">
+              {property.agency.phone ? (
+                <a
+                  href={`tel:${property.agency.phone}`}
+                  className="inline-flex items-center gap-2 hover:text-navy"
+                >
+                  <Phone className="h-4 w-4" />
+                  {property.agency.phone}
+                </a>
+              ) : null}
+              {property.agency.email ? (
+                <a
+                  href={`mailto:${property.agency.email}`}
+                  className="inline-flex items-center gap-2 hover:text-navy"
+                >
+                  <Mail className="h-4 w-4" />
+                  {property.agency.email}
+                </a>
+              ) : null}
+            </div>
+          </section>
         ) : null}
       </main>
 
