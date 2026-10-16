@@ -62,14 +62,22 @@ function OrgSwitchListener() {
   return null;
 }
 
+function isPublicPropertyPath(): boolean {
+  return /\/p\/[0-9a-f-]{8,}$/i.test(window.location.pathname);
+}
+
 export function AppProviders({ children }: AppProvidersProps) {
+  const publicFlyer = isPublicPropertyPath();
+
   return (
     <QueryClientProvider client={queryClient}>
       <SupabaseProvider client={supabase}>
-        <SessionTimeoutGuard loginPath="/login" storageKeyPrefix="nodo_inmo_session" />
+        {publicFlyer ? null : (
+          <SessionTimeoutGuard loginPath="/login" storageKeyPrefix="nodo_inmo_session" />
+        )}
         <AuthProvider config={AUTH_CONFIG}>
           <OrgSwitchListener />
-          <ThemeInitializer>{children}</ThemeInitializer>
+          {publicFlyer ? children : <ThemeInitializer>{children}</ThemeInitializer>}
         </AuthProvider>
       </SupabaseProvider>
     </QueryClientProvider>

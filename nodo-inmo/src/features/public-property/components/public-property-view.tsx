@@ -23,6 +23,8 @@ import type { PublicProperty } from "../hooks/use-public-property";
 import {
   publicListingLocation,
   publicListingMapQuery,
+  publicListingTheme,
+  publicListingThemeStyle,
   publicListingTitle,
   publicListingWhatsAppMessage,
   whatsappConsultHref,
@@ -65,6 +67,21 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
     property.agency?.phone,
     publicListingWhatsAppMessage(property, pageUrl),
   );
+  const theme = publicListingTheme(property);
+  const headerMark =
+    property.agency?.logo_url && theme.logoType !== "text" ? (
+      <img
+        src={property.agency.logo_url}
+        alt={property.agency.legal_name ?? "Inmobiliaria"}
+        className="h-10 max-w-[180px] object-contain"
+      />
+    ) : (
+      <p className="font-display text-sm font-semibold tracking-wide">
+        {theme.logoType === "text" && theme.brandText
+          ? theme.brandText
+          : (property.agency?.legal_name ?? "Nodo Inmo")}
+      </p>
+    );
 
   function prevPhoto() {
     if (photos.length < 2) return;
@@ -92,20 +109,10 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
   });
 
   return (
-    <div className="min-h-screen bg-paper pb-24">
+    <div className="min-h-screen bg-paper pb-24" style={publicListingThemeStyle(theme)}>
       <header className="sticky top-0 z-40 bg-navy text-white">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-3 px-4">
-          {property.agency?.logo_url ? (
-            <img
-              src={property.agency.logo_url}
-              alt={property.agency.legal_name ?? "Inmobiliaria"}
-              className="h-10 max-w-[180px] object-contain"
-            />
-          ) : (
-            <p className="font-display text-sm font-semibold tracking-wide">
-              {property.agency?.legal_name ?? "Nodo Inmo"}
-            </p>
-          )}
+          {headerMark}
           {property.agency?.phone ? (
             <a
               href={`tel:${property.agency.phone}`}

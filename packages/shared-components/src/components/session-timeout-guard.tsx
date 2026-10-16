@@ -94,12 +94,21 @@ export function SessionTimeoutGuard({
   }, [lastActivityKey]);
 
   useEffect(() => {
-    if (!localStorage.getItem(loginAtKey)) {
-      localStorage.setItem(loginAtKey, String(Date.now()));
-    }
-    if (!localStorage.getItem(lastActivityKey)) {
-      localStorage.setItem(lastActivityKey, String(Date.now()));
-    }
+    let enabled = false;
+
+    const startClock = () => {
+      if (!localStorage.getItem(loginAtKey)) {
+        localStorage.setItem(loginAtKey, String(Date.now()));
+      }
+      if (!localStorage.getItem(lastActivityKey)) {
+        localStorage.setItem(lastActivityKey, String(Date.now()));
+      }
+      enabled = true;
+    };
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data.session) startClock();
+    });
 
     // Defense-in-depth: if a fresh sign-in happens while this guard is already
     // mounted (e.g. same-tab re-login after a sign-out that didn't go through
@@ -109,12 +118,18 @@ export function SessionTimeoutGuard({
     // INITIAL_SESSION always fires on subscribe, even for an existing valid
     // session, so it's deliberately excluded here — only a real subsequent
     // SIGNED_IN should reset the clock.
-    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        enabled = false;
+        setSecondsLeft(null);
+        return;
+      }
       if (event === "SIGNED_IN") {
         const now = Date.now();
         localStorage.setItem(loginAtKey, String(now));
         localStorage.setItem(lastActivityKey, String(now));
         lastWriteRef.current = now;
+        enabled = true;
       }
     });
 
@@ -123,6 +138,7 @@ export function SessionTimeoutGuard({
     }
 
     const interval = window.setInterval(() => {
+      if (!enabled) return;
       const lastActivity = Number(localStorage.getItem(lastActivityKey)) || Date.now();
       const loginAt = Number(localStorage.getItem(loginAtKey)) || Date.now();
       const idleFor = Date.now() - lastActivity;

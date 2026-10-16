@@ -29,6 +29,7 @@ export type PublicProperty = {
   has_elevator: boolean;
   has_parking: boolean;
   photo_urls: string[];
+  theme_settings?: Record<string, unknown> | null;
   agency: PublicPropertyAgency | null;
 };
 
