@@ -35,9 +35,15 @@ export async function GET(
       const property = await loadPublicProperty(slug[1]);
       if (property) {
         const tags = buildPublicPropertyOgTags(property, request.url.split("?")[0]);
-        return new NextResponse(injectPublicPropertyOg(html, tags), {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
-        });
+        const bootstrap = JSON.stringify(property).replace(/</g, "\\u003c");
+        const withOg = injectPublicPropertyOg(html, tags);
+        return new NextResponse(
+          withOg.replace(
+            "</head>",
+            `<script>window.__NODO_PUBLIC_PROPERTY__=${bootstrap}</script></head>`,
+          ),
+          { headers: { "Content-Type": "text/html; charset=utf-8" } },
+        );
       }
     } catch {
       /* SPA still loads without OG */

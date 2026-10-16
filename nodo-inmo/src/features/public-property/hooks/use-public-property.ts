@@ -42,24 +42,26 @@ export function usePublicProperty(shareToken: string | undefined) {
     enabled: !!shareToken,
     retry: false,
     queryFn: async () => {
+      const boot = (window as Window & { __NODO_PUBLIC_PROPERTY__?: PublicProperty }).__NODO_PUBLIC_PROPERTY__;
       const token = encodeURIComponent(shareToken!);
-      const landingRes = await fetch(`/api/inmo/public-property?token=${token}`);
-      if (landingRes.ok) {
-        return (await landingRes.json()) as PublicProperty;
-      }
-      const res = await fetch(
-        `${supabaseUrl}/functions/v1/public-property?token=${token}`,
-        {
-          headers: {
-            apikey: anonKey,
-            Authorization: `Bearer ${anonKey}`,
-          },
+      const [landingRes, edgeRes] = await Promise.all([
+        fetch(`/api/inmo/public-property?token=${token}`),
+        fetch(`${supabaseUrl}/functions/v1/public-property?token=${token}`, {
+          headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+        }),
+      ]);
+      const landing = landingRes.ok ? ((await landingRes.json()) as PublicProperty) : null;
+      const edge = edgeRes.ok ? ((await edgeRes.json()) as PublicProperty) : null;
+      const property = landing ?? edge ?? boot;
+      if (!property) throw new Error("not_found");
+      return {
+        ...property,
+        theme_settings: landing?.theme_settings ?? edge?.theme_settings ?? boot?.theme_settings ?? null,
+        agency: {
+          ...(property.agency ?? { legal_name: null, phone: null, email: null }),
+          logo_url: landing?.agency?.logo_url ?? edge?.agency?.logo_url ?? boot?.agency?.logo_url ?? null,
         },
-      );
-      if (!res.ok) {
-        throw new Error("not_found");
-      }
-      return (await res.json()) as PublicProperty;
+      };
     },
   });
 }
