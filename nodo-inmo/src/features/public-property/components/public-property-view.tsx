@@ -109,21 +109,21 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
   });
 
   return (
-    <div className="min-h-screen bg-paper pb-24" style={publicListingThemeStyle(theme)}>
-      <header className="sticky top-0 z-40 bg-navy text-white">
+    <div className="min-h-screen pb-24" style={{ ...publicListingThemeStyle(theme), backgroundColor: theme.backgroundColor || "#f5f8fc" }}>
+      <header className="sticky top-0 z-40 text-white" style={{ backgroundColor: theme.secondaryColor }}>
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-3 px-4">
           {headerMark}
           {property.agency?.phone ? (
             <a
               href={`tel:${property.agency.phone}`}
-              className="inline-flex items-center gap-2 text-sm font-medium text-brand-300 hover:text-white"
+              className="inline-flex items-center gap-2 text-sm font-medium text-white/90 hover:text-white"
             >
               <Phone className="h-4 w-4" />
               <span className="hidden sm:inline">{property.agency.phone}</span>
             </a>
           ) : null}
         </div>
-        <div className="h-1 bg-brand" />
+        <div className="h-1" style={{ backgroundColor: theme.primaryColor }} />
       </header>
 
       <main className="relative z-10 mx-auto max-w-5xl space-y-8 px-4 py-6">
@@ -175,17 +175,20 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
               </h1>
               {location ? (
                 <p className="inline-flex items-center gap-1.5 text-sm text-slate2">
-                  <MapPin className="h-4 w-4 text-brand" />
+                  <MapPin className="h-4 w-4" style={{ color: theme.primaryColor }} />
                   {property.address} — {location}
                 </p>
               ) : (
                 <p className="inline-flex items-center gap-1.5 text-sm text-slate2">
-                  <MapPin className="h-4 w-4 text-brand" />
+                  <MapPin className="h-4 w-4" style={{ color: theme.primaryColor }} />
                   {property.address}
                 </p>
               )}
             </div>
-            <p className="shrink-0 rounded-xl bg-brand px-4 py-2 text-xl font-bold text-white sm:text-2xl">
+            <p
+              className="shrink-0 rounded-xl px-4 py-2 text-xl font-bold sm:text-2xl"
+              style={{ backgroundColor: theme.primaryColor, color: theme.buttonFontColor || "#fff" }}
+            >
               {price}
             </p>
           </div>
