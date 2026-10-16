@@ -23,9 +23,5 @@ export function PublicPropertyPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <PublicPropertyView property={data} />
-    </div>
-  );
+  return <PublicPropertyView property={data} />;
 }

@@ -1,36 +1,52 @@
-import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Home, Mail, Phone, X } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  Bath,
+  BedDouble,
+  Car,
+  ChevronLeft,
+  ChevronRight,
+  Home,
+  Mail,
+  MapPin,
+  Phone,
+  Ruler,
+  X,
+} from "lucide-react";
 import { PropertyAmenityIconsLarge } from "@/features/portal/components/amenity-icons";
 import type { PortalProperty } from "@/features/portal/hooks/use-portal-properties";
 import {
   OPERATION_LABELS,
-  PROPERTY_TYPE_LABELS,
-  STATUS_COLORS,
-  STATUS_LABELS,
   formatPortalPrice,
 } from "@/features/portal/lib/portal-filters";
 import { cn } from "@/shared/lib/utils";
 import type { PublicProperty } from "../hooks/use-public-property";
+import {
+  publicListingLocation,
+  publicListingMapQuery,
+  publicListingTitle,
+  publicListingWhatsAppMessage,
+  whatsappConsultHref,
+} from "../lib/public-listing";
+import { PublicPropertyMap } from "./public-property-map";
 
 function toAmenityShape(property: PublicProperty): PortalProperty {
   return property as unknown as PortalProperty;
 }
 
-function InfoCell({
+function Stat({
+  icon,
   label,
   value,
-  highlight,
 }: {
+  icon: ReactNode;
   label: string;
   value: string;
-  highlight?: boolean;
 }) {
   return (
-    <div className="rounded-md border border-border bg-card px-3 py-2">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate2">{label}</p>
-      <p className={`mt-0.5 text-sm font-semibold ${highlight ? "text-brand" : "text-foreground"}`}>
-        {value}
-      </p>
+    <div className="flex flex-col items-center gap-1 px-2 py-3 text-center">
+      <span className="text-navy/70">{icon}</span>
+      <p className="text-[11px] font-medium uppercase tracking-wide text-slate2">{label}</p>
+      <p className="text-lg font-semibold text-navy">{value}</p>
     </div>
   );
 }
@@ -39,12 +55,16 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
   const photos = property.photo_urls;
   const [activeIndex, setActiveIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const statusColor = STATUS_COLORS[property.status] ?? "bg-slate-100 text-slate-700";
-  const statusLabel = STATUS_LABELS[property.status] ?? property.status;
   const operationLabel = OPERATION_LABELS[property.operation] ?? property.operation;
-  const typeLabel = PROPERTY_TYPE_LABELS[property.property_type] ?? property.property_type;
+  const title = publicListingTitle(property);
+  const location = publicListingLocation(property);
+  const price = formatPortalPrice(property.sale_price, property.currency);
   const mainPhoto = photos[activeIndex];
-  const location = [property.localidad, property.provincia].filter(Boolean).join(", ");
+  const pageUrl = typeof window !== "undefined" ? window.location.href : "";
+  const waHref = whatsappConsultHref(
+    property.agency?.phone,
+    publicListingWhatsAppMessage(property, pageUrl),
+  );
 
   function prevPhoto() {
     if (photos.length < 2) return;
@@ -55,6 +75,10 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
     if (photos.length < 2) return;
     setActiveIndex((i) => (i + 1) % photos.length);
   }
+
+  useEffect(() => {
+    document.title = `${title} · ${property.agency?.legal_name ?? "Nodo Inmo"}`;
+  }, [title, property.agency?.legal_name]);
 
   useEffect(() => {
     if (!lightboxOpen) return;
@@ -68,23 +92,34 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
   });
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8">
-      <header className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate2">Ficha pública</p>
-        <h1 className="text-2xl font-bold leading-tight text-foreground">{property.address}</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusColor}`}>
-            {statusLabel}
-          </span>
-          <span className="rounded-full bg-navy/10 px-2 py-0.5 text-[11px] font-semibold text-navy">
-            {operationLabel}
-          </span>
-          <span className="text-[11px] text-slate2">{typeLabel}</span>
+    <div className="min-h-screen bg-paper pb-24">
+      <header className="sticky top-0 z-40 bg-navy text-white">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-3 px-4">
+          {property.agency?.logo_url ? (
+            <img
+              src={property.agency.logo_url}
+              alt={property.agency.legal_name ?? "Inmobiliaria"}
+              className="h-10 max-w-[180px] object-contain"
+            />
+          ) : (
+            <p className="font-display text-sm font-semibold tracking-wide">
+              {property.agency?.legal_name ?? "Nodo Inmo"}
+            </p>
+          )}
+          {property.agency?.phone ? (
+            <a
+              href={`tel:${property.agency.phone}`}
+              className="inline-flex items-center gap-2 text-sm font-medium text-brand-300 hover:text-white"
+            >
+              <Phone className="h-4 w-4" />
+              <span className="hidden sm:inline">{property.agency.phone}</span>
+            </a>
+          ) : null}
         </div>
-        {location ? <p className="text-sm text-slate2">📍 {location}</p> : null}
+        <div className="h-1 bg-brand" />
       </header>
 
-      <div className="relative aspect-video overflow-hidden rounded-lg bg-mist">
+      <div className="relative aspect-[16/10] w-full bg-navy sm:aspect-[2.2/1]">
         {mainPhoto ? (
           <button
             type="button"
@@ -95,16 +130,19 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
             <img src={mainPhoto} alt={property.address} className="h-full w-full object-cover" />
           </button>
         ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Home className="h-16 w-16 text-slate-300" />
+          <div className="flex h-full items-center justify-center">
+            <Home className="h-16 w-16 text-white/30" />
           </div>
         )}
+        <span className="absolute left-4 top-4 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow">
+          {operationLabel}
+        </span>
         {photos.length > 1 ? (
           <>
             <button
               type="button"
               onClick={prevPhoto}
-              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
+              className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
               aria-label="Foto anterior"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -112,7 +150,7 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
             <button
               type="button"
               onClick={nextPhoto}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
               aria-label="Foto siguiente"
             >
               <ChevronRight className="h-5 w-5" />
@@ -121,25 +159,104 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
         ) : null}
       </div>
 
-      {photos.length > 1 ? (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {photos.map((url, index) => (
-            <button
-              key={`${url}-${index}`}
-              type="button"
-              onClick={() => setActiveIndex(index)}
-              className={cn(
-                "overflow-hidden rounded-md ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
-                index === activeIndex ? "ring-2 ring-brand" : "opacity-80 hover:opacity-100",
+      <main className="relative z-10 mx-auto -mt-10 max-w-5xl space-y-10 px-4">
+        <section className="rounded-2xl bg-white p-5 shadow-lg sm:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-2">
+              <h1 className="font-display text-2xl font-bold leading-tight text-navy sm:text-3xl">
+                {title}
+              </h1>
+              {location ? (
+                <p className="inline-flex items-center gap-1.5 text-sm text-slate2">
+                  <MapPin className="h-4 w-4 text-brand" />
+                  {property.address} — {location}
+                </p>
+              ) : (
+                <p className="inline-flex items-center gap-1.5 text-sm text-slate2">
+                  <MapPin className="h-4 w-4 text-brand" />
+                  {property.address}
+                </p>
               )}
-              aria-label={`Ver foto ${index + 1}`}
-              aria-current={index === activeIndex}
-            >
-              <img src={url} alt="" className="aspect-square w-full object-cover" />
-            </button>
-          ))}
-        </div>
-      ) : null}
+            </div>
+            <p className="shrink-0 rounded-xl bg-brand px-4 py-2 text-xl font-bold text-white sm:text-2xl">
+              {price}
+            </p>
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 divide-y divide-mist rounded-xl border border-mist sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+            {property.rooms != null ? (
+              <Stat icon={<BedDouble className="h-5 w-5" />} label="Ambientes" value={String(property.rooms)} />
+            ) : null}
+            {property.bathrooms != null ? (
+              <Stat icon={<Bath className="h-5 w-5" />} label="Baños" value={String(property.bathrooms)} />
+            ) : null}
+            {property.has_garage || property.has_parking ? (
+              <Stat icon={<Car className="h-5 w-5" />} label="Cocheras" value="1" />
+            ) : null}
+            {property.total_sqm != null ? (
+              <Stat icon={<Ruler className="h-5 w-5" />} label="Superficie" value={`${property.total_sqm} m²`} />
+            ) : null}
+          </div>
+        </section>
+
+        {property.description ? (
+          <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-8">
+            <h2 className="font-display text-xl font-bold text-navy">Descripción</h2>
+            <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-navy/80">
+              {property.description}
+            </p>
+          </section>
+        ) : null}
+
+        <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-8">
+          <h2 className="font-display text-xl font-bold text-navy">Características</h2>
+          <div className="mt-4">
+            <PropertyAmenityIconsLarge property={toAmenityShape(property)} />
+          </div>
+        </section>
+
+        <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-8">
+          <h2 className="font-display text-xl font-bold text-navy">Ubicación</h2>
+          <p className="mt-1 text-sm text-slate2">{publicListingMapQuery(property)}</p>
+          <div className="mt-4">
+            <PublicPropertyMap query={publicListingMapQuery(property)} />
+          </div>
+        </section>
+
+        {photos.length > 0 ? (
+          <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-8">
+            <h2 className="font-display text-xl font-bold text-navy">Galería de fotos</h2>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {photos.map((url, index) => (
+                <button
+                  key={`${url}-${index}`}
+                  type="button"
+                  onClick={() => {
+                    setActiveIndex(index);
+                    setLightboxOpen(true);
+                  }}
+                  className={cn(
+                    "overflow-hidden rounded-xl ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
+                    index === activeIndex ? "ring-2 ring-brand" : "hover:opacity-90",
+                  )}
+                  aria-label={`Ver foto ${index + 1}`}
+                >
+                  <img src={url} alt="" className="aspect-[4/3] w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {property.agency?.email ? (
+          <p className="text-center text-sm text-slate2">
+            <a href={`mailto:${property.agency.email}`} className="inline-flex items-center gap-1.5 hover:text-navy">
+              <Mail className="h-3.5 w-3.5" />
+              {property.agency.email}
+            </a>
+          </p>
+        ) : null}
+      </main>
 
       {lightboxOpen && mainPhoto ? (
         <div
@@ -191,50 +308,31 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <InfoCell
-          label="Precio"
-          value={formatPortalPrice(property.sale_price, property.currency)}
-          highlight
-        />
-        {property.rooms ? <InfoCell label="Ambientes" value={String(property.rooms)} /> : null}
-        {property.bathrooms ? <InfoCell label="Baños" value={String(property.bathrooms)} /> : null}
-        {property.total_sqm ? <InfoCell label="Superficie" value={`${property.total_sqm} m²`} /> : null}
-      </div>
-
-      <PropertyAmenityIconsLarge property={toAmenityShape(property)} />
-
-      {property.description ? (
-        <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate2">Descripción</p>
-          <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
-            {property.description}
-          </p>
-        </div>
-      ) : null}
-
-      {property.agency?.legal_name || property.agency?.phone || property.agency?.email ? (
-        <div className="rounded-lg border border-border bg-mist/40 p-4 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate2">Consultas</p>
-          {property.agency.legal_name ? (
-            <p className="text-sm font-semibold text-foreground">{property.agency.legal_name}</p>
-          ) : null}
-          <div className="flex flex-col gap-1 text-sm text-slate2">
-            {property.agency.phone ? (
-              <a href={`tel:${property.agency.phone}`} className="inline-flex items-center gap-2 hover:text-foreground">
-                <Phone className="h-3.5 w-3.5" />
-                {property.agency.phone}
-              </a>
-            ) : null}
-            {property.agency.email ? (
-              <a href={`mailto:${property.agency.email}`} className="inline-flex items-center gap-2 hover:text-foreground">
-                <Mail className="h-3.5 w-3.5" />
-                {property.agency.email}
-              </a>
-            ) : null}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-mist bg-white/95 shadow-[0_-8px_24px_rgba(18,30,47,0.08)] backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-navy">{property.address}</p>
+            <p className="text-sm font-bold text-brand">{price}</p>
           </div>
+          {waHref ? (
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex shrink-0 items-center gap-2 rounded-full bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-emerald-600"
+            >
+              Consultar por WhatsApp
+            </a>
+          ) : property.agency?.phone ? (
+            <a
+              href={`tel:${property.agency.phone}`}
+              className="inline-flex shrink-0 items-center gap-2 rounded-full bg-brand px-4 py-2.5 text-sm font-semibold text-white"
+            >
+              Llamar
+            </a>
+          ) : null}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
