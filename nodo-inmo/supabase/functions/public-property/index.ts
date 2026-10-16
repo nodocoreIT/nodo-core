@@ -42,7 +42,17 @@ Deno.serve(async (req) => {
     }
   }
 
-  return json({ ...data, photo_urls }, 200);
+  const agency = data.agency && typeof data.agency === "object" ? { ...data.agency } as Record<string, unknown> : {};
+  const logoPath = typeof agency.logo_path === "string" ? agency.logo_path : null;
+  let logo_url: string | null = null;
+  if (logoPath) {
+    const { data: signedLogo } = await admin.storage
+      .from("org-branding")
+      .createSignedUrl(logoPath, 3600);
+    logo_url = signedLogo?.signedUrl ?? null;
+  }
+
+  return json({ ...data, photo_urls, agency: { ...agency, logo_url } }, 200);
 });
 
 function json(body: unknown, status: number): Response {
