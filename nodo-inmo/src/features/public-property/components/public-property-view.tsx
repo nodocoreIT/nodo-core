@@ -27,6 +27,7 @@ import {
   publicListingThemeStyle,
   publicListingTitle,
   publicListingWhatsAppMessage,
+  parseAgencyPhones,
   whatsappConsultHref,
 } from "../lib/public-listing";
 import { PublicPropertyMap } from "./public-property-map";
@@ -63,6 +64,7 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
   const price = formatPortalPrice(property.sale_price, property.currency);
   const mainPhoto = photos[activeIndex];
   const pageUrl = typeof window !== "undefined" ? window.location.href : "";
+  const phones = parseAgencyPhones(property.agency?.phone);
   const waHref = whatsappConsultHref(
     property.agency?.phone,
     publicListingWhatsAppMessage(property, pageUrl),
@@ -113,13 +115,13 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
       <header className="sticky top-0 z-40 text-white" style={{ backgroundColor: theme.secondaryColor }}>
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-3 px-4">
           {headerMark}
-          {property.agency?.phone ? (
+          {phones[0] ? (
             <a
-              href={`tel:${property.agency.phone}`}
+              href={`tel:${phones[0]}`}
               className="inline-flex items-center gap-2 text-sm font-medium text-white/90 hover:text-white"
             >
               <Phone className="h-4 w-4" />
-              <span className="hidden sm:inline">{property.agency.phone}</span>
+              <span className="hidden sm:inline">{phones[0]}</span>
             </a>
           ) : null}
         </div>
@@ -265,15 +267,16 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
               <p className="mt-2 text-sm font-semibold text-navy">{property.agency.legal_name}</p>
             ) : null}
             <div className="mt-3 flex flex-col gap-2 text-sm text-slate2">
-              {property.agency.phone ? (
+              {phones.map((number) => (
                 <a
-                  href={`tel:${property.agency.phone}`}
+                  key={number}
+                  href={`tel:${number}`}
                   className="inline-flex items-center gap-2 hover:text-navy"
                 >
                   <Phone className="h-4 w-4" />
-                  {property.agency.phone}
+                  {number}
                 </a>
-              ) : null}
+              ))}
               {property.agency.email ? (
                 <a
                   href={`mailto:${property.agency.email}`}
@@ -353,9 +356,9 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
             >
               Consultar por WhatsApp
             </a>
-          ) : property.agency?.phone ? (
+          ) : phones[0] ? (
             <a
-              href={`tel:${property.agency.phone}`}
+              href={`tel:${phones[0]}`}
               className="inline-flex shrink-0 items-center gap-2 rounded-full bg-brand px-4 py-2.5 text-sm font-semibold text-white"
             >
               Llamar

@@ -24,11 +24,28 @@ export function publicListingMapQuery(property: Pick<PublicProperty, "address" |
     .join(", ");
 }
 
+/** Splits "2954586125 / 2954362150" (or similar) into one number per phone. */
+export function parseAgencyPhones(phone: string | null | undefined): string[] {
+  if (!phone?.trim()) return [];
+  const fromSeparators = phone
+    .split(/[/|,;]+|\s+y\s+|\s+e\s+/i)
+    .map((part) => part.replace(/\D/g, ""))
+    .filter((digits) => digits.length >= 8);
+  if (fromSeparators.length > 1) return [...new Set(fromSeparators)];
+  const all = phone.replace(/\D/g, "");
+  if (all.length >= 16 && all.length % 10 === 0) {
+    const chunks: string[] = [];
+    for (let i = 0; i < all.length; i += 10) chunks.push(all.slice(i, i + 10));
+    return chunks.filter((d) => d.length >= 8);
+  }
+  if (all.length >= 8) return [fromSeparators[0] ?? all];
+  return [];
+}
+
 export function whatsappConsultHref(phone: string | null | undefined, message: string): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 8) return null;
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+  const first = parseAgencyPhones(phone)[0];
+  if (!first) return null;
+  return `https://wa.me/${first}?text=${encodeURIComponent(message)}`;
 }
 
 export function publicListingWhatsAppMessage(property: PublicProperty, pageUrl?: string): string {
