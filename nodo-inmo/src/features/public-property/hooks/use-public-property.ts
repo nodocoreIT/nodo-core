@@ -42,8 +42,13 @@ export function usePublicProperty(shareToken: string | undefined) {
     enabled: !!shareToken,
     retry: false,
     queryFn: async () => {
+      const token = encodeURIComponent(shareToken!);
+      const landingRes = await fetch(`/api/inmo/public-property?token=${token}`);
+      if (landingRes.ok) {
+        return (await landingRes.json()) as PublicProperty;
+      }
       const res = await fetch(
-        `${supabaseUrl}/functions/v1/public-property?token=${encodeURIComponent(shareToken!)}`,
+        `${supabaseUrl}/functions/v1/public-property?token=${token}`,
         {
           headers: {
             apikey: anonKey,

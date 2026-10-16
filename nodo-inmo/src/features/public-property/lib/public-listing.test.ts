@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  parseAgencyPhones,
   publicListingMapQuery,
   publicListingTheme,
   publicListingTitle,
@@ -40,5 +41,15 @@ describe("public listing copy", () => {
       "https://wa.me/5492954623600?text=Hola",
     );
     expect(whatsappConsultHref("11", "Hola")).toBeNull();
+  });
+
+  it("uses only the first number when the agency stored two phones", () => {
+    expect(parseAgencyPhones("2954586125 / 2954362150")).toEqual([
+      "2954586125",
+      "2954362150",
+    ]);
+    expect(whatsappConsultHref("2954586125 / 2954362150", "Hola")).toBe(
+      "https://wa.me/2954586125?text=Hola",
+    );
   });
 });
