@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     .eq("share_token", token)
     .maybeSingle();
 
-  let theme_settings: unknown = null;
+  let theme_settings: unknown = data.theme_settings ?? null;
   if (propRow?.org_id) {
     const { data: profile } = await admin
       .schema("nodo_inmo")
