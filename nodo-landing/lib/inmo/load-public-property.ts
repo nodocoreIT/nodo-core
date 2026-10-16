@@ -8,20 +8,6 @@ function inmoAdmin() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-async function signPaths(
-  admin: ReturnType<typeof createClient>,
-  bucket: string,
-  paths: string[],
-): Promise<string[]> {
-  const urls: string[] = [];
-  for (const path of paths) {
-    if (!path) continue;
-    const { data } = await admin.storage.from(bucket).createSignedUrl(path, 3600);
-    if (data?.signedUrl) urls.push(data.signedUrl);
-  }
-  return urls;
-}
-
 export async function loadPublicProperty(token: string) {
   const admin = inmoAdmin();
   if (!admin) return null;
@@ -52,9 +38,18 @@ export async function loadPublicProperty(token: string) {
         ? [row.main_photo]
         : [];
 
-  const photo_urls = await signPaths(admin, "property-photos", photoPaths);
+  const photo_urls: string[] = [];
+  for (const path of photoPaths) {
+    if (!path) continue;
+    const { data } = await admin.storage.from("property-photos").createSignedUrl(path, 3600);
+    if (data?.signedUrl) photo_urls.push(data.signedUrl);
+  }
   const logoPath = profile?.logo_path || profile?.pdf_logo_path || null;
-  const logo_urls = logoPath ? await signPaths(admin, "org-branding", [logoPath]) : [];
+  const logo_urls: string[] = [];
+  if (logoPath) {
+    const { data } = await admin.storage.from("org-branding").createSignedUrl(logoPath, 3600);
+    if (data?.signedUrl) logo_urls.push(data.signedUrl);
+  }
 
   return {
     address: row.address,
