@@ -12,7 +12,7 @@ function inmoAdmin() {
 }
 
 export async function loadPublicProperty(token: string) {
-  const admin = inmoAdmin();
+  const admin = inmoAdmin() as any;
   if (!admin) return null;
 
   const { data, error } = await admin.rpc("get_public_property", {
@@ -40,7 +40,7 @@ export async function loadPublicProperty(token: string) {
     .eq("share_token", token)
     .maybeSingle();
 
-  let theme_settings: unknown = null;
+  let theme_settings: unknown = row.theme_settings ?? null;
   let logoPath =
     typeof agencyIn.logo_path === "string" ? agencyIn.logo_path : null;
 

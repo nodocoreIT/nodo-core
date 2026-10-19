@@ -34,7 +34,7 @@ export async function GET(
     try {
       const property = await loadPublicProperty(slug[1]);
       if (property) {
-        const tags = buildPublicPropertyOgTags(property, request.url.split("?")[0]);
+        const tags = buildPublicPropertyOgTags(property as never, request.url.split("?")[0]);
         const bootstrap = JSON.stringify(property).replace(/</g, "\\u003c");
         const withOg = injectPublicPropertyOg(html, tags);
         return new NextResponse(
