@@ -3,6 +3,7 @@ import {
   PROPERTY_TYPE_LABELS,
   formatPortalPrice,
 } from "@/features/portal/lib/portal-filters";
+import { useThemeStore } from "@/shared/hooks/use-theme-settings";
 
 export type ShareableProperty = {
   address: string;
@@ -21,7 +22,13 @@ export function getPublicPropertyUrl(shareToken: string): string {
   const landing =
     (import.meta.env.VITE_NODO_LANDING_URL as string | undefined)?.replace(/\/$/, "") ||
     (typeof window !== "undefined" ? window.location.origin : "");
-  return `${landing}/inmo/p/${shareToken}`;
+  const url = `${landing}/inmo/p/${shareToken}`;
+  const theme = useThemeStore.getState().settings;
+  if (!theme.primaryColor && !theme.secondaryColor) return url;
+  const q = new URLSearchParams();
+  if (theme.primaryColor) q.set("pc", theme.primaryColor.replace(/^#/, ""));
+  if (theme.secondaryColor) q.set("sc", theme.secondaryColor.replace(/^#/, ""));
+  return `${url}?${q.toString()}`;
 }
 
 export function buildPropertyShareText(

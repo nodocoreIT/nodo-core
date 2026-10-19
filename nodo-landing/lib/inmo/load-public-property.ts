@@ -6,7 +6,8 @@ function inmoAdmin() {
   if (fromPair) return fromPair;
   const url =
     process.env.NODO_INMO_SUPABASE_URL ?? process.env.NEXT_PUBLIC_NODO_INMO_SUPABASE_URL;
-  const key = process.env.NODO_INMO_SERVICE_ROLE_KEY;
+  const key =
+    process.env.NODO_INMO_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_NODO_INMO_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }

@@ -50,8 +50,22 @@ export function usePublicProperty(shareToken: string | undefined) {
           headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
         }),
       ]);
+      const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/get_public_property`, {
+        method: "POST",
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ p_share_token: shareToken }),
+      });
       const landing = landingRes.ok ? ((await landingRes.json()) as PublicProperty) : null;
       const edge = edgeRes.ok ? ((await edgeRes.json()) as PublicProperty) : null;
+      const rpc = rpcRes.ok ? await rpcRes.json() : null;
+      const rpcTheme =
+        rpc && typeof rpc === "object" && rpc.theme_settings && typeof rpc.theme_settings === "object"
+          ? (rpc.theme_settings as Record<string, unknown>)
+          : null;
       const property = landing ?? edge ?? boot;
       if (!property) throw new Error("not_found");
       const theme =
@@ -61,6 +75,7 @@ export function usePublicProperty(shareToken: string | undefined) {
         (edge?.theme_settings && Object.keys(edge.theme_settings).length > 0
           ? edge.theme_settings
           : null) ??
+        rpcTheme ??
         boot?.theme_settings ??
         null;
       return {

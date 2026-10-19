@@ -43,8 +43,20 @@ function ThemeInitializer({ children }: { children: ReactNode }) {
   // Supabase wins over localStorage so all admins share the same branding.
   useEffect(() => {
     if (profile === undefined) return;
-    const theme = mergeThemeSettings(profile?.theme_settings, DEFAULT_SETTINGS);
-    setSettings(theme);
+    const stored = profile?.theme_settings as { primaryColor?: string } | null;
+    const dbHasBrand = typeof stored?.primaryColor === "string" && stored.primaryColor.length > 3;
+    if (dbHasBrand) {
+      setSettings(mergeThemeSettings(profile?.theme_settings, DEFAULT_SETTINGS));
+      return;
+    }
+    const local = useThemeStore.getState().settings;
+    if (profile?.org_id && local.primaryColor !== DEFAULT_SETTINGS.primaryColor) {
+      void supabase
+        .schema("nodo_inmo")
+        .from("org_profiles")
+        .update({ theme_settings: local as never })
+        .eq("org_id", profile.org_id);
+    }
   }, [profile, setSettings]);
 
   // Apply CSS custom properties to :root from the Zustand store.

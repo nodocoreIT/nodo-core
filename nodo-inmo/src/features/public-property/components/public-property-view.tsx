@@ -63,7 +63,10 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
     property.agency?.phone,
     publicListingWhatsAppMessage(property, pageUrl),
   );
-  const theme = publicListingTheme(property);
+  const theme = publicListingTheme(
+    property,
+    typeof window !== "undefined" ? window.location.search : "",
+  );
   const headerMark =
     property.agency?.logo_url && theme.logoType !== "text" ? (
       <img
