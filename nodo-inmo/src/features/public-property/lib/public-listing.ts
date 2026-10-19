@@ -42,10 +42,25 @@ export function parseAgencyPhones(phone: string | null | undefined): string[] {
   return [];
 }
 
+/** Argentina WhatsApp ids: 10 local digits → 549… so iOS doesn’t treat them as @usernames. */
+export function toWhatsAppNumber(digits: string): string {
+  const d = digits.replace(/\D/g, "").replace(/^0+/, "");
+  if (d.length < 8) return d;
+  if (d.startsWith("54") && d.length >= 12) {
+    if (d.length === 12 && !d.startsWith("549")) return `549${d.slice(2)}`;
+    return d;
+  }
+  if (d.startsWith("9") && d.length >= 11) return `54${d}`;
+  if (d.length === 10) return `549${d}`;
+  if (d.length >= 8 && !d.startsWith("54")) return `54${d}`;
+  return d;
+}
+
 export function whatsappConsultHref(phone: string | null | undefined, message: string): string | null {
   const first = parseAgencyPhones(phone)[0];
   if (!first) return null;
-  return `https://wa.me/${first}?text=${encodeURIComponent(message)}`;
+  const id = toWhatsAppNumber(first);
+  return `https://api.whatsapp.com/send?phone=${id}&text=${encodeURIComponent(message)}`;
 }
 
 export function publicListingWhatsAppMessage(property: PublicProperty, pageUrl?: string): string {
@@ -84,7 +99,11 @@ export function themeFromShareQuery(search: string): Record<string, unknown> | n
 export function publicListingTheme(property: PublicProperty, search?: string): ThemeSettings {
   const fromProperty = coerceThemeSettings(property.theme_settings);
   const fromQuery = search ? themeFromShareQuery(search) : null;
-  return mergeThemeSettings({ ...fromQuery, ...fromProperty }, DEFAULT_SETTINGS);
+  const fromWindow =
+    typeof window !== "undefined"
+      ? coerceThemeSettings((window as Window & { __NODO_FLYER_THEME__?: unknown }).__NODO_FLYER_THEME__)
+      : null;
+  return mergeThemeSettings({ ...fromQuery, ...fromWindow, ...fromProperty }, DEFAULT_SETTINGS);
 }
 
 export function publicListingThemeStyle(theme: ThemeSettings): CSSProperties {
@@ -99,5 +118,7 @@ export function publicListingThemeStyle(theme: ThemeSettings): CSSProperties {
     ["--color-ink" as string]: theme.fontColor,
     ["--color-foreground" as string]: theme.fontColor,
     ["--color-paper" as string]: theme.backgroundColor || "#f5f8fc",
+    ["--flyer-primary" as string]: theme.primaryColor,
+    ["--flyer-secondary" as string]: theme.secondaryColor,
   };
 }

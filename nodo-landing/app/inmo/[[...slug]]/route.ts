@@ -36,11 +36,22 @@ export async function GET(
       if (property) {
         const tags = buildPublicPropertyOgTags(property as never, request.url.split("?")[0]);
         const bootstrap = JSON.stringify(property).replace(/</g, "\\u003c");
+        const themeRaw =
+          property.theme_settings && typeof property.theme_settings === "object"
+            ? (property.theme_settings as Record<string, unknown>)
+            : {};
+        const flyerTheme = {
+          primaryColor: themeRaw.primaryColor,
+          secondaryColor: themeRaw.secondaryColor,
+          logoType: themeRaw.logoType,
+          brandText: themeRaw.brandText,
+        };
+        const flyerJson = JSON.stringify(flyerTheme).replace(/</g, "\\u003c");
         const withOg = injectPublicPropertyOg(html, tags);
         return new NextResponse(
           withOg.replace(
             "</head>",
-            `<script>window.__NODO_PUBLIC_PROPERTY__=${bootstrap}</script></head>`,
+            `<script>window.__NODO_PUBLIC_PROPERTY__=${bootstrap};window.__NODO_FLYER_THEME__=${flyerJson};(function(){var t=window.__NODO_FLYER_THEME__||{};var r=document.documentElement;if(t.primaryColor)r.style.setProperty('--flyer-primary',t.primaryColor);if(t.secondaryColor)r.style.setProperty('--flyer-secondary',t.secondaryColor);})();</script></head>`,
           ),
           { headers: { "Content-Type": "text/html; charset=utf-8" } },
         );
