@@ -36,6 +36,12 @@ describe("public listing copy", () => {
     expect(theme.secondaryColor).toBe("#0f3d2e");
   });
 
+  it("reads branding from the share query when the API has no theme", () => {
+    const theme = publicListingTheme({} as Parameters<typeof publicListingTheme>[0], "pc=124304&sc=003000");
+    expect(theme.primaryColor).toBe("#124304");
+    expect(theme.secondaryColor).toBe("#003000");
+  });
+
   it("builds a wa.me link from a formatted phone", () => {
     expect(whatsappConsultHref("+54 9 2954 62-3600", "Hola")).toBe(
       "https://wa.me/5492954623600?text=Hola",

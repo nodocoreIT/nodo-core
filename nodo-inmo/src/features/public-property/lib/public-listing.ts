@@ -55,8 +55,36 @@ export function publicListingWhatsAppMessage(property: PublicProperty, pageUrl?:
   return lines.join("\n");
 }
 
-export function publicListingTheme(property: PublicProperty): ThemeSettings {
-  return mergeThemeSettings(property.theme_settings, DEFAULT_SETTINGS);
+export function coerceThemeSettings(raw: unknown): Record<string, unknown> | null {
+  if (raw == null) return null;
+  if (typeof raw === "string") {
+    try {
+      return coerceThemeSettings(JSON.parse(raw));
+    } catch {
+      return null;
+    }
+  }
+  if (typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.primaryColor === "string" && obj.primaryColor.length > 3) return obj;
+  return Object.keys(obj).length > 0 ? obj : null;
+}
+
+export function themeFromShareQuery(search: string): Record<string, unknown> | null {
+  const params = new URLSearchParams(search.startsWith("?") ? search : `?${search}`);
+  const pc = params.get("pc");
+  const sc = params.get("sc");
+  if (!pc && !sc) return null;
+  const out: Record<string, unknown> = {};
+  if (pc) out.primaryColor = pc.startsWith("#") ? pc : `#${pc}`;
+  if (sc) out.secondaryColor = sc.startsWith("#") ? sc : `#${sc}`;
+  return out;
+}
+
+export function publicListingTheme(property: PublicProperty, search?: string): ThemeSettings {
+  const fromProperty = coerceThemeSettings(property.theme_settings);
+  const fromQuery = search ? themeFromShareQuery(search) : null;
+  return mergeThemeSettings({ ...fromQuery, ...fromProperty }, DEFAULT_SETTINGS);
 }
 
 export function publicListingThemeStyle(theme: ThemeSettings): CSSProperties {
