@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/shared/lib/supabase";
 
 export type PublicPropertyAgency = {
   legal_name: string | null;
@@ -45,19 +44,14 @@ export function usePublicProperty(shareToken: string | undefined) {
     queryFn: async () => {
       const boot = (window as Window & { __NODO_PUBLIC_PROPERTY__?: PublicProperty }).__NODO_PUBLIC_PROPERTY__;
       const token = encodeURIComponent(shareToken!);
-      const [landingRes, edgeRes, rpcRes] = await Promise.all([
+      const [landingRes, edgeRes] = await Promise.all([
         fetch(`/api/inmo/public-property?token=${token}`),
         fetch(`${supabaseUrl}/functions/v1/public-property?token=${token}`, {
           headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
         }),
-        (supabase as { rpc: (fn: string, args: object) => Promise<{ data: unknown }> }).rpc(
-          "get_public_property",
-          { p_share_token: shareToken },
-        ),
       ]);
       const landing = landingRes.ok ? ((await landingRes.json()) as PublicProperty) : null;
       const edge = edgeRes.ok ? ((await edgeRes.json()) as PublicProperty) : null;
-      const rpc = rpcRes.data as (PublicProperty & { theme_settings?: unknown }) | null;
       const property = landing ?? edge ?? boot;
       if (!property) throw new Error("not_found");
       const theme =
@@ -67,7 +61,6 @@ export function usePublicProperty(shareToken: string | undefined) {
         (edge?.theme_settings && Object.keys(edge.theme_settings).length > 0
           ? edge.theme_settings
           : null) ??
-        (rpc?.theme_settings as Record<string, unknown> | null) ??
         boot?.theme_settings ??
         null;
       return {
