@@ -62,7 +62,7 @@ export function DetalleTarjetaPage() {
   const consumosDelMes = useMemo(() => {
     if (!id) return [];
     return finanzas.consumosTarjetas.filter((c) => {
-      const anioMes = new Date(c.fecha).toISOString().slice(0, 7);
+      const anioMes = c.fecha.slice(0, 7);
       return c.tarjetaId === id && anioMes === filtroMes;
     });
   }, [finanzas.consumosTarjetas, id, filtroMes]);

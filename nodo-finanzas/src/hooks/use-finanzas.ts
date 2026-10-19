@@ -5,6 +5,7 @@ import { useAuth } from '@nodocore/shared-components';
 import { guardarInteresesFinanciacion } from '@/features/tarjetas/intereses-financiacion';
 import { calcularMesFacturacion } from '@/utils/tarjeta-fechas';
 import { getFechaHoy } from '@/utils/formatters';
+import { fechaCuotaTarjeta } from '@/utils/vencimientos';
 import type {
   AppState,
   Cuenta,
@@ -21,16 +22,6 @@ import type {
   PlanAhorro,
   MovimientoCuenta,
 } from '@/types';
-
-/** Suma meses a YYYY-MM-DD en calendario local. Evita toISOString(), que Postgres rechaza en columnas date. */
-function sumarMesesFecha(iso: string, meses: number): string {
-  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
-  const dt = new Date(y, m - 1 + meses, d);
-  const yy = dt.getFullYear();
-  const mm = String(dt.getMonth() + 1).padStart(2, '0');
-  const dd = String(dt.getDate()).padStart(2, '0');
-  return `${yy}-${mm}-${dd}`;
-}
 
 // Module-level cache: survives component unmounts within the same page session.
 // Allows secondary hook instances (e.g. child forms) to start with already-loaded
@@ -663,36 +654,20 @@ export const useFinanzas = () => {
           }
 
           // === CREAR CONSUMO SI ES TARJETA ===
+          // Si la compra es después del 10, la primera cuota cae el mes siguiente.
           if (gasto.formaPago === 'TARJETA' && gasto.tarjetaId) {
-            const tarjeta = estado.tarjetas.find(t => t.id === gasto.tarjetaId);
-            let fechaFacturacion = gasto.fecha;
-
-            if (tarjeta && tarjeta.diaCierre) {
-              try {
-                fechaFacturacion = calcularMesFacturacion(gasto.fecha, {
-                  diaCierre: tarjeta.diaCierre,
-                  diaVencimiento: tarjeta.diaVencimiento
-                });
-                console.log(`[Tarjeta] Consumo: ${gasto.fecha}, Cierre: ${tarjeta.diaCierre}, Vencimiento: ${tarjeta.diaVencimiento} → Facturación: ${fechaFacturacion}`);
-              } catch (e) {
-                console.error('Error calculando fecha de facturación:', e);
-              }
-            }
-
             const rubroConsumo: RubroConsumo = (gasto.rubro as RubroConsumo) || 'OTROS';
-            const totalCuotas = gasto.cuotas || 1;
+            const totalCuotas = Math.max(1, Number(gasto.cuotas) || 1);
             const montoPorCuota = totalCuotas > 1 ? gasto.monto / totalCuotas : gasto.monto;
-
             const codigoOperacion = gasto.codigoOperacion || crypto.randomUUID();
+            const fechaBase = (gasto.fecha || getFechaHoy()).slice(0, 10);
+
             const promesasCuotas = [];
-
             for (let cuota = 1; cuota <= totalCuotas; cuota++) {
-              const fechaCuotaFinal = sumarMesesFecha(fechaFacturacion, cuota - 1);
-
               const consumoTarjeta: Omit<ConsumoTarjeta, 'id'> = {
                 tarjetaId: gasto.tarjetaId,
-                fecha: fechaCuotaFinal,
-                fechaCompra: gasto.fecha,
+                fecha: fechaCuotaTarjeta(fechaBase, cuota - 1),
+                fechaCompra: fechaBase,
                 lugar: gasto.descripcion,
                 rubro: rubroConsumo,
                 rubroId: gasto.rubroId || (gasto.rubro && gasto.rubro.length > 20 ? gasto.rubro : undefined),
@@ -703,11 +678,18 @@ export const useFinanzas = () => {
                 totalCuotas: totalCuotas,
                 codigoOperacion: codigoOperacion,
               };
-
               promesasCuotas.push(FinanzasService.crearConsumoTarjeta(consumoTarjeta));
             }
 
-            await Promise.all(promesasCuotas);
+            const creados = (await Promise.all(promesasCuotas)).filter(
+              (consumo): consumo is ConsumoTarjeta => consumo != null,
+            );
+            if (creados.length > 0) {
+              syncEstado(prev => ({
+                ...prev,
+                consumosTarjetas: [...creados, ...prev.consumosTarjetas],
+              }));
+            }
           }
         }
 

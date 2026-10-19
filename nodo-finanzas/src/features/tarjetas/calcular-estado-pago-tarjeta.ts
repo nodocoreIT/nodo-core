@@ -31,7 +31,7 @@ export function calcularEstadoPagoTarjetaMes(
   mes: string,
 ): EstadoPagoTarjetaMes {
   const consumosDelMes = consumosTarjetas.filter((c) => {
-    const anioMes = new Date(c.fecha).toISOString().slice(0, 7);
+    const anioMes = c.fecha.slice(0, 7);
     return c.tarjetaId === tarjeta.id && anioMes === mes;
   });
 

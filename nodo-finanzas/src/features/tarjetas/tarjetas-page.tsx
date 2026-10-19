@@ -26,6 +26,7 @@ import {
   montoInteresesFinanciacion,
 } from './intereses-financiacion';
 import { guardarSaldoMesAnterior, montoSaldoMesAnterior } from './saldo-mes-anterior';
+import { TarjetaPlastico } from './tarjeta-plastico';
 import type { Tarjeta, RubroConsumo } from '@/types';
 
 type Vista = 'resumen' | 'registro';
@@ -77,7 +78,7 @@ export function TarjetasPage() {
 
   const resumenesDelMes = tarjetasActivas.map((tarjeta) => {
     const consumosDelMes = finanzas.consumosTarjetas.filter((c) => {
-      const anioMes = new Date(c.fecha).toISOString().slice(0, 7);
+      const anioMes = c.fecha.slice(0, 7);
       return c.tarjetaId === tarjeta.id && anioMes === filtroMes;
     });
 
@@ -238,16 +239,18 @@ export function TarjetasPage() {
             {resumenesDelMes.map((resumen) => (
               <div
                 key={resumen.tarjeta.id}
-                className="bg-white rounded-xl shadow-sm border border-mist p-5 hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
+                className="bg-white rounded-2xl shadow-sm border border-mist hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
                 onClick={() => navigate(`/admin/tarjetas/${resumen.tarjeta.id}`)}
               >
-                {/* Status banner */}
+                <TarjetaPlastico tarjeta={resumen.tarjeta} />
+
+                <div className="p-4">
                 {resumen.pagada && (
-                  <div className="bg-green-600 text-white px-5 py-2 -mx-5 -mt-5 mb-4 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span className="text-xs font-bold uppercase tracking-widest">Tarjeta Pagada</span>
-                    </div>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-green-700">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Pagada
+                    </span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -262,7 +265,7 @@ export function TarjetasPage() {
                         );
                         if (gastoPago) finanzas.eliminarGastoDiario(gastoPago.id).then(() => finanzas.recargarDatos(true));
                       }}
-                      className="flex items-center gap-1 text-xs text-white/80 hover:text-white transition-colors"
+                      className="flex items-center gap-1 text-xs text-slate2 hover:text-ink transition-colors"
                       title="Deshacer pago"
                     >
                       <Undo2 className="w-3.5 h-3.5" />
@@ -271,11 +274,11 @@ export function TarjetasPage() {
                   </div>
                 )}
                 {resumen.pagoParcial && (
-                  <div className="bg-orange-500 text-white px-5 py-2 -mx-5 -mt-5 mb-4 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4" />
-                      <span className="text-xs font-bold uppercase tracking-widest">Pagada Parcialmente</span>
-                    </div>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-orange-600">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Pago parcial
+                    </span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -284,7 +287,7 @@ export function TarjetasPage() {
                         );
                         if (gastoPago) finanzas.eliminarGastoDiario(gastoPago.id).then(() => finanzas.recargarDatos(true));
                       }}
-                      className="flex items-center gap-1 text-xs text-white/80 hover:text-white transition-colors"
+                      className="flex items-center gap-1 text-xs text-slate2 hover:text-ink transition-colors"
                       title="Deshacer pago"
                     >
                       <Undo2 className="w-3.5 h-3.5" />
@@ -293,13 +296,13 @@ export function TarjetasPage() {
                   </div>
                 )}
                 {!resumen.pagada && !resumen.pagoParcial && (
-                  <div className="bg-slate-500 text-white px-5 py-2 -mx-5 -mt-5 mb-4 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="w-4 h-4" />
-                      <span className="text-xs font-bold uppercase tracking-widest">Tarjeta Sin Pagar</span>
-                    </div>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-slate2">
+                      <CreditCard className="w-3.5 h-3.5" />
+                      Sin pagar
+                    </span>
                     <label
-                      className="flex items-center gap-1.5 text-xs text-white/90 hover:text-white cursor-pointer"
+                      className="flex items-center gap-1.5 text-xs text-slate2 hover:text-ink cursor-pointer"
                       onClick={(e) => e.stopPropagation()}
                       title="Marcar como pagada sin registrar un gasto"
                     >
@@ -311,32 +314,13 @@ export function TarjetasPage() {
                             .actualizarTarjeta(resumen.tarjeta.id, { pagada: true, ultimoPagoMes: filtroMes })
                             .then(() => finanzas.recargarDatos(true));
                         }}
-                        className="h-3.5 w-3.5 accent-white cursor-pointer"
+                        className="h-3.5 w-3.5 cursor-pointer"
                       />
                       Marcar pagada
                     </label>
                   </div>
                 )}
 
-                {/* Card info */}
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="font-bold text-ink text-lg">{resumen.tarjeta.nombre}</h3>
-                    <p className="text-sm text-slate2">{resumen.tarjeta.banco}</p>
-                    <p className="text-xs text-slate2">Titular: {resumen.tarjeta.titular}</p>
-                  </div>
-                  <span className={`px-2.5 py-1 text-xs rounded-full font-bold uppercase ${
-                    resumen.tarjeta.tipo === 'VISA'
-                      ? 'bg-blue-100 text-blue-800'
-                      : resumen.tarjeta.tipo === 'MASTERCARD'
-                      ? 'bg-orange-100 text-orange-800'
-                      : 'bg-green-100 text-green-800'
-                  }`}>
-                    {resumen.tarjeta.tipo}
-                  </span>
-                </div>
-
-                {/* Totales */}
                 <div className="space-y-2 mb-4">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-slate2">
@@ -492,6 +476,7 @@ export function TarjetasPage() {
                     <Receipt className="w-4 h-4" />
                     Gasto
                   </Button>
+                </div>
                 </div>
               </div>
             ))}

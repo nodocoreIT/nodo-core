@@ -5,6 +5,26 @@
  * keep showing June/July as "vence hoy".
  */
 
+/**
+ * Fecha de la cuota N (0 = primera) de una compra con tarjeta.
+ * Si el día de la compra ya pasó del 10, la primera cuota cae el mes siguiente.
+ */
+export function fechaCuotaTarjeta(fechaCompra: string, indice: number): string {
+  const dia = Number(fechaCompra.slice(8, 10));
+  const arranque = dia > 10 ? 1 : 0;
+  return sumarMesesFecha(fechaCompra, arranque + indice);
+}
+
+/** Suma meses a YYYY-MM-DD en calendario local, sin pasar por UTC. */
+export function sumarMesesFecha(iso: string, meses: number): string {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  const dt = new Date(y, m - 1 + meses, d);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
 export function fechaEnMes(year: number, month1to12: number, dia: number): string {
   const maxDay = new Date(year, month1to12, 0).getDate();
   const day = Math.min(Math.max(1, dia), maxDay);

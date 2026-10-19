@@ -271,7 +271,11 @@ export function PrestamosPage() {
     else if (cuenta.tipo === 'VIRTUAL') formaPago = 'MERCADO_PAGO';
 
     setProcesandoPago(true);
-    const rubroCreditos = rubrosActivos.find((r) => r.codigo === 'CREDITOS');
+    const plano = (valor: string) =>
+      valor.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/[^a-z0-9]/g, '');
+    const rubroCreditos = rubrosActivos.find(
+      (r) => plano(r.codigo) === 'creditos' || plano(r.nombre) === 'creditos',
+    );
 
     try {
       await finanzas.agregarGastoDiario({
@@ -283,7 +287,7 @@ export function PrestamosPage() {
         cuentaId: cuentaPagoId,
         prestamoId: prestamoParaPago.id,
         rubroId: rubroCreditos?.id,
-        rubro: rubroCreditos ? 'CREDITOS' : undefined,
+        rubro: rubroCreditos?.codigo,
       });
 
       const cambios: Partial<Prestamo> = {

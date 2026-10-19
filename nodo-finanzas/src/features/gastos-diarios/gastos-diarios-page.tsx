@@ -17,7 +17,7 @@ import { useExtractGastoFromVoice } from './hooks/use-extract-gasto-from-voice';
 import { useRubros } from '@/hooks/use-rubros';
 import { compararMontoVisible } from '@/utils/comparar-monto';
 import { formatearMoneda, formatearFecha } from '@/utils/formatters';
-import { cuentaPillClass } from '@/utils/cuenta-colors';
+import { cuentaPillClass, tarjetaPillClass } from '@/utils/cuenta-colors';
 import type { GastoDiario } from '@/types';
 
 type VoiceState = 'idle' | 'listening' | 'extracting' | 'error';
@@ -281,7 +281,7 @@ export function GastosDiariosPage() {
   function obtenerPillClass(g: GastoDiario): string {
     if (g.formaPago === 'TARJETA' && g.tarjetaId) {
       const t = finanzas.tarjetas.find((t) => t.id === g.tarjetaId);
-      return t ? cuentaPillClass(t.banco || t.nombre) : 'bg-mist text-slate2';
+      return t ? tarjetaPillClass(t.nombre, t.banco) : 'bg-mist text-slate2';
     }
     const cuenta = resolverCuenta(g);
     if (cuenta) return cuentaPillClass(cuenta.nombre);

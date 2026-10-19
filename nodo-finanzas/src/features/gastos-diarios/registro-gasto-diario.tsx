@@ -12,9 +12,10 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { useRubros } from '@/hooks/use-rubros';
-import { getFechaHoy, formatearMoneda } from '@/utils/formatters';
+import { getFechaHoy, formatearMoneda, formatearFecha } from '@/utils/formatters';
 import { capitalizarDescripcion } from '@/utils/capitalizar-descripcion';
 import { cuentaIdPorFormaPago } from '@/utils/cuenta-por-forma-pago';
+import { fechaCuotaTarjeta } from '@/utils/vencimientos';
 import type { FormaDePago, GastoDiario } from '@/types';
 
 const schema = z.object({
@@ -27,7 +28,7 @@ const schema = z.object({
   formaPago: z.enum(['EFECTIVO', 'DEBITO', 'TARJETA', 'TRANSFERENCIA BANCO', 'MERCADO_PAGO']),
   tarjetaId: z.string().optional(),
   cuentaId: z.string().optional(),
-  cuotas: z.number().min(1).optional(),
+  cuotas: z.coerce.number().int().min(1, 'Indicá las cuotas').max(24),
   planId: z.string().optional(),
   prestamoId: z.string().optional(),
   pagoTarjetaId: z.string().optional(),
@@ -102,6 +103,17 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
   const formaPago = watch('formaPago');
   const cuotas = watch('cuotas') ?? 1;
   const monto = watch('monto') ?? 0;
+  const fecha = watch('fecha');
+  const totalCuotas = Math.max(1, Number(cuotas) || 1);
+  const vencimientosCuotas = useMemo(() => {
+    if (formaPago !== 'TARJETA' || totalCuotas <= 1 || !fecha) return [];
+    const base = fecha.slice(0, 10);
+    const montoPorCuota = monto / totalCuotas;
+    return Array.from({ length: totalCuotas }, (_, i) => ({
+      fecha: fechaCuotaTarjeta(base, i),
+      monto: montoPorCuota,
+    }));
+  }, [formaPago, totalCuotas, fecha, monto]);
 
   const tarjetasActivas = finanzas.tarjetas.filter((t) => t.activa);
   const cuentasActivas = finanzas.cuentas.filter((c) => c.activa);
@@ -192,7 +204,13 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
 
       <Card>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <form
+          onSubmit={handleSubmit(onSubmit, (formErrors) => {
+            const first = Object.values(formErrors).find((error) => error && 'message' in error && error.message);
+            toast.error(typeof first?.message === 'string' ? first.message : 'Revisá los campos del formulario');
+          })}
+          className="space-y-5"
+        >
           {/* Hidden fields */}
           <input type="hidden" {...register('planId')} />
           <input type="hidden" {...register('prestamoId')} />
@@ -295,23 +313,47 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
               )}
             />
 
-            <Select
-              label="Cuotas"
-              options={opcionesCuotas.map((option) => ({
-                value: String(option.value),
-                label: option.label,
-              }))}
-              {...register('cuotas', { valueAsNumber: true })}
+            <Controller
+              control={control}
+              name="cuotas"
+              render={({ field }) => (
+                <Select
+                  label="Cuotas"
+                  options={opcionesCuotas.map((option) => ({
+                    value: String(option.value),
+                    label: option.label,
+                  }))}
+                  value={String(field.value ?? 1)}
+                  onChange={(e) => field.onChange(Number(e.target.value))}
+                  error={errors.cuotas?.message}
+                  name={field.name}
+                />
+              )}
             />
           </div>
 
-          {/* Cuotas summary */}
-          {formaPago === 'TARJETA' && cuotas > 1 && (
-            <div className="bg-mist/40 p-4 rounded-xl border border-mist text-sm">
-              <p className="font-semibold text-ink">Resumen de cuotas</p>
-              <p className="text-slate2 mt-1">
-                {cuotas} cuotas de {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(monto / cuotas)}
-              </p>
+          {vencimientosCuotas.length > 0 && (
+            <div className="rounded-xl border border-mist overflow-hidden text-sm">
+              <div className="flex items-center justify-between bg-mist/40 px-4 py-3">
+                <p className="font-semibold text-ink">Vencimientos</p>
+                <p className="text-slate2">
+                  {totalCuotas} cuotas de {formatearMoneda(monto / totalCuotas)}
+                </p>
+              </div>
+              <div className="grid grid-cols-[2.5rem_1fr_auto] gap-0 px-4 py-2 text-xs font-medium text-slate2 border-b border-mist">
+                <span>#</span>
+                <span>Vencimiento</span>
+                <span>Monto</span>
+              </div>
+              <div className="divide-y divide-mist max-h-72 overflow-y-auto">
+                {vencimientosCuotas.map((cuota, i) => (
+                  <div key={`${i}-${cuota.fecha}`} className="grid grid-cols-[2.5rem_1fr_auto] items-center px-4 py-2">
+                    <span className="text-xs font-medium text-slate2">{i + 1}</span>
+                    <span className="text-ink">{formatearFecha(cuota.fecha)}</span>
+                    <span className="font-medium text-ink">{formatearMoneda(cuota.monto)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

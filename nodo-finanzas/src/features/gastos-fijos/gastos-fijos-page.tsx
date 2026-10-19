@@ -17,7 +17,7 @@ import { useDolar } from '@/hooks/use-dolar';
 import { useExtractGastoFijoFromVoice, type ExtractedGastoFijo } from './hooks/use-extract-gasto-fijo-from-voice';
 import { compararMontoVisible } from '@/utils/comparar-monto';
 import { formatearMoneda, esFechaDelMesActual } from '@/utils/formatters';
-import { cuentaPillClass } from '@/utils/cuenta-colors';
+import { cuentaPillClass, tarjetaPillClass } from '@/utils/cuenta-colors';
 import { cuentaIdPorFormaPago } from '@/utils/cuenta-por-forma-pago';
 import { normalizarCodigoRubro } from '@/utils/rubro-formatters';
 import type { GastoFijo } from '@/types';
@@ -119,7 +119,7 @@ export function GastosFijosPage() {
       return {
         mainLabel: 'Tarjeta',
         subLabel: tarjeta?.nombre,
-        pillClass: tarjeta ? cuentaPillClass(tarjeta.banco || tarjeta.nombre) : 'bg-brand/10 text-brand',
+        pillClass: tarjeta ? tarjetaPillClass(tarjeta.nombre, tarjeta.banco) : 'bg-brand/10 text-brand',
       };
     }
     if (gasto.formaDePago === 'MERCADO_PAGO') {
