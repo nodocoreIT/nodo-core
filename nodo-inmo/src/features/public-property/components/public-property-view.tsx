@@ -12,8 +12,6 @@ import {
   Ruler,
   X,
 } from "lucide-react";
-import { PropertyAmenityIconsLarge } from "@/features/portal/components/amenity-icons";
-import type { PortalProperty } from "@/features/portal/hooks/use-portal-properties";
 import {
   OPERATION_LABELS,
   formatPortalPrice,
@@ -31,10 +29,6 @@ import {
   whatsappConsultHref,
 } from "../lib/public-listing";
 import { PublicPropertyMap } from "./public-property-map";
-
-function toAmenityShape(property: PublicProperty): PortalProperty {
-  return property as unknown as PortalProperty;
-}
 
 function Stat({
   icon,
@@ -221,13 +215,6 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
         ) : null}
 
         <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-8">
-          <h2 className="font-display text-xl font-bold text-navy">Características</h2>
-          <div className="mt-4">
-            <PropertyAmenityIconsLarge property={toAmenityShape(property)} />
-          </div>
-        </section>
-
-        <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-8">
           <h2 className="font-display text-xl font-bold text-navy">Ubicación</h2>
           <p className="mt-1 text-sm text-slate2">{publicListingMapQuery(property)}</p>
           <div className="mt-4">
@@ -345,7 +332,7 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-navy">{property.address}</p>
-            <p className="text-sm font-bold text-brand">{price}</p>
+            <p className="text-sm font-bold" style={{ color: theme.primaryColor }}>{price}</p>
           </div>
           {waHref ? (
             <a
