@@ -65,10 +65,11 @@ export function PropertyDetailDialog({ property, onClose }: PropertyDetailDialog
 
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ 
-          text, 
+        await navigator.share({
           title: property!.address,
-          ...(filesArray.length > 0 ? { files: filesArray } : {}) 
+          url: publicUrl,
+          text: publicUrl ?? text,
+          ...(filesArray.length > 0 ? { files: filesArray } : {}),
         });
       } catch {
         // ignore
@@ -100,7 +101,7 @@ export function PropertyDetailDialog({ property, onClose }: PropertyDetailDialog
   }
 
   function handleWhatsApp() {
-    openWhatsAppShare(shareText());
+    openWhatsAppShare(publicUrl ?? shareText());
     setShowShareMenu(false);
   }
 
