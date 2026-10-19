@@ -4,6 +4,7 @@ import {
   publicListingMapQuery,
   publicListingTheme,
   publicListingTitle,
+  toWhatsAppNumber,
   whatsappConsultHref,
 } from "./public-listing";
 
@@ -42,9 +43,9 @@ describe("public listing copy", () => {
     expect(theme.secondaryColor).toBe("#003000");
   });
 
-  it("builds a wa.me link from a formatted phone", () => {
+  it("builds a WhatsApp link from a formatted phone", () => {
     expect(whatsappConsultHref("+54 9 2954 62-3600", "Hola")).toBe(
-      "https://wa.me/5492954623600?text=Hola",
+      "https://api.whatsapp.com/send?phone=5492954623600&text=Hola",
     );
     expect(whatsappConsultHref("11", "Hola")).toBeNull();
   });
@@ -54,8 +55,9 @@ describe("public listing copy", () => {
       "2954586125",
       "2954362150",
     ]);
+    expect(toWhatsAppNumber("2954586125")).toBe("5492954586125");
     expect(whatsappConsultHref("2954586125 / 2954362150", "Hola")).toBe(
-      "https://wa.me/2954586125?text=Hola",
+      "https://api.whatsapp.com/send?phone=5492954586125&text=Hola",
     );
   });
 });

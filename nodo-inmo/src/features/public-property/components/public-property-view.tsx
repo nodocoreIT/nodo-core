@@ -109,7 +109,10 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
 
   return (
     <div className="min-h-screen pb-24" style={{ ...publicListingThemeStyle(theme), backgroundColor: theme.backgroundColor || "#f5f8fc" }}>
-      <header className="sticky top-0 z-40 text-white" style={{ backgroundColor: theme.secondaryColor }}>
+      <header
+        className="sticky top-0 z-40 text-white"
+        style={{ backgroundColor: `var(--flyer-secondary, ${theme.secondaryColor})` }}
+      >
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-3 px-4">
           {headerMark}
           {phones[0] ? (
@@ -186,7 +189,10 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
             </div>
             <p
               className="shrink-0 rounded-xl px-4 py-2 text-xl font-bold sm:text-2xl"
-              style={{ backgroundColor: theme.primaryColor, color: theme.buttonFontColor || "#fff" }}
+              style={{
+                backgroundColor: `var(--flyer-primary, ${theme.primaryColor})`,
+                color: theme.buttonFontColor || "#fff",
+              }}
             >
               {price}
             </p>
