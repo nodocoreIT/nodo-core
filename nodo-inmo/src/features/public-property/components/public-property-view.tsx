@@ -5,11 +5,18 @@ import {
   Car,
   ChevronLeft,
   ChevronRight,
+  Flame,
   Home,
   Mail,
   MapPin,
+  MoveVertical,
+  ParkingCircle,
+  PawPrint,
   Phone,
   Ruler,
+  TreePine,
+  WashingMachine,
+  Waves,
   X,
 } from "lucide-react";
 import {
@@ -19,6 +26,7 @@ import {
 import { cn } from "@/shared/lib/utils";
 import type { PublicProperty } from "../hooks/use-public-property";
 import {
+  publicListingAmenities,
   publicListingLocation,
   publicListingMapQuery,
   publicListingTheme,
@@ -28,6 +36,17 @@ import {
   parseAgencyPhones,
   whatsappConsultHref,
 } from "../lib/public-listing";
+
+const AMENITY_ICONS: Record<string, ReactNode> = {
+  has_pool: <Waves className="h-3.5 w-3.5" />,
+  pets_allowed: <PawPrint className="h-3.5 w-3.5" />,
+  has_garage: <Car className="h-3.5 w-3.5" />,
+  has_garden: <TreePine className="h-3.5 w-3.5" />,
+  has_laundry: <WashingMachine className="h-3.5 w-3.5" />,
+  has_bbq: <Flame className="h-3.5 w-3.5" />,
+  has_elevator: <MoveVertical className="h-3.5 w-3.5" />,
+  has_parking: <ParkingCircle className="h-3.5 w-3.5" />,
+};
 import { PublicPropertyMap } from "./public-property-map";
 
 function Stat({
@@ -67,20 +86,20 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
     property,
     typeof window !== "undefined" ? window.location.search : "",
   );
-  const headerMark =
-    property.agency?.logo_url && theme.logoType !== "text" ? (
-      <img
-        src={property.agency.logo_url}
-        alt={property.agency.legal_name ?? "Inmobiliaria"}
-        className="h-10 max-w-[180px] object-contain"
-      />
-    ) : (
-      <p className="font-display text-sm font-semibold tracking-wide">
-        {theme.logoType === "text" && theme.brandText
-          ? theme.brandText
-          : (property.agency?.legal_name ?? "Nodo Inmo")}
-      </p>
-    );
+  const amenities = publicListingAmenities(property);
+  const headerMark = property.agency?.logo_url ? (
+    <img
+      src={property.agency.logo_url}
+      alt={property.agency.legal_name ?? "Inmobiliaria"}
+      className="h-10 max-h-12 w-auto max-w-[220px] object-contain"
+    />
+  ) : (
+    <p className="font-display text-sm font-semibold tracking-wide">
+      {theme.logoType === "text" && theme.brandText
+        ? theme.brandText
+        : (property.agency?.legal_name ?? "Nodo Inmo")}
+    </p>
+  );
 
   function prevPhoto() {
     if (photos.length < 2) return;
@@ -212,6 +231,20 @@ export function PublicPropertyView({ property }: { property: PublicProperty }) {
               <Stat icon={<Ruler className="h-5 w-5" />} label="Superficie" value={`${property.total_sqm} m²`} />
             ) : null}
           </div>
+
+          {amenities.length > 0 ? (
+            <div className="mt-5 flex flex-wrap gap-2">
+              {amenities.map((item) => (
+                <span
+                  key={item.key}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-slate2"
+                >
+                  {AMENITY_ICONS[item.key]}
+                  {item.label}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </section>
 
         {property.description ? (

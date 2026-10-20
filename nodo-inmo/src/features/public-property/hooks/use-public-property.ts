@@ -66,6 +66,7 @@ export function usePublicProperty(shareToken: string | undefined) {
         rpc && typeof rpc === "object" && rpc.theme_settings && typeof rpc.theme_settings === "object"
           ? (rpc.theme_settings as Record<string, unknown>)
           : null;
+      const rpcRow = rpc && typeof rpc === "object" ? (rpc as Partial<PublicProperty>) : null;
       const property = landing ?? edge ?? boot;
       if (!property) throw new Error("not_found");
       const theme =
@@ -78,12 +79,30 @@ export function usePublicProperty(shareToken: string | undefined) {
         rpcTheme ??
         boot?.theme_settings ??
         null;
+      const amenity = (key: keyof PublicProperty) =>
+        property[key] === true ||
+        landing?.[key] === true ||
+        edge?.[key] === true ||
+        rpcRow?.[key] === true ||
+        boot?.[key] === true;
       return {
         ...property,
+        has_pool: amenity("has_pool"),
+        pets_allowed: amenity("pets_allowed"),
+        has_garage: amenity("has_garage"),
+        has_garden: amenity("has_garden"),
+        has_laundry: amenity("has_laundry"),
+        has_bbq: amenity("has_bbq"),
+        has_elevator: amenity("has_elevator"),
+        has_parking: amenity("has_parking"),
         theme_settings: theme,
         agency: {
           ...(property.agency ?? { legal_name: null, phone: null, email: null }),
-          logo_url: landing?.agency?.logo_url ?? edge?.agency?.logo_url ?? boot?.agency?.logo_url ?? null,
+          logo_url:
+            landing?.agency?.logo_url ||
+            edge?.agency?.logo_url ||
+            boot?.agency?.logo_url ||
+            null,
         },
       };
     },
