@@ -1,173 +1,113 @@
 import { useState } from "react";
-import { Share2, Loader2 } from "lucide-react";
+import { Share2, Check, Copy, Link2, Mail } from "lucide-react";
 import { Button } from "@nodocore/shared-components";
-import { supabase } from "@/shared/lib/supabase";
 import type { PropertyRow } from "@/features/properties/hooks/use-properties";
 import {
-  OPERATION_LABELS,
-  PROPERTY_TYPE_LABELS,
-  formatPrice,
-} from "@/features/properties/lib/property-labels";
-
-function buildShareText(property: PropertyRow, coverPhotoUrl: string = ""): string {
-  const op = OPERATION_LABELS[property.operation] ?? property.operation;
-  const type = PROPERTY_TYPE_LABELS[property.property_type] ?? property.property_type;
-  const price = formatPrice(property.sale_price, property.currency);
-
-  const lines: string[] = [];
-
-  // Header: Address
-  lines.push(`🏠 ${property.address}`);
-
-  // Type, operation, price
-  lines.push(`${type} en ${op} · ${price}`);
-  lines.push("");
-
-  // Specs: sqm, rooms, bathrooms
-  const specs: string[] = [];
-  if ((property as any).total_sqm) specs.push(`📐 ${property.total_sqm}m²`);
-  if (property.rooms) specs.push(`🛏 ${property.rooms} amb.`);
-  if ((property as any).bathrooms) specs.push(`🚿 ${property.bathrooms} baños`);
-  if (specs.length > 0) lines.push(specs.join("   "));
-
-  // Location
-  const location: string[] = [];
-  if ((property as any).localidad) location.push((property as any).localidad);
-  if ((property as any).provincia) location.push((property as any).provincia);
-  if (location.length > 0) lines.push(`📍 ${location.join(", ")}`);
-
-  // Amenities
-  const amenities: string[] = [];
-  if ((property as any).has_pool) amenities.push("Pileta");
-  if ((property as any).has_garage) amenities.push("Garaje");
-  if ((property as any).has_garden) amenities.push("Jardín");
-  if ((property as any).has_laundry) amenities.push("Lavadero");
-  if ((property as any).has_bbq) amenities.push("Parrilla");
-  if ((property as any).has_elevator) amenities.push("Ascensor");
-  if ((property as any).has_parking) amenities.push("Estacionamiento");
-  if ((property as any).pets_allowed) amenities.push("Mascotas");
-  if (amenities.length > 0) lines.push(`✅ ${amenities.join(" · ")}`);
-
-  // Description
-  if (property.description) {
-    lines.push("");
-    lines.push(property.description);
-  }
-
-  // Cover photo (desktop only)
-  if (coverPhotoUrl) {
-    lines.push("");
-    lines.push(`📸 Foto: ${coverPhotoUrl}`);
-  }
-
-  // Instagram
-  if ((property as any).instagram_url) {
-    lines.push("");
-    lines.push(`📱 Instagram: ${(property as any).instagram_url}`);
-  }
-
-  return lines.join("\n");
-}
-
-async function fetchCoverPhotoFile(path: string): Promise<File | null> {
-  try {
-    const { data, error } = await supabase.storage
-      .from("property-photos")
-      .createSignedUrl(path, 60);
-    if (error || !data) return null;
-
-    const res = await fetch(data.signedUrl);
-    if (!res.ok) return null;
-
-    const blob = await res.blob();
-    const ext = path.split(".").pop() ?? "jpg";
-    return new File([blob], `portada.${ext}`, { type: blob.type });
-  } catch {
-    return null;
-  }
-}
-
-async function fetchCoverPhotoUrl(path: string): Promise<string> {
-  try {
-    const { data, error } = await supabase.storage
-      .from("property-photos")
-      .createSignedUrl(path, 60);
-    if (error || !data) return "";
-    return data.signedUrl;
-  } catch {
-    return "";
-  }
-}
+  buildPropertyShareText,
+  getPublicPropertyUrl,
+  openWhatsAppShare,
+} from "@/features/properties/lib/property-share";
 
 interface SharePropertyButtonProps {
   property: PropertyRow;
 }
 
 export function SharePropertyButton({ property }: SharePropertyButtonProps) {
-  const [sharing, setSharing] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
-  async function handleShare() {
-    setSharing(true);
-    try {
-      const title = property.address;
-      const photos = (property as unknown as { photos?: string[] }).photos;
-      const coverPath = photos?.[0] ?? property.main_photo ?? null;
+  const shareToken = (property as PropertyRow & { share_token?: string | null }).share_token;
+  const publicUrl = shareToken ? getPublicPropertyUrl(shareToken) : undefined;
+  const shareText = buildPropertyShareText(property, { publicUrl });
 
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  async function handleCopyLink() {
+    if (!publicUrl) return;
+    await navigator.clipboard.writeText(publicUrl);
+    setLinkCopied(true);
+    setOpen(false);
+    setTimeout(() => setLinkCopied(false), 2000);
+  }
 
-      // Mobile: try native share sheet with cover photo
-      if (isMobile && coverPath) {
-        const file = await fetchCoverPhotoFile(coverPath);
-        const text = buildShareText(property);
-        if (
-          file &&
-          typeof navigator.canShare === "function" &&
-          navigator.canShare({ files: [file] })
-        ) {
-          await navigator.share({ files: [file], title, text });
-          return;
-        }
-      }
+  function handleWhatsApp() {
+    openWhatsAppShare(publicUrl ?? shareText);
+    setOpen(false);
+  }
 
-      // Mobile without file support: text-only native share
-      if (isMobile && typeof navigator.share === "function") {
-        const text = buildShareText(property);
-        await navigator.share({ title, text });
-        return;
-      }
+  async function handleCopyInfo() {
+    await navigator.clipboard.writeText(shareText);
+    setCopied(true);
+    setOpen(false);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
-      // Desktop: WhatsApp web with text + cover photo URL
-      let coverPhotoUrl = "";
-      if (coverPath) {
-        coverPhotoUrl = await fetchCoverPhotoUrl(coverPath);
-      }
-      const text = buildShareText(property, coverPhotoUrl);
-      window.open(
-        `https://wa.me/?text=${encodeURIComponent(text)}`,
-        "_blank",
-        "noreferrer",
-      );
-    } catch {
-      // User cancelled — do nothing
-    } finally {
-      setSharing(false);
-    }
+  function handleMail() {
+    window.location.href = `mailto:?subject=${encodeURIComponent(property.address)}&body=${encodeURIComponent(shareText)}`;
+    setOpen(false);
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      aria-label="Compartir propiedad"
-      disabled={sharing}
-      onClick={() => void handleShare()}
-    >
-      {sharing ? (
-        <Loader2 className="h-4 w-4 animate-spin" />
-      ) : (
-        <Share2 className="h-4 w-4" />
-      )}
-      <span className="sr-only">Compartir</span>
-    </Button>
+    <div className="relative">
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-label="Compartir propiedad"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((prev) => !prev);
+        }}
+      >
+        {copied || linkCopied ? (
+          <Check className="h-4 w-4 text-green-600" />
+        ) : (
+          <Share2 className="h-4 w-4" />
+        )}
+        <span className="sr-only">Compartir</span>
+      </Button>
+
+      {open ? (
+        <div
+          className="absolute right-0 top-full z-50 mt-1 w-48 rounded-md border border-border bg-card p-1 shadow-md"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {publicUrl ? (
+            <button
+              type="button"
+              onClick={() => void handleCopyLink()}
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted"
+            >
+              <Link2 className="h-4 w-4" />
+              Copiar link web
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleWhatsApp}
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="#25D366" xmlns="http://www.w3.org/2000/svg">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+            </svg>
+            WhatsApp
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleCopyInfo()}
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted"
+          >
+            <Copy className="h-4 w-4" />
+            Copiar info
+          </button>
+          <button
+            type="button"
+            onClick={handleMail}
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted"
+          >
+            <Mail className="h-4 w-4" />
+            Mail
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
