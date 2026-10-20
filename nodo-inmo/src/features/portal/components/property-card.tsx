@@ -29,7 +29,7 @@ function PropertyCardInner({
   return (
     <div className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
       {/* Photo */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-mist">
+      <div className="relative aspect-[16/9] overflow-hidden bg-mist sm:aspect-[2/1]">
         {photoUrl ? (
           <img
             src={photoUrl}
@@ -56,7 +56,7 @@ function PropertyCardInner({
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 flex-col gap-2 p-4">
+      <div className="flex flex-1 flex-col gap-1.5 p-3">
         <div>
           <p className="text-xs text-slate2">{typeLabel}</p>
           <h3 className="line-clamp-2 text-sm font-semibold text-foreground leading-snug">
