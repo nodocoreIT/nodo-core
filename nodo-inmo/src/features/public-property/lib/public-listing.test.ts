@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   parseAgencyPhones,
+  publicListingAmenities,
   publicListingMapQuery,
   publicListingTheme,
   publicListingTitle,
@@ -27,6 +28,21 @@ describe("public listing copy", () => {
         provincia: "La Pampa",
       }),
     ).toBe("Cervantes 345, Santa Rosa, La Pampa, Argentina");
+  });
+
+  it("lists active amenities for the public flyer", () => {
+    expect(
+      publicListingAmenities({
+        has_pool: false,
+        pets_allowed: true,
+        has_garage: false,
+        has_garden: false,
+        has_laundry: true,
+        has_bbq: false,
+        has_elevator: false,
+        has_parking: true,
+      }).map((item) => item.label),
+    ).toEqual(["Mascotas", "Lavadero", "Estacionamiento"]);
   });
 
   it("uses the agency theme colors on the public flyer", () => {

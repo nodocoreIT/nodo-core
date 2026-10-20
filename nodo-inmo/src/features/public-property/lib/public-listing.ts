@@ -106,6 +106,33 @@ export function publicListingTheme(property: PublicProperty, search?: string): T
   return mergeThemeSettings({ ...fromQuery, ...fromWindow, ...fromProperty }, DEFAULT_SETTINGS);
 }
 
+export const PUBLIC_AMENITY_LABELS = [
+  { key: "has_pool" as const, label: "Pileta" },
+  { key: "pets_allowed" as const, label: "Mascotas" },
+  { key: "has_garage" as const, label: "Garaje" },
+  { key: "has_garden" as const, label: "Jardín" },
+  { key: "has_laundry" as const, label: "Lavadero" },
+  { key: "has_bbq" as const, label: "Parrilla" },
+  { key: "has_elevator" as const, label: "Ascensor" },
+  { key: "has_parking" as const, label: "Estacionamiento" },
+];
+
+export function publicListingAmenities(
+  property: Pick<
+    PublicProperty,
+    | "has_pool"
+    | "pets_allowed"
+    | "has_garage"
+    | "has_garden"
+    | "has_laundry"
+    | "has_bbq"
+    | "has_elevator"
+    | "has_parking"
+  >,
+): { key: string; label: string }[] {
+  return PUBLIC_AMENITY_LABELS.filter((item) => property[item.key] === true);
+}
+
 export function publicListingThemeStyle(theme: ThemeSettings): CSSProperties {
   return {
     ["--color-brand" as string]: theme.primaryColor,
