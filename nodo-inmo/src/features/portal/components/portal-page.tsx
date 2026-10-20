@@ -196,7 +196,7 @@ export function PortalPage() {
 
       {/* Grid */}
       {!isLoading && !isError && paged.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {paged.map((p) => (
             <PropertyCard key={p.id} property={p} onSelect={setSelected} />
           ))}
