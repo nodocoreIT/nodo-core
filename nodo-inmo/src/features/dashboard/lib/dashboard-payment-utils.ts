@@ -42,6 +42,36 @@ export function remainingAmount(payment: {
   );
 }
 
+/** Last cobrado alquiler on this contract, ignoring the current pending month. */
+export function lastPaidPactado(
+  payments: { contract_id: string; status: string; period: string; amount: number; paid_amount: number | null }[],
+  contractId: string,
+  today: Date = new Date(),
+): number {
+  const current = currentMonthKey(today);
+  let max = 0;
+  for (const p of payments) {
+    if (p.contract_id !== contractId) continue;
+    if (p.status !== "paid" && monthKey(p.period) >= current) continue;
+    max = Math.max(max, Math.round(p.amount), Math.round(p.paid_amount ?? 0));
+  }
+  return max;
+}
+
+export function remainingAmountWithStickyPactado(
+  payment: {
+    contract_id: string;
+    amount: number;
+    expenses_amount?: number | null;
+    paid_amount: number | null;
+  },
+  allPayments: { contract_id: string; status: string; period: string; amount: number; paid_amount: number | null }[],
+  today: Date = new Date(),
+): number {
+  const pactado = Math.max(Math.round(payment.amount), lastPaidPactado(allPayments, payment.contract_id, today));
+  return pactado + Math.round(payment.expenses_amount ?? 0) - Math.round(payment.paid_amount ?? 0);
+}
+
 export function isPartialPayment(payment: {
   amount: number;
   paid_amount: number | null;

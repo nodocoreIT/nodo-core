@@ -23,6 +23,26 @@ export function adjustmentWindowSize(periodMonths: number | null | undefined): n
   return Math.max(1, periodMonths ?? 12);
 }
 
+/** Look back a year of cuotas so a 4-month IPC is still visible in November. */
+export const PACTADO_LOOKBACK_MONTHS = 12;
+
+/**
+ * Aplicar aumento already rolled last/next dates, but rent_amount was later
+ * overwritten back to the pre-IPC value. Don't wait for the next due date.
+ */
+export function shouldRestoreIndexRent(input: {
+  contractRent: number;
+  lastAdjustmentDate: string | null | undefined;
+  nextAdjustmentDate: string | null | undefined;
+  todayMonth: string;
+  paidBeforeLast: number | null;
+}): boolean {
+  if (!input.lastAdjustmentDate || !input.nextAdjustmentDate) return false;
+  if (input.nextAdjustmentDate.slice(0, 7) <= input.todayMonth) return false;
+  if (input.paidBeforeLast == null) return false;
+  return Math.round(input.contractRent) <= Math.round(input.paidBeforeLast) + 1;
+}
+
 /** If próximo aumento is still in the past after an IPC already cobrado, roll the window forward. */
 export function rollAdjustmentDatesIfStale(input: {
   lastAdjustmentDate: string | null | undefined;
