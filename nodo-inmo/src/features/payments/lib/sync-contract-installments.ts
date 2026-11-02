@@ -1,5 +1,10 @@
 import { supabase } from "@/shared/lib/supabase";
-import { generateInstallments } from "./generate-installments";
+import { currentMonthKeyFromDate, generateInstallments } from "./generate-installments";
+import {
+  adjustmentWindowSize,
+  rollAdjustmentDatesIfStale,
+  stickyPactadoRent,
+} from "./sticky-pactado-rent";
 
 export interface SyncInstallmentsContract {
   id: string;
@@ -8,6 +13,9 @@ export interface SyncInstallmentsContract {
   rent_amount: number;
   currency: string;
   status: string;
+  last_adjustment_date?: string | null;
+  next_adjustment_date?: string | null;
+  adjustment_period_months?: number | null;
 }
 
 export interface SyncInstallmentsConcept {
@@ -17,13 +25,14 @@ export interface SyncInstallmentsConcept {
 
 /**
  * Generate missing monthly installments for an active contract.
- * Idempotent: existing (contract_id, period) rows are left unchanged.
+ * Idempotent: existing (contract_id, period) rows are not replaced on insert.
  *
- * Charge concepts with a `default_amount` (e.g. "Expensas", usually a fixed
- * monthly cost) are pre-seeded into `payment_charges` for every pending
- * installment — the sync_payment_charge trigger derives
- * `payments.expenses_amount` from those rows. Concepts without a default
- * amount are left for the user to fill in at collection time.
+ * New months keep the last IPC/ICL alquiler (sticky) until the next adjustment
+ * date. Pending cuotas from that increased period forward are aligned up to
+ * that amount; they are never auto-decreased here (apply / edit contract do that).
+ *
+ * Charge concepts with a `default_amount` (e.g. "Expensas") are pre-seeded into
+ * `payment_charges` for every pending installment.
  */
 export async function syncContractInstallments(
   orgId: string,
@@ -36,10 +45,34 @@ export async function syncContractInstallments(
     return { inserted: 0 };
   }
 
+  const windowSize = adjustmentWindowSize(contract.adjustment_period_months);
+  const { data: recent, error: recentError } = await supabase
+    .schema("nodo_inmo")
+    .from("payments")
+    .select("period, amount")
+    .eq("contract_id", contract.id)
+    .order("period", { ascending: false })
+    .limit(windowSize);
+
+  if (recentError) throw recentError;
+
+  const windowRows = recent ?? [];
+  const { pactado, sourceAmount } = stickyPactadoRent(
+    contract.rent_amount,
+    windowRows.map((row) => Number(row.amount)),
+  );
+  const increasedPeriod =
+    sourceAmount != null
+      ? windowRows
+          .filter((row) => Math.round(Number(row.amount)) === sourceAmount)
+          .map((row) => row.period)
+          .sort()[0]
+      : null;
+
   const drafts = generateInstallments({
     start_date: contract.start_date,
     end_date: contract.end_date,
-    rent_amount: contract.rent_amount,
+    rent_amount: pactado,
     currency: contract.currency,
     from_date: fromDate,
   });
@@ -63,18 +96,47 @@ export async function syncContractInstallments(
     if (error) throw error;
   }
 
-  // Keep pending installments aligned with the current contract rent.
+  if (pactado > Math.round(contract.rent_amount)) {
+    const todayMonth = currentMonthKeyFromDate(new Date());
+    const rolled =
+      increasedPeriod != null
+        ? rollAdjustmentDatesIfStale({
+            lastAdjustmentDate: contract.last_adjustment_date,
+            nextAdjustmentDate: contract.next_adjustment_date,
+            periodMonths: windowSize,
+            increasedPeriod,
+            todayMonth,
+          })
+        : null;
+    const { error: healError } = await supabase
+      .schema("nodo_inmo")
+      .from("contracts")
+      .update({
+        rent_amount: pactado,
+        ...(rolled ?? {}),
+      })
+      .eq("id", contract.id);
+
+    if (healError) throw healError;
+  }
+
+  // Align pending cuotas from the increased period forward — never drop them
+  // back to a stale contract.rent_amount.
+  const floorPeriod =
+    increasedPeriod ??
+    windowRows[0]?.period ??
+    fromDate ??
+    `${contract.start_date.slice(0, 7)}-01`;
   const { error: syncError } = await supabase
     .schema("nodo_inmo")
     .from("payments")
-    .update({ amount: contract.rent_amount })
+    .update({ amount: pactado })
     .eq("contract_id", contract.id)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .gte("period", floorPeriod);
 
   if (syncError) throw syncError;
 
-  // Seed/keep default charge amounts (e.g. Expensas) on every pending
-  // installment — mirrors the rent-sync above.
   const defaultConcepts = concepts.filter((c) => c.default_amount != null);
   if (defaultConcepts.length > 0) {
     const { data: pendingPayments, error: pendingError } = await supabase
