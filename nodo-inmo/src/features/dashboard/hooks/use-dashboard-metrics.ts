@@ -14,6 +14,7 @@ import {
   isPastMonthPayment,
   monthKey,
   remainingAmount,
+  remainingAmountWithStickyPactado,
   type CollectionStatus,
   isOperationalPayment,
 } from "../lib/dashboard-payment-utils";
@@ -179,7 +180,10 @@ function buildCurrentMonthCollections(
       const first = payments[0];
       const tenantName = first.contract?.tenant?.name ?? "—";
       const propertyAddress = first.contract?.property?.address ?? "—";
-      const balance = payments.reduce((sum, p) => sum + remainingAmount(p), 0);
+      const balance = payments.reduce(
+        (sum, p) => sum + remainingAmountWithStickyPactado(p, paymentRows, today),
+        0,
+      );
       const contract = first.contract;
 
       const alerts: { type: "expiration" | "adjustment"; text: string }[] = [];
@@ -278,7 +282,7 @@ function buildCurrentMonthCollections(
         currency: first.currency,
         payments: payments.map((p) => ({
           id: p.id,
-          remaining: remainingAmount(p),
+          remaining: remainingAmountWithStickyPactado(p, paymentRows, today),
         })),
         alerts,
         pendingIndexAdjustment,

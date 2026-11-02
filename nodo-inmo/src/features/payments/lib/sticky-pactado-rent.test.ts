@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   adjustmentWindowSize,
   rollAdjustmentDatesIfStale,
+  shouldRestoreIndexRent,
   stickyPactadoRent,
 } from "./sticky-pactado-rent";
 
@@ -39,6 +40,44 @@ describe("adjustmentWindowSize", () => {
   it("uses the contract period and falls back to 12", () => {
     expect(adjustmentWindowSize(4)).toBe(4);
     expect(adjustmentWindowSize(null)).toBe(12);
+  });
+});
+
+describe("shouldRestoreIndexRent", () => {
+  it("restores when dates were rolled but the contract rent is still the pre-IPC amount", () => {
+    expect(
+      shouldRestoreIndexRent({
+        contractRent: 1_100_000,
+        lastAdjustmentDate: "2026-09-01",
+        nextAdjustmentDate: "2027-01-01",
+        todayMonth: "2026-11",
+        paidBeforeLast: 1_100_000,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not restore when the contract already has the increased rent", () => {
+    expect(
+      shouldRestoreIndexRent({
+        contractRent: 1_188_448,
+        lastAdjustmentDate: "2026-09-01",
+        nextAdjustmentDate: "2027-01-01",
+        todayMonth: "2026-11",
+        paidBeforeLast: 1_100_000,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not restore when the next IPC is already due", () => {
+    expect(
+      shouldRestoreIndexRent({
+        contractRent: 1_100_000,
+        lastAdjustmentDate: "2026-09-01",
+        nextAdjustmentDate: "2026-09-01",
+        todayMonth: "2026-11",
+        paidBeforeLast: 1_100_000,
+      }),
+    ).toBe(false);
   });
 });
 

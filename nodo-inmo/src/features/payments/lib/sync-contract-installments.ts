@@ -2,6 +2,7 @@ import { supabase } from "@/shared/lib/supabase";
 import { currentMonthKeyFromDate, generateInstallments } from "./generate-installments";
 import {
   adjustmentWindowSize,
+  PACTADO_LOOKBACK_MONTHS,
   rollAdjustmentDatesIfStale,
   stickyPactadoRent,
 } from "./sticky-pactado-rent";
@@ -46,20 +47,23 @@ export async function syncContractInstallments(
   }
 
   const windowSize = adjustmentWindowSize(contract.adjustment_period_months);
+  const todayMonth = currentMonthKeyFromDate(new Date());
   const { data: recent, error: recentError } = await supabase
     .schema("nodo_inmo")
     .from("payments")
-    .select("period, amount, paid_amount")
+    .select("period, amount, paid_amount, status")
     .eq("contract_id", contract.id)
     .order("period", { ascending: false })
-    .limit(windowSize);
+    .limit(PACTADO_LOOKBACK_MONTHS);
 
   if (recentError) throw recentError;
 
-  const windowRows = (recent ?? []).map((row) => ({
-    period: row.period,
-    amount: Math.max(Math.round(Number(row.amount)), Math.round(Number(row.paid_amount ?? 0))),
-  }));
+  const windowRows = (recent ?? [])
+    .filter((row) => row.status === "paid" || String(row.period).slice(0, 7) < todayMonth)
+    .map((row) => ({
+      period: row.period,
+      amount: Math.max(Math.round(Number(row.amount)), Math.round(Number(row.paid_amount ?? 0))),
+    }));
   const { pactado, sourceAmount } = stickyPactadoRent(
     contract.rent_amount,
     windowRows.map((row) => row.amount),
@@ -100,7 +104,6 @@ export async function syncContractInstallments(
   }
 
   if (pactado > Math.round(contract.rent_amount)) {
-    const todayMonth = currentMonthKeyFromDate(new Date());
     const rolled =
       increasedPeriod != null
         ? rollAdjustmentDatesIfStale({
