@@ -6,8 +6,9 @@
  * its first day is strictly before end_date. A 2026-01-01 → 2028-01-01 contract
  * yields 24 installments (Jan 2026 … Dec 2027).
  *
- * Each installment uses the contract's current rent_amount (index adjustments
- * like IPC/ICL are applied later by editing individual cuotas — a future slice).
+ * Each installment uses the rent passed in (the current pactado). IPC/ICL
+ * changes that amount on the contract; later months reuse it until the next
+ * ajuste.
  * The due day is the contract's start day-of-month, clamped to the month length.
  */
 export interface InstallmentDraft {

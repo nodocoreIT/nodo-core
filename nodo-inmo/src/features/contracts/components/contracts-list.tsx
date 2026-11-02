@@ -66,6 +66,9 @@ export function ContractsList() {
     rent_amount: number;
     currency: string;
     status: string;
+    last_adjustment_date?: string | null;
+    next_adjustment_date?: string | null;
+    adjustment_period_months?: number | null;
   } | null>(null);
   const [page, setPage] = useState(0);
   const [sortConfig, setSortConfig] = useState<{
@@ -416,6 +419,9 @@ export function ContractsList() {
               rent_amount: payload.rent_amount,
               currency: payload.currency,
               status: payload.status,
+              last_adjustment_date: payload.last_adjustment_date,
+              next_adjustment_date: payload.next_adjustment_date,
+              adjustment_period_months: payload.adjustment_period_months,
             });
           }}
           isPending={updateContract.isPending}

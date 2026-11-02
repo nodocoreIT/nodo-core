@@ -28,6 +28,9 @@ interface GeneratePaymentsDialogProps {
     rent_amount: number;
     currency: string;
     status: string;
+    last_adjustment_date?: string | null;
+    next_adjustment_date?: string | null;
+    adjustment_period_months?: number | null;
   } | null;
   onClose: () => void;
   /** True when this dialog follows an edit to an existing contract (not a brand-new one) — defaults to "No generar por ahora" instead of regenerating from the start. */
