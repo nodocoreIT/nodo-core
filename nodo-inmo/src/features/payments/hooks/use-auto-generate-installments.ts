@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@nodocore/shared-components";
-import { useContracts } from "@/features/contracts/hooks/use-contracts";
+import { CONTRACTS_QUERY_KEY, useContracts } from "@/features/contracts/hooks/use-contracts";
 import { syncContractInstallments } from "@/features/payments/lib/sync-contract-installments";
-import { currentMonthKeyFromDate, generateInstallments } from "../lib/generate-installments";
+import { currentMonthKeyFromDate } from "../lib/generate-installments";
 import { PAYMENTS_QUERY_KEY, usePayments } from "./use-payments";
 
 /** First day of the month after a 'YYYY-MM-DD' period. */
@@ -20,10 +20,11 @@ function nextMonthStart(period: string): string {
  *
  * Generates from the month after the contract's latest existing installment
  * through the current month, so months skipped while the app wasn't opened
- * still show up as unpaid. Contracts with no installments at all start at the
- * current month (history is the user's choice via "Generar pagos"). Earlier
- * gaps, e.g. deliberately deleted cuotas, are never recreated, and existing
- * installments are untouched (the upsert ignores duplicates).
+ * still show up as unpaid. Also re-aligns the current month to the last IPC
+ * alquiler when that cuota was already created at the old rent. Contracts with
+ * no installments at all start at the current month (history is the user's
+ * choice via "Generar pagos"). Earlier gaps, e.g. deliberately deleted cuotas,
+ * are never recreated.
  */
 export function useAutoGenerateInstallments() {
   const { orgId } = useAuth();
@@ -43,7 +44,7 @@ export function useAutoGenerateInstallments() {
       if (!prev || p.period > prev) latestPeriod.set(p.contract_id, p.period);
     }
 
-    const missing: { contract: (typeof contracts.data)[number]; from: string }[] = [];
+    const toSync: { contract: (typeof contracts.data)[number]; from: string }[] = [];
     for (const c of contracts.data) {
       if (c.status !== "active" || c.archived_at) continue;
       if (!c.start_date || !c.end_date || !c.rent_amount) continue;
@@ -51,23 +52,14 @@ export function useAutoGenerateInstallments() {
 
       const latest = latestPeriod.get(c.id);
       const from = latest ? nextMonthStart(latest) : fallbackFrom;
-      if (from.slice(0, 7) > monthKey) continue;
-
-      const drafts = generateInstallments({
-        start_date: c.start_date,
-        end_date: c.end_date,
-        rent_amount: c.rent_amount,
-        currency: c.currency,
-        from_date: from,
-      });
-      if (drafts.length > 0) missing.push({ contract: c, from });
+      toSync.push({ contract: c, from });
     }
-    if (missing.length === 0) return;
+    if (toSync.length === 0) return;
 
-    for (const { contract } of missing) attempted.current.add(`${contract.id}:${monthKey}`);
+    for (const { contract } of toSync) attempted.current.add(`${contract.id}:${monthKey}`);
 
     void Promise.allSettled(
-      missing.map(({ contract: c, from }) =>
+      toSync.map(({ contract: c, from }) =>
         syncContractInstallments(
           orgId,
           c,
@@ -75,6 +67,9 @@ export function useAutoGenerateInstallments() {
           from,
         ),
       ),
-    ).then(() => queryClient.invalidateQueries({ queryKey: PAYMENTS_QUERY_KEY }));
+    ).then(() => {
+      queryClient.invalidateQueries({ queryKey: PAYMENTS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: CONTRACTS_QUERY_KEY });
+    });
   }, [orgId, contracts.data, payments.data, queryClient]);
 }
