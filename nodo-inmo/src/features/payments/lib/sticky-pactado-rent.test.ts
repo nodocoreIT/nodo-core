@@ -20,6 +20,13 @@ describe("stickyPactadoRent", () => {
     ).toEqual({ pactado: 1_188_448, sourceAmount: 1_188_448 });
   });
 
+  it("uses cobrado amount when the cuota pactado was never updated", () => {
+    expect(stickyPactadoRent(1_100_000, [1_188_448, 1_100_000])).toEqual({
+      pactado: 1_188_448,
+      sourceAmount: 1_188_448,
+    });
+  });
+
   it("follows the contract when it already has the increased rent", () => {
     expect(stickyPactadoRent(1_188_448, [1_188_448, 1_100_000])).toEqual({
       pactado: 1_188_448,

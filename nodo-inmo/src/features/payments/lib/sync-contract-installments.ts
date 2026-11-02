@@ -49,22 +49,25 @@ export async function syncContractInstallments(
   const { data: recent, error: recentError } = await supabase
     .schema("nodo_inmo")
     .from("payments")
-    .select("period, amount")
+    .select("period, amount, paid_amount")
     .eq("contract_id", contract.id)
     .order("period", { ascending: false })
     .limit(windowSize);
 
   if (recentError) throw recentError;
 
-  const windowRows = recent ?? [];
+  const windowRows = (recent ?? []).map((row) => ({
+    period: row.period,
+    amount: Math.max(Math.round(Number(row.amount)), Math.round(Number(row.paid_amount ?? 0))),
+  }));
   const { pactado, sourceAmount } = stickyPactadoRent(
     contract.rent_amount,
-    windowRows.map((row) => Number(row.amount)),
+    windowRows.map((row) => row.amount),
   );
   const increasedPeriod =
     sourceAmount != null
       ? windowRows
-          .filter((row) => Math.round(Number(row.amount)) === sourceAmount)
+          .filter((row) => row.amount === sourceAmount)
           .map((row) => row.period)
           .sort()[0]
       : null;
