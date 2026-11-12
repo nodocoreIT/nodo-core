@@ -34,6 +34,7 @@ import {
   montoInteresesFinanciacion,
 } from './intereses-financiacion';
 import { guardarSaldoMesAnterior, montoSaldoMesAnterior } from './saldo-mes-anterior';
+import { guardarImpuestos, montoImpuestos } from './impuestos-tarjeta';
 import { toast } from 'sonner';
 import type { ConsumoTarjeta } from '@/types';
 
@@ -318,6 +319,24 @@ export function DetalleTarjetaPage() {
             </p>
           </div>
         )}
+        <div>
+          <MoneyInput
+            label="Impuestos"
+            value={montoImpuestos(finanzas.consumosTarjetas, tarjeta.id, filtroMes)}
+            onChange={() => {}}
+            onBlur={(valor) => {
+              const actual = montoImpuestos(finanzas.consumosTarjetas, tarjeta.id, filtroMes);
+              if (Math.abs(valor - actual) <= 0.001) return;
+              void guardarImpuestos(finanzas, tarjeta.id, filtroMes, valor).then(() => {
+                toast.success('Impuestos actualizados');
+              });
+            }}
+            moneda="ARS"
+          />
+          <p className="text-xs text-slate2 mt-1">
+            Se suma al total del mes. Escribí el monto y hacé clic afuera para guardarlo.
+          </p>
+        </div>
       </div>
 
       {/* Filters */}

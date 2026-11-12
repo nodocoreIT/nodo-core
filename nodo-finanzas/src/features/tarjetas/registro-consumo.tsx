@@ -5,10 +5,21 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { FormSelect, SearchableSelect } from '@nodocore/shared-components';
 import { RubroSelector } from '@/components/rubros/rubro-selector';
 import { useFinanzas } from '@/hooks/use-finanzas';
+import { MonthPicker } from '@/components/ui/month-picker';
 import { formatearMoneda, getFechaHoy } from '@/utils/formatters';
+import { fechaCuotaEnMesPago } from '@/utils/vencimientos';
 import { completarConsumoRecurrenteHastaFinDeAnio } from './completar-consumo-recurrente';
 import { toast } from 'sonner';
 import type { Tarjeta, RubroConsumo, ConsumoTarjeta } from '@/types';
+
+/** Día 11 o posterior: el período es el mes siguiente. Hasta el 10, el mes de la compra. */
+function periodoCobroSugerido(fechaCompra: string): string {
+  const base = fechaCompra.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(base)) return '';
+  const [anio, mes, dia] = base.split('-').map(Number);
+  const fecha = new Date(anio, mes - 1 + (dia > 10 ? 1 : 0), 1);
+  return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+}
 
 interface RegistroConsumoProps {
   onVolver: () => void;
@@ -30,8 +41,8 @@ export function RegistroConsumo({
   const monedaOrigen: 'ARS' | 'USD' = (origen?.importeUSD ?? 0) !== 0 ? 'USD' : 'ARS';
 
   const [tarjetaId, setTarjetaId] = useState(tarjetaPreseleccionada?.id ?? origen?.tarjetaId ?? '');
-  const [fecha, setFecha] = useState(getFechaHoy());
   const [fechaCompra, setFechaCompra] = useState(getFechaHoy());
+  const [periodo, setPeriodo] = useState(() => periodoCobroSugerido(getFechaHoy()));
   const [fechaVencimiento, setFechaVencimiento] = useState('');
   const [lugar, setLugar] = useState(origen?.lugar ?? '');
   const [rubroId, setRubroId] = useState(origen?.rubroId ?? '');
@@ -55,23 +66,22 @@ export function RegistroConsumo({
     setFechaVencimiento(match ? match[1] : '');
   }, [tarjetaId]);
 
-  // Recalculate installment preview whenever cuotas, fecha, or monto change
+  const fechaCobro = periodo ? fechaCuotaEnMesPago(periodo, 0) : '';
+
+  // Recalculate installment preview whenever cuotas, periodo, or monto change
   useEffect(() => {
-    if (cuotas <= 1) {
+    if (cuotas <= 1 || !periodo) {
       setCuotasDetalle([]);
       return;
     }
     const montoPorCuota = monto !== 0 ? monto / cuotas : 0;
-    const detalle = Array.from({ length: cuotas }, (_, i) => {
-      const d = new Date(`${fecha}T12:00:00`);
-      d.setMonth(d.getMonth() + i);
-      return {
-        fecha: d.toISOString().slice(0, 10),
+    setCuotasDetalle(
+      Array.from({ length: cuotas }, (_, i) => ({
+        fecha: fechaCuotaEnMesPago(periodo, i),
         monto: montoPorCuota,
-      };
-    });
-    setCuotasDetalle(detalle);
-  }, [cuotas, fecha, monto]);
+      })),
+    );
+  }, [cuotas, periodo, monto]);
 
   const opcionesCuotas = Array.from({ length: 24 }, (_, i) => ({
     value: i + 1,
@@ -113,7 +123,7 @@ export function RegistroConsumo({
       } else {
         await finanzas.agregarConsumo({
           tarjetaId,
-          fecha,
+          fecha: fechaCobro,
           fechaCompra,
           lugar,
           rubro: (rubroCodigo || 'OTROS') as RubroConsumo,
@@ -130,7 +140,7 @@ export function RegistroConsumo({
 
         if (gastoFijo) {
           const creados = await completarConsumoRecurrenteHastaFinDeAnio({
-            fechaBase: fecha,
+            fechaBase: fechaCobro,
             tarjetaId,
             lugar,
             rubro: rubroCodigo || 'OTROS',
@@ -256,20 +266,19 @@ export function RegistroConsumo({
                   value={fechaCompra}
                   onChange={(e) => {
                     setFechaCompra(e.target.value);
-                    setFecha(e.target.value);
+                    const mes = periodoCobroSugerido(e.target.value);
+                    if (mes) setPeriodo(mes);
                   }}
                   className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
                   required
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-ink">Fecha de Cobro (Período) *</label>
-                <input
-                  type="date"
-                  value={fecha}
-                  onChange={(e) => setFecha(e.target.value)}
-                  className="border border-mist rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
-                  required
+                <label className="text-sm font-medium text-ink">Periodo de Cobro *</label>
+                <MonthPicker
+                  value={periodo}
+                  onChange={setPeriodo}
+                  className="w-full justify-center rounded-full px-3"
                 />
               </div>
             </div>

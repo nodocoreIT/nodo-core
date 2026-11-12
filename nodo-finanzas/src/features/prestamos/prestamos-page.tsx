@@ -57,21 +57,38 @@ function proximaFechaDesdiaDia(dia: number): { iso: string; display: string } {
   return { iso, display: `${String(dayNext).padStart(2, '0')}/${String(nextMonth).padStart(2, '0')}/${nextYear}` };
 }
 
-function avanzarMes(fechaISO: string, diaPago: number): string {
-  const [year, month] = fechaISO.split('-').map(Number);
+function avanzarMes(fechaISO: string, diaPago: number): string | undefined {
+  const [year, month] = fechaISO.slice(0, 10).split('-').map(Number);
+  if (!year || !month || !diaPago) return undefined;
   const nextMonth = month === 12 ? 1 : month + 1;
   const nextYear = month === 12 ? year + 1 : year;
   const maxDay = new Date(nextYear, nextMonth, 0).getDate();
   const day = Math.min(diaPago, maxDay);
+  if (!day) return undefined;
   return `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-function retrocederMes(fechaISO: string, diaPago: number): string {
-  const [year, month] = fechaISO.split('-').map(Number);
+function cuotasPagasVisibles(prestamo: Prestamo): number {
+  if (prestamo.cuotasPagas != null && !Number.isNaN(Number(prestamo.cuotasPagas))) {
+    return Number(prestamo.cuotasPagas);
+  }
+  if (prestamo.importeCuota) {
+    return Math.max(
+      0,
+      Math.round((prestamo.montoOriginal - prestamo.saldoPendiente) / prestamo.importeCuota),
+    );
+  }
+  return 0;
+}
+
+function retrocederMes(fechaISO: string, diaPago: number): string | undefined {
+  const [year, month] = fechaISO.slice(0, 10).split('-').map(Number);
+  if (!year || !month || !diaPago) return undefined;
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear = month === 1 ? year - 1 : year;
   const maxDay = new Date(prevYear, prevMonth, 0).getDate();
   const day = Math.min(diaPago, maxDay);
+  if (!day) return undefined;
   return `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
@@ -231,14 +248,15 @@ export function PrestamosPage() {
   };
 
   const handleDesmarcarCuota = async (prestamo: Prestamo) => {
-    const cuotasPagasActual = prestamo.cuotasPagas ?? 0;
+    const cuotasPagasActual = cuotasPagasVisibles(prestamo);
     const cambios: Partial<Prestamo> = {
       cuotaAbonada: false,
       cuotasPagas: Math.max(0, cuotasPagasActual - 1),
       ultimoPagoMes: undefined,
     };
     if (prestamo.diaPago && prestamo.fechaVencimiento) {
-      cambios.fechaVencimiento = retrocederMes(prestamo.fechaVencimiento, prestamo.diaPago);
+      const anterior = retrocederMes(prestamo.fechaVencimiento, prestamo.diaPago);
+      if (anterior) cambios.fechaVencimiento = anterior;
     }
     if (prestamo.importeCuota) {
       cambios.saldoPendiente = prestamo.saldoPendiente + prestamo.importeCuota;
@@ -251,7 +269,8 @@ export function PrestamosPage() {
       if (gastoAsociado) {
         await finanzas.eliminarGastoDiario(gastoAsociado.id);
       }
-      await finanzas.actualizarPrestamo(prestamo.id, cambios);
+      const ok = await finanzas.actualizarPrestamo(prestamo.id, cambios);
+      if (!ok) throw new Error('No se pudo actualizar el préstamo');
       toast.success('Pago desmarcado');
     } catch {
       toast.error('Error al actualizar el préstamo');
@@ -263,7 +282,7 @@ export function PrestamosPage() {
     const cuenta = finanzas.cuentas.find((c) => c.id === cuentaPagoId);
     if (!cuenta) return;
 
-    const cuotasPagasActual = prestamoParaPago.cuotasPagas ?? 0;
+    const cuotasPagasActual = cuotasPagasVisibles(prestamoParaPago);
     const numeroCuota = cuotasPagasActual + 1;
 
     let formaPago: import('@/types').FormaDePago = 'TRANSFERENCIA BANCO';
@@ -277,6 +296,19 @@ export function PrestamosPage() {
       (r) => plano(r.codigo) === 'creditos' || plano(r.nombre) === 'creditos',
     );
 
+    const cambios: Partial<Prestamo> = {
+      cuotaAbonada: true,
+      cuotasPagas: numeroCuota,
+      ultimoPagoMes: mesActual,
+    };
+    if (prestamoParaPago.diaPago && prestamoParaPago.fechaVencimiento) {
+      const siguiente = avanzarMes(prestamoParaPago.fechaVencimiento, prestamoParaPago.diaPago);
+      if (siguiente) cambios.fechaVencimiento = siguiente;
+    }
+    if (prestamoParaPago.importeCuota) {
+      cambios.saldoPendiente = Math.max(0, prestamoParaPago.saldoPendiente - prestamoParaPago.importeCuota);
+    }
+
     try {
       await finanzas.agregarGastoDiario({
         descripcion: 'Préstamo',
@@ -288,21 +320,7 @@ export function PrestamosPage() {
         prestamoId: prestamoParaPago.id,
         rubroId: rubroCreditos?.id,
         rubro: rubroCreditos?.codigo,
-      });
-
-      const cambios: Partial<Prestamo> = {
-        cuotaAbonada: true,
-        cuotasPagas: numeroCuota,
-        ultimoPagoMes: mesActual,
-      };
-      if (prestamoParaPago.diaPago && prestamoParaPago.fechaVencimiento) {
-        cambios.fechaVencimiento = avanzarMes(prestamoParaPago.fechaVencimiento, prestamoParaPago.diaPago);
-      }
-      if (prestamoParaPago.importeCuota) {
-        cambios.saldoPendiente = Math.max(0, prestamoParaPago.saldoPendiente - prestamoParaPago.importeCuota);
-      }
-
-      await finanzas.actualizarPrestamo(prestamoParaPago.id, cambios);
+      }, { prestamo: cambios });
       toast.success('Cuota registrada como pagada');
       setPrestamoParaPago(null);
       setCuentaPagoId('');
@@ -515,12 +533,7 @@ export function PrestamosPage() {
                 const proximoVencimiento = diasRestantes !== null && diasRestantes <= 30 && diasRestantes >= 0;
                 const estaPagadoEsteMes = prestamoCuotaPagadaEsteMes(prestamo, mesActual);
                 const cuotaDelMesPagada = !prestamo.pagado && prestamo.ultimoPagoMes === mesActual;
-                const cuotasPagadas =
-                  prestamo.cuotasPagas != null
-                    ? prestamo.cuotasPagas
-                    : prestamo.importeCuota
-                    ? Math.round((prestamo.montoOriginal - prestamo.saldoPendiente) / prestamo.importeCuota)
-                    : 0;
+                const cuotasPagadas = cuotasPagasVisibles(prestamo);
 
                 return (
                   <div
@@ -771,7 +784,7 @@ export function PrestamosPage() {
             <div className="bg-mist/50 rounded-lg p-3 space-y-1">
               <p className="text-sm font-semibold text-ink">{prestamoParaPago.concepto}</p>
               <p className="text-xs text-slate2">
-                Cuota {(prestamoParaPago.cuotasPagas ?? 0) + 1} de {prestamoParaPago.cuotasTotales ?? '?'}
+                Cuota {cuotasPagasVisibles(prestamoParaPago) + 1} de {prestamoParaPago.cuotasTotales ?? '?'}
                 {prestamoParaPago.importeCuota
                   ? ` — ${formatearMoneda(prestamoParaPago.importeCuota, prestamoParaPago.moneda as Moneda)}`
                   : ''}

@@ -5,7 +5,7 @@ import { useAuth } from '@nodocore/shared-components';
 import { guardarInteresesFinanciacion } from '@/features/tarjetas/intereses-financiacion';
 import { calcularMesFacturacion } from '@/utils/tarjeta-fechas';
 import { getFechaHoy } from '@/utils/formatters';
-import { fechaCuotaTarjeta } from '@/utils/vencimientos';
+import { fechaCuotaEnMesPago, fechaCuotaTarjeta } from '@/utils/vencimientos';
 import type {
   AppState,
   Cuenta,
@@ -562,10 +562,14 @@ export const useFinanzas = () => {
   }, []);
 
   // === GASTOS DIARIOS ===
-  const agregarGastoDiario = useCallback(async (gasto: Omit<GastoDiario, 'id'>) => {
+  const agregarGastoDiario = useCallback(async (
+    gasto: Omit<GastoDiario, 'id'>,
+    opciones?: { prestamo?: Partial<Prestamo> },
+  ) => {
     try {
       // === PRE-CALCULAR MES DE FACTURACIÓN PARA TARJETAS ===
-      if (gasto.formaPago === 'TARJETA' && gasto.tarjetaId) {
+      // Si el formulario ya mandó el mes de pago, se respeta.
+      if (gasto.formaPago === 'TARJETA' && gasto.tarjetaId && !gasto.pagoTarjetaMes) {
         const tarjeta = estado.tarjetas.find(t => t.id === gasto.tarjetaId);
         if (tarjeta && tarjeta.diaCierre) {
           try {
@@ -654,19 +658,23 @@ export const useFinanzas = () => {
           }
 
           // === CREAR CONSUMO SI ES TARJETA ===
-          // Si la compra es después del 10, la primera cuota cae el mes siguiente.
+          // El cargo queda en la tarjeta elegida. Si hay mes de pago, cae en ese mes.
           if (gasto.formaPago === 'TARJETA' && gasto.tarjetaId) {
             const rubroConsumo: RubroConsumo = (gasto.rubro as RubroConsumo) || 'OTROS';
             const totalCuotas = Math.max(1, Number(gasto.cuotas) || 1);
             const montoPorCuota = totalCuotas > 1 ? gasto.monto / totalCuotas : gasto.monto;
             const codigoOperacion = gasto.codigoOperacion || crypto.randomUUID();
             const fechaBase = (gasto.fecha || getFechaHoy()).slice(0, 10);
+            const mesPago = gasto.pagoTarjetaMes?.slice(0, 7);
+            const mesPagoElegido = mesPago && /^\d{4}-\d{2}$/.test(mesPago) ? mesPago : '';
 
             const promesasCuotas = [];
             for (let cuota = 1; cuota <= totalCuotas; cuota++) {
               const consumoTarjeta: Omit<ConsumoTarjeta, 'id'> = {
                 tarjetaId: gasto.tarjetaId,
-                fecha: fechaCuotaTarjeta(fechaBase, cuota - 1),
+                fecha: mesPagoElegido
+                  ? fechaCuotaEnMesPago(mesPagoElegido, cuota - 1)
+                  : fechaCuotaTarjeta(fechaBase, cuota - 1),
                 fechaCompra: fechaBase,
                 lugar: gasto.descripcion,
                 rubro: rubroConsumo,
@@ -846,20 +854,31 @@ export const useFinanzas = () => {
         }
 
         // === ACTUALIZAR PRÉSTAMO SI TIENE prestamoId ===
+        // Un solo update: saldo, mes y cuotas pagas. El caller (Pagar cuota)
+        // manda cuotasPagas ya incrementadas en opciones.prestamo para que
+        // no queden en un segundo guardado que se puede perder.
         if (gasto.prestamoId) {
-          const prestamo = estado.prestamos.find(p => p.id === gasto.prestamoId);
+          const prestamo =
+            _moduleCache.prestamos.find(p => p.id === gasto.prestamoId) ??
+            estado.prestamos.find(p => p.id === gasto.prestamoId);
+
+          const mesDePago = (gasto.fecha || getFechaHoy()).slice(0, 7);
+          const cambios: Partial<Prestamo> = {};
+
           if (prestamo) {
-            const mesDePago = (gasto.fecha || getFechaHoy()).slice(0, 7);
-            const nuevoSaldo = Math.max(0, prestamo.saldoPendiente - gasto.monto);
-
+            const nuevoSaldo = Math.max(0, Number(prestamo.saldoPendiente) - Number(gasto.monto));
+            cambios.saldoPendiente = nuevoSaldo;
+            cambios.ultimoPagoMes = mesDePago;
+            cambios.pagado = nuevoSaldo <= 0;
+            cambios.activo = nuevoSaldo > 0;
             console.log(`[useFinanzas] Registrando pago de préstamo: ${prestamo.concepto}. Nuevo saldo: ${nuevoSaldo}. Mes: ${mesDePago}`);
+          }
 
-            await actualizarPrestamo(prestamo.id, {
-              saldoPendiente: nuevoSaldo,
-              ultimoPagoMes: mesDePago,
-              pagado: nuevoSaldo <= 0,
-              activo: nuevoSaldo > 0
-            });
+          Object.assign(cambios, opciones?.prestamo);
+
+          if (Object.keys(cambios).length > 0) {
+            const ok = await actualizarPrestamo(gasto.prestamoId, cambios);
+            if (!ok) throw new Error('No se pudo actualizar el préstamo');
           }
         }
 
@@ -1019,8 +1038,10 @@ export const useFinanzas = () => {
           ),
         }));
       }
+      return success;
     } catch (error) {
       console.error('Error actualizando préstamo:', error);
+      return false;
     }
   }, [syncEstado]);
 

@@ -26,6 +26,7 @@ import {
   montoInteresesFinanciacion,
 } from './intereses-financiacion';
 import { guardarSaldoMesAnterior, montoSaldoMesAnterior } from './saldo-mes-anterior';
+import { guardarImpuestos, montoImpuestos } from './impuestos-tarjeta';
 import { TarjetaPlastico } from './tarjeta-plastico';
 import type { Tarjeta, RubroConsumo } from '@/types';
 
@@ -108,6 +109,7 @@ export function TarjetasPage() {
       tarjeta.id,
       filtroMes,
     );
+    const impuestos = montoImpuestos(finanzas.consumosTarjetas, tarjeta.id, filtroMes);
 
     return {
       tarjeta,
@@ -127,6 +129,7 @@ export function TarjetasPage() {
       marcadaSinGasto,
       saldoAnterior,
       interesesFinanciacion,
+      impuestos,
     };
   });
 
@@ -366,6 +369,18 @@ export function TarjetasPage() {
                         />
                       </div>
                     )}
+                    <div className="mt-2">
+                      <MoneyInput
+                        label="Impuestos"
+                        moneda="ARS"
+                        value={resumen.impuestos}
+                        onChange={() => {}}
+                        onBlur={(valor) => {
+                          if (Math.abs(valor - resumen.impuestos) <= 0.001) return;
+                          void guardarImpuestos(finanzas, resumen.tarjeta.id, filtroMes, valor);
+                        }}
+                      />
+                    </div>
                   </div>
 
                   <div className="flex justify-between items-center text-sm">

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { ArrowLeft, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm, Controller } from 'react-hook-form';
@@ -15,7 +15,7 @@ import { useRubros } from '@/hooks/use-rubros';
 import { getFechaHoy, formatearMoneda, formatearFecha } from '@/utils/formatters';
 import { capitalizarDescripcion } from '@/utils/capitalizar-descripcion';
 import { cuentaIdPorFormaPago } from '@/utils/cuenta-por-forma-pago';
-import { fechaCuotaTarjeta } from '@/utils/vencimientos';
+import { fechaCuotaEnMesPago, fechaCuotaTarjeta, mesPagoSugerido } from '@/utils/vencimientos';
 import type { FormaDePago, GastoDiario } from '@/types';
 
 const schema = z.object({
@@ -33,6 +33,15 @@ const schema = z.object({
   prestamoId: z.string().optional(),
   pagoTarjetaId: z.string().optional(),
   gastoFijoId: z.string().optional(),
+  pagoTarjetaMes: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.formaPago !== 'TARJETA') return;
+  if (!data.tarjetaId) {
+    ctx.addIssue({ code: 'custom', path: ['tarjetaId'], message: 'Seleccioná la tarjeta' });
+  }
+  if (!/^\d{4}-\d{2}$/.test(data.pagoTarjetaMes ?? '')) {
+    ctx.addIssue({ code: 'custom', path: ['pagoTarjetaMes'], message: 'Indicá el mes de pago' });
+  }
 });
 
 type FormData = z.infer<typeof schema>;
@@ -73,6 +82,9 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
         prestamoId: gastoEditando.prestamoId ?? '',
         pagoTarjetaId: gastoEditando.pagoTarjetaId ?? '',
         gastoFijoId: gastoEditando.gastoFijoId ?? '',
+        pagoTarjetaMes: gastoEditando.pagoTarjetaMes ?? (
+          gastoEditando.formaPago === 'TARJETA' ? mesPagoSugerido(gastoEditando.fecha) : ''
+        ),
       }
     : {
         descripcion: datosIniciales?.descripcion ?? '',
@@ -89,6 +101,11 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
         prestamoId: datosIniciales?.prestamoId ?? '',
         pagoTarjetaId: datosIniciales?.pagoTarjetaId ?? '',
         gastoFijoId: datosIniciales?.gastoFijoId ?? '',
+        pagoTarjetaMes: datosIniciales?.pagoTarjetaMes ?? (
+          datosIniciales?.formaPago === 'TARJETA'
+            ? mesPagoSugerido(datosIniciales.fecha ?? getFechaHoy())
+            : ''
+        ),
       };
 
   const {
@@ -104,30 +121,31 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
   const cuotas = watch('cuotas') ?? 1;
   const monto = watch('monto') ?? 0;
   const fecha = watch('fecha');
+  const pagoTarjetaMes = watch('pagoTarjetaMes');
+  const mesPagoTocado = useRef(Boolean(gastoEditando?.pagoTarjetaMes || datosIniciales?.pagoTarjetaMes));
   const totalCuotas = Math.max(1, Number(cuotas) || 1);
+  const mesPagoValido = Boolean(pagoTarjetaMes && /^\d{4}-\d{2}$/.test(pagoTarjetaMes));
   const vencimientosCuotas = useMemo(() => {
     if (formaPago !== 'TARJETA' || totalCuotas <= 1 || !fecha) return [];
     const base = fecha.slice(0, 10);
     const montoPorCuota = monto / totalCuotas;
     return Array.from({ length: totalCuotas }, (_, i) => ({
-      fecha: fechaCuotaTarjeta(base, i),
+      fecha: mesPagoValido
+        ? fechaCuotaEnMesPago(pagoTarjetaMes, i)
+        : fechaCuotaTarjeta(base, i),
       monto: montoPorCuota,
     }));
-  }, [formaPago, totalCuotas, fecha, monto]);
+  }, [formaPago, totalCuotas, fecha, monto, mesPagoValido, pagoTarjetaMes]);
+
+  useEffect(() => {
+    if (formaPago !== 'TARJETA' || mesPagoTocado.current) return;
+    const sugerido = mesPagoSugerido(fecha || getFechaHoy());
+    if (sugerido && sugerido !== pagoTarjetaMes) setValue('pagoTarjetaMes', sugerido);
+  }, [formaPago, fecha, pagoTarjetaMes, setValue]);
 
   const tarjetasActivas = finanzas.tarjetas.filter((t) => t.activa);
   const cuentasActivas = finanzas.cuentas.filter((c) => c.activa);
-
-  // Compute auto-selections inline — instant, no effect delay
-  const autoTarjetaId = useMemo(() => {
-    // When editing, field.value takes priority (field.value || autoTarjetaId).
-    // This fallback only applies when field.value is empty (e.g. older records without tarjetaId stored).
-    const visibles = tarjetasActivas.filter((t) => !t.banco?.toLowerCase().includes('pampa'));
-    return (
-      visibles.find((t) => { const n = t.nombre.toLowerCase(); return n.includes('visa') || n.includes('santander'); })
-      ?? visibles[0]
-    )?.id ?? '';
-  }, [tarjetasActivas]);
+  const tarjetasParaGasto = tarjetasActivas.filter((t) => !t.banco?.toLowerCase().includes('pampa'));
 
   const autoCuentaId = useMemo(
     () => cuentaIdPorFormaPago(formaPago, cuentasActivas),
@@ -142,11 +160,15 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
   async function onSubmit(data: FormData) {
     setProcesando(true);
     try {
-      const effectiveTarjetaId = data.tarjetaId || autoTarjetaId;
+      const effectiveTarjetaId = data.formaPago === 'TARJETA' ? data.tarjetaId : undefined;
       const effectiveCuentaId = data.cuentaId || autoCuentaId;
 
       if (data.formaPago === 'TARJETA' && !effectiveTarjetaId) {
-        toast.error('Seleccioná una tarjeta para continuar');
+        toast.error('Seleccioná la tarjeta');
+        return;
+      }
+      if (data.formaPago === 'TARJETA' && !/^\d{4}-\d{2}$/.test(data.pagoTarjetaMes ?? '')) {
+        toast.error('Indicá el mes de pago');
         return;
       }
 
@@ -169,11 +191,28 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
         prestamoId: data.prestamoId || undefined,
         pagoTarjetaId: data.pagoTarjetaId || undefined,
         gastoFijoId: data.gastoFijoId || undefined,
+        pagoTarjetaMes: data.formaPago === 'TARJETA' ? data.pagoTarjetaMes : undefined,
         codigoOperacion: gastoEditando?.codigoOperacion ?? crypto.randomUUID(),
       };
 
       if (gastoEditando) {
         await finanzas.actualizarGastoDiario(gastoEditando.id, payload);
+        if (
+          data.formaPago === 'TARJETA' &&
+          data.pagoTarjetaMes &&
+          gastoEditando.codigoOperacion
+        ) {
+          const consumos = finanzas.consumosTarjetas
+            .filter((c) => c.codigoOperacion === gastoEditando.codigoOperacion)
+            .sort((a, b) => (a.cuotaActual ?? 0) - (b.cuotaActual ?? 0) || a.fecha.localeCompare(b.fecha));
+          await Promise.all(consumos.map((consumo) => {
+            const indice = Math.max(0, (consumo.cuotaActual ?? 1) - 1);
+            return finanzas.actualizarConsumo(consumo.id, {
+              tarjetaId: data.tarjetaId,
+              fecha: fechaCuotaEnMesPago(data.pagoTarjetaMes, indice),
+            });
+          }));
+        }
         toast.success('Gasto actualizado');
       } else {
         await finanzas.agregarGastoDiario(payload);
@@ -283,6 +322,9 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
                     field.onChange(next);
                     setValue('cuentaId', cuentaIdPorFormaPago(next, cuentasActivas));
                     setValue('tarjetaId', '');
+                    if (next === 'TARJETA' && !mesPagoTocado.current) {
+                      setValue('pagoTarjetaMes', mesPagoSugerido(fecha || getFechaHoy()));
+                    }
                   }}
                   name={field.name}
                 />
@@ -298,16 +340,15 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
               render={({ field }) => (
                 <Select
                   label="Tarjeta"
-                  options={tarjetasActivas
-                    .filter((t) => !t.banco?.toLowerCase().includes('pampa'))
-                    .map((t) => ({
-                      value: t.id,
-                      label: t.nombre,
-                    }))}
+                  options={tarjetasParaGasto.map((t) => ({
+                    value: t.id,
+                    label: t.banco ? `${t.nombre} · ${t.banco}` : t.nombre,
+                  }))}
                   allowEmpty
                   emptyLabel="— Seleccioná una tarjeta —"
-                  value={field.value || autoTarjetaId}
+                  value={field.value ?? ''}
                   onChange={(e) => field.onChange(e.target.value)}
+                  error={errors.tarjetaId?.message}
                   name={field.name}
                 />
               )}
@@ -330,6 +371,23 @@ export function RegistroGastoDiario({ onVolver, onGastoRegistrado, gastoEditando
                 />
               )}
             />
+
+            <div>
+              <Input
+                label="Mes de pago"
+                type="month"
+                required
+                {...register('pagoTarjetaMes')}
+                onChange={(e) => {
+                  mesPagoTocado.current = true;
+                  setValue('pagoTarjetaMes', e.target.value, { shouldValidate: true });
+                }}
+                error={errors.pagoTarjetaMes?.message}
+              />
+              {!errors.pagoTarjetaMes?.message && (
+                <p className="text-xs text-slate2 mt-1">Mes del resumen en el que se cobra este gasto.</p>
+              )}
+            </div>
           </div>
 
           {vencimientosCuotas.length > 0 && (

@@ -15,6 +15,24 @@ export function fechaCuotaTarjeta(fechaCompra: string, indice: number): string {
   return sumarMesesFecha(fechaCompra, arranque + indice);
 }
 
+/** Mes YYYY-MM que hoy se asignaría a la primera cuota de una compra. */
+export function mesPagoSugerido(fechaCompra: string): string {
+  const base = fechaCompra.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(base)) return '';
+  return fechaCuotaTarjeta(base, 0).slice(0, 7);
+}
+
+/**
+ * Fecha de la cuota N cuando el usuario eligió el mes de pago (YYYY-MM).
+ * La primera cuota cae el día 1 de ese mes, así no se corre al mes siguiente.
+ * Las cuotas que siguen caen el día 1 de los meses posteriores.
+ */
+export function fechaCuotaEnMesPago(mesPago: string, indice: number): string {
+  const [year, month] = mesPago.slice(0, 7).split('-').map(Number);
+  const base = fechaEnMes(year, month, 1);
+  return sumarMesesFecha(base, indice);
+}
+
 /** Suma meses a YYYY-MM-DD en calendario local, sin pasar por UTC. */
 export function sumarMesesFecha(iso: string, meses: number): string {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
