@@ -1,8 +1,7 @@
 /**
  * Helpers for month-scoped due dates (préstamos / planes / dashboard labels).
- * Stored fechaVencimiento often lags behind after a month rollover; these
- * project to the current calendar month so "Próximos Vencimientos" doesn't
- * keep showing June/July as "vence hoy".
+ * Una cuota impaga conserva su fecha: en el dashboard figura como vencida
+ * y no se reemplaza por el mes en curso.
  */
 
 /**
@@ -75,6 +74,37 @@ export function diasHastaFecha(fechaISO: string, hoy: Date = new Date()): number
   const end = new Date(fechaISO.slice(0, 10) + 'T12:00:00');
   end.setHours(0, 0, 0, 0);
   return Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Cuotas desde la primera impaga hasta la que cae dentro de la ventana próxima.
+ * Las anteriores a hoy se conservan para mostrarlas como vencidas.
+ */
+export function fechasCuotasPendientes(
+  primeraImpaga: string,
+  hoy: Date = new Date(),
+  horizonteDias = 31,
+): string[] {
+  const base = primeraImpaga.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(base)) return [];
+
+  const dia = Number(base.slice(8, 10));
+  let year = Number(base.slice(0, 4));
+  let month = Number(base.slice(5, 7));
+  const fechas: string[] = [];
+
+  for (let i = 0; i < 36; i++) {
+    const iso = fechaEnMes(year, month, dia);
+    if (diasHastaFecha(iso, hoy) > horizonteDias) break;
+    fechas.push(iso);
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+
+  return fechas;
 }
 
 export function labelDiasVencimiento(diffDays: number): string {

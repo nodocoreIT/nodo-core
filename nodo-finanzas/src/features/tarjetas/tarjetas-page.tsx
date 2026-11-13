@@ -4,8 +4,6 @@ import {
   Plus,
   Banknote,
   Receipt,
-  ChevronLeft,
-  ChevronRight,
   CheckCircle2,
   AlertTriangle,
   Calendar,
@@ -14,6 +12,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MoneyInput } from '@/components/ui/money-input';
+import { MonthPicker } from '@/components/ui/month-picker';
 import { Spinner } from '@/components/ui/spinner';
 import { useFinanzas } from '@/hooks/use-finanzas';
 import { getFechaHoy } from '@/utils/formatters';
@@ -23,12 +22,57 @@ import { ModalPagarTarjeta } from './modal-pagar-tarjeta';
 import { calcularEstadoPagoTarjetaMes } from './calcular-estado-pago-tarjeta';
 import {
   guardarInteresesFinanciacion,
+  LUGAR_INTERESES_FINANCIACION,
   montoInteresesFinanciacion,
 } from './intereses-financiacion';
-import { guardarSaldoMesAnterior, montoSaldoMesAnterior } from './saldo-mes-anterior';
-import { guardarImpuestos, montoImpuestos } from './impuestos-tarjeta';
+import { guardarSaldoMesAnterior, LUGAR_SALDO_MES_ANTERIOR, montoSaldoMesAnterior } from './saldo-mes-anterior';
+import { guardarImpuestos, LUGAR_IMPUESTOS, montoImpuestos } from './impuestos-tarjeta';
 import { TarjetaPlastico } from './tarjeta-plastico';
-import type { Tarjeta, RubroConsumo } from '@/types';
+import type { ConsumoTarjeta, Tarjeta, RubroConsumo } from '@/types';
+
+const LUGARES_DE_RESUMEN = new Set([
+  LUGAR_IMPUESTOS,
+  LUGAR_INTERESES_FINANCIACION,
+  LUGAR_SALDO_MES_ANTERIOR,
+]);
+
+function ConsumosDelMes({ consumos }: { consumos: ConsumoTarjeta[] }) {
+  const compras = consumos.filter((c) => !LUGARES_DE_RESUMEN.has(c.lugar));
+  const visibles = compras.slice(0, 5);
+
+  return (
+    <div className="space-y-1.5 pt-1">
+      <div className="flex justify-between items-center text-sm">
+        <span className="text-slate2">Consumos</span>
+        <span className="font-medium text-ink">{compras.length}</span>
+      </div>
+      {compras.length === 0 ? (
+        <p className="text-xs text-slate2">No hay consumos en este mes.</p>
+      ) : (
+        <div className="space-y-1">
+          {visibles.map((consumo) => (
+            <div key={consumo.id} className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="min-w-0 truncate text-ink">
+                {consumo.lugar}
+                {(consumo.totalCuotas ?? 1) > 1 && (
+                  <span className="text-slate2"> · {consumo.cuotaActual ?? 1}/{consumo.totalCuotas}</span>
+                )}
+              </span>
+              <span className="shrink-0 font-medium text-ink">
+                {consumo.importeUSD
+                  ? `USD ${consumo.importeUSD.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : `$${(consumo.importeARS || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              </span>
+            </div>
+          ))}
+          {compras.length > visibles.length && (
+            <p className="text-xs text-slate2">+ {compras.length - visibles.length} más</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Vista = 'resumen' | 'registro';
 
@@ -66,14 +110,6 @@ export function TarjetasPage() {
     totalUSD: number;
     saldoAnterior: number;
   } | null>(null);
-
-  const cambiarMes = (incremento: number) => {
-    const [anio, mes] = filtroMes.split('-').map(Number);
-    const nueva = new Date(anio, mes - 1 + incremento, 1);
-    const nuevoAnio = nueva.getFullYear();
-    const nuevoMes = String(nueva.getMonth() + 1).padStart(2, '0');
-    setFiltroMes(`${nuevoAnio}-${nuevoMes}`);
-  };
 
   const tarjetasActivas = finanzas.tarjetas.filter((t) => t.activa);
 
@@ -189,32 +225,11 @@ export function TarjetasPage() {
         </Button>
       </div>
 
-      {/* Month picker */}
-      <div className="flex items-center justify-between bg-white rounded-xl border border-mist p-4">
-        <span className="text-sm font-semibold text-ink capitalize">
-          {formatearMesLabel(filtroMes)}
-        </span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => cambiarMes(-1)}
-            className="p-1.5 rounded-lg hover:bg-mist transition-colors text-slate2"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <input
-            type="month"
-            value={filtroMes}
-            onChange={(e) => setFiltroMes(e.target.value)}
-            className="px-3 py-1.5 border border-mist rounded-lg text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand bg-paper cursor-pointer"
-          />
-          <button
-            onClick={() => cambiarMes(1)}
-            className="p-1.5 rounded-lg hover:bg-mist transition-colors text-slate2"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+      <MonthPicker
+        value={filtroMes}
+        onChange={setFiltroMes}
+        className="rounded-full px-4"
+      />
 
       {/* Resumen */}
       <ResumenTarjetas
@@ -247,10 +262,9 @@ export function TarjetasPage() {
               >
                 <TarjetaPlastico tarjeta={resumen.tarjeta} />
 
-                <div className="p-4">
                 {resumen.pagada && (
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-green-700">
+                  <div className="flex items-center justify-between gap-2 bg-green-700 px-4 py-2.5 text-white">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       Pagada
                     </span>
@@ -268,7 +282,7 @@ export function TarjetasPage() {
                         );
                         if (gastoPago) finanzas.eliminarGastoDiario(gastoPago.id).then(() => finanzas.recargarDatos(true));
                       }}
-                      className="flex items-center gap-1 text-xs text-slate2 hover:text-ink transition-colors"
+                      className="flex items-center gap-1 text-xs font-medium text-white/90 hover:text-white transition-colors"
                       title="Deshacer pago"
                     >
                       <Undo2 className="w-3.5 h-3.5" />
@@ -277,8 +291,8 @@ export function TarjetasPage() {
                   </div>
                 )}
                 {resumen.pagoParcial && (
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-orange-600">
+                  <div className="flex items-center justify-between gap-2 bg-orange-700 px-4 py-2.5 text-white">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide">
                       <AlertTriangle className="w-3.5 h-3.5" />
                       Pago parcial
                     </span>
@@ -290,7 +304,7 @@ export function TarjetasPage() {
                         );
                         if (gastoPago) finanzas.eliminarGastoDiario(gastoPago.id).then(() => finanzas.recargarDatos(true));
                       }}
-                      className="flex items-center gap-1 text-xs text-slate2 hover:text-ink transition-colors"
+                      className="flex items-center gap-1 text-xs font-medium text-white/90 hover:text-white transition-colors"
                       title="Deshacer pago"
                     >
                       <Undo2 className="w-3.5 h-3.5" />
@@ -298,6 +312,8 @@ export function TarjetasPage() {
                     </button>
                   </div>
                 )}
+
+                <div className="p-4">
                 {!resumen.pagada && !resumen.pagoParcial && (
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-slate2">
@@ -383,10 +399,7 @@ export function TarjetasPage() {
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate2">Transacciones:</span>
-                    <span className="font-medium text-ink">{resumen.cantidadTransacciones}</span>
-                  </div>
+                  <ConsumosDelMes consumos={resumen.consumosDelMes} />
 
                   <div className="flex justify-between items-center text-sm">
                     <span className="flex items-center gap-1 text-slate2">

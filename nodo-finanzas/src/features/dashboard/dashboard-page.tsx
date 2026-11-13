@@ -471,11 +471,12 @@ export function DashboardPage() {
               <p className="text-xs text-slate2">Sin vencimientos próximos</p>
             </div>
           ) : (
-            <div className="space-y-2 mt-3">
-              {vencimientos.slice(0, 5).map((n) => {
+            <div className="space-y-2 mt-3 max-h-[28rem] overflow-y-auto">
+              {vencimientos.map((n) => {
                 const s = urgenciaStyle[n.urgencia];
                 const diffDays = diasHastaFecha(n.fecha, hoy);
                 const diasLabel = labelDiasVencimiento(diffDays);
+                const vencido = diffDays < 0;
                 return (
                   <button
                     key={n.id}
@@ -503,11 +504,15 @@ export function DashboardPage() {
                           {formatearMoneda(n.monto, n.moneda ?? 'ARS')}
                         </span>
                       )}
-                      {n.urgencia === 'alta' && (
+                      {vencido ? (
+                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${s.badge ?? 'bg-white/20 text-white'}`}>
+                          Vencido
+                        </span>
+                      ) : n.urgencia === 'alta' ? (
                         <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${s.badge}`}>
                           Urgente
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </button>
                 );
