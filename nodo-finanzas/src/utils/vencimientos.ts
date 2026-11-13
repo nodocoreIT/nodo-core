@@ -107,6 +107,15 @@ export function fechasCuotasPendientes(
   return fechas;
 }
 
+/** Marca en el detalle del gasto qué mes de cuota se está pagando. */
+export function detalleConMesCuota(detalle: string, mes: string): string {
+  return `${detalle} [${mes.slice(0, 7)}]`;
+}
+
+export function mesCuotaDeDetalle(detalle?: string | null): string | null {
+  return detalle?.match(/\[(\d{4}-\d{2})\]/)?.[1] ?? null;
+}
+
 export function labelDiasVencimiento(diffDays: number): string {
   if (diffDays < 0) {
     return diffDays === -1 ? 'vencido hace 1 día' : `vencido hace ${-diffDays} días`;

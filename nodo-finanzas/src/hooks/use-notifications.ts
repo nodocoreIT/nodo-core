@@ -6,6 +6,7 @@ import { calcularFechasTarjeta } from '@/utils/tarjeta-fechas';
 import {
   diasHastaFecha,
   fechasCuotasPendientes,
+  mesCuotaDeDetalle,
   vencimientoCuotaMesEnCurso,
 } from '@/utils/vencimientos';
 import type { Tarjeta, Prestamo, PlanAhorro } from '@/types';
@@ -160,10 +161,17 @@ export const useNotifications = () => {
         : 36;
       if (restantes === 0) return;
 
+      const mesesPagos = new Set(
+        gastosDiarios
+          .filter((g) => g.prestamoId === prestamo.id)
+          .map((g) => mesCuotaDeDetalle(g.detalle))
+          .filter((mes): mes is string => Boolean(mes)),
+      );
       const fechas = fechasCuotasPendientes(ancla, hoy).slice(0, restantes);
       for (const vtoStr of fechas) {
         const mes = vtoStr.slice(0, 7);
         if (prestamo.ultimoPagoMes && mes <= prestamo.ultimoPagoMes) continue;
+        if (mesesPagos.has(mes)) continue;
 
         const diffDays = diasHastaFecha(vtoStr, hoy);
         const venceHoy = diffDays === 0;

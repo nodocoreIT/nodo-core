@@ -868,7 +868,7 @@ export const useFinanzas = () => {
           if (prestamo) {
             const nuevoSaldo = Math.max(0, Number(prestamo.saldoPendiente) - Number(gasto.monto));
             cambios.saldoPendiente = nuevoSaldo;
-            cambios.ultimoPagoMes = mesDePago;
+            if (!opciones?.prestamo) cambios.ultimoPagoMes = mesDePago;
             cambios.pagado = nuevoSaldo <= 0;
             cambios.activo = nuevoSaldo > 0;
             console.log(`[useFinanzas] Registrando pago de préstamo: ${prestamo.concepto}. Nuevo saldo: ${nuevoSaldo}. Mes: ${mesDePago}`);

@@ -484,7 +484,9 @@ export function DashboardPage() {
                       if (n.tipo === 'tarjeta') {
                         navigate(`/admin/tarjetas/${n.entityId}`);
                       } else if (n.tipo === 'prestamo') {
-                        navigate('/admin/prestamos', { state: { openId: n.entityId } });
+                        navigate('/admin/prestamos', {
+                          state: { openId: n.entityId, mes: n.fecha.slice(0, 7), fecha: n.fecha },
+                        });
                       } else {
                         navigate('/admin/planes-ahorro', { state: { openId: n.entityId } });
                       }

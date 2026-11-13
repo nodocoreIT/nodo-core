@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Plus,
   Edit,
@@ -29,7 +29,7 @@ import {
   mesActualYYYYMM,
   prestamoCuotaPagadaEsteMes,
 } from '@/utils/formatters';
-import { diasHastaFecha, vencimientoCuotaMesEnCurso } from '@/utils/vencimientos';
+import { detalleConMesCuota, diasHastaFecha, vencimientoCuotaMesEnCurso } from '@/utils/vencimientos';
 import { GestionCuotasProgramadas } from './gestion-cuotas-programadas';
 import { ModalComprobantes } from './modal-comprobantes';
 import toast from 'react-hot-toast';
@@ -66,6 +66,16 @@ function avanzarMes(fechaISO: string, diaPago: number): string | undefined {
   const day = Math.min(diaPago, maxDay);
   if (!day) return undefined;
   return `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function etiquetaMes(mes: string): string {
+  const [anio, month] = mes.slice(0, 7).split('-').map(Number);
+  if (!anio || !month) return mes;
+  const label = new Date(anio, month - 1, 1).toLocaleDateString('es-AR', {
+    month: 'long',
+    year: 'numeric',
+  });
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function cuotasPagasVisibles(prestamo: Prestamo): number {
@@ -147,6 +157,9 @@ export function PrestamosPage() {
   const [prestamoParaCuotas, setPrestamoParaCuotas] = useState<Prestamo | null>(null);
   const [prestamoParaComprobantes, setPrestamoParaComprobantes] = useState<Prestamo | null>(null);
   const [prestamoParaPago, setPrestamoParaPago] = useState<Prestamo | null>(null);
+  const [pagoMes, setPagoMes] = useState<string | null>(null);
+  const [pagoFecha, setPagoFecha] = useState<string | null>(null);
+  const pagoAbierto = useRef<string | null>(null);
   const [prestamoIdAEliminar, setPrestamoIdAEliminar] = useState<string | null>(null);
   const [cuentaPagoId, setCuentaPagoId] = useState('');
   const [procesandoPago, setProcesandoPago] = useState(false);
@@ -154,7 +167,10 @@ export function PrestamosPage() {
   const [form, setForm] = useState<FormState>(defaultForm());
   const [guardando, setGuardando] = useState(false);
 
-  const openId = (location.state as { openId?: string } | null)?.openId;
+  const navState = location.state as { openId?: string; mes?: string; fecha?: string } | null;
+  const openId = navState?.openId;
+  const mesNav = navState?.mes;
+  const fechaNav = navState?.fecha;
 
   const abrirFormulario = (prestamo?: Prestamo) => {
     if (prestamo) {
@@ -189,10 +205,24 @@ export function PrestamosPage() {
 
   useEffect(() => {
     if (!openId || finanzas.loading) return;
+    const clave = `${openId}:${mesNav ?? ''}:${fechaNav ?? ''}`;
+    if (pagoAbierto.current === clave) return;
     const prestamo = finanzas.prestamos.find((p) => p.id === openId);
-    if (prestamo) abrirFormulario(prestamo);
+    if (!prestamo) return;
+    pagoAbierto.current = clave;
+    if (mesNav) {
+      const cuentasCompatibles = finanzas.cuentas.filter(
+        (c) => c.activa && c.moneda === prestamo.moneda,
+      );
+      setCuentaPagoId(cuentasCompatibles[0]?.id || '');
+      setPrestamoParaPago(prestamo);
+      setPagoMes(mesNav.slice(0, 7));
+      setPagoFecha(fechaNav ?? `${mesNav.slice(0, 7)}-01`);
+      return;
+    }
+    abrirFormulario(prestamo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openId, finanzas.loading]);
+  }, [openId, mesNav, fechaNav, finanzas.loading, finanzas.prestamos]);
 
   if (finanzas.loading) {
     return (
@@ -283,7 +313,9 @@ export function PrestamosPage() {
     if (!cuenta) return;
 
     const cuotasPagasActual = cuotasPagasVisibles(prestamoParaPago);
-    const numeroCuota = cuotasPagasActual + 1;
+    const mesCuota = pagoMes ?? mesActual;
+    const fechaCuota = pagoFecha ?? `${mesCuota}-01`;
+    const etiqueta = etiquetaMes(mesCuota);
 
     let formaPago: import('@/types').FormaDePago = 'TRANSFERENCIA BANCO';
     if (cuenta.tipo === 'EFECTIVO') formaPago = 'EFECTIVO';
@@ -296,33 +328,42 @@ export function PrestamosPage() {
       (r) => plano(r.codigo) === 'creditos' || plano(r.nombre) === 'creditos',
     );
 
+    const mesAncla = prestamoParaPago.fechaVencimiento?.slice(0, 7);
+    const pagaLaProxima = !mesAncla || mesAncla === mesCuota;
     const cambios: Partial<Prestamo> = {
-      cuotaAbonada: true,
-      cuotasPagas: numeroCuota,
-      ultimoPagoMes: mesActual,
+      cuotasPagas: cuotasPagasActual + 1,
+      saldoPendiente: prestamoParaPago.importeCuota
+        ? Math.max(0, prestamoParaPago.saldoPendiente - prestamoParaPago.importeCuota)
+        : prestamoParaPago.saldoPendiente,
     };
-    if (prestamoParaPago.diaPago && prestamoParaPago.fechaVencimiento) {
-      const siguiente = avanzarMes(prestamoParaPago.fechaVencimiento, prestamoParaPago.diaPago);
-      if (siguiente) cambios.fechaVencimiento = siguiente;
-    }
-    if (prestamoParaPago.importeCuota) {
-      cambios.saldoPendiente = Math.max(0, prestamoParaPago.saldoPendiente - prestamoParaPago.importeCuota);
+    if (pagaLaProxima) {
+      cambios.ultimoPagoMes = mesCuota;
+      cambios.cuotaAbonada = mesCuota === mesActual;
+      if (prestamoParaPago.diaPago && prestamoParaPago.fechaVencimiento) {
+        const siguiente = avanzarMes(prestamoParaPago.fechaVencimiento, prestamoParaPago.diaPago);
+        if (siguiente) cambios.fechaVencimiento = siguiente;
+      }
     }
 
     try {
       await finanzas.agregarGastoDiario({
         descripcion: 'Préstamo',
-        detalle: `${prestamoParaPago.concepto} - Cuota ${numeroCuota} de ${prestamoParaPago.cuotasTotales ?? '?'}`,
+        detalle: detalleConMesCuota(
+          `${prestamoParaPago.concepto} - Cuota ${etiqueta}`,
+          mesCuota,
+        ),
         monto: prestamoParaPago.importeCuota || 0,
-        fecha: getFechaHoy(),
+        fecha: fechaCuota,
         formaPago,
         cuentaId: cuentaPagoId,
         prestamoId: prestamoParaPago.id,
         rubroId: rubroCreditos?.id,
         rubro: rubroCreditos?.codigo,
       }, { prestamo: cambios });
-      toast.success('Cuota registrada como pagada');
+      toast.success(`Cuota de ${etiqueta} registrada como pagada`);
       setPrestamoParaPago(null);
+      setPagoMes(null);
+      setPagoFecha(null);
       setCuentaPagoId('');
     } catch {
       toast.error('Error al registrar el pago');
@@ -623,6 +664,8 @@ export function PrestamosPage() {
                                     (c) => c.activa && c.moneda === prestamo.moneda
                                   );
                                   setCuentaPagoId(cuentasCompatibles[0]?.id || '');
+                                  setPagoMes(null);
+                                  setPagoFecha(null);
                                   setPrestamoParaPago(prestamo);
                                 }
                               }}
@@ -684,6 +727,8 @@ export function PrestamosPage() {
                                 (c) => c.activa && c.moneda === prestamo.moneda
                               );
                               setCuentaPagoId(cuentasCompatibles[0]?.id || '');
+                              setPagoMes(null);
+                              setPagoFecha(null);
                               setPrestamoParaPago(prestamo);
                             }
                           }}
@@ -784,7 +829,9 @@ export function PrestamosPage() {
             <div className="bg-mist/50 rounded-lg p-3 space-y-1">
               <p className="text-sm font-semibold text-ink">{prestamoParaPago.concepto}</p>
               <p className="text-xs text-slate2">
-                Cuota {cuotasPagasVisibles(prestamoParaPago) + 1} de {prestamoParaPago.cuotasTotales ?? '?'}
+                {pagoMes
+                  ? `${etiquetaMes(pagoMes)}${pagoFecha ? ` — vence el ${formatearFecha(pagoFecha)}` : ''}`
+                  : `Cuota ${cuotasPagasVisibles(prestamoParaPago) + 1} de ${prestamoParaPago.cuotasTotales ?? '?'}`}
                 {prestamoParaPago.importeCuota
                   ? ` — ${formatearMoneda(prestamoParaPago.importeCuota, prestamoParaPago.moneda as Moneda)}`
                   : ''}
@@ -811,7 +858,7 @@ export function PrestamosPage() {
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => { setPrestamoParaPago(null); setCuentaPagoId(''); }}
+                onClick={() => { setPrestamoParaPago(null); setPagoMes(null); setPagoFecha(null); setCuentaPagoId(''); }}
                 disabled={procesandoPago}
               >
                 Cancelar
